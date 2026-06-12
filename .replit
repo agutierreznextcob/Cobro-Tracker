@@ -33,3 +33,8 @@ externalPort = 3000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+WEBHOOK_SECRET = "e55976eab6a0041aaa3b76d44f4ab8f71a69d02f7a71a1af49e271c05af274e3"

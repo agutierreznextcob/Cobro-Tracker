@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import { Router } from "express";
 import { db, cobrosTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -12,7 +13,38 @@ const EVENTO_A_ESTADO: Record<string, "pagado" | "fallido" | "cancelado" | "pend
   "pago.pendiente": "pendiente",
 };
 
+function verifySignature(rawBody: Buffer, signatureHeader: string, secret: string): boolean {
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const expectedBuf = Buffer.from(`sha256=${expected}`, "utf8");
+  const receivedBuf = Buffer.from(signatureHeader, "utf8");
+  if (expectedBuf.length !== receivedBuf.length) return false;
+  return timingSafeEqual(expectedBuf, receivedBuf);
+}
+
 webhooksRouter.post("/webhooks/cobro", async (req, res) => {
+  const secret = process.env.WEBHOOK_SECRET;
+  const signatureHeader = req.headers["x-webhook-signature"];
+
+  if (secret) {
+    if (!signatureHeader || typeof signatureHeader !== "string") {
+      req.log.warn("Webhook rejected: missing X-Webhook-Signature header");
+      res.status(401).json({ error: "Falta la firma del webhook (X-Webhook-Signature)" });
+      return;
+    }
+
+    if (!req.rawBody) {
+      req.log.error("rawBody not available for signature verification");
+      res.status(500).json({ error: "Error interno del servidor" });
+      return;
+    }
+
+    if (!verifySignature(req.rawBody, signatureHeader, secret)) {
+      req.log.warn({ signatureHeader }, "Webhook rejected: invalid signature");
+      res.status(401).json({ error: "Firma inválida" });
+      return;
+    }
+  }
+
   const parsed = ReceiveCobroWebhookBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -21,7 +53,7 @@ webhooksRouter.post("/webhooks/cobro", async (req, res) => {
 
   const { evento, cobroId, referencia } = parsed.data;
 
-  req.log.info({ evento, cobroId }, "Webhook received");
+  req.log.info({ evento, cobroId }, "Webhook received and verified");
 
   const nuevoEstado = EVENTO_A_ESTADO[evento];
 
