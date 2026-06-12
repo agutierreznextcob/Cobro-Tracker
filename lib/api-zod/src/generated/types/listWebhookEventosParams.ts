@@ -5,7 +5,17 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+import type { ListWebhookEventosResultado } from './listWebhookEventosResultado';
 
 export type ListWebhookEventosParams = {
 limit?: number;
+offset?: number;
+/**
+ * Filter by outcome
+ */
+resultado?: ListWebhookEventosResultado;
+/**
+ * Filter by event type (exact match)
+ */
+evento?: string;
 };

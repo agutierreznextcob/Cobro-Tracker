@@ -189,16 +189,33 @@ paths:
           required: false
           schema:
             type: integer
-            default: 50
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: resultado
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [exitoso, fallido]
+          description: Filter by outcome
+        - name: evento
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by event type (exact match)
       responses:
         "200":
-          description: List of webhook events
+          description: Paginated list of webhook events with total count
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WebhookEvento"
+                $ref: "#/components/schemas/WebhookEventosPage"
 
 components:
   schemas:
@@ -308,6 +325,27 @@ components:
           type: boolean
         cobroActualizado:
           type: ["boolean", "null"]
+
+    WebhookEventosPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEvento"
+        total:
+          type: integer
+          description: Total number of events matching the filters
+        limit:
+          type: integer
+        offset:
+          type: integer
+        eventosUnicos:
+          type: array
+          items:
+            type: string
+          description: Distinct event types present in the full dataset
 
     WebhookEvento:
       type: object

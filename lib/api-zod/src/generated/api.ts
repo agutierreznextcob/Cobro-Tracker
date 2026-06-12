@@ -135,13 +135,18 @@ export const ReceiveCobroWebhookResponse = zod.object({
  * Returns all received webhook events ordered by date desc
  * @summary List webhook audit log
  */
-export const listWebhookEventosQueryLimitDefault = 50;
+export const listWebhookEventosQueryLimitDefault = 20;
+export const listWebhookEventosQueryOffsetDefault = 0;
 
 export const ListWebhookEventosQueryParams = zod.object({
-  "limit": zod.coerce.number().default(listWebhookEventosQueryLimitDefault)
+  "limit": zod.coerce.number().default(listWebhookEventosQueryLimitDefault),
+  "offset": zod.coerce.number().default(listWebhookEventosQueryOffsetDefault),
+  "resultado": zod.enum(['exitoso', 'fallido']).optional().describe('Filter by outcome'),
+  "evento": zod.coerce.string().optional().describe('Filter by event type (exact match)')
 })
 
-export const ListWebhookEventosResponseItem = zod.object({
+export const ListWebhookEventosResponse = zod.object({
+  "items": zod.array(zod.object({
   "id": zod.number(),
   "evento": zod.string(),
   "cobroId": zod.number().nullish(),
@@ -150,7 +155,11 @@ export const ListWebhookEventosResponseItem = zod.object({
   "exitoso": zod.boolean(),
   "detalle": zod.string().nullish(),
   "creadoEn": zod.coerce.date()
+})),
+  "total": zod.number().describe('Total number of events matching the filters'),
+  "limit": zod.number(),
+  "offset": zod.number(),
+  "eventosUnicos": zod.array(zod.string()).optional().describe('Distinct event types present in the full dataset')
 })
-export const ListWebhookEventosResponse = zod.array(ListWebhookEventosResponseItem)
 
 

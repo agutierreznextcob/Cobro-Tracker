@@ -115,11 +115,38 @@ export interface WebhookEvento {
   creadoEn: string;
 }
 
+export interface WebhookEventosPage {
+  items: WebhookEvento[];
+  /** Total number of events matching the filters */
+  total: number;
+  limit: number;
+  offset: number;
+  /** Distinct event types present in the full dataset */
+  eventosUnicos?: string[];
+}
+
 export interface ErrorResponse {
   error: string;
 }
 
 export type ListWebhookEventosParams = {
 limit?: number;
+offset?: number;
+/**
+ * Filter by outcome
+ */
+resultado?: ListWebhookEventosResultado;
+/**
+ * Filter by event type (exact match)
+ */
+evento?: string;
 };
+
+export type ListWebhookEventosResultado = typeof ListWebhookEventosResultado[keyof typeof ListWebhookEventosResultado];
+
+
+export const ListWebhookEventosResultado = {
+  exitoso: 'exitoso',
+  fallido: 'fallido',
+} as const;
 

@@ -27,7 +27,7 @@ import type {
   ErrorResponse,
   HealthStatus,
   ListWebhookEventosParams,
-  WebhookEvento,
+  WebhookEventosPage,
   WebhookPayload,
   WebhookResponse
 } from './api.schemas';
@@ -589,9 +589,9 @@ export const getListWebhookEventosUrl = (params?: ListWebhookEventosParams,) => 
  * Returns all received webhook events ordered by date desc
  * @summary List webhook audit log
  */
-export const listWebhookEventos = async (params?: ListWebhookEventosParams, options?: RequestInit): Promise<WebhookEvento[]> => {
+export const listWebhookEventos = async (params?: ListWebhookEventosParams, options?: RequestInit): Promise<WebhookEventosPage> => {
 
-  return customFetch<WebhookEvento[]>(getListWebhookEventosUrl(params),
+  return customFetch<WebhookEventosPage>(getListWebhookEventosUrl(params),
   {
     ...options,
     method: 'GET'

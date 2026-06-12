@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { Router } from "express";
 import { db, cobrosTable, webhookEventosTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { ReceiveCobroWebhookBody } from "@workspace/api-zod";
 
 const webhooksRouter = Router();
@@ -132,20 +132,47 @@ webhooksRouter.post("/webhooks/cobro", async (req, res) => {
 });
 
 webhooksRouter.get("/webhooks/eventos", async (req, res) => {
-  const limit = Math.min(Number(req.query.limit) || 50, 200);
-  try {
-    const eventos = await db
-      .select()
-      .from(webhookEventosTable)
-      .orderBy(desc(webhookEventosTable.creadoEn))
-      .limit(limit);
+  const limit = Math.min(Number(req.query.limit) || 20, 200);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const resultado = req.query.resultado as "exitoso" | "fallido" | undefined;
+  const evento = req.query.evento as string | undefined;
 
-    res.json(
-      eventos.map((e) => ({
+  try {
+    const conditions = [];
+    if (resultado === "exitoso") conditions.push(eq(webhookEventosTable.exitoso, true));
+    else if (resultado === "fallido") conditions.push(eq(webhookEventosTable.exitoso, false));
+    if (evento) conditions.push(eq(webhookEventosTable.evento, evento));
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [eventosRows, countRows, eventosUnicosRows] = await Promise.all([
+      db
+        .select()
+        .from(webhookEventosTable)
+        .where(where)
+        .orderBy(desc(webhookEventosTable.creadoEn))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(webhookEventosTable)
+        .where(where),
+      db
+        .selectDistinct({ evento: webhookEventosTable.evento })
+        .from(webhookEventosTable)
+        .orderBy(webhookEventosTable.evento),
+    ]);
+
+    res.json({
+      items: eventosRows.map((e) => ({
         ...e,
         creadoEn: e.creadoEn.toISOString(),
       })),
-    );
+      total: countRows[0]?.count ?? 0,
+      limit,
+      offset,
+      eventosUnicos: eventosUnicosRows.map((r) => r.evento),
+    });
   } catch (err) {
     req.log.error({ err }, "Error listing webhook eventos");
     res.status(500).json({ error: "Error interno del servidor" });
