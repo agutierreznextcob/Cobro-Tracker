@@ -1,13 +1,14 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { CreditCard, Home, Plus, Activity } from "lucide-react";
+import { Home, Plus, Activity, Webhook } from "lucide-react";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: Home },
-    { href: "/cobros/nuevo", label: "New Cobro", icon: Plus },
+    { href: "/cobros/nuevo", label: "Nuevo cobro", icon: Plus },
+    { href: "/webhooks/log", label: "Log webhooks", icon: Webhook },
   ];
 
   return (

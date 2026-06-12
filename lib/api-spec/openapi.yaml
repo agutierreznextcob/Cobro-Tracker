@@ -143,7 +143,14 @@ paths:
       operationId: receiveCobroWebhook
       tags: [webhooks]
       summary: Receive a cobro webhook
-      description: Endpoint to receive external payment provider webhook events for cobros
+      description: Endpoint to receive external payment provider webhook events for cobros. Requires X-Webhook-Signature header (HMAC-SHA256).
+      parameters:
+        - name: X-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+          description: "HMAC-SHA256 signature of the raw request body: sha256=<hex>"
       requestBody:
         required: true
         content:
@@ -163,6 +170,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or invalid signature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /webhooks/eventos:
+    get:
+      operationId: listWebhookEventos
+      tags: [webhooks]
+      summary: List webhook audit log
+      description: Returns all received webhook events ordered by date desc
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of webhook events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WebhookEvento"
 
 components:
   schemas:
@@ -272,6 +308,29 @@ components:
           type: boolean
         cobroActualizado:
           type: ["boolean", "null"]
+
+    WebhookEvento:
+      type: object
+      required: [id, evento, resultado, exitoso, creadoEn]
+      properties:
+        id:
+          type: integer
+        evento:
+          type: string
+        cobroId:
+          type: ["integer", "null"]
+        ipOrigen:
+          type: ["string", "null"]
+        resultado:
+          type: string
+          enum: [exitoso, fallido]
+        exitoso:
+          type: boolean
+        detalle:
+          type: ["string", "null"]
+        creadoEn:
+          type: string
+          format: date-time
 
     ErrorResponse:
       type: object

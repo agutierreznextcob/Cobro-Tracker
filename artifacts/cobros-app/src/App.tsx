@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import NewCobro from "@/pages/new-cobro";
 import CobroDetail from "@/pages/cobro-detail";
+import WebhookLog from "@/pages/webhook-log";
 import { Layout } from "@/components/layout";
 
 const queryClient = new QueryClient();
@@ -17,6 +18,7 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/cobros/nuevo" component={NewCobro} />
         <Route path="/cobros/:id" component={CobroDetail} />
+        <Route path="/webhooks/log" component={WebhookLog} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

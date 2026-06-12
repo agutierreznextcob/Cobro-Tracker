@@ -93,7 +93,33 @@ export interface WebhookResponse {
   cobroActualizado?: boolean | null;
 }
 
+export type WebhookEventoResultado = typeof WebhookEventoResultado[keyof typeof WebhookEventoResultado];
+
+
+export const WebhookEventoResultado = {
+  exitoso: 'exitoso',
+  fallido: 'fallido',
+} as const;
+
+export interface WebhookEvento {
+  id: number;
+  evento: string;
+  /** @nullable */
+  cobroId?: number | null;
+  /** @nullable */
+  ipOrigen?: string | null;
+  resultado: WebhookEventoResultado;
+  exitoso: boolean;
+  /** @nullable */
+  detalle?: string | null;
+  creadoEn: string;
+}
+
 export interface ErrorResponse {
   error: string;
 }
+
+export type ListWebhookEventosParams = {
+limit?: number;
+};
 

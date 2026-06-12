@@ -109,9 +109,13 @@ export const GetCobrosSummaryResponse = zod.object({
 
 
 /**
- * Endpoint to receive external payment provider webhook events for cobros
+ * Endpoint to receive external payment provider webhook events for cobros. Requires X-Webhook-Signature header (HMAC-SHA256).
  * @summary Receive a cobro webhook
  */
+export const ReceiveCobroWebhookHeader = zod.object({
+  "X-Webhook-Signature": zod.string().describe('HMAC-SHA256 signature of the raw request body: sha256=<hex>')
+})
+
 export const ReceiveCobroWebhookBody = zod.object({
   "evento": zod.string().describe('Event type (e.g. pago.completado, pago.fallido)'),
   "cobroId": zod.number().describe('ID of the cobro this event refers to'),
@@ -125,5 +129,28 @@ export const ReceiveCobroWebhookResponse = zod.object({
   "recibido": zod.boolean(),
   "cobroActualizado": zod.boolean().nullish()
 })
+
+
+/**
+ * Returns all received webhook events ordered by date desc
+ * @summary List webhook audit log
+ */
+export const listWebhookEventosQueryLimitDefault = 50;
+
+export const ListWebhookEventosQueryParams = zod.object({
+  "limit": zod.coerce.number().default(listWebhookEventosQueryLimitDefault)
+})
+
+export const ListWebhookEventosResponseItem = zod.object({
+  "id": zod.number(),
+  "evento": zod.string(),
+  "cobroId": zod.number().nullish(),
+  "ipOrigen": zod.string().nullish(),
+  "resultado": zod.enum(['exitoso', 'fallido']),
+  "exitoso": zod.boolean(),
+  "detalle": zod.string().nullish(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListWebhookEventosResponse = zod.array(ListWebhookEventosResponseItem)
 
 

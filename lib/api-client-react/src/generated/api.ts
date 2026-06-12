@@ -26,6 +26,8 @@ import type {
   CobrosSummary,
   ErrorResponse,
   HealthStatus,
+  ListWebhookEventosParams,
+  WebhookEvento,
   WebhookPayload,
   WebhookResponse
 } from './api.schemas';
@@ -505,7 +507,7 @@ export const getReceiveCobroWebhookUrl = () => {
 }
 
 /**
- * Endpoint to receive external payment provider webhook events for cobros
+ * Endpoint to receive external payment provider webhook events for cobros. Requires X-Webhook-Signature header (HMAC-SHA256).
  * @summary Receive a cobro webhook
  */
 export const receiveCobroWebhook = async (webhookPayload: WebhookPayload, options?: RequestInit): Promise<WebhookResponse> => {
@@ -567,4 +569,89 @@ export const useReceiveCobroWebhook = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getReceiveCobroWebhookMutationOptions(options));
     }
+
+export const getListWebhookEventosUrl = (params?: ListWebhookEventosParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/webhooks/eventos?${stringifiedParams}` : `/api/webhooks/eventos`
+}
+
+/**
+ * Returns all received webhook events ordered by date desc
+ * @summary List webhook audit log
+ */
+export const listWebhookEventos = async (params?: ListWebhookEventosParams, options?: RequestInit): Promise<WebhookEvento[]> => {
+
+  return customFetch<WebhookEvento[]>(getListWebhookEventosUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWebhookEventosQueryKey = (params?: ListWebhookEventosParams,) => {
+    return [
+    `/api/webhooks/eventos`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListWebhookEventosQueryOptions = <TData = Awaited<ReturnType<typeof listWebhookEventos>>, TError = ErrorType<unknown>>(params?: ListWebhookEventosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWebhookEventos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWebhookEventosQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWebhookEventos>>> = ({ signal }) => listWebhookEventos(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWebhookEventos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWebhookEventosQueryResult = NonNullable<Awaited<ReturnType<typeof listWebhookEventos>>>
+export type ListWebhookEventosQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List webhook audit log
+ */
+
+export function useListWebhookEventos<TData = Awaited<ReturnType<typeof listWebhookEventos>>, TError = ErrorType<unknown>>(
+ params?: ListWebhookEventosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWebhookEventos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWebhookEventosQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
