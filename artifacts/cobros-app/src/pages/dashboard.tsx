@@ -1,14 +1,43 @@
+import { useState, useMemo } from "react";
 import { useListCobros, useGetCobrosSummary } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { Link } from "wouter";
-import { ArrowRight, Wallet, CheckCircle2, Clock, XCircle, ArrowUpRight, User } from "lucide-react";
+import { ArrowRight, Wallet, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter } from "lucide-react";
 
 export default function Dashboard() {
   const { data: summary, isLoading: isLoadingSummary } = useGetCobrosSummary();
   const { data: cobros, isLoading: isLoadingCobros } = useListCobros();
+
+  const [filtroResponsable, setFiltroResponsable] = useState<string>("todos");
+  const [filtroEstado, setFiltroEstado] = useState<string>("todos");
+
+  const responsablesUnicos = useMemo(() => {
+    if (!cobros) return [];
+    const seen = new Map<string, string>();
+    for (const c of cobros) {
+      if (c.responsableId && c.responsableNombre && !seen.has(c.responsableId)) {
+        seen.set(c.responsableId, c.responsableNombre);
+      }
+    }
+    return Array.from(seen.entries()).map(([id, nombre]) => ({ id, nombre }));
+  }, [cobros]);
+
+  const cobrosFiltrados = useMemo(() => {
+    if (!cobros) return [];
+    return cobros.filter((c) => {
+      const matchResponsable =
+        filtroResponsable === "todos" ||
+        (filtroResponsable === "sin_asignar" ? !c.responsableId : c.responsableId === filtroResponsable);
+      const matchEstado = filtroEstado === "todos" || c.estado === filtroEstado;
+      return matchResponsable && matchEstado;
+    });
+  }, [cobros, filtroResponsable, filtroEstado]);
+
+  const hayFiltros = filtroResponsable !== "todos" || filtroEstado !== "todos";
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -38,16 +67,15 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground mt-1">{summary.total} cobros en total</p>
             </CardContent>
           </Card>
-          
+
           {summary.porEstado.map(stat => {
             const icons: Record<string, React.ElementType> = {
-              "pagado": CheckCircle2,
-              "pendiente": Clock,
-              "fallido": XCircle,
-              "cancelado": XCircle,
+              pagado: CheckCircle2,
+              pendiente: Clock,
+              fallido: XCircle,
+              cancelado: XCircle,
             };
             const Icon = icons[stat.estado] || ArrowRight;
-            
             return (
               <Card key={stat.estado} className="shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -65,13 +93,62 @@ export default function Dashboard() {
       ) : null}
 
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold tracking-tight">Cobros recientes</h2>
-          <Link href="/cobros/nuevo" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
-            Nuevo cobro <ArrowUpRight className="h-3 w-3" />
-          </Link>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold tracking-tight">Cobros recientes</h2>
+            {hayFiltros && (
+              <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                <Filter className="h-3 w-3" />
+                Filtrado
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
+              <SelectTrigger className="h-8 text-sm w-[170px] gap-1.5">
+                <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <SelectValue placeholder="Responsable" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los responsables</SelectItem>
+                {responsablesUnicos.map(({ id, nombre }) => (
+                  <SelectItem key={id} value={id}>{nombre}</SelectItem>
+                ))}
+                {cobros?.some(c => !c.responsableId) && (
+                  <SelectItem value="sin_asignar">Sin asignar</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+
+            <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+              <SelectTrigger className="h-8 text-sm w-[140px]">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los estados</SelectItem>
+                <SelectItem value="pendiente">Pendiente</SelectItem>
+                <SelectItem value="pagado">Pagado</SelectItem>
+                <SelectItem value="fallido">Fallido</SelectItem>
+                <SelectItem value="cancelado">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {hayFiltros && (
+              <button
+                onClick={() => { setFiltroResponsable("todos"); setFiltroEstado("todos"); }}
+                className="h-8 px-3 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              >
+                Limpiar
+              </button>
+            )}
+
+            <Link href="/cobros/nuevo" className="text-sm font-medium text-primary hover:underline flex items-center gap-1 ml-1">
+              Nuevo <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
         </div>
-        
+
         <Card className="shadow-sm">
           <Table>
             <TableHeader>
@@ -94,14 +171,16 @@ export default function Dashboard() {
                     <TableCell><div className="h-4 w-16 bg-muted rounded ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : cobros?.length === 0 ? (
+              ) : cobrosFiltrados.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                    Sin cobros registrados. Crea uno para comenzar.
+                    {hayFiltros
+                      ? "Ningún cobro coincide con los filtros seleccionados."
+                      : "Sin cobros registrados. Crea uno para comenzar."}
                   </TableCell>
                 </TableRow>
               ) : (
-                cobros?.slice(0, 10).map((cobro) => (
+                cobrosFiltrados.slice(0, 20).map((cobro) => (
                   <TableRow key={cobro.id} className="group hover:bg-muted/30 transition-colors">
                     <TableCell className="text-muted-foreground text-sm">
                       {formatShortDate(cobro.creadoEn)}
@@ -114,8 +193,10 @@ export default function Dashboard() {
                     <TableCell>
                       {cobro.responsableNombre ? (
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <User className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate max-w-[120px]">{cobro.responsableNombre}</span>
+                          <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-semibold shrink-0">
+                            {cobro.responsableNombre.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </div>
+                          <span className="truncate max-w-[110px]">{cobro.responsableNombre}</span>
                         </div>
                       ) : (
                         <span className="text-muted-foreground/40 text-sm">—</span>
@@ -132,6 +213,12 @@ export default function Dashboard() {
               )}
             </TableBody>
           </Table>
+
+          {cobrosFiltrados.length > 20 && (
+            <div className="px-4 py-3 border-t text-sm text-muted-foreground text-center">
+              Mostrando 20 de {cobrosFiltrados.length} cobros
+            </div>
+          )}
         </Card>
       </div>
     </div>
