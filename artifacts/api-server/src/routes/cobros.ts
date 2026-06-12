@@ -10,6 +10,14 @@ import {
 
 const cobrosRouter = Router();
 
+cobrosRouter.use((req, res, next) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "No autorizado" });
+    return;
+  }
+  next();
+});
+
 cobrosRouter.get("/cobros", async (req, res) => {
   try {
     const cobros = await db
