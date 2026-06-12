@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   RefreshCw, CheckCircle2, XCircle, Globe,
-  Calendar, Info, Webhook, ChevronLeft, ChevronRight, Filter, X
+  Calendar, Info, Webhook, ChevronLeft, ChevronRight, Filter, X, Download
 } from "lucide-react";
 import { formatDate } from "@/lib/format";
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const PAGE_SIZE = 20;
 
@@ -65,6 +67,17 @@ export default function WebhookLog() {
     queryClient.invalidateQueries({ queryKey: ["webhooks", "eventos"] });
   };
 
+  const handleExport = () => {
+    const qs = new URLSearchParams();
+    if (filterResultado) qs.set("resultado", filterResultado);
+    if (filterEvento) qs.set("evento", filterEvento);
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    const url = `${BASE}/api/webhooks/eventos/export${query}`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.click();
+  };
+
   const resetFilters = () => {
     setFilterResultado("");
     setFilterEvento("");
@@ -87,16 +100,33 @@ export default function WebhookLog() {
             Historial de eventos recibidos, con filtros por resultado y tipo.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isFetching}
-          className="gap-2 shrink-0"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={isLoading || total === 0}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Exportar CSV
+            {hasFilters && total > 0 && (
+              <span className="ml-1 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5 font-medium">
+                {total}
+              </span>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            Actualizar
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

@@ -179,4 +179,58 @@ webhooksRouter.get("/webhooks/eventos", async (req, res) => {
   }
 });
 
+webhooksRouter.get("/webhooks/eventos/export", async (req, res) => {
+  const resultado = req.query.resultado as "exitoso" | "fallido" | undefined;
+  const evento = req.query.evento as string | undefined;
+
+  try {
+    const conditions = [];
+    if (resultado === "exitoso") conditions.push(eq(webhookEventosTable.exitoso, true));
+    else if (resultado === "fallido") conditions.push(eq(webhookEventosTable.exitoso, false));
+    if (evento) conditions.push(eq(webhookEventosTable.evento, evento));
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const rows = await db
+      .select()
+      .from(webhookEventosTable)
+      .where(where)
+      .orderBy(desc(webhookEventosTable.creadoEn));
+
+    const escape = (v: string | number | boolean | null | undefined): string => {
+      if (v === null || v === undefined) return "";
+      const s = String(v);
+      if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const header = ["id", "evento", "cobro_id", "ip_origen", "resultado", "exitoso", "detalle", "creado_en"].join(",");
+    const lines = rows.map((r) =>
+      [
+        escape(r.id),
+        escape(r.evento),
+        escape(r.cobroId),
+        escape(r.ipOrigen),
+        escape(r.resultado),
+        escape(r.exitoso),
+        escape(r.detalle),
+        escape(r.creadoEn.toISOString()),
+      ].join(","),
+    );
+
+    const csv = [header, ...lines].join("\n");
+    const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const filename = `webhook-eventos-${now}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("\uFEFF" + csv); // UTF-8 BOM for Excel compatibility
+  } catch (err) {
+    req.log.error({ err }, "Error exporting webhook eventos");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
 export default webhooksRouter;
