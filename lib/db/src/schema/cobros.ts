@@ -15,6 +15,8 @@ export const cobrosTable = pgTable("cobros", {
   descripcion: text("descripcion").notNull(),
   estado: estadoCobroEnum("estado").notNull().default("pendiente"),
   referencia: text("referencia"),
+  responsableId: text("responsable_id"),
+  responsableNombre: text("responsable_nombre"),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),
 });

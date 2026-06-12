@@ -46,6 +46,10 @@ cobrosRouter.post("/cobros", async (req, res) => {
   }
 
   const { monto, descripcion, referencia } = parsed.data;
+  const user = req.isAuthenticated() ? req.user : null;
+  const responsableNombre = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null
+    : null;
 
   try {
     const [cobro] = await db
@@ -55,6 +59,8 @@ cobrosRouter.post("/cobros", async (req, res) => {
         descripcion,
         referencia: referencia ?? null,
         estado: "pendiente",
+        responsableId: user?.id ?? null,
+        responsableNombre,
       })
       .returning();
 

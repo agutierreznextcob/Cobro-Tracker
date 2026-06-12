@@ -362,6 +362,12 @@ components:
         referencia:
           type: ["string", "null"]
           description: Optional external reference (e.g. payment provider ID)
+        responsableId:
+          type: ["string", "null"]
+          description: User ID of the person who created this cobro
+        responsableNombre:
+          type: ["string", "null"]
+          description: Display name of the person who created this cobro
         creadoEn:
           type: string
           format: date-time

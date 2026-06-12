@@ -30,6 +30,16 @@ export interface Cobro {
      * @nullable
      */
   referencia?: string | null;
+  /**
+     * User ID of the person who created this cobro
+     * @nullable
+     */
+  responsableId?: string | null;
+  /**
+     * Display name of the person who created this cobro
+     * @nullable
+     */
+  responsableNombre?: string | null;
   creadoEn: string;
   actualizadoEn?: string;
 }

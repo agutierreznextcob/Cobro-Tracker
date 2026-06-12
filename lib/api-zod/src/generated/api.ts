@@ -106,6 +106,8 @@ export const ListCobrosResponseItem = zod.object({
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
+  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -140,6 +142,8 @@ export const GetCobroResponse = zod.object({
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
+  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -167,6 +171,8 @@ export const UpdateCobroResponse = zod.object({
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
+  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
