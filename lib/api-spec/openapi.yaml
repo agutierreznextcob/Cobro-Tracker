@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API specification for Cobros (charges) management
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: cobros
+    description: Cobros (charges) operations
+  - name: webhooks
+    description: Webhook endpoints
 paths:
   /healthz:
     get:
@@ -24,6 +28,142 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /cobros:
+    get:
+      operationId: listCobros
+      tags: [cobros]
+      summary: List all cobros
+      description: Returns all cobros ordered by creation date desc
+      responses:
+        "200":
+          description: List of cobros
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Cobro"
+
+    post:
+      operationId: createCobro
+      tags: [cobros]
+      summary: Create a new cobro
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CobroInput"
+      responses:
+        "201":
+          description: Created cobro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cobro"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/{id}:
+    get:
+      operationId: getCobro
+      tags: [cobros]
+      summary: Get a cobro by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cobro found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cobro"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateCobro
+      tags: [cobros]
+      summary: Update cobro status or fields
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CobroUpdate"
+      responses:
+        "200":
+          description: Updated cobro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cobro"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/stats/summary:
+    get:
+      operationId: getCobrosSummary
+      tags: [cobros]
+      summary: Get cobros summary statistics
+      description: Returns totals grouped by status and overall amount
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CobrosSummary"
+
+  /webhooks/cobro:
+    post:
+      operationId: receiveCobroWebhook
+      tags: [webhooks]
+      summary: Receive a cobro webhook
+      description: Endpoint to receive external payment provider webhook events for cobros
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "200":
+          description: Webhook received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+        "400":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +174,108 @@ components:
       required:
         - status
 
+    Cobro:
+      type: object
+      required: [id, monto, descripcion, estado, creadoEn]
+      properties:
+        id:
+          type: integer
+        monto:
+          type: number
+          description: Amount in currency units
+        descripcion:
+          type: string
+        estado:
+          type: string
+          enum: [pendiente, pagado, fallido, cancelado]
+        referencia:
+          type: ["string", "null"]
+          description: Optional external reference (e.g. payment provider ID)
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+
+    CobroInput:
+      type: object
+      required: [monto, descripcion]
+      properties:
+        monto:
+          type: number
+          minimum: 0.01
+        descripcion:
+          type: string
+          minLength: 1
+        referencia:
+          type: string
+
+    CobroUpdate:
+      type: object
+      properties:
+        estado:
+          type: string
+          enum: [pendiente, pagado, fallido, cancelado]
+        descripcion:
+          type: string
+          minLength: 1
+        referencia:
+          type: string
+
+    CobrosSummary:
+      type: object
+      required: [total, montoTotal, porEstado]
+      properties:
+        total:
+          type: integer
+        montoTotal:
+          type: number
+        porEstado:
+          type: array
+          items:
+            $ref: "#/components/schemas/EstadoCount"
+
+    EstadoCount:
+      type: object
+      required: [estado, cantidad, monto]
+      properties:
+        estado:
+          type: string
+        cantidad:
+          type: integer
+        monto:
+          type: number
+
+    WebhookPayload:
+      type: object
+      required: [evento, cobroId]
+      properties:
+        evento:
+          type: string
+          description: Event type (e.g. pago.completado, pago.fallido)
+        cobroId:
+          type: integer
+          description: ID of the cobro this event refers to
+        referencia:
+          type: string
+          description: External payment reference
+        datos:
+          type: object
+          description: Additional event data
+
+    WebhookResponse:
+      type: object
+      required: [recibido]
+      properties:
+        recibido:
+          type: boolean
+        cobroActualizado:
+          type: ["boolean", "null"]
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
