@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Activity, Webhook, LogOut } from "lucide-react";
+import { Home, Plus, Activity, Webhook, LogOut, Search } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 
 function UserBadge() {
@@ -49,6 +49,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const navItems = [
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/cobros/nuevo", label: "Nuevo cobro", icon: Plus },
+    { href: "/cobros/buscar", label: "Buscar", icon: Search },
     { href: "/webhooks/log", label: "Log webhooks", icon: Webhook },
   ];
 
