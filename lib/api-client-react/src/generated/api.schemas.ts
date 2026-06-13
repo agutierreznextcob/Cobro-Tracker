@@ -40,6 +40,21 @@ export interface Cobro {
      * @nullable
      */
   responsableNombre?: string | null;
+  /**
+     * Email of the payer for Flow payment link
+     * @nullable
+     */
+  emailPagador?: string | null;
+  /**
+     * Flow order ID returned after creating payment
+     * @nullable
+     */
+  flowOrdenId?: string | null;
+  /**
+     * Flow payment URL for the payer
+     * @nullable
+     */
+  flowLinkPago?: string | null;
   creadoEn: string;
   actualizadoEn?: string;
 }
@@ -50,6 +65,31 @@ export interface CobroInput {
   /** @minLength 1 */
   descripcion: string;
   referencia?: string;
+  emailPagador?: string;
+}
+
+export interface FlowCredentialsStatus {
+  configurado: boolean;
+}
+
+export interface FlowCredentialsInput {
+  /** @minLength 1 */
+  apiKey: string;
+  /** @minLength 1 */
+  secretKey: string;
+}
+
+export interface GenerarFlowLinkInput {
+  emailPagador: string;
+}
+
+export interface FlowLinkResponse {
+  linkPago: string;
+  flowOrdenId: string;
+}
+
+export interface OkResponse {
+  ok: boolean;
 }
 
 export type CobroUpdateEstado = typeof CobroUpdateEstado[keyof typeof CobroUpdateEstado];

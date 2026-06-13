@@ -12,4 +12,5 @@ export interface CobroInput {
   /** @minLength 1 */
   descripcion: string;
   referencia?: string;
+  emailPagador?: string;
 }

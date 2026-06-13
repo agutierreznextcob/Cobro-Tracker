@@ -53,6 +53,71 @@ function getClientIp(req: { headers: Record<string, string | string[] | undefine
   return req.socket.remoteAddress ?? null;
 }
 
+webhooksRouter.post("/webhooks/flow", async (req, res) => {
+  const token = req.body?.token as string | undefined;
+  const ip = getClientIp(req as Parameters<typeof getClientIp>[0]);
+
+  if (!token) {
+    req.log.warn("Flow webhook: missing token");
+    res.status(400).json({ error: "Falta token" });
+    return;
+  }
+
+  try {
+    const commerceOrder = req.body?.commerceOrder as string | undefined;
+    const status = Number(req.body?.status);
+
+    if (!commerceOrder) {
+      req.log.warn({ token }, "Flow webhook: missing commerceOrder");
+      res.json({ ok: true });
+      return;
+    }
+
+    const match = commerceOrder.match(/^cobro-(\d+)$/);
+    if (!match) {
+      req.log.warn({ commerceOrder }, "Flow webhook: unknown commerceOrder format");
+      res.json({ ok: true });
+      return;
+    }
+
+    const cobroId = Number(match[1]);
+    const nuevoEstado = status === 2 ? "pagado" : status === 3 ? "fallido" : status === 4 ? "cancelado" : null;
+
+    req.log.info({ cobroId, token, status, nuevoEstado }, "Flow payment webhook received");
+
+    if (nuevoEstado) {
+      const [cobro] = await db
+        .update(cobrosTable)
+        .set({ estado: nuevoEstado, actualizadoEn: new Date() })
+        .where(eq(cobrosTable.id, cobroId))
+        .returning();
+
+      await logEvento({
+        evento: `flow.pago.${nuevoEstado}`,
+        cobroId,
+        ipOrigen: ip,
+        exitoso: true,
+        detalle: `Flow status ${status} → ${nuevoEstado}. Token: ${token}`,
+      });
+
+      req.log.info({ cobroId, nuevoEstado }, "Cobro updated via Flow webhook");
+      res.json({ ok: !!cobro });
+    } else {
+      await logEvento({
+        evento: "flow.pago.desconocido",
+        cobroId,
+        ipOrigen: ip,
+        exitoso: true,
+        detalle: `Flow status desconocido: ${status}`,
+      });
+      res.json({ ok: true });
+    }
+  } catch (err) {
+    req.log.error({ err }, "Error processing Flow webhook");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
 webhooksRouter.post("/webhooks/cobro", async (req, res) => {
   const secret = process.env.WEBHOOK_SECRET;
   const signatureHeader = req.headers["x-webhook-signature"];

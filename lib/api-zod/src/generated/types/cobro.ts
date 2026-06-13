@@ -28,6 +28,21 @@ export interface Cobro {
      * @nullable
      */
   responsableNombre?: string | null;
+  /**
+     * Email of the payer for Flow payment link
+     * @nullable
+     */
+  emailPagador?: string | null;
+  /**
+     * Flow order ID returned after creating payment
+     * @nullable
+     */
+  flowOrdenId?: string | null;
+  /**
+     * Flow payment URL for the payer
+     * @nullable
+     */
+  flowLinkPago?: string | null;
   creadoEn: Date;
   actualizadoEn?: Date;
 }

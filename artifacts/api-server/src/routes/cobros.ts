@@ -7,6 +7,9 @@ import {
   GetCobroParams,
   UpdateCobroParams,
 } from "@workspace/api-zod";
+import { z } from "zod";
+import { getFlowCredentials } from "./profile";
+import { crearOrdenFlow } from "../lib/flow-api";
 
 const cobrosRouter = Router();
 
@@ -46,6 +49,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
   }
 
   const { monto, descripcion, referencia } = parsed.data;
+  const emailPagador = (parsed.data as Record<string, unknown>).emailPagador as string | undefined;
   const user = req.isAuthenticated() ? req.user : null;
   const responsableNombre = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null
@@ -61,6 +65,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
         estado: "pendiente",
         responsableId: user?.id ?? null,
         responsableNombre,
+        emailPagador: emailPagador ?? null,
       })
       .returning();
 
@@ -132,6 +137,78 @@ cobrosRouter.get("/cobros/:id", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error getting cobro");
     res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+const GenerarFlowLinkInput = z.object({
+  emailPagador: z.string().email("Email inválido"),
+});
+
+cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+
+  const bodyParsed = GenerarFlowLinkInput.safeParse(req.body);
+  if (!bodyParsed.success) {
+    res.status(400).json({ error: bodyParsed.error.message });
+    return;
+  }
+
+  const { emailPagador } = bodyParsed.data;
+  const userId = req.user!.id;
+
+  try {
+    const [cobro] = await db
+      .select()
+      .from(cobrosTable)
+      .where(eq(cobrosTable.id, paramsParsed.data.id));
+
+    if (!cobro) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+
+    if (cobro.flowLinkPago) {
+      res.json({ linkPago: cobro.flowLinkPago, flowOrdenId: cobro.flowOrdenId! });
+      return;
+    }
+
+    const creds = await getFlowCredentials(userId);
+    if (!creds) {
+      res.status(400).json({ error: "No tienes credenciales de Flow configuradas. Ve a tu perfil para configurarlas." });
+      return;
+    }
+
+    const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0] ?? "localhost"}`;
+    const result = await crearOrdenFlow(creds.apiKey, creds.secretKey, {
+      commerceOrder: `cobro-${cobro.id}`,
+      subject: cobro.descripcion.slice(0, 200),
+      currency: "CLP",
+      amount: Math.round(Number(cobro.monto)),
+      email: bodyParsed.data.emailPagador,
+      urlConfirmation: `${baseUrl}/api/webhooks/flow`,
+      urlReturn: `${baseUrl}/cobros/${cobro.id}`,
+    });
+
+    const [updated] = await db
+      .update(cobrosTable)
+      .set({
+        flowOrdenId: String(result.flowOrder),
+        flowLinkPago: result.url,
+        emailPagador: bodyParsed.data.emailPagador,
+        actualizadoEn: new Date(),
+      })
+      .where(eq(cobrosTable.id, cobro.id))
+      .returning();
+
+    req.log.info({ cobroId: cobro.id, flowOrder: result.flowOrder }, "Flow payment link created");
+    res.json({ linkPago: updated.flowLinkPago!, flowOrdenId: updated.flowOrdenId! });
+  } catch (err) {
+    req.log.error({ err }, "Error creating Flow payment link");
+    res.status(500).json({ error: `Error al crear orden en Flow: ${err instanceof Error ? err.message : String(err)}` });
   }
 });
 

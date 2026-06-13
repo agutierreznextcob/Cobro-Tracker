@@ -108,6 +108,9 @@ export const ListCobrosResponseItem = zod.object({
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
+  "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -125,7 +128,8 @@ export const createCobroBodyMontoMin = 0.01;
 export const CreateCobroBody = zod.object({
   "monto": zod.number().min(createCobroBodyMontoMin),
   "descripcion": zod.string().min(1),
-  "referencia": zod.string().optional()
+  "referencia": zod.string().optional(),
+  "emailPagador": zod.string().email().optional()
 })
 
 
@@ -144,6 +148,9 @@ export const GetCobroResponse = zod.object({
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
+  "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -173,6 +180,9 @@ export const UpdateCobroResponse = zod.object({
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
+  "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -190,6 +200,65 @@ export const GetCobrosSummaryResponse = zod.object({
   "cantidad": zod.number(),
   "monto": zod.number()
 }))
+})
+
+
+/**
+ * @summary Get Flow credentials status for current user
+ */
+export const GetFlowCredentialsResponse = zod.object({
+  "configurado": zod.boolean()
+})
+
+
+/**
+ * @summary Save or update Flow API credentials for current user
+ */
+
+
+
+
+export const SaveFlowCredentialsBody = zod.object({
+  "apiKey": zod.string().min(1),
+  "secretKey": zod.string().min(1)
+})
+
+export const SaveFlowCredentialsResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Delete Flow credentials for current user
+ */
+export const DeleteFlowCredentialsResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Generate a Flow payment link for a cobro
+ */
+export const GenerarFlowLinkParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GenerarFlowLinkBody = zod.object({
+  "emailPagador": zod.string().email()
+})
+
+export const GenerarFlowLinkResponse = zod.object({
+  "linkPago": zod.string(),
+  "flowOrdenId": zod.string()
+})
+
+
+/**
+ * Flow calls this endpoint when a payment is completed. No signature required (Flow uses token-based confirmation).
+ * @summary Receive payment confirmation from Flow
+ */
+export const ReceiveFlowWebhookResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 

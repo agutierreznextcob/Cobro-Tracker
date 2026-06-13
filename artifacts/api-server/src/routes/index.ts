@@ -3,6 +3,7 @@ import healthRouter from "./health";
 import authRouter from "./auth";
 import cobrosRouter from "./cobros";
 import webhooksRouter from "./webhooks";
+import { profileRouter } from "./profile";
 
 const router: IRouter = Router();
 
@@ -10,5 +11,6 @@ router.use(healthRouter);
 router.use(authRouter);
 router.use(cobrosRouter);
 router.use(webhooksRouter);
+router.use(profileRouter);
 
 export default router;

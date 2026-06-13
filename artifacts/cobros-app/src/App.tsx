@@ -8,6 +8,7 @@ import NewCobro from "@/pages/new-cobro";
 import CobroDetail from "@/pages/cobro-detail";
 import WebhookLog from "@/pages/webhook-log";
 import SearchPage from "@/pages/search";
+import ProfilePage from "@/pages/profile";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@workspace/replit-auth-web";
 
@@ -57,6 +58,7 @@ function Router() {
         <Route path="/cobros/buscar" component={SearchPage} />
         <Route path="/cobros/:id" component={CobroDetail} />
         <Route path="/webhooks/log" component={WebhookLog} />
+        <Route path="/perfil" component={ProfilePage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

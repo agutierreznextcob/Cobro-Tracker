@@ -1,23 +1,30 @@
-import { useGetCobro, getGetCobroQueryKey, useUpdateCobro, getListCobrosQueryKey, getGetCobrosSummaryQueryKey } from "@workspace/api-client-react";
+import { useState } from "react";
+import { useGetCobro, getGetCobroQueryKey, useUpdateCobro, useGenerarFlowLink, getListCobrosQueryKey, getGetCobrosSummaryQueryKey } from "@workspace/api-client-react";
 import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
-import { ArrowLeft, RefreshCw, Calendar, FileText, Hash, Wallet, User } from "lucide-react";
+import { ArrowLeft, RefreshCw, Calendar, FileText, Hash, Wallet, User, Link2, ExternalLink, Copy, Loader2, Mail } from "lucide-react";
 import { CobroUpdateEstado } from "@workspace/api-client-react";
 
 export default function CobroDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id || "0", 10);
-  
+
   const { data: cobro, isLoading } = useGetCobro(id, { query: { enabled: !!id, queryKey: getGetCobroQueryKey(id) } });
   const updateCobro = useUpdateCobro();
+  const generarFlowLink = useGenerarFlowLink();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const [emailPagador, setEmailPagador] = useState("");
+  const [showEmailInput, setShowEmailInput] = useState(false);
 
   const handleStatusChange = (newStatus: string) => {
     updateCobro.mutate({
@@ -34,6 +41,33 @@ export default function CobroDetail() {
         toast({ title: "Error al actualizar", description: "No se pudo cambiar el estado.", variant: "destructive" });
       }
     });
+  };
+
+  const handleGenerarLink = () => {
+    const email = emailPagador.trim() || cobro?.emailPagador || "";
+    if (!email) {
+      setShowEmailInput(true);
+      return;
+    }
+    generarFlowLink.mutate({ id, data: { emailPagador: email } }, {
+      onSuccess: () => {
+        toast({ title: "Link de pago generado", description: "El link de Flow fue creado exitosamente." });
+        queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+        setShowEmailInput(false);
+        setEmailPagador("");
+      },
+      onError: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
+        toast({ title: "Error al generar link Flow", description: msg, variant: "destructive" });
+      }
+    });
+  };
+
+  const handleCopyLink = async () => {
+    if (cobro?.flowLinkPago) {
+      await navigator.clipboard.writeText(cobro.flowLinkPago);
+      toast({ title: "Link copiado", description: "El link de pago fue copiado al portapapeles." });
+    }
   };
 
   if (isLoading) {
@@ -74,12 +108,12 @@ export default function CobroDetail() {
             Creado el {formatDate(cobro.creadoEn)}
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <div className="bg-card border rounded-md px-3 py-1.5 shadow-sm flex items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground">Estado:</span>
-            <Select 
-              value={cobro.estado} 
+            <Select
+              value={cobro.estado}
               onValueChange={handleStatusChange}
               disabled={updateCobro.isPending}
             >
@@ -111,7 +145,7 @@ export default function CobroDetail() {
               <p className="text-sm font-medium text-muted-foreground mb-1">Descripción</p>
               <p className="text-base">{cobro.descripcion}</p>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/50">
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
@@ -140,25 +174,115 @@ export default function CobroDetail() {
                 </div>
               </div>
             )}
+
+            {cobro.emailPagador && (
+              <div className="pt-4 border-t border-border/50">
+                <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5" /> Email del pagador
+                </p>
+                <p className="text-sm font-mono">{cobro.emailPagador}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-primary/20 bg-primary/5 h-fit">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-primary" />
-              Monto
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold font-mono text-primary tracking-tight">
-              {formatCurrency(cobro.monto)}
-            </div>
-            <div className="mt-6 pt-6 border-t border-primary/10">
-              <StatusBadge status={cobro.estado} />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card className="shadow-sm border-primary/20 bg-primary/5">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-primary" />
+                Monto
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold font-mono text-primary tracking-tight">
+                {formatCurrency(cobro.monto)}
+              </div>
+              <div className="mt-6 pt-6 border-t border-primary/10">
+                <StatusBadge status={cobro.estado} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-border/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-primary" />
+                Pago con Flow
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {cobro.flowLinkPago ? (
+                <>
+                  <div className="text-xs text-muted-foreground">
+                    Orden Flow: <span className="font-mono">{cobro.flowOrdenId}</span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <a
+                      href={cobro.flowLinkPago}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground h-9 px-3 text-sm font-medium shadow hover:bg-primary/90 transition-colors"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Ir al pago
+                    </a>
+                    <Button variant="outline" size="sm" onClick={handleCopyLink} className="w-full">
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copiar link
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  {showEmailInput ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="emailPagador" className="text-xs">Email del pagador</Label>
+                      <Input
+                        id="emailPagador"
+                        type="email"
+                        placeholder="pagador@ejemplo.com"
+                        value={emailPagador}
+                        onChange={(e) => setEmailPagador(e.target.value)}
+                        className="h-8 text-sm"
+                        onKeyDown={(e) => e.key === "Enter" && handleGenerarLink()}
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleGenerarLink} disabled={generarFlowLink.isPending} className="flex-1">
+                          {generarFlowLink.isPending ? (
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Generando...</>
+                          ) : "Generar"}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => { setShowEmailInput(false); setEmailPagador(""); }}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Genera un link de pago real en Flow para que el pagador pueda pagar online.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleGenerarLink}
+                        disabled={generarFlowLink.isPending}
+                      >
+                        {generarFlowLink.isPending ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Generando...</>
+                        ) : (
+                          <><Link2 className="h-3.5 w-3.5 mr-1.5" />Generar link Flow</>
+                        )}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

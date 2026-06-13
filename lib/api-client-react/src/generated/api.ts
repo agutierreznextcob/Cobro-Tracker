@@ -28,12 +28,17 @@ import type {
   CobrosSummary,
   ErrorEnvelope,
   ErrorResponse,
+  FlowCredentialsInput,
+  FlowCredentialsStatus,
+  FlowLinkResponse,
+  GenerarFlowLinkInput,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
   ListWebhookEventosParams,
   LogoutSuccess,
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
+  OkResponse,
   WebhookEventosPage,
   WebhookPayload,
   WebhookResponse
@@ -967,6 +972,367 @@ export function useGetCobrosSummary<TData = Awaited<ReturnType<typeof getCobrosS
 
 
 
+
+export const getGetFlowCredentialsUrl = () => {
+
+
+
+
+  return `/api/profile/flow-credentials`
+}
+
+/**
+ * @summary Get Flow credentials status for current user
+ */
+export const getFlowCredentials = async ( options?: RequestInit): Promise<FlowCredentialsStatus> => {
+
+  return customFetch<FlowCredentialsStatus>(getGetFlowCredentialsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFlowCredentialsQueryKey = () => {
+    return [
+    `/api/profile/flow-credentials`
+    ] as const;
+    }
+
+
+export const getGetFlowCredentialsQueryOptions = <TData = Awaited<ReturnType<typeof getFlowCredentials>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFlowCredentials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFlowCredentialsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlowCredentials>>> = ({ signal }) => getFlowCredentials({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlowCredentials>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFlowCredentialsQueryResult = NonNullable<Awaited<ReturnType<typeof getFlowCredentials>>>
+export type GetFlowCredentialsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get Flow credentials status for current user
+ */
+
+export function useGetFlowCredentials<TData = Awaited<ReturnType<typeof getFlowCredentials>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFlowCredentials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFlowCredentialsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveFlowCredentialsUrl = () => {
+
+
+
+
+  return `/api/profile/flow-credentials`
+}
+
+/**
+ * @summary Save or update Flow API credentials for current user
+ */
+export const saveFlowCredentials = async (flowCredentialsInput: FlowCredentialsInput, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getSaveFlowCredentialsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      flowCredentialsInput,)
+  }
+);}
+
+
+
+
+export const getSaveFlowCredentialsMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlowCredentials>>, TError,{data: BodyType<FlowCredentialsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveFlowCredentials>>, TError,{data: BodyType<FlowCredentialsInput>}, TContext> => {
+
+const mutationKey = ['saveFlowCredentials'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveFlowCredentials>>, {data: BodyType<FlowCredentialsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveFlowCredentials(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveFlowCredentialsMutationResult = NonNullable<Awaited<ReturnType<typeof saveFlowCredentials>>>
+    export type SaveFlowCredentialsMutationBody = BodyType<FlowCredentialsInput>
+    export type SaveFlowCredentialsMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Save or update Flow API credentials for current user
+ */
+export const useSaveFlowCredentials = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlowCredentials>>, TError,{data: BodyType<FlowCredentialsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveFlowCredentials>>,
+        TError,
+        {data: BodyType<FlowCredentialsInput>},
+        TContext
+      > => {
+      return useMutation(getSaveFlowCredentialsMutationOptions(options));
+    }
+
+export const getDeleteFlowCredentialsUrl = () => {
+
+
+
+
+  return `/api/profile/flow-credentials`
+}
+
+/**
+ * @summary Delete Flow credentials for current user
+ */
+export const deleteFlowCredentials = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getDeleteFlowCredentialsUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteFlowCredentialsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFlowCredentials>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteFlowCredentials>>, TError,void, TContext> => {
+
+const mutationKey = ['deleteFlowCredentials'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteFlowCredentials>>, void> = () => {
+
+
+          return  deleteFlowCredentials(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteFlowCredentialsMutationResult = NonNullable<Awaited<ReturnType<typeof deleteFlowCredentials>>>
+
+    export type DeleteFlowCredentialsMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete Flow credentials for current user
+ */
+export const useDeleteFlowCredentials = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFlowCredentials>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteFlowCredentials>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeleteFlowCredentialsMutationOptions(options));
+    }
+
+export const getGenerarFlowLinkUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/flow-link`
+}
+
+/**
+ * @summary Generate a Flow payment link for a cobro
+ */
+export const generarFlowLink = async (id: number,
+    generarFlowLinkInput: GenerarFlowLinkInput, options?: RequestInit): Promise<FlowLinkResponse> => {
+
+  return customFetch<FlowLinkResponse>(getGenerarFlowLinkUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generarFlowLinkInput,)
+  }
+);}
+
+
+
+
+export const getGenerarFlowLinkMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generarFlowLink>>, TError,{id: number;data: BodyType<GenerarFlowLinkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generarFlowLink>>, TError,{id: number;data: BodyType<GenerarFlowLinkInput>}, TContext> => {
+
+const mutationKey = ['generarFlowLink'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generarFlowLink>>, {id: number;data: BodyType<GenerarFlowLinkInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  generarFlowLink(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerarFlowLinkMutationResult = NonNullable<Awaited<ReturnType<typeof generarFlowLink>>>
+    export type GenerarFlowLinkMutationBody = BodyType<GenerarFlowLinkInput>
+    export type GenerarFlowLinkMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Generate a Flow payment link for a cobro
+ */
+export const useGenerarFlowLink = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generarFlowLink>>, TError,{id: number;data: BodyType<GenerarFlowLinkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generarFlowLink>>,
+        TError,
+        {id: number;data: BodyType<GenerarFlowLinkInput>},
+        TContext
+      > => {
+      return useMutation(getGenerarFlowLinkMutationOptions(options));
+    }
+
+export const getReceiveFlowWebhookUrl = () => {
+
+
+
+
+  return `/api/webhooks/flow`
+}
+
+/**
+ * Flow calls this endpoint when a payment is completed. No signature required (Flow uses token-based confirmation).
+ * @summary Receive payment confirmation from Flow
+ */
+export const receiveFlowWebhook = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getReceiveFlowWebhookUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReceiveFlowWebhookMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveFlowWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof receiveFlowWebhook>>, TError,void, TContext> => {
+
+const mutationKey = ['receiveFlowWebhook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof receiveFlowWebhook>>, void> = () => {
+
+
+          return  receiveFlowWebhook(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReceiveFlowWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof receiveFlowWebhook>>>
+
+    export type ReceiveFlowWebhookMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Receive payment confirmation from Flow
+ */
+export const useReceiveFlowWebhook = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveFlowWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof receiveFlowWebhook>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReceiveFlowWebhookMutationOptions(options));
+    }
 
 export const getReceiveCobroWebhookUrl = () => {
 

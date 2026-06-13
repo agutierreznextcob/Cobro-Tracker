@@ -1,0 +1,1 @@
+- [Flow integration design](flow-integration.md) — credenciales por usuario encriptadas con AES-256-GCM; zod importa como "zod" (no "zod/v4") en api-server

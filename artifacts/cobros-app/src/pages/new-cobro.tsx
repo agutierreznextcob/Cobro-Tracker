@@ -14,9 +14,10 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 
 const formSchema = z.object({
-  monto: z.coerce.number().min(0.01, "Amount must be greater than 0"),
-  descripcion: z.string().min(1, "Description is required").max(255),
+  monto: z.coerce.number().min(0.01, "El monto debe ser mayor a 0"),
+  descripcion: z.string().min(1, "La descripción es obligatoria").max(255),
   referencia: z.string().optional(),
+  emailPagador: z.string().email("Email inválido").optional().or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -33,15 +34,22 @@ export default function NewCobro() {
       monto: 0,
       descripcion: "",
       referencia: "",
+      emailPagador: "",
     },
   });
 
   const onSubmit = (values: FormValues) => {
-    createCobro.mutate({ data: values }, {
+    const payload = {
+      monto: values.monto,
+      descripcion: values.descripcion,
+      referencia: values.referencia || undefined,
+      emailPagador: values.emailPagador || undefined,
+    };
+    createCobro.mutate({ data: payload }, {
       onSuccess: (data) => {
         toast({
-          title: "Success",
-          description: "Cobro created successfully.",
+          title: "Cobro creado",
+          description: "El cobro fue creado exitosamente.",
         });
         queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
@@ -50,7 +58,7 @@ export default function NewCobro() {
       onError: () => {
         toast({
           title: "Error",
-          description: "Failed to create cobro.",
+          description: "No se pudo crear el cobro.",
           variant: "destructive",
         });
       }
@@ -66,8 +74,8 @@ export default function NewCobro() {
       
       <Card className="shadow-sm border-border/50">
         <CardHeader>
-          <CardTitle className="text-2xl">Create New Cobro</CardTitle>
-          <CardDescription>Issue a new charge to be tracked and collected.</CardDescription>
+          <CardTitle className="text-2xl">Nuevo cobro</CardTitle>
+          <CardDescription>Crea un nuevo cargo para seguimiento y cobro.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -78,16 +86,16 @@ export default function NewCobro() {
                   name="monto"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Amount (USD)</FormLabel>
+                      <FormLabel>Monto</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            placeholder="0.00" 
-                            className="pl-7 font-mono" 
-                            {...field} 
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            className="pl-7 font-mono"
+                            {...field}
                           />
                         </div>
                       </FormControl>
@@ -101,11 +109,11 @@ export default function NewCobro() {
                   name="referencia"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Reference (Optional)</FormLabel>
+                      <FormLabel>Referencia (opcional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="Invoice #, PO Number..." className="font-mono text-sm" {...field} />
+                        <Input placeholder="Factura #, N° de orden..." className="font-mono text-sm" {...field} />
                       </FormControl>
-                      <FormDescription>External identifier for reconciliation.</FormDescription>
+                      <FormDescription>Identificador externo para conciliación.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -117,14 +125,36 @@ export default function NewCobro() {
                 name="descripcion"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Descripción</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="What is this charge for?" 
+                      <Textarea
+                        placeholder="¿Por qué es este cobro?"
                         className="resize-none h-24"
-                        {...field} 
+                        {...field}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="emailPagador"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email del pagador (opcional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="pagador@ejemplo.com"
+                        className="text-sm"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Se usará al generar el link de pago con Flow.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -133,9 +163,9 @@ export default function NewCobro() {
               <div className="flex justify-end pt-4 border-t border-border/50">
                 <Button type="submit" disabled={createCobro.isPending} className="min-w-32">
                   {createCobro.isPending ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creando...</>
                   ) : (
-                    "Create Charge"
+                    "Crear cobro"
                   )}
                 </Button>
               </div>
