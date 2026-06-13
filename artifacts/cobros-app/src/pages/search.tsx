@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useListCobros } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,7 +7,16 @@ import { Input } from "@/components/ui/input";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { Link } from "wouter";
-import { Search, X, User, SlidersHorizontal } from "lucide-react";
+import { Search, X, User, SlidersHorizontal, Download } from "lucide-react";
+
+function escapeCSV(v: string | number | boolean | null | undefined): string {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
 
 export default function SearchPage() {
   const { data: cobros, isLoading } = useListCobros();
@@ -54,13 +63,51 @@ export default function SearchPage() {
     inputRef.current?.focus();
   }
 
+  const exportarCSV = useCallback(() => {
+    const header = ["id", "descripcion", "referencia", "estado", "monto", "responsable", "creado_en"].join(",");
+    const lines = resultados.map((c) =>
+      [
+        escapeCSV(c.id),
+        escapeCSV(c.descripcion),
+        escapeCSV(c.referencia),
+        escapeCSV(c.estado),
+        escapeCSV(c.monto),
+        escapeCSV(c.responsableNombre),
+        escapeCSV(c.creadoEn),
+      ].join(",")
+    );
+    const csv = "\uFEFF" + [header, ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const filtroStr = hayFiltros ? "-filtrado" : "";
+    a.href = url;
+    a.download = `cobros${filtroStr}-${now}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [resultados, hayFiltros]);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Buscar cobros</h1>
-        <p className="text-muted-foreground mt-1">
-          Busca por descripción, referencia o ID — combina con los filtros para afinar resultados.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Buscar cobros</h1>
+          <p className="text-muted-foreground mt-1">
+            Busca por descripción, referencia o ID — combina con los filtros para afinar resultados.
+          </p>
+        </div>
+
+        {resultados.length > 0 && (
+          <button
+            onClick={exportarCSV}
+            className="inline-flex items-center gap-2 h-9 px-4 rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-muted/50 transition-colors shadow-sm shrink-0"
+          >
+            <Download className="h-4 w-4" />
+            Exportar CSV
+            <span className="text-xs text-muted-foreground font-normal">({resultados.length})</span>
+          </button>
+        )}
       </div>
 
       {/* Search + filters bar */}
@@ -238,8 +285,15 @@ export default function SearchPage() {
         </Table>
 
         {resultados.length > 0 && (
-          <div className="px-4 py-2 border-t text-xs text-muted-foreground text-right">
-            {resultados.length} resultado{resultados.length !== 1 ? "s" : ""}
+          <div className="px-4 py-2 border-t text-xs text-muted-foreground flex items-center justify-between">
+            <span>{resultados.length} resultado{resultados.length !== 1 ? "s" : ""}</span>
+            <button
+              onClick={exportarCSV}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Exportar CSV
+            </button>
           </div>
         )}
       </Card>
