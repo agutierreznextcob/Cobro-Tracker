@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { Home, Plus, Activity, Webhook, LogOut, Search } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 
 function UserBadge() {
   const { user, logout } = useAuth();
@@ -43,6 +44,11 @@ function UserBadge() {
   );
 }
 
+function WebhookPoller() {
+  useWebhookPolling();
+  return null;
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
 
@@ -55,6 +61,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background text-foreground">
+      <WebhookPoller />
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 shrink-0">
