@@ -12,7 +12,7 @@ function getResend(): Resend | null {
   return resend;
 }
 
-const FROM = process.env.RESEND_FROM_EMAIL || "Cobro Simple <noreply@cobrosimple.cl>";
+const FROM = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
 function formatCLP(amount: number): string {
   return new Intl.NumberFormat("es-CL", {
