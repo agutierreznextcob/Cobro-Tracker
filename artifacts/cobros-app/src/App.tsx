@@ -38,8 +38,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 function AppRouter() {
-  const { isAuthenticated } = useAuth();
-
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
