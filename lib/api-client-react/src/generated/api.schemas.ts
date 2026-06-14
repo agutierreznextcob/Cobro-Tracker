@@ -247,6 +247,46 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface AiConversation {
+  id: number;
+  title: string;
+  creadoEn: string;
+  actualizadoEn?: string;
+}
+
+export interface AiConversationInput {
+  /** @minLength 1 */
+  title: string;
+}
+
+export type AiMessageRole = typeof AiMessageRole[keyof typeof AiMessageRole];
+
+
+export const AiMessageRole = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export interface AiMessage {
+  id: number;
+  conversationId: number;
+  role: AiMessageRole;
+  content: string;
+  creadoEn: string;
+}
+
+export interface AiMessageInput {
+  /** @minLength 1 */
+  content: string;
+}
+
+export interface AiConversationWithMessages {
+  id: number;
+  title: string;
+  creadoEn: string;
+  messages: AiMessage[];
+}
+
 export interface Liquidacion {
   id: number;
   /** Date of bank deposit (YYYY-MM-DD) */

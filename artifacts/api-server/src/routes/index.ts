@@ -4,6 +4,7 @@ import authRouter from "./auth";
 import cobrosRouter from "./cobros";
 import clientesRouter from "./clientes";
 import liquidacionesRouter from "./liquidaciones";
+import aiRouter from "./ai";
 import webhooksRouter from "./webhooks";
 import { profileRouter } from "./profile";
 
@@ -18,6 +19,7 @@ router.use(webhooksRouter);
 router.use(cobrosRouter);
 router.use(clientesRouter);
 router.use(liquidacionesRouter);
+router.use(aiRouter);
 router.use(profileRouter);
 
 export default router;

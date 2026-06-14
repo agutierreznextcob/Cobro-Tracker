@@ -14,6 +14,8 @@ tags:
     description: Cobros (charges) operations
   - name: clientes
     description: Clientes operations
+  - name: ai
+    description: AI assistant chat operations
   - name: liquidaciones
     description: Liquidaciones (settlements) from Flow
   - name: webhooks
@@ -257,6 +259,109 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Unauthorized
+
+  /ai/conversations:
+    get:
+      operationId: listAiConversations
+      tags: [ai]
+      summary: List all AI conversations for the current user
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiConversation"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createAiConversation
+      tags: [ai]
+      summary: Create a new conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiConversationInput"
+      responses:
+        "201":
+          description: Created conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiConversation"
+        "401":
+          description: Unauthorized
+
+  /ai/conversations/{id}:
+    get:
+      operationId: getAiConversation
+      tags: [ai]
+      summary: Get conversation with messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiConversationWithMessages"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+    delete:
+      operationId: deleteAiConversation
+      tags: [ai]
+      summary: Delete a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+
+  /ai/conversations/{id}/messages:
+    post:
+      operationId: sendAiMessage
+      tags: [ai]
+      summary: Send a user message and stream the AI response (SSE)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiMessageInput"
+      responses:
+        "200":
+          description: SSE stream of assistant response chunks
+          content:
+            text/event-stream: {}
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
 
   /liquidaciones:
     get:
@@ -965,6 +1070,70 @@ components:
       properties:
         error:
           type: string
+
+    AiConversation:
+      type: object
+      required: [id, title, creadoEn]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+
+    AiConversationInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+
+    AiMessage:
+      type: object
+      required: [id, conversationId, role, content, creadoEn]
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        creadoEn:
+          type: string
+          format: date-time
+
+    AiMessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+
+    AiConversationWithMessages:
+      type: object
+      required: [id, title, creadoEn, messages]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        creadoEn:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiMessage"
 
     Liquidacion:
       type: object

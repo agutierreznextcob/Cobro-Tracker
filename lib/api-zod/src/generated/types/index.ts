@@ -6,6 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './aiConversation';
+export * from './aiConversationInput';
+export * from './aiConversationWithMessages';
+export * from './aiMessage';
+export * from './aiMessageInput';
+export * from './aiMessageRole';
 export * from './authorizationSessionHeaderParameter';
 export * from './authUser';
 export * from './authUserEnvelope';

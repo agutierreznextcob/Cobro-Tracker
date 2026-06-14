@@ -195,6 +195,73 @@ export const UpdateClienteResponse = zod.object({
 
 
 /**
+ * @summary List all AI conversations for the current user
+ */
+export const ListAiConversationsResponseItem = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date().optional()
+})
+export const ListAiConversationsResponse = zod.array(ListAiConversationsResponseItem)
+
+
+/**
+ * @summary Create a new conversation
+ */
+
+
+
+export const CreateAiConversationBody = zod.object({
+  "title": zod.string().min(1)
+})
+
+
+/**
+ * @summary Get conversation with messages
+ */
+export const GetAiConversationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetAiConversationResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "creadoEn": zod.coerce.date(),
+  "messages": zod.array(zod.object({
+  "id": zod.number(),
+  "conversationId": zod.number(),
+  "role": zod.enum(['user', 'assistant']),
+  "content": zod.string(),
+  "creadoEn": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Delete a conversation
+ */
+export const DeleteAiConversationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Send a user message and stream the AI response (SSE)
+ */
+export const SendAiMessageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const SendAiMessageBody = zod.object({
+  "content": zod.string().min(1)
+})
+
+
+/**
  * @summary List settlements from Flow
  */
 export const listLiquidacionesQueryStartMin = 0;

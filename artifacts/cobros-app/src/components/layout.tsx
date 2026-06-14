@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Home, Plus, Activity, Webhook, LogOut, Search, UserCircle, Users, Landmark } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
+import { AiChat } from "@/components/ai-chat";
 
 function UserBadge() {
   const { user, logout } = useAuth();
@@ -101,6 +102,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="flex-1 container mx-auto px-4 py-8">
         {children}
       </main>
+      <AiChat />
     </div>
   );
 }
