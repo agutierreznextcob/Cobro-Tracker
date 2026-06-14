@@ -10,6 +10,7 @@ import {
 import { z } from "zod";
 import { getFlowCredentials } from "./profile";
 import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
+import { sendPaymentLinkEmail, sendRecordatorioEmail } from "../lib/email";
 
 const cobrosRouter = Router();
 
@@ -218,10 +219,71 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
       .returning();
 
     req.log.info({ cobroId: cobro.id, flowOrder: result.flowOrder }, "Flow payment link created");
+
+    // Send payment link email asynchronously (non-blocking)
+    sendPaymentLinkEmail({
+      emailPagador: bodyParsed.data.emailPagador,
+      clienteNombre: cobro.clienteNombre,
+      descripcion: cobro.descripcion,
+      monto: Number(cobro.monto),
+      linkPago: result.url,
+      comercioNombre: cobro.responsableNombre || "Cobro Simple",
+    }, req.log).catch(() => {});
+
     res.json({ linkPago: updated.flowLinkPago!, flowOrdenId: updated.flowOrdenId! });
   } catch (err) {
     req.log.error({ err }, "Error creating Flow payment link");
     res.status(500).json({ error: `Error al crear orden en Flow: ${err instanceof Error ? err.message : String(err)}` });
+  }
+});
+
+cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+
+  try {
+    const [cobro] = await db
+      .select()
+      .from(cobrosTable)
+      .where(eq(cobrosTable.id, paramsParsed.data.id));
+
+    if (!cobro) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+
+    if (!cobro.emailPagador) {
+      res.status(400).json({ error: "El cobro no tiene email del pagador registrado." });
+      return;
+    }
+
+    if (!cobro.flowLinkPago) {
+      res.status(400).json({ error: "El cobro no tiene link de pago generado. Genera el link de Flow primero." });
+      return;
+    }
+
+    const sent = await sendRecordatorioEmail({
+      emailPagador: cobro.emailPagador,
+      clienteNombre: cobro.clienteNombre,
+      descripcion: cobro.descripcion,
+      monto: Number(cobro.monto),
+      linkPago: cobro.flowLinkPago,
+      comercioNombre: cobro.responsableNombre || "Cobro Simple",
+    }, req.log);
+
+    if (!sent) {
+      res.status(500).json({ error: "No se pudo enviar el email. Verifica que RESEND_API_KEY esté configurado." });
+      return;
+    }
+
+    req.log.info({ cobroId: cobro.id, emailPagador: cobro.emailPagador }, "Reminder email sent");
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error sending reminder email");
+    res.status(500).json({ error: "Error interno al enviar recordatorio." });
   }
 });
 

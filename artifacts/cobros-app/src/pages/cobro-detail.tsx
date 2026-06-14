@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { useGetCobro, getGetCobroQueryKey, useUpdateCobro, useGenerarFlowLink, getListCobrosQueryKey, getGetCobrosSummaryQueryKey } from "@workspace/api-client-react";
+import {
+  useGetCobro,
+  getGetCobroQueryKey,
+  useUpdateCobro,
+  useGenerarFlowLink,
+  useEnviarRecordatorioEmail,
+  getListCobrosQueryKey,
+  getGetCobrosSummaryQueryKey,
+} from "@workspace/api-client-react";
 import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -10,16 +18,54 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
-import { ArrowLeft, RefreshCw, Calendar, FileText, Hash, Wallet, User, Link2, ExternalLink, Copy, Loader2, Mail } from "lucide-react";
+import {
+  ArrowLeft,
+  RefreshCw,
+  Calendar,
+  FileText,
+  Hash,
+  Wallet,
+  User,
+  Link2,
+  ExternalLink,
+  Copy,
+  Loader2,
+  Mail,
+  MessageCircle,
+} from "lucide-react";
 import { CobroUpdateEstado } from "@workspace/api-client-react";
+
+function buildWhatsappUrl(opts: {
+  clienteNombre: string | null;
+  monto: number;
+  descripcion: string;
+  linkPago: string;
+}): string {
+  const nombre = opts.clienteNombre || "cliente";
+  const monto = new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  }).format(Math.round(opts.monto));
+
+  const msg =
+    `Hola ${nombre}, tienes un cobro pendiente de ${monto} ` +
+    `por concepto de "${opts.descripcion}". ` +
+    `Puedes pagar aquí: ${opts.linkPago}`;
+
+  return `https://wa.me/?text=${encodeURIComponent(msg)}`;
+}
 
 export default function CobroDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id || "0", 10);
 
-  const { data: cobro, isLoading } = useGetCobro(id, { query: { enabled: !!id, queryKey: getGetCobroQueryKey(id) } });
+  const { data: cobro, isLoading } = useGetCobro(id, {
+    query: { enabled: !!id, queryKey: getGetCobroQueryKey(id) },
+  });
   const updateCobro = useUpdateCobro();
   const generarFlowLink = useGenerarFlowLink();
+  const enviarRecordatorio = useEnviarRecordatorioEmail();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -27,20 +73,20 @@ export default function CobroDetail() {
   const [showEmailInput, setShowEmailInput] = useState(false);
 
   const handleStatusChange = (newStatus: string) => {
-    updateCobro.mutate({
-      id,
-      data: { estado: newStatus as CobroUpdateEstado }
-    }, {
-      onSuccess: () => {
-        toast({ title: "Estado actualizado", description: `Cobro marcado como ${newStatus}.` });
-        queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
-        queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
-      },
-      onError: () => {
-        toast({ title: "Error al actualizar", description: "No se pudo cambiar el estado.", variant: "destructive" });
+    updateCobro.mutate(
+      { id, data: { estado: newStatus as CobroUpdateEstado } },
+      {
+        onSuccess: () => {
+          toast({ title: "Estado actualizado", description: `Cobro marcado como ${newStatus}.` });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
+        },
+        onError: () => {
+          toast({ title: "Error al actualizar", description: "No se pudo cambiar el estado.", variant: "destructive" });
+        },
       }
-    });
+    );
   };
 
   const handleGenerarLink = () => {
@@ -49,18 +95,21 @@ export default function CobroDetail() {
       setShowEmailInput(true);
       return;
     }
-    generarFlowLink.mutate({ id, data: { emailPagador: email } }, {
-      onSuccess: () => {
-        toast({ title: "Link de pago generado", description: "El link de Flow fue creado exitosamente." });
-        queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
-        setShowEmailInput(false);
-        setEmailPagador("");
-      },
-      onError: (err: unknown) => {
-        const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
-        toast({ title: "Error al generar link Flow", description: msg, variant: "destructive" });
+    generarFlowLink.mutate(
+      { id, data: { emailPagador: email } },
+      {
+        onSuccess: () => {
+          toast({ title: "Link de pago generado", description: "El link de Flow fue creado y el email fue enviado al cliente." });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+          setShowEmailInput(false);
+          setEmailPagador("");
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
+          toast({ title: "Error al generar link Flow", description: msg, variant: "destructive" });
+        },
       }
-    });
+    );
   };
 
   const handleCopyLink = async () => {
@@ -68,6 +117,32 @@ export default function CobroDetail() {
       await navigator.clipboard.writeText(cobro.flowLinkPago);
       toast({ title: "Link copiado", description: "El link de pago fue copiado al portapapeles." });
     }
+  };
+
+  const handleRecordatorioEmail = () => {
+    enviarRecordatorio.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          toast({ title: "Recordatorio enviado", description: "El email de recordatorio fue enviado al cliente." });
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo enviar el recordatorio.";
+          toast({ title: "Error al enviar recordatorio", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const handleWhatsApp = () => {
+    if (!cobro?.flowLinkPago) return;
+    const url = buildWhatsappUrl({
+      clienteNombre: cobro.clienteNombre,
+      monto: cobro.monto,
+      descripcion: cobro.descripcion,
+      linkPago: cobro.flowLinkPago,
+    });
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   if (isLoading) {
@@ -87,16 +162,25 @@ export default function CobroDetail() {
       <div className="max-w-3xl mx-auto text-center py-20">
         <h2 className="text-2xl font-bold mb-2">Cobro no encontrado</h2>
         <p className="text-muted-foreground mb-6">El cobro que buscas no existe o fue eliminado.</p>
-        <Link href="/">
-          <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Volver al Dashboard</Button>
+        <Link href="/dashboard">
+          <Button variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Dashboard
+          </Button>
         </Link>
       </div>
     );
   }
 
+  const isPendiente = cobro.estado === "pendiente";
+  const hasFlowLink = !!cobro.flowLinkPago;
+  const hasEmail = !!cobro.emailPagador;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-300">
-      <Link href="/" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-2 transition-colors">
+      <Link
+        href="/dashboard"
+        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-2 transition-colors"
+      >
         <ArrowLeft className="mr-2 h-4 w-4" />
         Volver al Dashboard
       </Link>
@@ -104,9 +188,7 @@ export default function CobroDetail() {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cobro #{cobro.id}</h1>
-          <p className="text-muted-foreground mt-1">
-            Creado el {formatDate(cobro.creadoEn)}
-          </p>
+          <p className="text-muted-foreground mt-1">Creado el {formatDate(cobro.creadoEn)}</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -133,6 +215,7 @@ export default function CobroDetail() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
+        {/* Main details */}
         <Card className="md:col-span-2 shadow-sm border-border/50">
           <CardHeader className="bg-muted/20 border-b border-border/50 pb-4">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -168,7 +251,12 @@ export default function CobroDetail() {
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-semibold">
-                    {cobro.responsableNombre.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                    {cobro.responsableNombre
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
                   </div>
                   <span className="text-sm font-medium">{cobro.responsableNombre}</span>
                 </div>
@@ -186,7 +274,9 @@ export default function CobroDetail() {
           </CardContent>
         </Card>
 
+        {/* Right column */}
         <div className="space-y-4">
+          {/* Amount card */}
           <Card className="shadow-sm border-primary/20 bg-primary/5">
             <CardHeader className="pb-4">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -204,6 +294,7 @@ export default function CobroDetail() {
             </CardContent>
           </Card>
 
+          {/* Flow payment card */}
           <Card className="shadow-sm border-border/50">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -212,7 +303,7 @@ export default function CobroDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {cobro.flowLinkPago ? (
+              {hasFlowLink ? (
                 <>
                   <div className="text-xs text-muted-foreground">
                     Orden Flow: <span className="font-mono">{cobro.flowOrdenId}</span>
@@ -231,6 +322,16 @@ export default function CobroDetail() {
                       <Copy className="h-3.5 w-3.5 mr-1.5" />
                       Copiar link
                     </Button>
+                    {/* WhatsApp button — always visible when link exists */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-green-600/40 text-green-700 hover:bg-green-50 hover:border-green-600"
+                      onClick={handleWhatsApp}
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                      Enviar por WhatsApp
+                    </Button>
                   </div>
                 </>
               ) : (
@@ -248,12 +349,23 @@ export default function CobroDetail() {
                         onKeyDown={(e) => e.key === "Enter" && handleGenerarLink()}
                       />
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={handleGenerarLink} disabled={generarFlowLink.isPending} className="flex-1">
+                        <Button
+                          size="sm"
+                          onClick={handleGenerarLink}
+                          disabled={generarFlowLink.isPending}
+                          className="flex-1"
+                        >
                           {generarFlowLink.isPending ? (
                             <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Generando...</>
-                          ) : "Generar"}
+                          ) : (
+                            "Generar"
+                          )}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => { setShowEmailInput(false); setEmailPagador(""); }}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setShowEmailInput(false); setEmailPagador(""); }}
+                        >
                           Cancelar
                         </Button>
                       </div>
@@ -261,7 +373,7 @@ export default function CobroDetail() {
                   ) : (
                     <>
                       <p className="text-xs text-muted-foreground">
-                        Genera un link de pago real en Flow para que el pagador pueda pagar online.
+                        Genera un link de pago real en Flow. Se enviará un email al cliente automáticamente.
                       </p>
                       <Button
                         size="sm"
@@ -282,6 +394,48 @@ export default function CobroDetail() {
               )}
             </CardContent>
           </Card>
+
+          {/* Communication card — only for pending cobros with flow link */}
+          {isPendiente && hasFlowLink && (
+            <Card className="shadow-sm border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-primary" />
+                  Recordar al cliente
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {hasEmail ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleRecordatorioEmail}
+                    disabled={enviarRecordatorio.isPending}
+                  >
+                    {enviarRecordatorio.isPending ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Enviando...</>
+                    ) : (
+                      <><Mail className="h-3.5 w-3.5 mr-1.5" />Recordar por email</>
+                    )}
+                  </Button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Sin email del pagador. Agrega uno para enviar recordatorios.
+                  </p>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-green-600/40 text-green-700 hover:bg-green-50 hover:border-green-600"
+                  onClick={handleWhatsApp}
+                >
+                  <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                  Recordar por WhatsApp
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

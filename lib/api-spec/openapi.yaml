@@ -631,6 +631,39 @@ paths:
         "401":
           description: Unauthorized
 
+  /cobros/{id}/recordatorio-email:
+    post:
+      operationId: enviarRecordatorioEmail
+      tags: [cobros]
+      summary: Send a payment reminder email for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Cannot send email (no email or no payment link configured)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Cobro not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /cobros/{id}/flow-link:
     post:
       operationId: generarFlowLink

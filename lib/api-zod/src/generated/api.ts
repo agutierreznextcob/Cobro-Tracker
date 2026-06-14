@@ -491,6 +491,18 @@ export const DeleteFlowCredentialsResponse = zod.object({
 
 
 /**
+ * @summary Send a payment reminder email for a cobro
+ */
+export const EnviarRecordatorioEmailParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EnviarRecordatorioEmailResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary Generate a Flow payment link for a cobro
  */
 export const GenerarFlowLinkParams = zod.object({

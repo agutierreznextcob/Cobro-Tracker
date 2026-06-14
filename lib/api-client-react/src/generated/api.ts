@@ -2121,6 +2121,76 @@ export const useDeleteFlowCredentials = <TError = ErrorType<void>,
       return useMutation(getDeleteFlowCredentialsMutationOptions(options));
     }
 
+export const getEnviarRecordatorioEmailUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/recordatorio-email`
+}
+
+/**
+ * @summary Send a payment reminder email for a cobro
+ */
+export const enviarRecordatorioEmail = async (id: number, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getEnviarRecordatorioEmailUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getEnviarRecordatorioEmailMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enviarRecordatorioEmail>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof enviarRecordatorioEmail>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['enviarRecordatorioEmail'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof enviarRecordatorioEmail>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  enviarRecordatorioEmail(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EnviarRecordatorioEmailMutationResult = NonNullable<Awaited<ReturnType<typeof enviarRecordatorioEmail>>>
+
+    export type EnviarRecordatorioEmailMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Send a payment reminder email for a cobro
+ */
+export const useEnviarRecordatorioEmail = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enviarRecordatorioEmail>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof enviarRecordatorioEmail>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getEnviarRecordatorioEmailMutationOptions(options));
+    }
+
 export const getGenerarFlowLinkUrl = (id: number,) => {
 
 

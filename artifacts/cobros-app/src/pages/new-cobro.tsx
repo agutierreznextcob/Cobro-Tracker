@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -46,6 +46,13 @@ export default function NewCobro() {
 
   const selectedClienteId = form.watch("clienteId");
   const selectedCliente = clientes?.find((c) => c.id === selectedClienteId);
+
+  // Auto-fill email when a client is selected
+  useEffect(() => {
+    if (selectedCliente?.email) {
+      form.setValue("emailPagador", selectedCliente.email, { shouldValidate: true });
+    }
+  }, [selectedCliente?.id]);
 
   const onSubmit = (values: FormValues) => {
     const payload: CobroInput = {
