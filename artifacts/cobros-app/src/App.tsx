@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import LandingPage from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import NewCobro from "@/pages/new-cobro";
 import CobroDetail from "@/pages/cobro-detail";
@@ -19,7 +20,7 @@ import { useAuth } from "@workspace/replit-auth-web";
 const queryClient = new QueryClient();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isLoading, isAuthenticated, login } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
     return (
@@ -30,46 +31,96 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-6 p-8 rounded-xl border bg-card shadow-sm max-w-sm w-full">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">Cobros</h1>
-            <p className="text-muted-foreground text-sm">
-              Inicia sesión para acceder al sistema de gestión de cobros.
-            </p>
-          </div>
-          <button
-            onClick={login}
-            className="w-full inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground h-10 px-4 py-2 text-sm font-medium shadow hover:bg-primary/90 transition-colors"
-          >
-            Iniciar sesión
-          </button>
-        </div>
-      </div>
-    );
+    return <Redirect to="/" />;
   }
 
   return <>{children}</>;
 }
 
-function Router() {
+function AppRouter() {
+  const { isAuthenticated } = useAuth();
+
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/cobros/nuevo" component={NewCobro} />
-        <Route path="/cobros/buscar" component={SearchPage} />
-        <Route path="/cobros/:id" component={CobroDetail} />
-        <Route path="/clientes" component={ClientesPage} />
-        <Route path="/clientes/:id" component={ClienteDetailPage} />
-        <Route path="/liquidaciones" component={LiquidacionesPage} />
-        <Route path="/liquidaciones/:id" component={LiquidacionDetailPage} />
-        <Route path="/webhooks/log" component={WebhookLog} />
-        <Route path="/perfil" component={ProfilePage} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      <Route path="/" component={LandingPage} />
+      <Route path="/dashboard">
+        <AuthGate>
+          <Layout>
+            <Dashboard />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/cobros/nuevo">
+        <AuthGate>
+          <Layout>
+            <NewCobro />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/cobros/buscar">
+        <AuthGate>
+          <Layout>
+            <SearchPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/cobros/:id">
+        {(params) => (
+          <AuthGate>
+            <Layout>
+              <CobroDetail />
+            </Layout>
+          </AuthGate>
+        )}
+      </Route>
+      <Route path="/clientes">
+        <AuthGate>
+          <Layout>
+            <ClientesPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/clientes/:id">
+        {(params) => (
+          <AuthGate>
+            <Layout>
+              <ClienteDetailPage />
+            </Layout>
+          </AuthGate>
+        )}
+      </Route>
+      <Route path="/liquidaciones">
+        <AuthGate>
+          <Layout>
+            <LiquidacionesPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/liquidaciones/:id">
+        {(params) => (
+          <AuthGate>
+            <Layout>
+              <LiquidacionDetailPage />
+            </Layout>
+          </AuthGate>
+        )}
+      </Route>
+      <Route path="/webhooks/log">
+        <AuthGate>
+          <Layout>
+            <WebhookLog />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/perfil">
+        <AuthGate>
+          <Layout>
+            <ProfilePage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
@@ -78,9 +129,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthGate>
-            <Router />
-          </AuthGate>
+          <AppRouter />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
