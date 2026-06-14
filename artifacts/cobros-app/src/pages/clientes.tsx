@@ -14,11 +14,44 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 
+// Validates Chilean RUT checksum
+function validarRut(rut: string): boolean {
+  const cleaned = rut.replace(/\./g, "").replace(/-/g, "").toLowerCase();
+  if (!/^\d{7,8}[0-9k]$/.test(cleaned)) return false;
+  const body = cleaned.slice(0, -1);
+  const dv = cleaned.slice(-1);
+  let sum = 0;
+  let mult = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += parseInt(body[i]) * mult;
+    mult = mult === 7 ? 2 : mult + 1;
+  }
+  const expected = 11 - (sum % 11);
+  const dvExpected = expected === 11 ? "0" : expected === 10 ? "k" : String(expected);
+  return dv === dvExpected;
+}
+
 const clienteSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio").max(200),
-  rut: z.string().max(20).optional(),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
-  telefono: z.string().max(30).optional(),
+  rut: z
+    .string()
+    .min(1, "El RUT es obligatorio")
+    .refine(
+      (v) => /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/.test(v) || /^\d{7,8}-[\dkK]$/.test(v),
+      "Formato inválido — usa 12.345.678-9"
+    )
+    .refine(validarRut, "El RUT no es válido (dígito verificador incorrecto)"),
+  email: z
+    .string()
+    .min(1, "El email es obligatorio")
+    .email("Email inválido"),
+  telefono: z
+    .string()
+    .min(1, "El teléfono es obligatorio")
+    .regex(
+      /^\+56\s?9\s?\d{4}\s?\d{4}$/,
+      "Formato inválido — usa +56 9 1234 5678"
+    ),
 });
 type ClienteForm = z.infer<typeof clienteSchema>;
 
@@ -34,7 +67,7 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
 
   const onSubmit = (values: ClienteForm) => {
     createCliente.mutate(
-      { data: { nombre: values.nombre, rut: values.rut || undefined, email: values.email || undefined, telefono: values.telefono || undefined } },
+      { data: { nombre: values.nombre, rut: values.rut, email: values.email, telefono: values.telefono } },
       {
         onSuccess: () => {
           toast({ title: "Cliente creado", description: "El cliente fue creado exitosamente." });
@@ -81,7 +114,7 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
               name="rut"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>RUT (opcional)</FormLabel>
+                  <FormLabel>RUT *</FormLabel>
                   <FormControl>
                     <Input placeholder="12.345.678-9" className="font-mono" {...field} />
                   </FormControl>
@@ -95,7 +128,7 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email (opcional)</FormLabel>
+                    <FormLabel>Email *</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="email@ejemplo.com" {...field} />
                     </FormControl>
@@ -108,7 +141,7 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
                 name="telefono"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Teléfono (opcional)</FormLabel>
+                    <FormLabel>Teléfono *</FormLabel>
                     <FormControl>
                       <Input placeholder="+56 9 1234 5678" {...field} />
                     </FormControl>
