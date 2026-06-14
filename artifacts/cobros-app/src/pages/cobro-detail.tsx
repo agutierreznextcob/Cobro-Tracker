@@ -137,7 +137,7 @@ export default function CobroDetail() {
   const handleWhatsApp = () => {
     if (!cobro?.flowLinkPago) return;
     const url = buildWhatsappUrl({
-      clienteNombre: cobro.clienteNombre,
+      clienteNombre: cobro.clienteNombre ?? null,
       monto: cobro.monto,
       descripcion: cobro.descripcion,
       linkPago: cobro.flowLinkPago,
@@ -310,7 +310,7 @@ export default function CobroDetail() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <a
-                      href={cobro.flowLinkPago}
+                      href={cobro.flowLinkPago ?? undefined}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground h-9 px-3 text-sm font-medium shadow hover:bg-primary/90 transition-colors"

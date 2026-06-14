@@ -98,7 +98,7 @@ function AppRouter() {
         {(params) => (
           <AuthGate>
             <Layout>
-              <LiquidacionDetailPage />
+              <LiquidacionDetailPage params={params} />
             </Layout>
           </AuthGate>
         )}
