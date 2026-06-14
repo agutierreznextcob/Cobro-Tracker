@@ -16,7 +16,7 @@ import { Loader2, ArrowLeft, Users } from "lucide-react";
 import { Link } from "wouter";
 
 const formSchema = z.object({
-  monto: z.coerce.number().min(0.01, "El monto debe ser mayor a 0"),
+  monto: z.coerce.number().int("El monto debe ser un número entero").min(1, "El monto debe ser mayor a $0"),
   descripcion: z.string().min(1, "La descripción es obligatoria").max(255),
   referencia: z.string().optional(),
   clienteId: z.coerce.number().optional(),
@@ -104,8 +104,9 @@ export default function NewCobro() {
                           <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
                           <Input
                             type="number"
-                            step="0.01"
-                            placeholder="0.00"
+                            step="1"
+                            min="1"
+                            placeholder="0"
                             className="pl-7 font-mono"
                             {...field}
                           />
