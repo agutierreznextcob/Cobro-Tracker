@@ -1,0 +1,264 @@
+import { useState } from "react";
+import { useParams, Link } from "wouter";
+import { useGetCliente, useUpdateCliente, getGetClienteQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { StatusBadge } from "@/components/status-badge";
+import { formatCurrency, formatShortDate } from "@/lib/format";
+import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, TrendingUp, Clock, CheckCircle2 } from "lucide-react";
+
+const editSchema = z.object({
+  nombre: z.string().min(1, "El nombre es obligatorio").max(200),
+  rut: z.string().max(20).optional(),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  telefono: z.string().max(30).optional(),
+});
+type EditForm = z.infer<typeof editSchema>;
+
+function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nombre: string; rut?: string | null; email?: string | null; telefono?: string | null }; onUpdated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  const updateCliente = useUpdateCliente();
+
+  const form = useForm<EditForm>({
+    resolver: zodResolver(editSchema),
+    values: {
+      nombre: cliente.nombre,
+      rut: cliente.rut ?? "",
+      email: cliente.email ?? "",
+      telefono: cliente.telefono ?? "",
+    },
+  });
+
+  const onSubmit = (values: EditForm) => {
+    updateCliente.mutate(
+      { id: cliente.id, data: { nombre: values.nombre, rut: values.rut || undefined, email: values.email || undefined, telefono: values.telefono || undefined } },
+      {
+        onSuccess: () => {
+          toast({ title: "Cliente actualizado" });
+          setOpen(false);
+          onUpdated();
+        },
+        onError: () => {
+          toast({ title: "Error", description: "No se pudo actualizar.", variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="gap-1.5">
+          <Edit2 className="h-3.5 w-3.5" /> Editar
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar cliente</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+            <FormField control={form.control} name="nombre" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nombre *</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="rut" render={({ field }) => (
+              <FormItem>
+                <FormLabel>RUT</FormLabel>
+                <FormControl><Input placeholder="12.345.678-9" className="font-mono" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl><Input type="email" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="telefono" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Teléfono</FormLabel>
+                  <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={updateCliente.isPending}>
+                {updateCliente.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Guardando...</> : "Guardar cambios"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function ClienteDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const clienteId = Number(id);
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, error } = useGetCliente(clienteId);
+
+  const handleUpdated = () => {
+    queryClient.invalidateQueries({ queryKey: getGetClienteQueryKey(clienteId) });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+        <Card className="animate-pulse">
+          <CardHeader className="h-20 bg-muted/50" />
+          <CardContent className="h-32 bg-muted/20" />
+        </Card>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="text-center py-24">
+        <p className="text-muted-foreground">Cliente no encontrado.</p>
+        <Link href="/clientes" className="text-primary hover:underline text-sm mt-2 inline-block">
+          ← Volver a clientes
+        </Link>
+      </div>
+    );
+  }
+
+  const cobros = data.cobros ?? [];
+  const pagados = cobros.filter((c) => c.estado === "pagado");
+  const pendientes = cobros.filter((c) => c.estado === "pendiente");
+  const montoTotal = pagados.reduce((acc, c) => acc + Number(c.monto), 0);
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center justify-between">
+        <Link href="/clientes" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Clientes
+        </Link>
+        <EditClienteDialog cliente={data} onUpdated={handleUpdated} />
+      </div>
+
+      <Card className="shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl shrink-0">
+              {data.nombre.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-bold tracking-tight">{data.nombre}</h1>
+              {data.rut && <p className="text-muted-foreground font-mono text-sm mt-0.5">{data.rut}</p>}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                {data.email && (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Mail className="h-3.5 w-3.5" />
+                    <a href={`mailto:${data.email}`} className="hover:text-foreground hover:underline">{data.email}</a>
+                  </div>
+                )}
+                {data.telefono && (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Phone className="h-3.5 w-3.5" />
+                    <span>{data.telefono}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 grid-cols-3">
+        <Card className="shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <FileText className="h-4 w-4" />
+              <span className="text-sm">Total cobros</span>
+            </div>
+            <p className="text-2xl font-bold font-mono">{cobros.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-green-500/20 bg-green-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <span className="text-sm">Recaudado</span>
+            </div>
+            <p className="text-2xl font-bold font-mono text-green-700">{formatCurrency(montoTotal)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{pagados.length} pagados</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-amber-500/20 bg-amber-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Clock className="h-4 w-4 text-amber-600" />
+              <span className="text-sm">Pendientes</span>
+            </div>
+            <p className="text-2xl font-bold font-mono">{pendientes.length}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {pendientes.length > 0 ? formatCurrency(pendientes.reduce((a, c) => a + Number(c.monto), 0)) : "—"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight mb-4">Historial de cobros</h2>
+        <Card className="shadow-sm">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead>Fecha</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Monto</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {cobros.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                    No hay cobros registrados para este cliente.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                cobros.map((cobro) => (
+                  <TableRow key={cobro.id} className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-muted-foreground text-sm">{formatShortDate(cobro.creadoEn)}</TableCell>
+                    <TableCell>
+                      <Link href={`/cobros/${cobro.id}`} className="font-medium hover:underline text-foreground">
+                        {cobro.descripcion}
+                      </Link>
+                    </TableCell>
+                    <TableCell><StatusBadge status={cobro.estado} /></TableCell>
+                    <TableCell className="text-right font-mono font-medium">{formatCurrency(cobro.monto)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
+    </div>
+  );
+}

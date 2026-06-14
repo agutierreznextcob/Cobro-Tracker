@@ -1,1 +1,2 @@
-- [Flow integration design](flow-integration.md) — credenciales por usuario encriptadas con AES-256-GCM; zod importa como "zod" (no "zod/v4") en api-server
+- [Router ordering — auth middleware](router-auth-order.md) — webhooksRouter must be mounted BEFORE cobrosRouter in routes/index.ts
+- [Orval hook params — direct args](orval-hook-params.md) — hooks take params directly as first arg, NOT wrapped in { params: {} }

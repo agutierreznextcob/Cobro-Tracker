@@ -12,5 +12,7 @@ export interface CobroInput {
   /** @minLength 1 */
   descripcion: string;
   referencia?: string;
+  /** Associate an existing cliente */
+  clienteId?: number;
   emailPagador?: string;
 }

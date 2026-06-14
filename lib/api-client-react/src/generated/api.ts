@@ -22,18 +22,24 @@ import type {
 import type {
   AuthUserEnvelope,
   BeginBrowserLoginParams,
+  Cliente,
+  ClienteConHistorial,
+  ClienteInput,
   Cobro,
   CobroInput,
   CobroUpdate,
   CobrosSummary,
+  DashboardMetricas,
   ErrorEnvelope,
   ErrorResponse,
   FlowCredentialsInput,
   FlowCredentialsStatus,
   FlowLinkResponse,
   GenerarFlowLinkInput,
+  GetDashboardMetricsParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
+  ListClientesParams,
   ListWebhookEventosParams,
   LogoutSuccess,
   MobileTokenExchangeRequest,
@@ -597,6 +603,310 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+export const getListClientesUrl = (params?: ListClientesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/clientes?${stringifiedParams}` : `/api/clientes`
+}
+
+/**
+ * @summary List clientes for the current user
+ */
+export const listClientes = async (params?: ListClientesParams, options?: RequestInit): Promise<Cliente[]> => {
+
+  return customFetch<Cliente[]>(getListClientesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListClientesQueryKey = (params?: ListClientesParams,) => {
+    return [
+    `/api/clientes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListClientesQueryOptions = <TData = Awaited<ReturnType<typeof listClientes>>, TError = ErrorType<void>>(params?: ListClientesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClientes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListClientesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClientes>>> = ({ signal }) => listClientes(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listClientes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListClientesQueryResult = NonNullable<Awaited<ReturnType<typeof listClientes>>>
+export type ListClientesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List clientes for the current user
+ */
+
+export function useListClientes<TData = Awaited<ReturnType<typeof listClientes>>, TError = ErrorType<void>>(
+ params?: ListClientesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClientes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListClientesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateClienteUrl = () => {
+
+
+
+
+  return `/api/clientes`
+}
+
+/**
+ * @summary Create a new cliente
+ */
+export const createCliente = async (clienteInput: ClienteInput, options?: RequestInit): Promise<Cliente> => {
+
+  return customFetch<Cliente>(getCreateClienteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      clienteInput,)
+  }
+);}
+
+
+
+
+export const getCreateClienteMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCliente>>, TError,{data: BodyType<ClienteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCliente>>, TError,{data: BodyType<ClienteInput>}, TContext> => {
+
+const mutationKey = ['createCliente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCliente>>, {data: BodyType<ClienteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCliente(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateClienteMutationResult = NonNullable<Awaited<ReturnType<typeof createCliente>>>
+    export type CreateClienteMutationBody = BodyType<ClienteInput>
+    export type CreateClienteMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Create a new cliente
+ */
+export const useCreateCliente = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCliente>>, TError,{data: BodyType<ClienteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCliente>>,
+        TError,
+        {data: BodyType<ClienteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateClienteMutationOptions(options));
+    }
+
+export const getGetClienteUrl = (id: number,) => {
+
+
+
+
+  return `/api/clientes/${id}`
+}
+
+/**
+ * @summary Get a cliente by ID with cobros history
+ */
+export const getCliente = async (id: number, options?: RequestInit): Promise<ClienteConHistorial> => {
+
+  return customFetch<ClienteConHistorial>(getGetClienteUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetClienteQueryKey = (id: number,) => {
+    return [
+    `/api/clientes/${id}`
+    ] as const;
+    }
+
+
+export const getGetClienteQueryOptions = <TData = Awaited<ReturnType<typeof getCliente>>, TError = ErrorType<void | ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCliente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetClienteQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCliente>>> = ({ signal }) => getCliente(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCliente>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetClienteQueryResult = NonNullable<Awaited<ReturnType<typeof getCliente>>>
+export type GetClienteQueryError = ErrorType<void | ErrorResponse>
+
+
+/**
+ * @summary Get a cliente by ID with cobros history
+ */
+
+export function useGetCliente<TData = Awaited<ReturnType<typeof getCliente>>, TError = ErrorType<void | ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCliente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetClienteQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateClienteUrl = (id: number,) => {
+
+
+
+
+  return `/api/clientes/${id}`
+}
+
+/**
+ * @summary Update a cliente
+ */
+export const updateCliente = async (id: number,
+    clienteInput: ClienteInput, options?: RequestInit): Promise<Cliente> => {
+
+  return customFetch<Cliente>(getUpdateClienteUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      clienteInput,)
+  }
+);}
+
+
+
+
+export const getUpdateClienteMutationOptions = <TError = ErrorType<void | ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCliente>>, TError,{id: number;data: BodyType<ClienteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCliente>>, TError,{id: number;data: BodyType<ClienteInput>}, TContext> => {
+
+const mutationKey = ['updateCliente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCliente>>, {id: number;data: BodyType<ClienteInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCliente(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateClienteMutationResult = NonNullable<Awaited<ReturnType<typeof updateCliente>>>
+    export type UpdateClienteMutationBody = BodyType<ClienteInput>
+    export type UpdateClienteMutationError = ErrorType<void | ErrorResponse>
+
+    /**
+ * @summary Update a cliente
+ */
+export const useUpdateCliente = <TError = ErrorType<void | ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCliente>>, TError,{id: number;data: BodyType<ClienteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCliente>>,
+        TError,
+        {id: number;data: BodyType<ClienteInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateClienteMutationOptions(options));
+    }
+
 export const getListCobrosUrl = () => {
 
 
@@ -961,6 +1271,91 @@ export function useGetCobrosSummary<TData = Awaited<ReturnType<typeof getCobrosS
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetCobrosSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetDashboardMetricsUrl = (params?: GetDashboardMetricsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/metrics?${stringifiedParams}` : `/api/dashboard/metrics`
+}
+
+/**
+ * Returns key performance metrics scoped to the current user, with period filtering
+ * @summary Get dashboard metrics for the current user
+ */
+export const getDashboardMetrics = async (params?: GetDashboardMetricsParams, options?: RequestInit): Promise<DashboardMetricas> => {
+
+  return customFetch<DashboardMetricas>(getGetDashboardMetricsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDashboardMetricsQueryKey = (params?: GetDashboardMetricsParams,) => {
+    return [
+    `/api/dashboard/metrics`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDashboardMetricsQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardMetrics>>, TError = ErrorType<void>>(params?: GetDashboardMetricsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardMetricsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardMetrics>>> = ({ signal }) => getDashboardMetrics(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardMetrics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDashboardMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardMetrics>>>
+export type GetDashboardMetricsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get dashboard metrics for the current user
+ */
+
+export function useGetDashboardMetrics<TData = Awaited<ReturnType<typeof getDashboardMetrics>>, TError = ErrorType<void>>(
+ params?: GetDashboardMetricsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDashboardMetricsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

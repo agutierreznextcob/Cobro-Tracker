@@ -9,6 +9,8 @@ import CobroDetail from "@/pages/cobro-detail";
 import WebhookLog from "@/pages/webhook-log";
 import SearchPage from "@/pages/search";
 import ProfilePage from "@/pages/profile";
+import ClientesPage from "@/pages/clientes";
+import ClienteDetailPage from "@/pages/cliente-detail";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@workspace/replit-auth-web";
 
@@ -57,6 +59,8 @@ function Router() {
         <Route path="/cobros/nuevo" component={NewCobro} />
         <Route path="/cobros/buscar" component={SearchPage} />
         <Route path="/cobros/:id" component={CobroDetail} />
+        <Route path="/clientes" component={ClientesPage} />
+        <Route path="/clientes/:id" component={ClienteDetailPage} />
         <Route path="/webhooks/log" component={WebhookLog} />
         <Route path="/perfil" component={ProfilePage} />
         <Route component={NotFound} />

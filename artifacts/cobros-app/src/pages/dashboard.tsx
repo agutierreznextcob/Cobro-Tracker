@@ -1,19 +1,29 @@
 import { useState, useMemo } from "react";
-import { useListCobros, useGetCobrosSummary } from "@workspace/api-client-react";
+import { useListCobros, useGetDashboardMetrics } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { Link } from "wouter";
-import { ArrowRight, Wallet, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, BarChart3, Wallet, AlertCircle } from "lucide-react";
+
+type Periodo = "hoy" | "semana" | "mes" | "total";
+
+const PERIODOS: { value: Periodo; label: string }[] = [
+  { value: "hoy", label: "Hoy" },
+  { value: "semana", label: "Esta semana" },
+  { value: "mes", label: "Este mes" },
+  { value: "total", label: "Todo el tiempo" },
+];
 
 export default function Dashboard() {
-  const { data: summary, isLoading: isLoadingSummary } = useGetCobrosSummary();
-  const { data: cobros, isLoading: isLoadingCobros } = useListCobros();
-
+  const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [filtroResponsable, setFiltroResponsable] = useState<string>("todos");
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
+
+  const { data: metrics, isLoading: isLoadingMetrics } = useGetDashboardMetrics({ periodo });
+  const { data: cobros, isLoading: isLoadingCobros } = useListCobros();
 
   const responsablesUnicos = useMemo(() => {
     if (!cobros) return [];
@@ -41,54 +51,84 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Resumen en tiempo real de cobros e ingresos.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Métricas y resumen de tu actividad.</p>
+        </div>
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+          {PERIODOS.map((p) => (
+            <button
+              key={p.value}
+              onClick={() => setPeriodo(p.value)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                periodo === p.value
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {isLoadingSummary ? (
+      {isLoadingMetrics ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map(i => (
+          {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader className="h-10 bg-muted/50" />
               <CardContent className="h-16 bg-muted/20" />
             </Card>
           ))}
         </div>
-      ) : summary ? (
+      ) : metrics ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="shadow-sm border-primary/20 bg-primary/5">
+          <Card className="shadow-sm border-green-500/20 bg-green-500/5">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">Total ingresos</CardTitle>
-              <Wallet className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-green-700">Monto recaudado</CardTitle>
+              <Wallet className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold font-mono text-primary">{formatCurrency(summary.montoTotal)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{summary.total} cobros en total</p>
+              <div className="text-2xl font-bold font-mono text-green-700">{formatCurrency(metrics.montoRecaudado)}</div>
+              <p className="text-xs text-muted-foreground mt-1">{metrics.transaccionesPagadas} transacciones pagadas</p>
             </CardContent>
           </Card>
 
-          {summary.porEstado.map(stat => {
-            const icons: Record<string, React.ElementType> = {
-              pagado: CheckCircle2,
-              pendiente: Clock,
-              fallido: XCircle,
-              cancelado: XCircle,
-            };
-            const Icon = icons[stat.estado] || ArrowRight;
-            return (
-              <Card key={stat.estado} className="shadow-sm">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                  <CardTitle className="text-sm font-medium capitalize">{stat.estado}</CardTitle>
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold font-mono">{formatCurrency(stat.monto)}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.cantidad} cobros</p>
-                </CardContent>
-              </Card>
-            );
-          })}
+          <Card className="shadow-sm border-primary/20 bg-primary/5">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Ticket promedio</CardTitle>
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono text-primary">{formatCurrency(metrics.ticketPromedio)}</div>
+              <p className="text-xs text-muted-foreground mt-1">Por transacción pagada</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-amber-500/20 bg-amber-500/5">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-amber-700">Pendientes</CardTitle>
+              <Clock className="h-4 w-4 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono text-amber-700">{metrics.pendientesCantidad}</div>
+              <p className="text-xs text-muted-foreground mt-1">{formatCurrency(metrics.pendientesMonto)} por cobrar</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Transacciones pagadas</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono">{metrics.transaccionesPagadas}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {periodo === "hoy" ? "Hoy" : periodo === "semana" ? "Esta semana" : periodo === "mes" ? "Este mes" : "Histórico"}
+              </p>
+            </CardContent>
+          </Card>
         </div>
       ) : null}
 
@@ -115,7 +155,7 @@ export default function Dashboard() {
                 {responsablesUnicos.map(({ id, nombre }) => (
                   <SelectItem key={id} value={id}>{nombre}</SelectItem>
                 ))}
-                {cobros?.some(c => !c.responsableId) && (
+                {cobros?.some((c) => !c.responsableId) && (
                   <SelectItem value="sin_asignar">Sin asignar</SelectItem>
                 )}
               </SelectContent>
@@ -155,14 +195,14 @@ export default function Dashboard() {
               <TableRow className="bg-muted/50">
                 <TableHead>Fecha</TableHead>
                 <TableHead>Descripción</TableHead>
-                <TableHead>Responsable</TableHead>
+                <TableHead>Cliente / Responsable</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoadingCobros ? (
-                [1, 2, 3, 4, 5].map(i => (
+                [1, 2, 3, 4, 5].map((i) => (
                   <TableRow key={i} className="animate-pulse">
                     <TableCell><div className="h-4 w-20 bg-muted rounded" /></TableCell>
                     <TableCell><div className="h-4 w-48 bg-muted rounded" /></TableCell>
@@ -191,16 +231,21 @@ export default function Dashboard() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      {cobro.responsableNombre ? (
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-semibold shrink-0">
-                            {cobro.responsableNombre.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                      <div className="flex flex-col gap-0.5">
+                        {cobro.clienteNombre && (
+                          <span className="text-sm font-medium text-foreground">{cobro.clienteNombre}</span>
+                        )}
+                        {cobro.responsableNombre ? (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[9px] font-semibold shrink-0">
+                              {cobro.responsableNombre.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </div>
+                            <span className="truncate max-w-[100px]">{cobro.responsableNombre}</span>
                           </div>
-                          <span className="truncate max-w-[110px]">{cobro.responsableNombre}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground/40 text-sm">—</span>
-                      )}
+                        ) : (
+                          <span className="text-muted-foreground/40 text-xs">—</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={cobro.estado} />

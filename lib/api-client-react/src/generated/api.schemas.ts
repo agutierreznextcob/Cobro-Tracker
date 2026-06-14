@@ -9,6 +9,28 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface Cliente {
+  id: number;
+  nombre: string;
+  /** @nullable */
+  rut?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  userId: string;
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
+export interface ClienteInput {
+  /** @minLength 1 */
+  nombre: string;
+  rut?: string;
+  email?: string;
+  telefono?: string;
+}
+
 export type CobroEstado = typeof CobroEstado[keyof typeof CobroEstado];
 
 
@@ -41,6 +63,16 @@ export interface Cobro {
      */
   responsableNombre?: string | null;
   /**
+     * ID of the associated cliente
+     * @nullable
+     */
+  clienteId?: number | null;
+  /**
+     * Name of the associated cliente
+     * @nullable
+     */
+  clienteNombre?: string | null;
+  /**
      * Email of the payer for Flow payment link
      * @nullable
      */
@@ -59,12 +91,48 @@ export interface Cobro {
   actualizadoEn?: string;
 }
 
+export interface ClienteConHistorial {
+  id: number;
+  nombre: string;
+  /** @nullable */
+  rut?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  userId: string;
+  creadoEn: string;
+  actualizadoEn: string;
+  cobros: Cobro[];
+}
+
+export type DashboardMetricasPeriodo = typeof DashboardMetricasPeriodo[keyof typeof DashboardMetricasPeriodo];
+
+
+export const DashboardMetricasPeriodo = {
+  hoy: 'hoy',
+  semana: 'semana',
+  mes: 'mes',
+  total: 'total',
+} as const;
+
+export interface DashboardMetricas {
+  transaccionesPagadas: number;
+  montoRecaudado: number;
+  ticketPromedio: number;
+  pendientesCantidad: number;
+  pendientesMonto: number;
+  periodo: DashboardMetricasPeriodo;
+}
+
 export interface CobroInput {
   /** @minimum 0.01 */
   monto: number;
   /** @minLength 1 */
   descripcion: string;
   referencia?: string;
+  /** Associate an existing cliente */
+  clienteId?: number;
   emailPagador?: string;
 }
 
@@ -235,6 +303,27 @@ code?: string;
 state?: string;
 iss?: string;
 };
+
+export type ListClientesParams = {
+/**
+ * Search by nombre or RUT
+ */
+q?: string;
+};
+
+export type GetDashboardMetricsParams = {
+periodo?: GetDashboardMetricsPeriodo;
+};
+
+export type GetDashboardMetricsPeriodo = typeof GetDashboardMetricsPeriodo[keyof typeof GetDashboardMetricsPeriodo];
+
+
+export const GetDashboardMetricsPeriodo = {
+  hoy: 'hoy',
+  semana: 'semana',
+  mes: 'mes',
+  total: 'total',
+} as const;
 
 export type ListWebhookEventosParams = {
 limit?: number;

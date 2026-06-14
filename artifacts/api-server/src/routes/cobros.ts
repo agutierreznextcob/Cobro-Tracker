@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, cobrosTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { db, cobrosTable, clientesTable } from "@workspace/db";
+import { eq, desc, sql, and, gte } from "drizzle-orm";
 import {
   CreateCobroBody,
   UpdateCobroBody,
@@ -50,12 +50,20 @@ cobrosRouter.post("/cobros", async (req, res) => {
 
   const { monto, descripcion, referencia } = parsed.data;
   const emailPagador = (parsed.data as Record<string, unknown>).emailPagador as string | undefined;
+  const clienteId = (parsed.data as Record<string, unknown>).clienteId as number | undefined;
   const user = req.isAuthenticated() ? req.user : null;
   const responsableNombre = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null
     : null;
 
   try {
+    // Optionally resolve client name if clienteId provided
+    let clienteNombre: string | null = null;
+    if (clienteId) {
+      const [cliente] = await db.select().from(clientesTable).where(eq(clientesTable.id, clienteId));
+      if (cliente) clienteNombre = cliente.nombre;
+    }
+
     const [cobro] = await db
       .insert(cobrosTable)
       .values({
@@ -65,6 +73,8 @@ cobrosRouter.post("/cobros", async (req, res) => {
         estado: "pendiente",
         responsableId: user?.id ?? null,
         responsableNombre,
+        clienteId: clienteId ?? null,
+        clienteNombre,
         emailPagador: emailPagador ?? null,
       })
       .returning();
@@ -256,6 +266,60 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Error updating cobro");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Dashboard metrics — scoped to current user, with period filter
+cobrosRouter.get("/dashboard/metrics", async (req, res) => {
+  const userId = req.user!.id;
+  const periodo = (req.query.periodo as string) || "mes";
+
+  let periodStart: Date | null = null;
+  const now = new Date();
+  if (periodo === "hoy") {
+    periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  } else if (periodo === "semana") {
+    const day = now.getDay(); // 0=Sun
+    const diff = (day + 6) % 7; // days since Monday
+    periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff, 0, 0, 0, 0);
+  } else if (periodo === "mes") {
+    periodStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  }
+  // "total" => no date filter
+
+  try {
+    const baseConditions = periodStart
+      ? and(eq(cobrosTable.responsableId, userId), gte(cobrosTable.creadoEn, periodStart))
+      : eq(cobrosTable.responsableId, userId);
+
+    const rows = await db
+      .select({
+        estado: cobrosTable.estado,
+        cantidad: sql<number>`count(*)::int`,
+        monto: sql<number>`coalesce(sum(${cobrosTable.monto})::float, 0)`,
+      })
+      .from(cobrosTable)
+      .where(baseConditions)
+      .groupBy(cobrosTable.estado);
+
+    const pagado = rows.find((r) => r.estado === "pagado");
+    const pendiente = rows.find((r) => r.estado === "pendiente");
+
+    const transaccionesPagadas = pagado?.cantidad ?? 0;
+    const montoRecaudado = pagado?.monto ?? 0;
+    const ticketPromedio = transaccionesPagadas > 0 ? montoRecaudado / transaccionesPagadas : 0;
+
+    res.json({
+      transaccionesPagadas,
+      montoRecaudado,
+      ticketPromedio,
+      pendientesCantidad: pendiente?.cantidad ?? 0,
+      pendientesMonto: pendiente?.monto ?? 0,
+      periodo: ["hoy", "semana", "mes", "total"].includes(periodo) ? periodo : "mes",
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error getting dashboard metrics");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

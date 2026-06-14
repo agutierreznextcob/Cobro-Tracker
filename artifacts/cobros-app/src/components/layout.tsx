@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Activity, Webhook, LogOut, Search, UserCircle } from "lucide-react";
+import { Home, Plus, Activity, Webhook, LogOut, Search, UserCircle, Users } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 
@@ -56,6 +56,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/cobros/nuevo", label: "Nuevo cobro", icon: Plus },
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
+    { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/webhooks/log", label: "Log webhooks", icon: Webhook },
     { href: "/perfil", label: "Perfil", icon: UserCircle },
   ];

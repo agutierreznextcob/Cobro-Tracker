@@ -29,6 +29,16 @@ export interface Cobro {
      */
   responsableNombre?: string | null;
   /**
+     * ID of the associated cliente
+     * @nullable
+     */
+  clienteId?: number | null;
+  /**
+     * Name of the associated cliente
+     * @nullable
+     */
+  clienteNombre?: string | null;
+  /**
      * Email of the payer for Flow payment link
      * @nullable
      */

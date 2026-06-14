@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: cobros
     description: Cobros (charges) operations
+  - name: clientes
+    description: Clientes operations
   - name: webhooks
     description: Webhook endpoints
   - name: Auth
@@ -147,6 +149,113 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  /clientes:
+    get:
+      operationId: listClientes
+      tags: [clientes]
+      summary: List clientes for the current user
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search by nombre or RUT
+      responses:
+        "200":
+          description: List of clientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Cliente"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createCliente
+      tags: [clientes]
+      summary: Create a new cliente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClienteInput"
+      responses:
+        "201":
+          description: Created cliente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cliente"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+
+  /clientes/{id}:
+    get:
+      operationId: getCliente
+      tags: [clientes]
+      summary: Get a cliente by ID with cobros history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cliente with cobros history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClienteConHistorial"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+    patch:
+      operationId: updateCliente
+      tags: [clientes]
+      summary: Update a cliente
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClienteInput"
+      responses:
+        "200":
+          description: Updated cliente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cliente"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+
   /cobros:
     get:
       operationId: listCobros
@@ -255,6 +364,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CobrosSummary"
+
+  /dashboard/metrics:
+    get:
+      operationId: getDashboardMetrics
+      tags: [cobros]
+      summary: Get dashboard metrics for the current user
+      description: Returns key performance metrics scoped to the current user, with period filtering
+      parameters:
+        - name: periodo
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [hoy, semana, mes, total]
+            default: mes
+      responses:
+        "200":
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardMetricas"
+        "401":
+          description: Unauthorized
 
   /profile/flow-credentials:
     get:
@@ -447,6 +580,89 @@ components:
       required:
         - status
 
+    Cliente:
+      type: object
+      required: [id, nombre, userId, creadoEn, actualizadoEn]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        rut:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        userId:
+          type: string
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+
+    ClienteInput:
+      type: object
+      required: [nombre]
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+        rut:
+          type: string
+        email:
+          type: string
+          format: email
+        telefono:
+          type: string
+
+    ClienteConHistorial:
+      type: object
+      required: [id, nombre, userId, creadoEn, actualizadoEn, cobros]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        rut:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        userId:
+          type: string
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+        cobros:
+          type: array
+          items:
+            $ref: "#/components/schemas/Cobro"
+
+    DashboardMetricas:
+      type: object
+      required: [transaccionesPagadas, montoRecaudado, ticketPromedio, pendientesCantidad, pendientesMonto, periodo]
+      properties:
+        transaccionesPagadas:
+          type: integer
+        montoRecaudado:
+          type: number
+        ticketPromedio:
+          type: number
+        pendientesCantidad:
+          type: integer
+        pendientesMonto:
+          type: number
+        periodo:
+          type: string
+          enum: [hoy, semana, mes, total]
+
     Cobro:
       type: object
       required: [id, monto, descripcion, estado, creadoEn]
@@ -470,6 +686,12 @@ components:
         responsableNombre:
           type: ["string", "null"]
           description: Display name of the person who created this cobro
+        clienteId:
+          type: ["integer", "null"]
+          description: ID of the associated cliente
+        clienteNombre:
+          type: ["string", "null"]
+          description: Name of the associated cliente
         emailPagador:
           type: ["string", "null"]
           description: Email of the payer for Flow payment link
@@ -498,6 +720,9 @@ components:
           minLength: 1
         referencia:
           type: string
+        clienteId:
+          type: integer
+          description: Associate an existing cliente
         emailPagador:
           type: string
           format: email

@@ -97,6 +97,104 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary List clientes for the current user
+ */
+export const ListClientesQueryParams = zod.object({
+  "q": zod.coerce.string().optional().describe('Search by nombre or RUT')
+})
+
+export const ListClientesResponseItem = zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "rut": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "userId": zod.string(),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date()
+})
+export const ListClientesResponse = zod.array(ListClientesResponseItem)
+
+
+/**
+ * @summary Create a new cliente
+ */
+
+
+
+export const CreateClienteBody = zod.object({
+  "nombre": zod.string().min(1),
+  "rut": zod.string().optional(),
+  "email": zod.string().email().optional(),
+  "telefono": zod.string().optional()
+})
+
+
+/**
+ * @summary Get a cliente by ID with cobros history
+ */
+export const GetClienteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetClienteResponse = zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "rut": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "userId": zod.string(),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date(),
+  "cobros": zod.array(zod.object({
+  "id": zod.number(),
+  "monto": zod.number().describe('Amount in currency units'),
+  "descripcion": zod.string(),
+  "estado": zod.enum(['pendiente', 'pagado', 'fallido', 'cancelado']),
+  "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
+  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
+  "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
+  "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
+  "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date().optional()
+}))
+})
+
+
+/**
+ * @summary Update a cliente
+ */
+export const UpdateClienteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateClienteBody = zod.object({
+  "nombre": zod.string().min(1),
+  "rut": zod.string().optional(),
+  "email": zod.string().email().optional(),
+  "telefono": zod.string().optional()
+})
+
+export const UpdateClienteResponse = zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "rut": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "userId": zod.string(),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date()
+})
+
+
+/**
  * Returns all cobros ordered by creation date desc
  * @summary List all cobros
  */
@@ -108,6 +206,8 @@ export const ListCobrosResponseItem = zod.object({
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
+  "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
@@ -129,6 +229,7 @@ export const CreateCobroBody = zod.object({
   "monto": zod.number().min(createCobroBodyMontoMin),
   "descripcion": zod.string().min(1),
   "referencia": zod.string().optional(),
+  "clienteId": zod.number().optional().describe('Associate an existing cliente'),
   "emailPagador": zod.string().email().optional()
 })
 
@@ -148,6 +249,8 @@ export const GetCobroResponse = zod.object({
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
+  "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
@@ -180,6 +283,8 @@ export const UpdateCobroResponse = zod.object({
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
+  "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
@@ -200,6 +305,26 @@ export const GetCobrosSummaryResponse = zod.object({
   "cantidad": zod.number(),
   "monto": zod.number()
 }))
+})
+
+
+/**
+ * Returns key performance metrics scoped to the current user, with period filtering
+ * @summary Get dashboard metrics for the current user
+ */
+export const getDashboardMetricsQueryPeriodoDefault = `mes`;
+
+export const GetDashboardMetricsQueryParams = zod.object({
+  "periodo": zod.enum(['hoy', 'semana', 'mes', 'total']).default(getDashboardMetricsQueryPeriodoDefault)
+})
+
+export const GetDashboardMetricsResponse = zod.object({
+  "transaccionesPagadas": zod.number(),
+  "montoRecaudado": zod.number(),
+  "ticketPromedio": zod.number(),
+  "pendientesCantidad": zod.number(),
+  "pendientesMonto": zod.number(),
+  "periodo": zod.enum(['hoy', 'semana', 'mes', 'total'])
 })
 
 

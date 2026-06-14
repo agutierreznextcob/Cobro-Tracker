@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import cobrosRouter from "./cobros";
+import clientesRouter from "./clientes";
 import webhooksRouter from "./webhooks";
 import { profileRouter } from "./profile";
 
@@ -14,6 +15,7 @@ router.use(authRouter);
 // every request including public webhook paths like /webhooks/flow.
 router.use(webhooksRouter);
 router.use(cobrosRouter);
+router.use(clientesRouter);
 router.use(profileRouter);
 
 export default router;
