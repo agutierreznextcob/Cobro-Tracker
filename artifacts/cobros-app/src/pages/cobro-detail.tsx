@@ -309,20 +309,26 @@ export default function CobroDetail() {
                     Orden Flow: <span className="font-mono">{cobro.flowOrdenId}</span>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <a
-                      href={cobro.flowLinkPago ?? undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground h-9 px-3 text-sm font-medium shadow hover:bg-primary/90 transition-colors"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Ir al pago
-                    </a>
-                    <Button variant="outline" size="sm" onClick={handleCopyLink} className="w-full">
-                      <Copy className="h-3.5 w-3.5 mr-1.5" />
-                      Copiar link
-                    </Button>
-                    {/* WhatsApp button — always visible when link exists */}
+                    {/* Primary: send email */}
+                    {hasEmail ? (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={handleRecordatorioEmail}
+                        disabled={enviarRecordatorio.isPending}
+                      >
+                        {enviarRecordatorio.isPending ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Enviando...</>
+                        ) : (
+                          <><Mail className="h-3.5 w-3.5 mr-1.5" />Enviar por email</>
+                        )}
+                      </Button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-1">
+                        Sin email del pagador para enviar.
+                      </p>
+                    )}
+                    {/* WhatsApp */}
                     <Button
                       variant="outline"
                       size="sm"
@@ -332,6 +338,27 @@ export default function CobroDetail() {
                       <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
                       Enviar por WhatsApp
                     </Button>
+                    {/* Secondary: link actions row */}
+                    <div className="flex gap-1.5 pt-1">
+                      <a
+                        href={cobro.flowLinkPago ?? undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border h-8 px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Ir al pago
+                      </a>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-muted-foreground"
+                        onClick={handleCopyLink}
+                        title="Copiar link"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 </>
               ) : (

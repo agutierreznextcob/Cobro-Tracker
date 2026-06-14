@@ -228,7 +228,9 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
       monto: Number(cobro.monto),
       linkPago: result.url,
       comercioNombre: cobro.responsableNombre || "Cobro Simple",
-    }, req.log).catch(() => {});
+    }, req.log).catch((err) => {
+      req.log.warn({ err }, "Unhandled error in payment link email");
+    });
 
     res.json({ linkPago: updated.flowLinkPago!, flowOrdenId: updated.flowOrdenId! });
   } catch (err) {
@@ -265,7 +267,7 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
       return;
     }
 
-    const sent = await sendRecordatorioEmail({
+    const result = await sendRecordatorioEmail({
       emailPagador: cobro.emailPagador,
       clienteNombre: cobro.clienteNombre,
       descripcion: cobro.descripcion,
@@ -274,8 +276,9 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
       comercioNombre: cobro.responsableNombre || "Cobro Simple",
     }, req.log);
 
-    if (!sent) {
-      res.status(500).json({ error: "No se pudo enviar el email. Verifica que RESEND_API_KEY esté configurado." });
+    if (!result.ok) {
+      req.log.warn({ cobroId: cobro.id, emailError: result.error }, "Reminder email failed");
+      res.status(500).json({ error: result.error ?? "No se pudo enviar el email." });
       return;
     }
 

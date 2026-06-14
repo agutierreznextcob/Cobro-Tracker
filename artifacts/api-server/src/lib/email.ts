@@ -101,11 +101,16 @@ export interface CobrosEmailData {
   comercioNombre: string;
 }
 
-export async function sendPaymentLinkEmail(data: CobrosEmailData, log?: { warn: (obj: object, msg: string) => void }): Promise<boolean> {
+export interface EmailResult {
+  ok: boolean;
+  error?: string;
+}
+
+export async function sendPaymentLinkEmail(data: CobrosEmailData, log?: { warn: (obj: object, msg: string) => void }): Promise<EmailResult> {
   const client = getResend();
   if (!client) {
     log?.warn({}, "RESEND_API_KEY not set — skipping payment link email");
-    return false;
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
   }
 
   const montoFormato = formatCLP(data.monto);
@@ -134,17 +139,18 @@ export async function sendPaymentLinkEmail(data: CobrosEmailData, log?: { warn: 
   });
 
   if (error) {
-    log?.warn({ error }, "Error sending payment link email via Resend");
-    return false;
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending payment link email via Resend");
+    return { ok: false, error: msg };
   }
-  return true;
+  return { ok: true };
 }
 
-export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn: (obj: object, msg: string) => void }): Promise<boolean> {
+export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn: (obj: object, msg: string) => void }): Promise<EmailResult> {
   const client = getResend();
   if (!client) {
     log?.warn({}, "RESEND_API_KEY not set — skipping reminder email");
-    return false;
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
   }
 
   const montoFormato = formatCLP(data.monto);
@@ -173,8 +179,9 @@ export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn:
   });
 
   if (error) {
-    log?.warn({ error }, "Error sending reminder email via Resend");
-    return false;
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending reminder email via Resend");
+    return { ok: false, error: msg };
   }
-  return true;
+  return { ok: true };
 }
