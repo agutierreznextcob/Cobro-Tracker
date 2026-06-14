@@ -1,6 +1,6 @@
 import { useListLiquidaciones } from "@workspace/api-client-react";
 import { Link } from "wouter";
-import { Landmark, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
+import { Landmark, ChevronRight, AlertCircle, RefreshCw, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,41 @@ export default function LiquidacionesPage() {
       ?? (error as { message?: string })?.message
       ?? "Error al cargar las liquidaciones";
 
+    const isSandbox = msg === "FLOW_SANDBOX_MODE";
     const isNoCreds = msg.toLowerCase().includes("credencial") || msg.toLowerCase().includes("configurad");
+
+    if (isSandbox) {
+      return (
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <Landmark className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold">Liquidaciones Flow</h1>
+          </div>
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100">
+                <FlaskConical className="h-7 w-7 text-amber-600" />
+              </div>
+              <div className="space-y-1">
+                <p className="font-semibold text-amber-900">Ambiente de pruebas activo</p>
+                <p className="text-sm text-amber-700 max-w-sm">
+                  Las liquidaciones estarán disponibles cuando actives tu cuenta de Flow en modo producción.
+                  Por ahora estás en ambiente de pruebas.
+                </p>
+              </div>
+              <a
+                href="https://www.flow.cl"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-amber-600 underline underline-offset-2"
+              >
+                Más información en flow.cl →
+              </a>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
 
     return (
       <div className="max-w-3xl mx-auto">

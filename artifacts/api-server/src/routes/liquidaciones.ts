@@ -27,8 +27,14 @@ liquidacionesRouter.get("/liquidaciones", async (req, res) => {
     const result = await listarLiquidaciones(creds.apiKey, creds.secretKey, { start, limit });
     res.json(result);
   } catch (err) {
-    req.log.error({ err }, "Error listing liquidaciones from Flow");
     const message = err instanceof Error ? err.message : "Error interno";
+    // Flow code 105 = "No services available" — expected in sandbox/test mode
+    if (message.includes('"code":105') || message.includes('"code": 105')) {
+      req.log.info({ err }, "Flow returned sandbox mode (code 105) for liquidaciones");
+      res.status(422).json({ error: "FLOW_SANDBOX_MODE" });
+      return;
+    }
+    req.log.error({ err }, "Error listing liquidaciones from Flow");
     res.status(502).json({ error: message });
   }
 });
