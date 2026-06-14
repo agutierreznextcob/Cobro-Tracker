@@ -4,6 +4,7 @@ import {
   getGetCobroQueryKey,
   useUpdateCobro,
   useGenerarFlowLink,
+  useGenerarMpLink,
   useEnviarRecordatorioEmail,
   getListCobrosQueryKey,
   getGetCobrosSummaryQueryKey,
@@ -65,6 +66,7 @@ export default function CobroDetail() {
   });
   const updateCobro = useUpdateCobro();
   const generarFlowLink = useGenerarFlowLink();
+  const generarMpLink = useGenerarMpLink();
   const enviarRecordatorio = useEnviarRecordatorioEmail();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -145,6 +147,40 @@ export default function CobroDetail() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const handleGenerarMpLink = () => {
+    generarMpLink.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          toast({ title: "Link de pago generado", description: "El link de MercadoPago fue creado exitosamente." });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
+          toast({ title: "Error al generar link MP", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const handleCopyMpLink = async () => {
+    if (cobro?.mpPaymentLinkUrl) {
+      await navigator.clipboard.writeText(cobro.mpPaymentLinkUrl);
+      toast({ title: "Link copiado", description: "El link de MercadoPago fue copiado al portapapeles." });
+    }
+  };
+
+  const handleWhatsAppMp = () => {
+    if (!cobro?.mpPaymentLinkUrl) return;
+    const url = buildWhatsappUrl({
+      clienteNombre: cobro.clienteNombre ?? null,
+      monto: cobro.monto,
+      descripcion: cobro.descripcion,
+      linkPago: cobro.mpPaymentLinkUrl,
+    });
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   if (isLoading) {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
@@ -173,6 +209,7 @@ export default function CobroDetail() {
 
   const isPendiente = cobro.estado === "pendiente";
   const hasFlowLink = !!cobro.flowLinkPago;
+  const hasMpLink = !!cobro.mpPaymentLinkUrl;
   const hasEmail = !!cobro.emailPagador;
 
   return (
@@ -417,6 +454,72 @@ export default function CobroDetail() {
                       </Button>
                     </>
                   )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* MercadoPago payment card */}
+          <Card className="shadow-sm border-border/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-[#009ee3]" />
+                Pago con MercadoPago
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {hasMpLink ? (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-green-600/40 text-green-700 hover:bg-green-50 hover:border-green-600"
+                      onClick={handleWhatsAppMp}
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                      Enviar por WhatsApp
+                    </Button>
+                    <div className="flex gap-1.5 pt-1">
+                      <a
+                        href={cobro.mpPaymentLinkUrl ?? undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border h-8 px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Ir al pago
+                      </a>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-muted-foreground"
+                        onClick={handleCopyMpLink}
+                        title="Copiar link"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Genera un link de pago en MercadoPago. Requiere tener tu Access Token configurado en el perfil.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleGenerarMpLink}
+                    disabled={generarMpLink.isPending}
+                  >
+                    {generarMpLink.isPending ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Generando...</>
+                    ) : (
+                      <><Link2 className="h-3.5 w-3.5 mr-1.5" />Generar link MercadoPago</>
+                    )}
+                  </Button>
                 </div>
               )}
             </CardContent>

@@ -4,6 +4,7 @@ import { db, cobrosTable, webhookEventosTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { ReceiveCobroWebhookBody } from "@workspace/api-zod";
 import { verificarPagoFlow } from "../lib/flow-api";
+import { obtenerPagoMp } from "../lib/mp-api";
 import { getFlowCredentials } from "./profile";
 
 const webhooksRouter = Router();
@@ -153,6 +154,109 @@ webhooksRouter.post("/webhooks/flow", async (req, res) => {
     req.log.error({ err, token }, "Error processing Flow webhook");
     await logEvento({ evento: "flow.webhook.error", cobroId: null, ipOrigen: ip, exitoso: false, detalle: `Error interno: ${String(err)}` });
     // Return 200 so Flow doesn't retry infinitely — the error is on our side
+    res.status(200).json({ ok: false, error: "Error interno" });
+  }
+});
+
+// MercadoPago sends POST to notification_url with ?topic=payment&id=PAYMENT_ID
+// or ?type=payment&data.id=PAYMENT_ID (newer IPN format).
+// We verify the real payment status by calling the MP Payments API.
+webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
+  const ip = getClientIp(req as Parameters<typeof getClientIp>[0]);
+
+  // Support both IPN formats
+  const paymentId = (req.query.id ?? req.query["data.id"] ?? req.body?.data?.id) as string | undefined;
+  const topic = (req.query.topic ?? req.query.type ?? req.body?.type) as string | undefined;
+
+  req.log.info({ paymentId, topic, body: req.body, query: req.query }, "MercadoPago webhook received");
+
+  if (!paymentId || (topic && topic !== "payment" && topic !== "merchant_order")) {
+    await logEvento({ evento: "mp.webhook.ignorado", cobroId: null, ipOrigen: ip, exitoso: true, detalle: `topic=${topic}, id=${paymentId}` });
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  try {
+    // Find cobro by externalReference: `cobro-{id}`
+    // But we need the MP access token first — we'll search by mpPreferenceId approach:
+    // MP sends data.id (paymentId), we call GET /v1/payments/{id} to get external_reference
+    // external_reference = "cobro-{cobroId}"
+    // We need any valid MP access token — use the cobro owner's token
+
+    // First, do a quick DB lookup by approximating — we'll look at all cobros with mpPreferenceId set
+    // and find the one whose external_reference matches.
+    // More efficient: decode external_reference from payment after fetching with any user's token.
+    // Since we don't know whose token to use upfront, we try the cobro's responsableId after lookup.
+
+    // Strategy: find cobro using external_reference from the payment.
+    // We need a token to call MP API. We'll look up cobros with mpPreferenceId set first,
+    // then match by external_reference "cobro-{id}".
+
+    // Use the MP_ACCESS_TOKEN env var as a fallback global token for webhook verification
+    const globalToken = process.env.MP_ACCESS_TOKEN;
+    if (!globalToken) {
+      req.log.warn("MP_ACCESS_TOKEN not set — cannot verify MercadoPago payment");
+      await logEvento({ evento: "mp.webhook.error", cobroId: null, ipOrigen: ip, exitoso: false, detalle: "MP_ACCESS_TOKEN no configurado" });
+      res.status(200).json({ ok: false, error: "Token MP no configurado" });
+      return;
+    }
+
+    const payment = await obtenerPagoMp(globalToken, paymentId);
+    req.log.info({ paymentId, status: payment.status, externalRef: payment.external_reference }, "MercadoPago payment verified");
+
+    // Parse cobro ID from external_reference "cobro-{id}"
+    const match = payment.external_reference?.match(/^cobro-(\d+)$/);
+    if (!match) {
+      await logEvento({ evento: "mp.webhook.ignorado", cobroId: null, ipOrigen: ip, exitoso: true, detalle: `external_reference desconocida: ${payment.external_reference}` });
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    const cobroId = parseInt(match[1], 10);
+    const [cobro] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, cobroId));
+
+    if (!cobro) {
+      await logEvento({ evento: "mp.webhook.error", cobroId: null, ipOrigen: ip, exitoso: false, detalle: `Cobro #${cobroId} no encontrado` });
+      res.status(200).json({ ok: false, error: "Cobro no encontrado" });
+      return;
+    }
+
+    // Map MP status to cobro estado
+    const estadoMap: Record<string, "pagado" | "fallido" | "cancelado" | "pendiente"> = {
+      approved: "pagado",
+      rejected: "fallido",
+      cancelled: "cancelado",
+      refunded: "cancelado",
+      in_process: "pendiente",
+      pending: "pendiente",
+      authorized: "pendiente",
+    };
+
+    const nuevoEstado = estadoMap[payment.status];
+    if (!nuevoEstado || nuevoEstado === "pendiente") {
+      await logEvento({ evento: `mp.pago.${payment.status}`, cobroId: cobro.id, ipOrigen: ip, exitoso: true, detalle: `MP status ${payment.status} — sin cambio de estado` });
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    await db
+      .update(cobrosTable)
+      .set({ estado: nuevoEstado, actualizadoEn: new Date() })
+      .where(eq(cobrosTable.id, cobro.id));
+
+    await logEvento({
+      evento: `mp.pago.${nuevoEstado}`,
+      cobroId: cobro.id,
+      ipOrigen: ip,
+      exitoso: true,
+      detalle: `MP payment ${paymentId} status=${payment.status} → ${nuevoEstado}`,
+    });
+
+    req.log.info({ cobroId: cobro.id, nuevoEstado, paymentId }, "Cobro updated via MercadoPago webhook");
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    req.log.error({ err, paymentId }, "Error processing MercadoPago webhook");
+    await logEvento({ evento: "mp.webhook.error", cobroId: null, ipOrigen: ip, exitoso: false, detalle: `Error interno: ${String(err)}` });
     res.status(200).json({ ok: false, error: "Error interno" });
   }
 });

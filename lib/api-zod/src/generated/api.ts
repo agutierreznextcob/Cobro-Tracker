@@ -159,6 +159,8 @@ export const GetClienteResponse = zod.object({
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
+  "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
+  "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 }))
@@ -340,6 +342,8 @@ export const ListCobrosResponseItem = zod.object({
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
+  "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
+  "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -383,6 +387,8 @@ export const GetCobroResponse = zod.object({
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
+  "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
+  "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -417,6 +423,8 @@ export const UpdateCobroResponse = zod.object({
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
+  "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
+  "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -503,6 +511,37 @@ export const EnviarRecordatorioEmailResponse = zod.object({
 
 
 /**
+ * @summary Get MercadoPago credentials status for current user
+ */
+export const GetMpCredentialsResponse = zod.object({
+  "configurado": zod.boolean()
+})
+
+
+/**
+ * @summary Save or update MercadoPago Access Token for current user
+ */
+
+
+
+export const SaveMpCredentialsBody = zod.object({
+  "accessToken": zod.string().min(1)
+})
+
+export const SaveMpCredentialsResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Delete MercadoPago credentials for current user
+ */
+export const DeleteMpCredentialsResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary Generate a Flow payment link for a cobro
  */
 export const GenerarFlowLinkParams = zod.object({
@@ -516,6 +555,28 @@ export const GenerarFlowLinkBody = zod.object({
 export const GenerarFlowLinkResponse = zod.object({
   "linkPago": zod.string(),
   "flowOrdenId": zod.string()
+})
+
+
+/**
+ * @summary Generate a MercadoPago payment link for a cobro
+ */
+export const GenerarMpLinkParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GenerarMpLinkResponse = zod.object({
+  "linkPago": zod.string(),
+  "preferenceId": zod.string()
+})
+
+
+/**
+ * MercadoPago calls this endpoint when a payment event occurs.
+ * @summary Receive payment notification from MercadoPago
+ */
+export const ReceiveMpWebhookResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 

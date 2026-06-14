@@ -24,6 +24,8 @@ export const cobrosTable = pgTable("cobros", {
   flowOrdenId: text("flow_orden_id"),
   flowToken: text("flow_token"),
   flowLinkPago: text("flow_link_pago"),
+  mpPreferenceId: text("mp_preference_id"),
+  mpPaymentLinkUrl: text("mp_payment_link_url"),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),
 });

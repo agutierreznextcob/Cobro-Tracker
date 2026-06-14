@@ -53,6 +53,16 @@ export interface Cobro {
      * @nullable
      */
   flowLinkPago?: string | null;
+  /**
+     * MercadoPago preference ID
+     * @nullable
+     */
+  mpPreferenceId?: string | null;
+  /**
+     * MercadoPago checkout URL for the payer
+     * @nullable
+     */
+  mpPaymentLinkUrl?: string | null;
   creadoEn: Date;
   actualizadoEn?: Date;
 }

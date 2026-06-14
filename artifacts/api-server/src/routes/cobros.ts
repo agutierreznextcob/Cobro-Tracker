@@ -8,8 +8,9 @@ import {
   UpdateCobroParams,
 } from "@workspace/api-zod";
 import { z } from "zod";
-import { getFlowCredentials } from "./profile";
+import { getFlowCredentials, getMpCredentials } from "./profile";
 import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
+import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail } from "../lib/email";
 
 const cobrosRouter = Router();
@@ -236,6 +237,67 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error creating Flow payment link");
     res.status(500).json({ error: `Error al crear orden en Flow: ${err instanceof Error ? err.message : String(err)}` });
+  }
+});
+
+cobrosRouter.post("/cobros/:id/mp-link", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+
+  const userId = req.user!.id;
+
+  try {
+    const [cobro] = await db
+      .select()
+      .from(cobrosTable)
+      .where(eq(cobrosTable.id, paramsParsed.data.id));
+
+    if (!cobro) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+
+    if (cobro.mpPaymentLinkUrl) {
+      res.json({ linkPago: cobro.mpPaymentLinkUrl, preferenceId: cobro.mpPreferenceId! });
+      return;
+    }
+
+    const accessToken = await getMpCredentials(userId);
+    if (!accessToken) {
+      res.status(400).json({ error: "No tienes credenciales de MercadoPago configuradas. Ve a tu perfil para configurarlas." });
+      return;
+    }
+
+    const baseUrl = getPublicBaseUrl();
+    req.log.info({ baseUrl }, "Generating MercadoPago payment link");
+
+    const result = await crearPreferenciaMp(accessToken, {
+      title: cobro.descripcion.slice(0, 256),
+      quantity: 1,
+      unitPrice: Math.round(Number(cobro.monto)),
+      externalReference: `cobro-${cobro.id}`,
+      notificationUrl: `${baseUrl}/api/webhooks/mercadopago`,
+      backUrl: `${baseUrl}/cobros/${cobro.id}`,
+    });
+
+    const [updated] = await db
+      .update(cobrosTable)
+      .set({
+        mpPreferenceId: result.preferenceId,
+        mpPaymentLinkUrl: result.initPoint,
+        actualizadoEn: new Date(),
+      })
+      .where(eq(cobrosTable.id, cobro.id))
+      .returning();
+
+    req.log.info({ cobroId: cobro.id, preferenceId: result.preferenceId }, "MercadoPago payment link created");
+    res.json({ linkPago: updated.mpPaymentLinkUrl!, preferenceId: updated.mpPreferenceId! });
+  } catch (err) {
+    req.log.error({ err }, "Error creating MercadoPago payment link");
+    res.status(500).json({ error: `Error al crear preferencia en MercadoPago: ${err instanceof Error ? err.message : String(err)}` });
   }
 });
 

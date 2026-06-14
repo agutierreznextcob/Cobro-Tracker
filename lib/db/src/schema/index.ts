@@ -3,5 +3,6 @@ export * from "./cobros";
 export * from "./webhook-eventos";
 export * from "./auth";
 export * from "./flow-credentials";
+export * from "./mp-credentials";
 export * from "./conversations";
 export * from "./messages";

@@ -87,6 +87,16 @@ export interface Cobro {
      * @nullable
      */
   flowLinkPago?: string | null;
+  /**
+     * MercadoPago preference ID
+     * @nullable
+     */
+  mpPreferenceId?: string | null;
+  /**
+     * MercadoPago checkout URL for the payer
+     * @nullable
+     */
+  mpPaymentLinkUrl?: string | null;
   creadoEn: string;
   actualizadoEn?: string;
 }
@@ -134,6 +144,20 @@ export interface CobroInput {
   /** Associate an existing cliente */
   clienteId?: number;
   emailPagador?: string;
+}
+
+export interface MpCredentialsStatus {
+  configurado: boolean;
+}
+
+export interface MpCredentialsInput {
+  /** @minLength 1 */
+  accessToken: string;
+}
+
+export interface MpLinkResponse {
+  linkPago: string;
+  preferenceId: string;
 }
 
 export interface FlowCredentialsStatus {

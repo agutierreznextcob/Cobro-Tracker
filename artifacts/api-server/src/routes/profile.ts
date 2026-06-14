@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db, flowCredencialesTable } from "@workspace/db";
+import { db, flowCredencialesTable, mpCredencialesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { encrypt, decrypt } from "../lib/encrypt";
 
@@ -98,7 +98,85 @@ profileRouter.delete("/profile/flow-credentials", async (req, res) => {
   }
 });
 
+// ── MercadoPago credentials ─────────────────────────────────────────────────
+
+const MpCredencialesInput = z.object({
+  accessToken: z.string().min(1, "Access Token requerido"),
+});
+
+profileRouter.get("/profile/mp-credentials", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const [row] = await db
+      .select()
+      .from(mpCredencialesTable)
+      .where(eq(mpCredencialesTable.userId, userId));
+    res.json({ configurado: !!row });
+  } catch (err) {
+    req.log.error({ err }, "Error getting MP credentials");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+profileRouter.put("/profile/mp-credentials", async (req, res) => {
+  const userId = req.user!.id;
+  const parsed = MpCredencialesInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const enc = encrypt(parsed.data.accessToken);
+
+  try {
+    await db
+      .insert(mpCredencialesTable)
+      .values({
+        userId,
+        accessTokenEncrypted: enc.encrypted,
+        accessTokenIv: enc.iv,
+        accessTokenAuthTag: enc.authTag,
+        actualizadoEn: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: mpCredencialesTable.userId,
+        set: {
+          accessTokenEncrypted: enc.encrypted,
+          accessTokenIv: enc.iv,
+          accessTokenAuthTag: enc.authTag,
+          actualizadoEn: new Date(),
+        },
+      });
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error saving MP credentials");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+profileRouter.delete("/profile/mp-credentials", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    await db
+      .delete(mpCredencialesTable)
+      .where(eq(mpCredencialesTable.userId, userId));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting MP credentials");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
 export { profileRouter };
+
+export async function getMpCredentials(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select()
+    .from(mpCredencialesTable)
+    .where(eq(mpCredencialesTable.userId, userId));
+  if (!row) return null;
+  return decrypt(row.accessTokenEncrypted, row.accessTokenIv, row.accessTokenAuthTag);
+}
 
 export async function getFlowCredentials(userId: string): Promise<{ apiKey: string; secretKey: string } | null> {
   const [row] = await db

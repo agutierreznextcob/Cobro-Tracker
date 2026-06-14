@@ -51,6 +51,9 @@ import type {
   LogoutSuccess,
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
+  MpCredentialsInput,
+  MpCredentialsStatus,
+  MpLinkResponse,
   OkResponse,
   WebhookEventosPage,
   WebhookPayload,
@@ -2191,6 +2194,224 @@ export const useEnviarRecordatorioEmail = <TError = ErrorType<ErrorResponse | vo
       return useMutation(getEnviarRecordatorioEmailMutationOptions(options));
     }
 
+export const getGetMpCredentialsUrl = () => {
+
+
+
+
+  return `/api/profile/mp-credentials`
+}
+
+/**
+ * @summary Get MercadoPago credentials status for current user
+ */
+export const getMpCredentials = async ( options?: RequestInit): Promise<MpCredentialsStatus> => {
+
+  return customFetch<MpCredentialsStatus>(getGetMpCredentialsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMpCredentialsQueryKey = () => {
+    return [
+    `/api/profile/mp-credentials`
+    ] as const;
+    }
+
+
+export const getGetMpCredentialsQueryOptions = <TData = Awaited<ReturnType<typeof getMpCredentials>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMpCredentials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMpCredentialsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMpCredentials>>> = ({ signal }) => getMpCredentials({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMpCredentials>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMpCredentialsQueryResult = NonNullable<Awaited<ReturnType<typeof getMpCredentials>>>
+export type GetMpCredentialsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get MercadoPago credentials status for current user
+ */
+
+export function useGetMpCredentials<TData = Awaited<ReturnType<typeof getMpCredentials>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMpCredentials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMpCredentialsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveMpCredentialsUrl = () => {
+
+
+
+
+  return `/api/profile/mp-credentials`
+}
+
+/**
+ * @summary Save or update MercadoPago Access Token for current user
+ */
+export const saveMpCredentials = async (mpCredentialsInput: MpCredentialsInput, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getSaveMpCredentialsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mpCredentialsInput,)
+  }
+);}
+
+
+
+
+export const getSaveMpCredentialsMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMpCredentials>>, TError,{data: BodyType<MpCredentialsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveMpCredentials>>, TError,{data: BodyType<MpCredentialsInput>}, TContext> => {
+
+const mutationKey = ['saveMpCredentials'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveMpCredentials>>, {data: BodyType<MpCredentialsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveMpCredentials(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveMpCredentialsMutationResult = NonNullable<Awaited<ReturnType<typeof saveMpCredentials>>>
+    export type SaveMpCredentialsMutationBody = BodyType<MpCredentialsInput>
+    export type SaveMpCredentialsMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Save or update MercadoPago Access Token for current user
+ */
+export const useSaveMpCredentials = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMpCredentials>>, TError,{data: BodyType<MpCredentialsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveMpCredentials>>,
+        TError,
+        {data: BodyType<MpCredentialsInput>},
+        TContext
+      > => {
+      return useMutation(getSaveMpCredentialsMutationOptions(options));
+    }
+
+export const getDeleteMpCredentialsUrl = () => {
+
+
+
+
+  return `/api/profile/mp-credentials`
+}
+
+/**
+ * @summary Delete MercadoPago credentials for current user
+ */
+export const deleteMpCredentials = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getDeleteMpCredentialsUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteMpCredentialsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMpCredentials>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMpCredentials>>, TError,void, TContext> => {
+
+const mutationKey = ['deleteMpCredentials'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMpCredentials>>, void> = () => {
+
+
+          return  deleteMpCredentials(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMpCredentialsMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMpCredentials>>>
+
+    export type DeleteMpCredentialsMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete MercadoPago credentials for current user
+ */
+export const useDeleteMpCredentials = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMpCredentials>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMpCredentials>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeleteMpCredentialsMutationOptions(options));
+    }
+
 export const getGenerarFlowLinkUrl = (id: number,) => {
 
 
@@ -2261,6 +2482,147 @@ export const useGenerarFlowLink = <TError = ErrorType<ErrorResponse | void>,
         TContext
       > => {
       return useMutation(getGenerarFlowLinkMutationOptions(options));
+    }
+
+export const getGenerarMpLinkUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/mp-link`
+}
+
+/**
+ * @summary Generate a MercadoPago payment link for a cobro
+ */
+export const generarMpLink = async (id: number, options?: RequestInit): Promise<MpLinkResponse> => {
+
+  return customFetch<MpLinkResponse>(getGenerarMpLinkUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getGenerarMpLinkMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generarMpLink>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generarMpLink>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['generarMpLink'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generarMpLink>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  generarMpLink(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerarMpLinkMutationResult = NonNullable<Awaited<ReturnType<typeof generarMpLink>>>
+
+    export type GenerarMpLinkMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Generate a MercadoPago payment link for a cobro
+ */
+export const useGenerarMpLink = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generarMpLink>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generarMpLink>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getGenerarMpLinkMutationOptions(options));
+    }
+
+export const getReceiveMpWebhookUrl = () => {
+
+
+
+
+  return `/api/webhooks/mercadopago`
+}
+
+/**
+ * MercadoPago calls this endpoint when a payment event occurs.
+ * @summary Receive payment notification from MercadoPago
+ */
+export const receiveMpWebhook = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getReceiveMpWebhookUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReceiveMpWebhookMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveMpWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof receiveMpWebhook>>, TError,void, TContext> => {
+
+const mutationKey = ['receiveMpWebhook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof receiveMpWebhook>>, void> = () => {
+
+
+          return  receiveMpWebhook(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReceiveMpWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof receiveMpWebhook>>>
+
+    export type ReceiveMpWebhookMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Receive payment notification from MercadoPago
+ */
+export const useReceiveMpWebhook = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveMpWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof receiveMpWebhook>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReceiveMpWebhookMutationOptions(options));
     }
 
 export const getReceiveFlowWebhookUrl = () => {

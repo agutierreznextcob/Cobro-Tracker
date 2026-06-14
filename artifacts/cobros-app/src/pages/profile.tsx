@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { useGetFlowCredentials, useSaveFlowCredentials, useDeleteFlowCredentials } from "@workspace/api-client-react";
+import {
+  useGetFlowCredentials,
+  useSaveFlowCredentials,
+  useDeleteFlowCredentials,
+  useGetMpCredentials,
+  useSaveMpCredentials,
+  useDeleteMpCredentials,
+  getGetMpCredentialsQueryKey,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +31,49 @@ export default function ProfilePage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [editing, setEditing] = useState(false);
+
+  // MercadoPago state
+  const { data: mpStatus, isLoading: mpLoading } = useGetMpCredentials();
+  const saveMp = useSaveMpCredentials();
+  const deleteMp = useDeleteMpCredentials();
+  const [mpAccessToken, setMpAccessToken] = useState("");
+  const [showMpToken, setShowMpToken] = useState(false);
+  const [mpEditing, setMpEditing] = useState(false);
+
+  const handleSaveMp = () => {
+    if (!mpAccessToken.trim()) {
+      toast({ title: "Campo requerido", description: "Debes ingresar tu Access Token.", variant: "destructive" });
+      return;
+    }
+    saveMp.mutate(
+      { data: { accessToken: mpAccessToken.trim() } },
+      {
+        onSuccess: () => {
+          toast({ title: "Credenciales guardadas", description: "Tu Access Token de MercadoPago fue encriptado y guardado." });
+          queryClient.invalidateQueries({ queryKey: getGetMpCredentialsQueryKey() });
+          setMpAccessToken("");
+          setMpEditing(false);
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Error al guardar.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const handleDeleteMp = () => {
+    deleteMp.mutate(undefined, {
+      onSuccess: () => {
+        toast({ title: "Credenciales eliminadas", description: "Tu Access Token de MercadoPago fue eliminado." });
+        queryClient.invalidateQueries({ queryKey: getGetMpCredentialsQueryKey() });
+        setMpEditing(false);
+      },
+      onError: () => {
+        toast({ title: "Error", description: "No se pudo eliminar.", variant: "destructive" });
+      },
+    });
+  };
 
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Usuario"
@@ -218,6 +269,107 @@ export default function ProfilePage() {
                   flow.cl
                 </a>
                 . Se almacenan encriptadas con AES-256-GCM y nunca salen del servidor.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* MercadoPago credentials card */}
+      <Card className="shadow-sm border-border/50">
+        <CardHeader className="bg-muted/20 border-b border-border/50">
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-[#009ee3]" />
+            Conectar MercadoPago
+          </CardTitle>
+          <CardDescription>
+            Ingresa tu Access Token de producción de MercadoPago para generar links de pago. Se guarda encriptado con AES-256.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-4">
+          {mpLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Verificando conexión...</span>
+            </div>
+          ) : mpStatus?.configurado && !mpEditing ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-[#009ee3]/5 border border-[#009ee3]/30">
+                <CheckCircle2 className="h-5 w-5 text-[#009ee3] shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">MercadoPago conectado</p>
+                  <p className="text-xs text-muted-foreground">Tu Access Token está guardado y encriptado de forma segura.</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setMpEditing(true)}>
+                  <Plug2 className="h-3.5 w-3.5 mr-1.5" />
+                  Actualizar token
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:bg-destructive/10 border-destructive/30"
+                  onClick={handleDeleteMp}
+                  disabled={deleteMp.isPending}
+                >
+                  {deleteMp.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Desconectar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {mpStatus?.configurado && mpEditing && (
+                <p className="text-sm text-muted-foreground">
+                  Ingresa un nuevo Access Token para reemplazar el actual.
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="mpAccessToken">Access Token de producción</Label>
+                <div className="relative">
+                  <Input
+                    id="mpAccessToken"
+                    type={showMpToken ? "text" : "password"}
+                    placeholder="APP_USR-..."
+                    value={mpAccessToken}
+                    onChange={(e) => setMpAccessToken(e.target.value)}
+                    className="pr-10 font-mono text-sm"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowMpToken(!showMpToken)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showMpToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleSaveMp} disabled={saveMp.isPending} className="min-w-28">
+                  {saveMp.isPending ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" />Guardando...</>
+                  ) : (
+                    "Guardar token"
+                  )}
+                </Button>
+                {mpEditing && (
+                  <Button variant="outline" onClick={() => setMpEditing(false)}>
+                    Cancelar
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Obtén tu Access Token de producción en{" "}
+                <a href="https://www.mercadopago.cl/developers/panel" target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                  mercadopago.cl/developers
+                </a>
+                . Usa el token de <strong>producción</strong> (APP_USR-...). Se almacena encriptado y nunca sale del servidor.
               </p>
             </div>
           )}
