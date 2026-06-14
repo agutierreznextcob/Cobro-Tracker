@@ -39,7 +39,10 @@ import type {
   GetDashboardMetricsParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
+  LiquidacionDetalle,
+  LiquidacionListResponse,
   ListClientesParams,
+  ListLiquidacionesParams,
   ListWebhookEventosParams,
   LogoutSuccess,
   MobileTokenExchangeRequest,
@@ -906,6 +909,167 @@ export const useUpdateCliente = <TError = ErrorType<void | ErrorResponse>,
       > => {
       return useMutation(getUpdateClienteMutationOptions(options));
     }
+
+export const getListLiquidacionesUrl = (params?: ListLiquidacionesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/liquidaciones?${stringifiedParams}` : `/api/liquidaciones`
+}
+
+/**
+ * @summary List settlements from Flow
+ */
+export const listLiquidaciones = async (params?: ListLiquidacionesParams, options?: RequestInit): Promise<LiquidacionListResponse> => {
+
+  return customFetch<LiquidacionListResponse>(getListLiquidacionesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLiquidacionesQueryKey = (params?: ListLiquidacionesParams,) => {
+    return [
+    `/api/liquidaciones`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListLiquidacionesQueryOptions = <TData = Awaited<ReturnType<typeof listLiquidaciones>>, TError = ErrorType<void | ErrorResponse>>(params?: ListLiquidacionesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLiquidaciones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLiquidacionesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLiquidaciones>>> = ({ signal }) => listLiquidaciones(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLiquidaciones>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLiquidacionesQueryResult = NonNullable<Awaited<ReturnType<typeof listLiquidaciones>>>
+export type ListLiquidacionesQueryError = ErrorType<void | ErrorResponse>
+
+
+/**
+ * @summary List settlements from Flow
+ */
+
+export function useListLiquidaciones<TData = Awaited<ReturnType<typeof listLiquidaciones>>, TError = ErrorType<void | ErrorResponse>>(
+ params?: ListLiquidacionesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLiquidaciones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLiquidacionesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetLiquidacionUrl = (id: number,) => {
+
+
+
+
+  return `/api/liquidaciones/${id}`
+}
+
+/**
+ * @summary Get settlement detail (included payments) from Flow
+ */
+export const getLiquidacion = async (id: number, options?: RequestInit): Promise<LiquidacionDetalle> => {
+
+  return customFetch<LiquidacionDetalle>(getGetLiquidacionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLiquidacionQueryKey = (id: number,) => {
+    return [
+    `/api/liquidaciones/${id}`
+    ] as const;
+    }
+
+
+export const getGetLiquidacionQueryOptions = <TData = Awaited<ReturnType<typeof getLiquidacion>>, TError = ErrorType<ErrorResponse | void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLiquidacion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLiquidacionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLiquidacion>>> = ({ signal }) => getLiquidacion(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLiquidacion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLiquidacionQueryResult = NonNullable<Awaited<ReturnType<typeof getLiquidacion>>>
+export type GetLiquidacionQueryError = ErrorType<ErrorResponse | void>
+
+
+/**
+ * @summary Get settlement detail (included payments) from Flow
+ */
+
+export function useGetLiquidacion<TData = Awaited<ReturnType<typeof getLiquidacion>>, TError = ErrorType<ErrorResponse | void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLiquidacion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLiquidacionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListCobrosUrl = () => {
 

@@ -247,6 +247,50 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface Liquidacion {
+  id: number;
+  /** Date of bank deposit (YYYY-MM-DD) */
+  depositDate: string;
+  /** Gross amount */
+  amount: number;
+  /** Net amount after fees */
+  netAmount: number;
+  /** Total fees charged by Flow */
+  fee: number;
+  /** Number of payments included in this settlement */
+  nOrders: number;
+}
+
+export interface LiquidacionListResponse {
+  total: number;
+  hasMore: boolean;
+  data: Liquidacion[];
+}
+
+export type PagoLiquidacionPaymentData = {
+  date?: string;
+  media?: string;
+  amount?: number;
+  fee?: number;
+};
+
+export interface PagoLiquidacion {
+  flowOrder: number;
+  commerceOrder: string;
+  requestDate: string;
+  /** 1=pending, 2=paid, 3=rejected, 4=cancelled */
+  status: number;
+  subject: string;
+  currency: string;
+  amount: number;
+  payer: string;
+  paymentData?: PagoLiquidacionPaymentData;
+}
+
+export type LiquidacionDetalle = Liquidacion & {
+  data: PagoLiquidacion[];
+};
+
 export interface AuthUser {
   id: string;
   /** @nullable */
@@ -309,6 +353,20 @@ export type ListClientesParams = {
  * Search by nombre or RUT
  */
 q?: string;
+};
+
+export type ListLiquidacionesParams = {
+/**
+ * Pagination offset
+ * @minimum 0
+ */
+start?: number;
+/**
+ * Items per page
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type GetDashboardMetricsParams = {

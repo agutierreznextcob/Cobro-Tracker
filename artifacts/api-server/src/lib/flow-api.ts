@@ -116,6 +116,73 @@ export async function verificarPagoFlow(
   return res.json() as Promise<FlowStatusResult>;
 }
 
+export interface FlowLiquidacion {
+  id: number;
+  depositDate: string;
+  amount: number;
+  netAmount: number;
+  fee: number;
+  nOrders: number;
+}
+
+export interface FlowPagoLiquidacion {
+  flowOrder: number;
+  commerceOrder: string;
+  requestDate: string;
+  status: number;
+  subject: string;
+  currency: string;
+  amount: number;
+  payer: string;
+  paymentData?: {
+    date: string;
+    media: string;
+    amount: number;
+    fee: number;
+  };
+}
+
+export interface FlowLiquidacionDetalle extends FlowLiquidacion {
+  data: FlowPagoLiquidacion[];
+}
+
+export async function listarLiquidaciones(
+  apiKey: string,
+  secretKey: string,
+  opts: { start?: number; limit?: number } = {}
+): Promise<{ total: number; hasMore: boolean; data: FlowLiquidacion[] }> {
+  const params: Record<string, string | number> = { apiKey };
+  if (opts.start !== undefined) params.start = opts.start;
+  if (opts.limit !== undefined) params.limit = opts.limit;
+
+  const qs = buildSignedQuery(params, secretKey);
+  const res = await fetch(`${FLOW_API_URL}/settlement/getList?${qs}`);
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Flow settlement/getList error ${res.status}: ${text}`);
+  }
+
+  return res.json() as Promise<{ total: number; hasMore: boolean; data: FlowLiquidacion[] }>;
+}
+
+export async function obtenerDetalleLiquidacion(
+  apiKey: string,
+  secretKey: string,
+  id: number
+): Promise<FlowLiquidacionDetalle> {
+  const params: Record<string, string | number> = { apiKey, id };
+  const qs = buildSignedQuery(params, secretKey);
+  const res = await fetch(`${FLOW_API_URL}/settlement/get?${qs}`);
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Flow settlement/get error ${res.status}: ${text}`);
+  }
+
+  return res.json() as Promise<FlowLiquidacionDetalle>;
+}
+
 export function getPublicBaseUrl(): string {
   // APP_PUBLIC_URL is set in production env vars to the deployed domain
   if (process.env.APP_PUBLIC_URL) {

@@ -14,6 +14,8 @@ tags:
     description: Cobros (charges) operations
   - name: clientes
     description: Clientes operations
+  - name: liquidaciones
+    description: Liquidaciones (settlements) from Flow
   - name: webhooks
     description: Webhook endpoints
   - name: Auth
@@ -255,6 +257,88 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Unauthorized
+
+  /liquidaciones:
+    get:
+      operationId: listLiquidaciones
+      tags: [liquidaciones]
+      summary: List settlements from Flow
+      parameters:
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Pagination offset
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Items per page
+      responses:
+        "200":
+          description: List of settlements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiquidacionListResponse"
+        "401":
+          description: Unauthorized
+        "422":
+          description: Flow credentials not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Flow API error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /liquidaciones/{id}:
+    get:
+      operationId: getLiquidacion
+      tags: [liquidaciones]
+      summary: Get settlement detail (included payments) from Flow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Settlement detail with payments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiquidacionDetalle"
+        "400":
+          description: Invalid ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "422":
+          description: Flow credentials not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Flow API error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /cobros:
     get:
@@ -881,6 +965,85 @@ components:
       properties:
         error:
           type: string
+
+    Liquidacion:
+      type: object
+      required: [id, depositDate, amount, netAmount, fee, nOrders]
+      properties:
+        id:
+          type: integer
+        depositDate:
+          type: string
+          description: Date of bank deposit (YYYY-MM-DD)
+        amount:
+          type: number
+          description: Gross amount
+        netAmount:
+          type: number
+          description: Net amount after fees
+        fee:
+          type: number
+          description: Total fees charged by Flow
+        nOrders:
+          type: integer
+          description: Number of payments included in this settlement
+
+    LiquidacionListResponse:
+      type: object
+      required: [total, hasMore, data]
+      properties:
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Liquidacion"
+
+    PagoLiquidacion:
+      type: object
+      required: [flowOrder, commerceOrder, requestDate, status, subject, currency, amount, payer]
+      properties:
+        flowOrder:
+          type: integer
+        commerceOrder:
+          type: string
+        requestDate:
+          type: string
+        status:
+          type: integer
+          description: "1=pending, 2=paid, 3=rejected, 4=cancelled"
+        subject:
+          type: string
+        currency:
+          type: string
+        amount:
+          type: number
+        payer:
+          type: string
+        paymentData:
+          type: object
+          properties:
+            date:
+              type: string
+            media:
+              type: string
+            amount:
+              type: number
+            fee:
+              type: number
+
+    LiquidacionDetalle:
+      allOf:
+        - $ref: "#/components/schemas/Liquidacion"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/PagoLiquidacion"
 
     AuthUser:
       type: object

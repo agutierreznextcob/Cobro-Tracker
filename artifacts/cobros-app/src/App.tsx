@@ -11,6 +11,8 @@ import SearchPage from "@/pages/search";
 import ProfilePage from "@/pages/profile";
 import ClientesPage from "@/pages/clientes";
 import ClienteDetailPage from "@/pages/cliente-detail";
+import LiquidacionesPage from "@/pages/liquidaciones";
+import LiquidacionDetailPage from "@/pages/liquidacion-detail";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@workspace/replit-auth-web";
 
@@ -61,6 +63,8 @@ function Router() {
         <Route path="/cobros/:id" component={CobroDetail} />
         <Route path="/clientes" component={ClientesPage} />
         <Route path="/clientes/:id" component={ClienteDetailPage} />
+        <Route path="/liquidaciones" component={LiquidacionesPage} />
+        <Route path="/liquidaciones/:id" component={LiquidacionDetailPage} />
         <Route path="/webhooks/log" component={WebhookLog} />
         <Route path="/perfil" component={ProfilePage} />
         <Route component={NotFound} />

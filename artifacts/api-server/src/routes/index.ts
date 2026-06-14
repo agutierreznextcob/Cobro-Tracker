@@ -3,6 +3,7 @@ import healthRouter from "./health";
 import authRouter from "./auth";
 import cobrosRouter from "./cobros";
 import clientesRouter from "./clientes";
+import liquidacionesRouter from "./liquidaciones";
 import webhooksRouter from "./webhooks";
 import { profileRouter } from "./profile";
 
@@ -16,6 +17,7 @@ router.use(authRouter);
 router.use(webhooksRouter);
 router.use(cobrosRouter);
 router.use(clientesRouter);
+router.use(liquidacionesRouter);
 router.use(profileRouter);
 
 export default router;

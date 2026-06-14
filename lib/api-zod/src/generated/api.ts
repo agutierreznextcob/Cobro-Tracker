@@ -195,6 +195,68 @@ export const UpdateClienteResponse = zod.object({
 
 
 /**
+ * @summary List settlements from Flow
+ */
+export const listLiquidacionesQueryStartMin = 0;
+
+export const listLiquidacionesQueryLimitMax = 100;
+
+
+
+export const ListLiquidacionesQueryParams = zod.object({
+  "start": zod.coerce.number().min(listLiquidacionesQueryStartMin).optional().describe('Pagination offset'),
+  "limit": zod.coerce.number().min(1).max(listLiquidacionesQueryLimitMax).optional().describe('Items per page')
+})
+
+export const ListLiquidacionesResponse = zod.object({
+  "total": zod.number(),
+  "hasMore": zod.boolean(),
+  "data": zod.array(zod.object({
+  "id": zod.number(),
+  "depositDate": zod.string().describe('Date of bank deposit (YYYY-MM-DD)'),
+  "amount": zod.number().describe('Gross amount'),
+  "netAmount": zod.number().describe('Net amount after fees'),
+  "fee": zod.number().describe('Total fees charged by Flow'),
+  "nOrders": zod.number().describe('Number of payments included in this settlement')
+}))
+})
+
+
+/**
+ * @summary Get settlement detail (included payments) from Flow
+ */
+export const GetLiquidacionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetLiquidacionResponse = zod.object({
+  "id": zod.number(),
+  "depositDate": zod.string().describe('Date of bank deposit (YYYY-MM-DD)'),
+  "amount": zod.number().describe('Gross amount'),
+  "netAmount": zod.number().describe('Net amount after fees'),
+  "fee": zod.number().describe('Total fees charged by Flow'),
+  "nOrders": zod.number().describe('Number of payments included in this settlement')
+}).and(zod.object({
+  "data": zod.array(zod.object({
+  "flowOrder": zod.number(),
+  "commerceOrder": zod.string(),
+  "requestDate": zod.string(),
+  "status": zod.number().describe('1=pending, 2=paid, 3=rejected, 4=cancelled'),
+  "subject": zod.string(),
+  "currency": zod.string(),
+  "amount": zod.number(),
+  "payer": zod.string(),
+  "paymentData": zod.object({
+  "date": zod.string().optional(),
+  "media": zod.string().optional(),
+  "amount": zod.number().optional(),
+  "fee": zod.number().optional()
+}).optional()
+}))
+}))
+
+
+/**
  * Returns all cobros ordered by creation date desc
  * @summary List all cobros
  */
