@@ -146,6 +146,57 @@ export async function sendPaymentLinkEmail(data: CobrosEmailData, log?: { warn: 
   return { ok: true };
 }
 
+export interface AvisoManualEmailData {
+  emailPagador: string;
+  clienteNombre: string | null;
+  descripcion: string;
+  monto: number;
+  comercioNombre: string;
+}
+
+export async function sendAvisoManualEmail(
+  data: AvisoManualEmailData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping aviso manual email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const montoFormato = formatCLP(data.monto);
+  const nombre = data.clienteNombre || "cliente";
+
+  const { error } = await client.emails.send({
+    from: FROM,
+    to: [data.emailPagador],
+    subject: `Cobro pendiente de ${montoFormato} — ${data.comercioNombre}`,
+    html: buildEmailHtml({
+      title: `Cobro pendiente — ${montoFormato}`,
+      previewText: `${data.comercioNombre} te informa de un cobro pendiente de ${montoFormato} por ${data.descripcion}.`,
+      heading: `Hola ${nombre}, tienes un cobro pendiente 👋`,
+      bodyLines: [
+        `<strong>${data.comercioNombre}</strong> te informa del siguiente cobro pendiente:`,
+        `<span style="display:block;background:#f4f4f5;border-radius:8px;padding:12px 16px;font-size:14px;color:#09090b;">
+          <strong>Concepto:</strong> ${data.descripcion}<br/>
+          <strong>Monto:</strong> <span style="font-family:monospace;font-weight:700;color:#2563eb;">${montoFormato}</span>
+        </span>`,
+        `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
+      ],
+      ctaText: `Responder al cobro`,
+      ctaUrl: `mailto:hola@cobrosimple.cl`,
+      footerNote: `Si no reconoces este cobro, ignora este correo.`,
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending aviso manual email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
 export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn: (obj: object, msg: string) => void }): Promise<EmailResult> {
   const client = getResend();
   if (!client) {

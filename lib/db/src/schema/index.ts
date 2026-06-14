@@ -6,3 +6,4 @@ export * from "./flow-credentials";
 export * from "./mp-credentials";
 export * from "./conversations";
 export * from "./messages";
+export * from "./seguimientos-cobranza";

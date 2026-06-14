@@ -25,6 +25,8 @@ import type {
   AiConversationWithMessages,
   AiMessageInput,
   AuthUserEnvelope,
+  AvisarClienteInput,
+  AvisarClienteResult,
   BeginBrowserLoginParams,
   Cliente,
   ClienteConHistorial,
@@ -55,6 +57,7 @@ import type {
   MpCredentialsStatus,
   MpLinkResponse,
   OkResponse,
+  SeguimientoCobranza,
   WebhookEventosPage,
   WebhookPayload,
   WebhookResponse
@@ -2193,6 +2196,155 @@ export const useEnviarRecordatorioEmail = <TError = ErrorType<ErrorResponse | vo
       > => {
       return useMutation(getEnviarRecordatorioEmailMutationOptions(options));
     }
+
+export const getAvisarClienteUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/avisar`
+}
+
+/**
+ * @summary Send a manual notification to the client about a pending cobro
+ */
+export const avisarCliente = async (id: number,
+    avisarClienteInput: AvisarClienteInput, options?: RequestInit): Promise<AvisarClienteResult> => {
+
+  return customFetch<AvisarClienteResult>(getAvisarClienteUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      avisarClienteInput,)
+  }
+);}
+
+
+
+
+export const getAvisarClienteMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avisarCliente>>, TError,{id: number;data: BodyType<AvisarClienteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof avisarCliente>>, TError,{id: number;data: BodyType<AvisarClienteInput>}, TContext> => {
+
+const mutationKey = ['avisarCliente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof avisarCliente>>, {id: number;data: BodyType<AvisarClienteInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  avisarCliente(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AvisarClienteMutationResult = NonNullable<Awaited<ReturnType<typeof avisarCliente>>>
+    export type AvisarClienteMutationBody = BodyType<AvisarClienteInput>
+    export type AvisarClienteMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Send a manual notification to the client about a pending cobro
+ */
+export const useAvisarCliente = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avisarCliente>>, TError,{id: number;data: BodyType<AvisarClienteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof avisarCliente>>,
+        TError,
+        {id: number;data: BodyType<AvisarClienteInput>},
+        TContext
+      > => {
+      return useMutation(getAvisarClienteMutationOptions(options));
+    }
+
+export const getListSeguimientosUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/seguimientos`
+}
+
+/**
+ * @summary List all manual follow-up records for a cobro
+ */
+export const listSeguimientos = async (id: number, options?: RequestInit): Promise<SeguimientoCobranza[]> => {
+
+  return customFetch<SeguimientoCobranza[]>(getListSeguimientosUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSeguimientosQueryKey = (id: number,) => {
+    return [
+    `/api/cobros/${id}/seguimientos`
+    ] as const;
+    }
+
+
+export const getListSeguimientosQueryOptions = <TData = Awaited<ReturnType<typeof listSeguimientos>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSeguimientos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSeguimientosQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSeguimientos>>> = ({ signal }) => listSeguimientos(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSeguimientos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSeguimientosQueryResult = NonNullable<Awaited<ReturnType<typeof listSeguimientos>>>
+export type ListSeguimientosQueryError = ErrorType<void>
+
+
+/**
+ * @summary List all manual follow-up records for a cobro
+ */
+
+export function useListSeguimientos<TData = Awaited<ReturnType<typeof listSeguimientos>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSeguimientos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSeguimientosQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetMpCredentialsUrl = () => {
 

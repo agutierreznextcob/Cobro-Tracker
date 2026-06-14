@@ -6,7 +6,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { Link } from "wouter";
-import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, BarChart3, Wallet, AlertCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, BarChart3, Wallet, AlertCircle, Minus } from "lucide-react";
+
+function PasarelaBadge({ flowLinkPago, mpPaymentLinkUrl }: { flowLinkPago?: string | null; mpPaymentLinkUrl?: string | null }) {
+  if (flowLinkPago && mpPaymentLinkUrl) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] font-semibold leading-none border border-blue-200">Flow</span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#009ee3]/10 text-[#009ee3] px-2 py-0.5 text-[10px] font-semibold leading-none border border-[#009ee3]/30">MP</span>
+      </div>
+    );
+  }
+  if (flowLinkPago) {
+    return <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] font-semibold leading-none border border-blue-200">Flow</span>;
+  }
+  if (mpPaymentLinkUrl) {
+    return <span className="inline-flex items-center gap-1 rounded-full bg-[#009ee3]/10 text-[#009ee3] px-2 py-0.5 text-[10px] font-semibold leading-none border border-[#009ee3]/30">MP</span>;
+  }
+  return <span className="inline-flex items-center gap-1 text-muted-foreground/50 text-xs"><Minus className="h-3 w-3" /></span>;
+}
 
 type Periodo = "hoy" | "semana" | "mes" | "total";
 
@@ -197,6 +215,7 @@ export default function Dashboard() {
                 <TableHead>Descripción</TableHead>
                 <TableHead>Cliente / Responsable</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Pasarela</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
               </TableRow>
             </TableHeader>
@@ -208,12 +227,13 @@ export default function Dashboard() {
                     <TableCell><div className="h-4 w-48 bg-muted rounded" /></TableCell>
                     <TableCell><div className="h-4 w-28 bg-muted rounded" /></TableCell>
                     <TableCell><div className="h-6 w-24 bg-muted rounded" /></TableCell>
+                    <TableCell><div className="h-5 w-14 bg-muted rounded-full" /></TableCell>
                     <TableCell><div className="h-4 w-16 bg-muted rounded ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : cobrosFiltrados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     {hayFiltros
                       ? "Ningún cobro coincide con los filtros seleccionados."
                       : "Sin cobros registrados. Crea uno para comenzar."}
@@ -249,6 +269,9 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={cobro.estado} />
+                    </TableCell>
+                    <TableCell>
+                      <PasarelaBadge flowLinkPago={cobro.flowLinkPago} mpPaymentLinkUrl={cobro.mpPaymentLinkUrl} />
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
                       {formatCurrency(cobro.monto)}

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, cobrosTable, clientesTable } from "@workspace/db";
+import { db, cobrosTable, clientesTable, seguimientosCobranzaTable } from "@workspace/db";
 import { eq, desc, sql, and, gte } from "drizzle-orm";
 import {
   CreateCobroBody,
@@ -11,7 +11,7 @@ import { z } from "zod";
 import { getFlowCredentials, getMpCredentials } from "./profile";
 import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
 import { crearPreferenciaMp } from "../lib/mp-api";
-import { sendPaymentLinkEmail, sendRecordatorioEmail } from "../lib/email";
+import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
 
 const cobrosRouter = Router();
 
@@ -349,6 +349,108 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error sending reminder email");
     res.status(500).json({ error: "Error interno al enviar recordatorio." });
+  }
+});
+
+const AvisarClienteBody = z.object({
+  tipo: z.enum(["email", "whatsapp"]),
+  notas: z.string().optional(),
+});
+
+cobrosRouter.post("/cobros/:id/avisar", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+
+  const bodyParsed = AvisarClienteBody.safeParse(req.body);
+  if (!bodyParsed.success) {
+    res.status(400).json({ error: bodyParsed.error.message });
+    return;
+  }
+
+  const { tipo, notas } = bodyParsed.data;
+
+  try {
+    const [cobro] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, paramsParsed.data.id));
+    if (!cobro) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+
+    let emailEnviado = false;
+    let emailError: string | undefined;
+
+    if (tipo === "email") {
+      if (!cobro.emailPagador) {
+        res.status(400).json({ error: "El cobro no tiene email del pagador registrado." });
+        return;
+      }
+      const emailResult = await sendAvisoManualEmail(
+        {
+          emailPagador: cobro.emailPagador,
+          clienteNombre: cobro.clienteNombre,
+          descripcion: cobro.descripcion,
+          monto: Number(cobro.monto),
+          comercioNombre: cobro.responsableNombre ?? "Cobro Simple",
+        },
+        req.log,
+      );
+      emailEnviado = emailResult.ok;
+      emailError = emailResult.error;
+    }
+
+    const [seg] = await db
+      .insert(seguimientosCobranzaTable)
+      .values({
+        cobroId: cobro.id,
+        tipo,
+        notas: notas ?? (tipo === "email" ? "Aviso enviado por email" : "Aviso por WhatsApp"),
+        creadoEn: new Date(),
+      })
+      .returning();
+
+    req.log.info({ cobroId: cobro.id, tipo, emailEnviado }, "Aviso de cobranza registrado");
+    res.json({ ok: true, seguimientoId: seg.id, emailEnviado, emailError });
+  } catch (err) {
+    req.log.error({ err }, "Error en aviso de cobranza");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+cobrosRouter.get("/cobros/:id/seguimientos", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+
+  try {
+    const [cobro] = await db
+      .select({ id: cobrosTable.id })
+      .from(cobrosTable)
+      .where(eq(cobrosTable.id, paramsParsed.data.id));
+    if (!cobro) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+
+    const seguimientos = await db
+      .select()
+      .from(seguimientosCobranzaTable)
+      .where(eq(seguimientosCobranzaTable.cobroId, paramsParsed.data.id))
+      .orderBy(desc(seguimientosCobranzaTable.creadoEn));
+
+    res.json(
+      seguimientos.map((s) => ({
+        ...s,
+        creadoEn: s.creadoEn.toISOString(),
+      })),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Error listing seguimientos");
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 

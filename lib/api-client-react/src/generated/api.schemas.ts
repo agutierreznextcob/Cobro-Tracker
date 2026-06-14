@@ -146,6 +146,43 @@ export interface CobroInput {
   emailPagador?: string;
 }
 
+export type AvisarClienteInputTipo = typeof AvisarClienteInputTipo[keyof typeof AvisarClienteInputTipo];
+
+
+export const AvisarClienteInputTipo = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export interface AvisarClienteInput {
+  tipo: AvisarClienteInputTipo;
+  notas?: string;
+}
+
+export interface AvisarClienteResult {
+  ok: boolean;
+  seguimientoId: number;
+  emailEnviado?: boolean;
+  emailError?: string;
+}
+
+export type SeguimientoCobranzaTipo = typeof SeguimientoCobranzaTipo[keyof typeof SeguimientoCobranzaTipo];
+
+
+export const SeguimientoCobranzaTipo = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export interface SeguimientoCobranza {
+  id: number;
+  cobroId: number;
+  tipo: SeguimientoCobranzaTipo;
+  /** @nullable */
+  notas?: string | null;
+  creadoEn: string;
+}
+
 export interface MpCredentialsStatus {
   configurado: boolean;
 }

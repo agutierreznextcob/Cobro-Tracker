@@ -511,6 +511,43 @@ export const EnviarRecordatorioEmailResponse = zod.object({
 
 
 /**
+ * @summary Send a manual notification to the client about a pending cobro
+ */
+export const AvisarClienteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AvisarClienteBody = zod.object({
+  "tipo": zod.enum(['email', 'whatsapp']),
+  "notas": zod.string().optional()
+})
+
+export const AvisarClienteResponse = zod.object({
+  "ok": zod.boolean(),
+  "seguimientoId": zod.number(),
+  "emailEnviado": zod.boolean().optional(),
+  "emailError": zod.string().optional()
+})
+
+
+/**
+ * @summary List all manual follow-up records for a cobro
+ */
+export const ListSeguimientosParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListSeguimientosResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "tipo": zod.enum(['email', 'whatsapp']),
+  "notas": zod.string().nullish(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListSeguimientosResponse = zod.array(ListSeguimientosResponseItem)
+
+
+/**
  * @summary Get MercadoPago credentials status for current user
  */
 export const GetMpCredentialsResponse = zod.object({

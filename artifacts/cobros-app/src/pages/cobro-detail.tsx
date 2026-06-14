@@ -6,6 +6,8 @@ import {
   useGenerarFlowLink,
   useGenerarMpLink,
   useEnviarRecordatorioEmail,
+  useAvisarCliente,
+  useListSeguimientos,
   getListCobrosQueryKey,
   getGetCobrosSummaryQueryKey,
 } from "@workspace/api-client-react";
@@ -33,6 +35,9 @@ import {
   Loader2,
   Mail,
   MessageCircle,
+  CheckCircle2,
+  Clock,
+  Send,
 } from "lucide-react";
 import { CobroUpdateEstado } from "@workspace/api-client-react";
 
@@ -179,6 +184,68 @@ export default function CobroDetail() {
       linkPago: cobro.mpPaymentLinkUrl,
     });
     window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  // --- Seguimiento de cobranza manual ---
+  const avisarCliente = useAvisarCliente();
+  const { data: seguimientos, isLoading: isLoadingSeguimientos } = useListSeguimientos(id, {
+    query: { enabled: !!id, queryKey: ["listSeguimientos", id] as const },
+  });
+
+  const noTieneLink = !cobro?.flowLinkPago && !cobro?.mpPaymentLinkUrl;
+
+  const handleAvisarEmail = () => {
+    avisarCliente.mutate(
+      { id, data: { tipo: "email" } },
+      {
+        onSuccess: (res) => {
+          if (res.emailEnviado) {
+            toast({ title: "Aviso enviado", description: "El email fue enviado al cliente y se registró el seguimiento." });
+          } else {
+            toast({ title: "Seguimiento registrado", description: res.emailError ? `No se pudo enviar el email: ${res.emailError}` : "Seguimiento registrado sin email.", variant: res.emailError ? "destructive" : "default" });
+          }
+          queryClient.invalidateQueries({ queryKey: ["listSeguimientos", id] });
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo registrar el aviso.";
+          toast({ title: "Error al avisar", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const handleAvisarWhatsApp = () => {
+    if (!cobro) return;
+    const monto = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(cobro.monto));
+    const nombre = cobro.clienteNombre || "cliente";
+    const msg = `Hola ${nombre}, tienes un cobro pendiente de ${monto} por concepto de "${cobro.descripcion}". Por favor comunícate para coordinar el pago.`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+
+    avisarCliente.mutate(
+      { id, data: { tipo: "whatsapp" } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["listSeguimientos", id] });
+        },
+      }
+    );
+  };
+
+  const handleMarcarPagado = () => {
+    updateCobro.mutate(
+      { id, data: { estado: "pagado" as CobroUpdateEstado } },
+      {
+        onSuccess: () => {
+          toast({ title: "Cobro marcado como pagado", description: "El estado fue actualizado correctamente." });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
+        },
+        onError: () => {
+          toast({ title: "Error al actualizar", description: "No se pudo cambiar el estado.", variant: "destructive" });
+        },
+      }
+    );
   };
 
   if (isLoading) {
@@ -563,6 +630,97 @@ export default function CobroDetail() {
                   <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
                   Recordar por WhatsApp
                 </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Seguimiento de cobranza manual — only for cobros sin pasarela */}
+          {noTieneLink && (
+            <Card className="shadow-sm border-amber-200/60 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  Seguimiento de cobranza
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Este cobro no tiene pasarela de pago. Registra los avisos que hagas al cliente.
+                </p>
+
+                {/* Acciones */}
+                {isPendiente && (
+                  <div className="flex flex-col gap-2">
+                    {hasEmail && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleAvisarEmail}
+                        disabled={avisarCliente.isPending}
+                      >
+                        {avisarCliente.isPending ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Enviando...</>
+                        ) : (
+                          <><Send className="h-3.5 w-3.5 mr-1.5" />Avisar por email</>
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full border-green-600/40 text-green-700 hover:bg-green-50 hover:border-green-600"
+                      onClick={handleAvisarWhatsApp}
+                      disabled={avisarCliente.isPending}
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                      Avisar por WhatsApp
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={handleMarcarPagado}
+                      disabled={updateCobro.isPending}
+                    >
+                      {updateCobro.isPending ? (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Actualizando...</>
+                      ) : (
+                        <><CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Marcar como pagado</>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Historial */}
+                {isLoadingSeguimientos ? (
+                  <div className="space-y-2 pt-1">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="h-10 bg-muted/40 rounded animate-pulse" />
+                    ))}
+                  </div>
+                ) : seguimientos && seguimientos.length > 0 ? (
+                  <div className="space-y-2 pt-1">
+                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Historial</p>
+                    {seguimientos.map((seg) => (
+                      <div key={seg.id} className="flex items-start gap-2 rounded-md border border-border/50 bg-background/60 px-3 py-2">
+                        {seg.tipo === "email" ? (
+                          <Mail className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+                        ) : (
+                          <MessageCircle className="h-3.5 w-3.5 mt-0.5 text-green-600 shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium capitalize">{seg.tipo}</p>
+                          {seg.notas && <p className="text-[11px] text-muted-foreground truncate">{seg.notas}</p>}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground/60 shrink-0">
+                          {formatDate(seg.creadoEn)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground/60 text-center py-1">Sin avisos registrados aún.</p>
+                )}
               </CardContent>
             </Card>
           )}
