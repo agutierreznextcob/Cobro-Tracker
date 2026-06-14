@@ -38,3 +38,6 @@ channel = "stable-25_05"
 
 [userenv.shared]
 WEBHOOK_SECRET = "e55976eab6a0041aaa3b76d44f4ab8f71a69d02f7a71a1af49e271c05af274e3"
+
+[userenv.production]
+APP_PUBLIC_URL = "https://cobro-tracker--anibalguti.replit.app"

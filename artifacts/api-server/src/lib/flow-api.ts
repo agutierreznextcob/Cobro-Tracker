@@ -18,11 +18,39 @@ export interface FlowOrdenResult {
   flowOrder: number;
 }
 
-function buildSignedParams(params: Record<string, string | number>, secretKey: string): string {
+export interface FlowStatusResult {
+  flowOrder: number;
+  commerceOrder: string;
+  requestDate: string;
+  status: number; // 1=pending, 2=paid, 3=rejected, 4=cancelled
+  subject: string;
+  currency: string;
+  amount: number;
+  payer: string;
+  paymentData?: { date: string; media: string; conversionDate: string; conversionRate: number; amount: number; currency: string; fee: number; balance: number; transferDate: string };
+}
+
+function buildSignature(params: Record<string, string | number>, secretKey: string): string {
   const sorted = Object.keys(params).sort();
   const toSign = sorted.map((k) => `${k}${params[k]}`).join("");
-  const s = createHmac("sha256", secretKey).update(toSign).digest("hex");
+  return createHmac("sha256", secretKey).update(toSign).digest("hex");
+}
+
+function buildSignedBody(params: Record<string, string | number>, secretKey: string): string {
+  const s = buildSignature(params, secretKey);
   const searchParams = new URLSearchParams();
+  const sorted = Object.keys(params).sort();
+  for (const k of sorted) {
+    searchParams.set(k, String(params[k]));
+  }
+  searchParams.set("s", s);
+  return searchParams.toString();
+}
+
+function buildSignedQuery(params: Record<string, string | number>, secretKey: string): string {
+  const s = buildSignature(params, secretKey);
+  const searchParams = new URLSearchParams();
+  const sorted = Object.keys(params).sort();
   for (const k of sorted) {
     searchParams.set(k, String(params[k]));
   }
@@ -47,7 +75,7 @@ export async function crearOrdenFlow(
     paymentMethod: 9,
   };
 
-  const body = buildSignedParams(payload, secretKey);
+  const body = buildSignedBody(payload, secretKey);
 
   const res = await fetch(`${FLOW_API_URL}/payment/create`, {
     method: "POST",
@@ -72,20 +100,29 @@ export async function verificarPagoFlow(
   apiKey: string,
   secretKey: string,
   token: string
-): Promise<{ status: number; commerceOrder: string; flowOrder: number }> {
+): Promise<FlowStatusResult> {
   const params: Record<string, string | number> = { apiKey, token };
-  const body = buildSignedParams(params, secretKey);
+  const qs = buildSignedQuery(params, secretKey);
 
-  const res = await fetch(`${FLOW_API_URL}/payment/getStatus`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
+  const res = await fetch(`${FLOW_API_URL}/payment/getStatus?${qs}`, {
+    method: "GET",
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Flow API error ${res.status}: ${text}`);
+    throw new Error(`Flow getStatus error ${res.status}: ${text}`);
   }
 
-  return res.json() as Promise<{ status: number; commerceOrder: string; flowOrder: number }>;
+  return res.json() as Promise<FlowStatusResult>;
+}
+
+export function getPublicBaseUrl(): string {
+  // APP_PUBLIC_URL is set in production env vars to the deployed domain
+  if (process.env.APP_PUBLIC_URL) {
+    return process.env.APP_PUBLIC_URL.replace(/\/$/, "");
+  }
+  // Fallback: use REPLIT_DOMAINS (first entry)
+  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
+  if (domain) return `https://${domain}`;
+  return "http://localhost:8080";
 }

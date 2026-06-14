@@ -19,6 +19,7 @@ export const cobrosTable = pgTable("cobros", {
   responsableNombre: text("responsable_nombre"),
   emailPagador: text("email_pagador"),
   flowOrdenId: text("flow_orden_id"),
+  flowToken: text("flow_token"),
   flowLinkPago: text("flow_link_pago"),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),

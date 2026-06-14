@@ -9,7 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { z } from "zod";
 import { getFlowCredentials } from "./profile";
-import { crearOrdenFlow } from "../lib/flow-api";
+import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
 
 const cobrosRouter = Router();
 
@@ -182,7 +182,9 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
       return;
     }
 
-    const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0] ?? "localhost"}`;
+    const baseUrl = getPublicBaseUrl();
+    req.log.info({ baseUrl }, "Generating Flow payment link");
+
     const result = await crearOrdenFlow(creds.apiKey, creds.secretKey, {
       commerceOrder: `cobro-${cobro.id}`,
       subject: cobro.descripcion.slice(0, 200),
@@ -197,6 +199,7 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
       .update(cobrosTable)
       .set({
         flowOrdenId: String(result.flowOrder),
+        flowToken: result.token,
         flowLinkPago: result.url,
         emailPagador: bodyParsed.data.emailPagador,
         actualizadoEn: new Date(),

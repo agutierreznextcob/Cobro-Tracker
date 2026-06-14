@@ -3,6 +3,8 @@ import { Router } from "express";
 import { db, cobrosTable, webhookEventosTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { ReceiveCobroWebhookBody } from "@workspace/api-zod";
+import { verificarPagoFlow } from "../lib/flow-api";
+import { getFlowCredentials } from "./profile";
 
 const webhooksRouter = Router();
 
@@ -53,68 +55,105 @@ function getClientIp(req: { headers: Record<string, string | string[] | undefine
   return req.socket.remoteAddress ?? null;
 }
 
+// Flow sends POST (form-urlencoded) with just `token` to urlConfirmation.
+// We must call back to Flow API with getStatus to verify the real payment status.
+// Security: trust only comes from calling Flow's API, not from the body content.
 webhooksRouter.post("/webhooks/flow", async (req, res) => {
-  const token = req.body?.token as string | undefined;
   const ip = getClientIp(req as Parameters<typeof getClientIp>[0]);
 
-  if (!token) {
-    req.log.warn("Flow webhook: missing token");
-    res.status(400).json({ error: "Falta token" });
+  // Flow sends token via form-urlencoded body
+  const token = (req.body?.token ?? req.query?.token) as string | undefined;
+
+  req.log.info({ token, body: req.body, query: req.query }, "Flow webhook received");
+
+  if (!token || typeof token !== "string" || token.trim() === "") {
+    req.log.warn({ body: req.body }, "Flow webhook: missing token");
+    await logEvento({ evento: "flow.webhook.error", cobroId: null, ipOrigen: ip, exitoso: false, detalle: "Falta token en la notificación de Flow" });
+    // Flow requires 200 OK even on errors, otherwise it retries
+    res.status(200).json({ ok: false, error: "Falta token" });
     return;
   }
 
   try {
-    const commerceOrder = req.body?.commerceOrder as string | undefined;
-    const status = Number(req.body?.status);
+    // 1. Find the cobro by the stored token (set when creating the Flow order)
+    const [cobro] = await db
+      .select()
+      .from(cobrosTable)
+      .where(eq(cobrosTable.flowToken, token.trim()));
 
-    if (!commerceOrder) {
-      req.log.warn({ token }, "Flow webhook: missing commerceOrder");
-      res.json({ ok: true });
+    if (!cobro) {
+      req.log.warn({ token }, "Flow webhook: no cobro found for token");
+      await logEvento({ evento: "flow.webhook.error", cobroId: null, ipOrigen: ip, exitoso: false, detalle: `Token desconocido: ${token}` });
+      res.status(200).json({ ok: false, error: "Token no reconocido" });
       return;
     }
 
-    const match = commerceOrder.match(/^cobro-(\d+)$/);
-    if (!match) {
-      req.log.warn({ commerceOrder }, "Flow webhook: unknown commerceOrder format");
-      res.json({ ok: true });
+    req.log.info({ cobroId: cobro.id, token }, "Found cobro for Flow token");
+
+    // 2. Get the credentials of the user who created this cobro
+    if (!cobro.responsableId) {
+      req.log.error({ cobroId: cobro.id }, "Cobro has no responsableId, cannot verify Flow payment");
+      await logEvento({ evento: "flow.webhook.error", cobroId: cobro.id, ipOrigen: ip, exitoso: false, detalle: "Cobro sin responsableId — no se pueden obtener credenciales" });
+      res.status(200).json({ ok: false });
       return;
     }
 
-    const cobroId = Number(match[1]);
-    const nuevoEstado = status === 2 ? "pagado" : status === 3 ? "fallido" : status === 4 ? "cancelado" : null;
-
-    req.log.info({ cobroId, token, status, nuevoEstado }, "Flow payment webhook received");
-
-    if (nuevoEstado) {
-      const [cobro] = await db
-        .update(cobrosTable)
-        .set({ estado: nuevoEstado, actualizadoEn: new Date() })
-        .where(eq(cobrosTable.id, cobroId))
-        .returning();
-
-      await logEvento({
-        evento: `flow.pago.${nuevoEstado}`,
-        cobroId,
-        ipOrigen: ip,
-        exitoso: true,
-        detalle: `Flow status ${status} → ${nuevoEstado}. Token: ${token}`,
-      });
-
-      req.log.info({ cobroId, nuevoEstado }, "Cobro updated via Flow webhook");
-      res.json({ ok: !!cobro });
-    } else {
-      await logEvento({
-        evento: "flow.pago.desconocido",
-        cobroId,
-        ipOrigen: ip,
-        exitoso: true,
-        detalle: `Flow status desconocido: ${status}`,
-      });
-      res.json({ ok: true });
+    const creds = await getFlowCredentials(cobro.responsableId);
+    if (!creds) {
+      req.log.error({ cobroId: cobro.id, responsableId: cobro.responsableId }, "No Flow credentials found for cobro owner");
+      await logEvento({ evento: "flow.webhook.error", cobroId: cobro.id, ipOrigen: ip, exitoso: false, detalle: "No hay credenciales Flow del responsable del cobro" });
+      res.status(200).json({ ok: false });
+      return;
     }
+
+    // 3. Call Flow API to get the REAL payment status (this is the actual verification)
+    const pagoStatus = await verificarPagoFlow(creds.apiKey, creds.secretKey, token);
+
+    req.log.info({ cobroId: cobro.id, flowStatus: pagoStatus.status, flowOrder: pagoStatus.flowOrder }, "Flow payment status verified");
+
+    // Flow status: 1=pending, 2=paid, 3=rejected/failed, 4=cancelled
+    const estadoMap: Record<number, "pagado" | "fallido" | "cancelado" | "pendiente"> = {
+      1: "pendiente",
+      2: "pagado",
+      3: "fallido",
+      4: "cancelado",
+    };
+    const nuevoEstado = estadoMap[pagoStatus.status];
+
+    if (!nuevoEstado || nuevoEstado === "pendiente") {
+      // Still pending — don't update, just acknowledge
+      await logEvento({
+        evento: "flow.pago.pendiente",
+        cobroId: cobro.id,
+        ipOrigen: ip,
+        exitoso: true,
+        detalle: `Flow status ${pagoStatus.status} — pago aún pendiente`,
+      });
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    // 4. Update cobro with the verified status
+    await db
+      .update(cobrosTable)
+      .set({ estado: nuevoEstado, actualizadoEn: new Date() })
+      .where(eq(cobrosTable.id, cobro.id));
+
+    await logEvento({
+      evento: `flow.pago.${nuevoEstado}`,
+      cobroId: cobro.id,
+      ipOrigen: ip,
+      exitoso: true,
+      detalle: `Flow status ${pagoStatus.status} → ${nuevoEstado}. FlowOrder: ${pagoStatus.flowOrder}. Token: ${token}`,
+    });
+
+    req.log.info({ cobroId: cobro.id, nuevoEstado }, "Cobro updated via Flow webhook (verified)");
+    res.status(200).json({ ok: true });
   } catch (err) {
-    req.log.error({ err }, "Error processing Flow webhook");
-    res.status(500).json({ error: "Error interno del servidor" });
+    req.log.error({ err, token }, "Error processing Flow webhook");
+    await logEvento({ evento: "flow.webhook.error", cobroId: null, ipOrigen: ip, exitoso: false, detalle: `Error interno: ${String(err)}` });
+    // Return 200 so Flow doesn't retry infinitely — the error is on our side
+    res.status(200).json({ ok: false, error: "Error interno" });
   }
 });
 
