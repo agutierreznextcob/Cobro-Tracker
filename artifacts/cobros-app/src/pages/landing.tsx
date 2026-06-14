@@ -1,4 +1,5 @@
 import { useAuth } from "@workspace/replit-auth-web";
+import { Redirect } from "wouter";
 import {
   Activity,
   ArrowRight,
@@ -395,6 +396,12 @@ function Footer() {
 }
 
 export default function LandingPage() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (!isLoading && isAuthenticated) {
+    return <Redirect to="/dashboard" />;
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <LandingNav />

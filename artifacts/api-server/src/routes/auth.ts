@@ -130,7 +130,9 @@ router.get("/callback", async (req: Request, res: Response) => {
   const expectedState = req.cookies?.state;
 
   if (!codeVerifier || !expectedState) {
-    res.redirect("/api/login");
+    // OIDC state cookies missing (expired or blocked).
+    // Restart login pointing to /dashboard so user doesn't land on landing page.
+    res.redirect(`/api/login?returnTo=${encodeURIComponent("/dashboard")}`);
     return;
   }
 
