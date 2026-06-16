@@ -17,25 +17,45 @@ import LiquidacionesPage from "@/pages/liquidaciones";
 import LiquidacionDetailPage from "@/pages/liquidacion-detail";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useGetSubscriptionStatus } from "@workspace/api-client-react";
+import { SubscriptionRequired } from "@/components/subscription-required";
 
 const queryClient = new QueryClient();
+
+function FullScreenLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="text-muted-foreground text-sm">Cargando...</div>
+    </div>
+  );
+}
+
+function SubscriptionGate({ children }: { children: React.ReactNode }) {
+  const { data: status, isLoading } = useGetSubscriptionStatus();
+
+  if (isLoading) {
+    return <FullScreenLoader />;
+  }
+
+  if (status && !status.hasAccess) {
+    return <SubscriptionRequired />;
+  }
+
+  return <>{children}</>;
+}
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground text-sm">Cargando...</div>
-      </div>
-    );
+    return <FullScreenLoader />;
   }
 
   if (!isAuthenticated) {
     return <Redirect to="/" />;
   }
 
-  return <>{children}</>;
+  return <SubscriptionGate>{children}</SubscriptionGate>;
 }
 
 function AppRouter() {

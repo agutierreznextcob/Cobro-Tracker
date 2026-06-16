@@ -12,6 +12,7 @@ import {
   getSubscription,
   mapSubscription,
 } from "../lib/flow-subscriptions";
+import { requireSubscription } from "../middlewares/requireSubscription";
 
 const webhooksRouter = Router();
 
@@ -408,7 +409,7 @@ webhooksRouter.post("/webhooks/cobro", async (req, res) => {
 webhooksRouter.get("/webhooks/eventos", (req, res, next) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "No autorizado" }); return; }
   next();
-}, async (req, res) => {
+}, requireSubscription, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 20, 200);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
   const resultado = req.query.resultado as "exitoso" | "fallido" | undefined;
@@ -459,7 +460,7 @@ webhooksRouter.get("/webhooks/eventos", (req, res, next) => {
 webhooksRouter.get("/webhooks/eventos/export", (req, res, next) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "No autorizado" }); return; }
   next();
-}, async (req, res) => {
+}, requireSubscription, async (req, res) => {
   const resultado = req.query.resultado as "exitoso" | "fallido" | undefined;
   const evento = req.query.evento as string | undefined;
 

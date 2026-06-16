@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetFlowCredentials,
   useSaveFlowCredentials,
@@ -7,6 +7,9 @@ import {
   useSaveMpCredentials,
   useDeleteMpCredentials,
   getGetMpCredentialsQueryKey,
+  useGetSubscriptionStatus,
+  useStartSubscription,
+  getGetSubscriptionStatusQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -15,7 +18,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound } from "lucide-react";
+import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles } from "lucide-react";
+
+function formatCLP(value: number): string {
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatFecha(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" });
+}
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -39,6 +55,40 @@ export default function ProfilePage() {
   const [mpAccessToken, setMpAccessToken] = useState("");
   const [showMpToken, setShowMpToken] = useState(false);
   const [mpEditing, setMpEditing] = useState(false);
+
+  // Subscription state
+  const { data: subStatus, isLoading: subLoading } = useGetSubscriptionStatus();
+  const startSubscription = useStartSubscription();
+
+  const handleSubscribe = () => {
+    startSubscription.mutate(undefined, {
+      onSuccess: (data) => {
+        window.location.href = data.url;
+      },
+      onError: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : "No se pudo iniciar la suscripción.";
+        toast({ title: "Error", description: msg, variant: "destructive" });
+      },
+    });
+  };
+
+  // Handle the redirect back from Flow's card-registration page.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("suscripcion");
+    if (!result) return;
+    if (result === "exito") {
+      toast({ title: "¡Suscripción activada!", description: "Gracias por suscribirte a Cobro Simple." });
+      queryClient.invalidateQueries({ queryKey: getGetSubscriptionStatusQueryKey() });
+    } else if (result === "error") {
+      toast({
+        title: "No se pudo completar la suscripción",
+        description: "El registro de tu tarjeta no se completó. Inténtalo nuevamente.",
+        variant: "destructive",
+      });
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [toast, queryClient]);
 
   const handleSaveMp = () => {
     if (!mpAccessToken.trim()) {
@@ -151,6 +201,76 @@ export default function ProfilePage() {
               {user?.email && <p className="text-sm text-muted-foreground">{user.email}</p>}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm border-border/50">
+        <CardHeader className="bg-muted/20 border-b border-border/50">
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4 text-primary" />
+            Suscripción
+          </CardTitle>
+          <CardDescription>Tu plan de Cobro Simple.</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-4">
+          {subLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Verificando suscripción...</span>
+            </div>
+          ) : subStatus?.status === "activa" ? (
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-green-800 dark:text-green-300">Suscripción activa</p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  {subStatus.periodEnd
+                    ? `Próximo cobro: ${formatFecha(subStatus.periodEnd)}`
+                    : `Plan mensual ${formatCLP(subStatus.precioMensual)}/mes`}
+                </p>
+              </div>
+            </div>
+          ) : subStatus?.status === "prueba" ? (
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Prueba gratis</p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    {subStatus.trialEndsAt
+                      ? `Tu prueba termina el ${formatFecha(subStatus.trialEndsAt)}`
+                      : "Estás en tu periodo de prueba"}
+                  </p>
+                </div>
+              </div>
+              <Button onClick={handleSubscribe} disabled={startSubscription.isPending} className="w-full sm:w-auto">
+                {startSubscription.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Redirigiendo...</>
+                ) : (
+                  `Suscribirme - ${formatCLP(subStatus.precioMensual)}/mes`
+                )}
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                <CreditCard className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Suscripción vencida</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Reactiva tu suscripción para seguir usando Cobro Simple.
+                  </p>
+                </div>
+              </div>
+              <Button onClick={handleSubscribe} disabled={startSubscription.isPending} className="w-full sm:w-auto">
+                {startSubscription.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Redirigiendo...</>
+                ) : (
+                  `Suscribirme - ${formatCLP(subStatus?.precioMensual ?? 18990)}/mes`
+                )}
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
