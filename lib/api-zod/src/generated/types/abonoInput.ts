@@ -12,4 +12,5 @@ export interface AbonoInput {
   monto: number;
   metodo: AbonoInputMetodo;
   notas?: string;
+  emailPagador?: string;
 }

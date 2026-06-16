@@ -1315,6 +1315,9 @@ components:
           enum: [flow, mp, manual]
         notas:
           type: string
+        emailPagador:
+          type: string
+          format: email
 
     MpCredentialsStatus:
       type: object

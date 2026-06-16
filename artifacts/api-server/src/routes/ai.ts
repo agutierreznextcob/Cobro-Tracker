@@ -303,4 +303,61 @@ aiRouter.post("/ai/conversations/:id/messages", async (req, res) => {
   }
 });
 
+// POST /ai/chat — stateless, no DB persistence
+const ChatInputSchema = z.object({
+  messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string() })),
+  content: z.string().min(1).max(10000),
+});
+
+aiRouter.post("/ai/chat", async (req, res) => {
+  const userId = req.user!.id;
+  const parsed = ChatInputSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { messages, content } = parsed.data;
+
+  try {
+    const userContext = await buildUserContext(userId);
+    const systemPrompt = `${SYSTEM_BASE}\n\n${userContext}\n\n---\nFecha y hora actual: ${new Date().toLocaleString("es-CL", { timeZone: "America/Santiago" })}`;
+
+    const chatMessages = [...messages, { role: "user" as const, content }];
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    try {
+      const groq = getGroqClient();
+      const stream = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        max_tokens: 2048,
+        messages: [{ role: "system", content: systemPrompt }, ...chatMessages],
+        stream: true,
+      });
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content ?? "";
+        if (delta) res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+      }
+    } catch (groqErr) {
+      req.log.error({ groqErr }, "Groq streaming error in /ai/chat");
+      res.write(`data: ${JSON.stringify({ error: "Error al comunicarse con el modelo de IA" })}\n\n`);
+    }
+
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+  } catch (err) {
+    req.log.error({ err }, "Error in stateless AI chat endpoint");
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Error interno" });
+    } else {
+      res.write(`data: ${JSON.stringify({ error: "Error interno" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    }
+  }
+});
+
 export default aiRouter;

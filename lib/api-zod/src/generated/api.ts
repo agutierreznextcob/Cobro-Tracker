@@ -590,7 +590,8 @@ export const crearAbonoBodyMontoMin = 0.01;
 export const CrearAbonoBody = zod.object({
   "monto": zod.number().min(crearAbonoBodyMontoMin),
   "metodo": zod.enum(['flow', 'mp', 'manual']),
-  "notas": zod.string().optional()
+  "notas": zod.string().optional(),
+  "emailPagador": zod.string().email().optional()
 })
 
 

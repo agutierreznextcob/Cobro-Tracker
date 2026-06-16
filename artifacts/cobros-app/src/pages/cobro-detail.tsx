@@ -85,8 +85,20 @@ export default function CobroDetail() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [emailPagador, setEmailPagador] = useState("");
-  const [showEmailInput, setShowEmailInput] = useState(false);
+  // Link generation modal state
+  const [showFlowConfig, setShowFlowConfig] = useState(false);
+  const [showMpConfig, setShowMpConfig] = useState(false);
+  const [linkTipo, setLinkTipo] = useState<"total" | "parcial">("total");
+  const [linkMonto, setLinkMonto] = useState("");
+  const [linkEmail, setLinkEmail] = useState("");
+
+  const resetLinkConfig = () => {
+    setShowFlowConfig(false);
+    setShowMpConfig(false);
+    setLinkTipo("total");
+    setLinkMonto("");
+    setLinkEmail("");
+  };
 
   const handleStatusChange = (newStatus: string) => {
     updateCobro.mutate(
@@ -105,27 +117,54 @@ export default function CobroDetail() {
     );
   };
 
-  const handleGenerarLink = () => {
-    const email = emailPagador.trim() || cobro?.emailPagador || "";
+  const handleConfirmarFlowLink = () => {
+    const email = linkEmail.trim() || cobro?.emailPagador || "";
     if (!email) {
-      setShowEmailInput(true);
+      toast({ title: "Email requerido", description: "Ingresa el email del pagador para generar el link de Flow.", variant: "destructive" });
       return;
     }
-    generarFlowLink.mutate(
-      { id, data: { emailPagador: email } },
-      {
-        onSuccess: () => {
-          toast({ title: "Link de pago generado", description: "El link de Flow fue creado y el email fue enviado al cliente." });
-          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
-          setShowEmailInput(false);
-          setEmailPagador("");
-        },
-        onError: (err: unknown) => {
-          const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
-          toast({ title: "Error al generar link Flow", description: msg, variant: "destructive" });
-        },
+    if (linkTipo === "parcial") {
+      const montoNum = Math.round(parseFloat(linkMonto.replace(/\./g, "").replace(",", ".")));
+      if (!montoNum || montoNum <= 0) {
+        toast({ title: "Monto inválido", description: "Ingresa un monto válido.", variant: "destructive" });
+        return;
       }
-    );
+      if (montoNum > saldoPendiente) {
+        toast({ title: "Monto excede saldo", description: `El monto no puede superar el saldo pendiente (${formatCurrency(saldoPendiente)}).`, variant: "destructive" });
+        return;
+      }
+      crearAbono.mutate(
+        { id, data: { monto: montoNum, metodo: "flow", emailPagador: email } },
+        {
+          onSuccess: () => {
+            toast({ title: "Abono generado", description: "El link de pago parcial en Flow fue creado." });
+            queryClient.invalidateQueries({ queryKey: getListAbonosQueryKey(id) });
+            queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+            queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+            resetLinkConfig();
+          },
+          onError: (err: unknown) => {
+            const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
+            toast({ title: "Error al crear abono Flow", description: msg, variant: "destructive" });
+          },
+        }
+      );
+    } else {
+      generarFlowLink.mutate(
+        { id, data: { emailPagador: email } },
+        {
+          onSuccess: () => {
+            toast({ title: "Link de pago generado", description: "El link de Flow fue creado y el email fue enviado al cliente." });
+            queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+            resetLinkConfig();
+          },
+          onError: (err: unknown) => {
+            const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
+            toast({ title: "Error al generar link Flow", description: msg, variant: "destructive" });
+          },
+        }
+      );
+    }
   };
 
   const handleCopyLink = async () => {
@@ -161,20 +200,49 @@ export default function CobroDetail() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const handleGenerarMpLink = () => {
-    generarMpLink.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          toast({ title: "Link de pago generado", description: "El link de MercadoPago fue creado exitosamente." });
-          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
-        },
-        onError: (err: unknown) => {
-          const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
-          toast({ title: "Error al generar link MP", description: msg, variant: "destructive" });
-        },
+  const handleConfirmarMpLink = () => {
+    if (linkTipo === "parcial") {
+      const montoNum = Math.round(parseFloat(linkMonto.replace(/\./g, "").replace(",", ".")));
+      if (!montoNum || montoNum <= 0) {
+        toast({ title: "Monto inválido", description: "Ingresa un monto válido.", variant: "destructive" });
+        return;
       }
-    );
+      if (montoNum > saldoPendiente) {
+        toast({ title: "Monto excede saldo", description: `El monto no puede superar el saldo pendiente (${formatCurrency(saldoPendiente)}).`, variant: "destructive" });
+        return;
+      }
+      crearAbono.mutate(
+        { id, data: { monto: montoNum, metodo: "mp" } },
+        {
+          onSuccess: () => {
+            toast({ title: "Abono generado", description: "El link de pago parcial en MercadoPago fue creado." });
+            queryClient.invalidateQueries({ queryKey: getListAbonosQueryKey(id) });
+            queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+            queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+            resetLinkConfig();
+          },
+          onError: (err: unknown) => {
+            const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
+            toast({ title: "Error al crear abono MP", description: msg, variant: "destructive" });
+          },
+        }
+      );
+    } else {
+      generarMpLink.mutate(
+        { id },
+        {
+          onSuccess: () => {
+            toast({ title: "Link de pago generado", description: "El link de MercadoPago fue creado exitosamente." });
+            queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+            resetLinkConfig();
+          },
+          onError: (err: unknown) => {
+            const msg = err instanceof Error ? err.message : "No se pudo generar el link.";
+            toast({ title: "Error al generar link MP", description: msg, variant: "destructive" });
+          },
+        }
+      );
+    }
   };
 
   const handleCopyMpLink = async () => {
@@ -542,36 +610,75 @@ export default function CobroDetail() {
                 </>
               ) : (
                 <div className="space-y-3">
-                  {showEmailInput ? (
-                    <div className="space-y-2">
-                      <Label htmlFor="emailPagador" className="text-xs">Email del pagador</Label>
-                      <Input
-                        id="emailPagador"
-                        type="email"
-                        placeholder="pagador@ejemplo.com"
-                        value={emailPagador}
-                        onChange={(e) => setEmailPagador(e.target.value)}
-                        className="h-8 text-sm"
-                        onKeyDown={(e) => e.key === "Enter" && handleGenerarLink()}
-                      />
+                  {showFlowConfig ? (
+                    <div className="space-y-2.5">
+                      {/* Tipo de pago */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Tipo de pago</Label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setLinkTipo("total")}
+                            className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${linkTipo === "total" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                          >
+                            Pago total
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLinkTipo("parcial")}
+                            className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${linkTipo === "parcial" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                          >
+                            Pago parcial
+                          </button>
+                        </div>
+                      </div>
+                      {/* Monto (solo si parcial) */}
+                      {linkTipo === "parcial" && (
+                        <div className="space-y-1">
+                          <Label htmlFor="flowLinkMonto" className="text-xs">
+                            Monto del abono <span className="text-muted-foreground">(saldo: {formatCurrency(saldoPendiente)})</span>
+                          </Label>
+                          <Input
+                            id="flowLinkMonto"
+                            type="number"
+                            placeholder="0"
+                            min={1}
+                            max={saldoPendiente}
+                            value={linkMonto}
+                            onChange={(e) => setLinkMonto(e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      )}
+                      {/* Email (si no hay email del cobro) */}
+                      {!cobro?.emailPagador && (
+                        <div className="space-y-1">
+                          <Label htmlFor="flowLinkEmail" className="text-xs">Email del pagador</Label>
+                          <Input
+                            id="flowLinkEmail"
+                            type="email"
+                            placeholder="pagador@ejemplo.com"
+                            value={linkEmail}
+                            onChange={(e) => setLinkEmail(e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      )}
+                      {/* Acciones */}
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={handleGenerarLink}
-                          disabled={generarFlowLink.isPending}
+                          onClick={handleConfirmarFlowLink}
+                          disabled={generarFlowLink.isPending || crearAbono.isPending}
                           className="flex-1"
                         >
-                          {generarFlowLink.isPending ? (
+                          {(generarFlowLink.isPending || crearAbono.isPending) ? (
                             <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Generando...</>
                           ) : (
-                            "Generar"
+                            <><Link2 className="h-3.5 w-3.5 mr-1" />Generar link</>
                           )}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => { setShowEmailInput(false); setEmailPagador(""); }}
-                        >
+                        <Button size="sm" variant="outline" onClick={resetLinkConfig}>
                           Cancelar
                         </Button>
                       </div>
@@ -579,20 +686,16 @@ export default function CobroDetail() {
                   ) : (
                     <>
                       <p className="text-xs text-muted-foreground">
-                        Genera un link de pago real en Flow. Se enviará un email al cliente automáticamente.
+                        Genera un link de pago en Flow. Se enviará un email al cliente automáticamente.
                       </p>
                       <Button
                         size="sm"
                         variant="outline"
                         className="w-full"
-                        onClick={handleGenerarLink}
+                        onClick={() => { setShowFlowConfig(true); setLinkTipo("total"); setLinkMonto(""); setLinkEmail(""); }}
                         disabled={generarFlowLink.isPending}
                       >
-                        {generarFlowLink.isPending ? (
-                          <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Generando...</>
-                        ) : (
-                          <><Link2 className="h-3.5 w-3.5 mr-1.5" />Generar link Flow</>
-                        )}
+                        <><Link2 className="h-3.5 w-3.5 mr-1.5" />Generar link Flow</>
                       </Button>
                     </>
                   )}
@@ -646,22 +749,81 @@ export default function CobroDetail() {
                 </>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    Genera un link de pago en MercadoPago. Requiere tener tu Access Token configurado en el perfil.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleGenerarMpLink}
-                    disabled={generarMpLink.isPending}
-                  >
-                    {generarMpLink.isPending ? (
-                      <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Generando...</>
-                    ) : (
-                      <><Link2 className="h-3.5 w-3.5 mr-1.5" />Generar link MercadoPago</>
-                    )}
-                  </Button>
+                  {showMpConfig ? (
+                    <div className="space-y-2.5">
+                      {/* Tipo de pago */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Tipo de pago</Label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setLinkTipo("total")}
+                            className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${linkTipo === "total" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                          >
+                            Pago total
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLinkTipo("parcial")}
+                            className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${linkTipo === "parcial" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                          >
+                            Pago parcial
+                          </button>
+                        </div>
+                      </div>
+                      {/* Monto (solo si parcial) */}
+                      {linkTipo === "parcial" && (
+                        <div className="space-y-1">
+                          <Label htmlFor="mpLinkMonto" className="text-xs">
+                            Monto del abono <span className="text-muted-foreground">(saldo: {formatCurrency(saldoPendiente)})</span>
+                          </Label>
+                          <Input
+                            id="mpLinkMonto"
+                            type="number"
+                            placeholder="0"
+                            min={1}
+                            max={saldoPendiente}
+                            value={linkMonto}
+                            onChange={(e) => setLinkMonto(e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      )}
+                      {/* Acciones */}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleConfirmarMpLink}
+                          disabled={generarMpLink.isPending || crearAbono.isPending}
+                          className="flex-1"
+                        >
+                          {(generarMpLink.isPending || crearAbono.isPending) ? (
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Generando...</>
+                          ) : (
+                            <><Link2 className="h-3.5 w-3.5 mr-1" />Generar link</>
+                          )}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={resetLinkConfig}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Genera un link de pago en MercadoPago. Requiere tener tu Access Token configurado en el perfil.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => { setShowMpConfig(true); setLinkTipo("total"); setLinkMonto(""); }}
+                        disabled={generarMpLink.isPending}
+                      >
+                        <><Link2 className="h-3.5 w-3.5 mr-1.5" />Generar link MercadoPago</>
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
             </CardContent>
