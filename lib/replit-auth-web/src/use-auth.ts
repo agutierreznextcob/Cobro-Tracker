@@ -44,9 +44,13 @@ export function useAuth(): AuthState {
   const login = useCallback(() => {
     const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "";
     const url = `/api/login?returnTo=${encodeURIComponent(base + "/dashboard")}`;
-    // Use window.top to break out of any iframe (e.g. Replit preview pane)
-    // so the OIDC provider page can load without X-Frame-Options restrictions.
-    (window.top ?? window).location.href = url;
+    // Try window.top to break out of any same-origin iframe.
+    // Falls back to window.location if top is cross-origin (e.g. Replit preview).
+    try {
+      (window.top ?? window).location.href = url;
+    } catch {
+      window.location.href = url;
+    }
   }, []);
 
   const logout = useCallback(() => {
