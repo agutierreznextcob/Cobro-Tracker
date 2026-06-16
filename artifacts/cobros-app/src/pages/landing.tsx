@@ -3,17 +3,17 @@ import { Redirect } from "wouter";
 import {
   Activity,
   ArrowRight,
-  BarChart3,
+  Bell,
   Bot,
   CheckCircle2,
   ChevronRight,
+  Coins,
   CreditCard,
   Link2,
   Share2,
   Sparkles,
   Users,
   Wallet,
-  Zap,
 } from "lucide-react";
 
 function LandingNav() {
@@ -66,9 +66,9 @@ function HeroSection() {
           <span className="text-primary">sin complicaciones</span>
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          Crea cobros, comparte links de pago con Webpay y recibe tu dinero
-          directamente. Con dashboard en tiempo real y asistente IA para
-          analizar tu negocio.
+          Crea cobros, comparte links de pago con Webpay y MercadoPago, y haz
+          seguimiento automático. Con dashboard en tiempo real y asistente IA
+          para analizar tu negocio.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
@@ -86,7 +86,7 @@ function HeroSection() {
           </a>
         </div>
         <p className="text-sm text-muted-foreground mt-5">
-          Primeros 30 días gratis · Sin tarjeta de crédito
+          14 días de prueba gratis · Luego $18.990 CLP/mes
         </p>
 
         {/* App preview mockup */}
@@ -96,6 +96,7 @@ function HeroSection() {
             <div className="h-3 w-3 rounded-full bg-yellow-400" />
             <div className="h-3 w-3 rounded-full bg-green-400" />
             <div className="mx-auto text-xs text-muted-foreground font-mono">cobrosimple.app/dashboard</div>
+            <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Datos de ejemplo</span>
           </div>
           <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
@@ -114,7 +115,7 @@ function HeroSection() {
             <div className="rounded-xl border bg-background overflow-hidden">
               <div className="px-4 py-2 bg-muted/30 border-b text-xs font-medium text-muted-foreground">Cobros recientes</div>
               {[
-                { desc: "Servicio mensual Plan Pro", monto: "$85.000", estado: "Pagado", col: "text-green-700 bg-green-50" },
+                { desc: "Servicio mensual · Cliente Pérez", monto: "$85.000", estado: "Pagado", col: "text-green-700 bg-green-50" },
                 { desc: "Consultoría Q2 · Empresa ABC", monto: "$320.000", estado: "Pendiente", col: "text-amber-700 bg-amber-50" },
                 { desc: "Mantenimiento web Enero", monto: "$45.000", estado: "Pagado", col: "text-green-700 bg-green-50" },
               ].map((row, i) => (
@@ -140,19 +141,19 @@ function ComoFuncionaSection() {
       number: "01",
       icon: CreditCard,
       title: "Crea tu cobro",
-      desc: "Ingresa el monto, descripción y el cliente. En segundos tienes tu cobro registrado y listo para enviar.",
+      desc: "Ingresa el monto, la descripción y el cliente. Regístralo en segundos, ya sea con link de pago o cobranza manual.",
     },
     {
       number: "02",
       icon: Share2,
       title: "Comparte el link",
-      desc: "Genera un link de pago con Webpay con un clic y envíalo por WhatsApp, email o donde prefieras.",
+      desc: "Genera un link de pago con Webpay o MercadoPago y envíalo por WhatsApp o email. También puedes enviar recordatorios automáticos.",
     },
     {
       number: "03",
       icon: Wallet,
-      title: "Recibe el pago",
-      desc: "Tu cliente paga online y el dinero llega a tu cuenta. Ves todo en el dashboard en tiempo real.",
+      title: "Haz seguimiento",
+      desc: "Recibe el pago total o por abonos. La plataforma actualiza el estado y tu dashboard en tiempo real.",
     },
   ];
   return (
@@ -185,12 +186,12 @@ function ComoFuncionaSection() {
 
 function CaracteristicasSection() {
   const features = [
-    { icon: BarChart3, title: "Dashboard en tiempo real", desc: "Métricas de recaudación, cobros pendientes, ticket promedio y más. Todo actualizado al instante." },
-    { icon: Link2, title: "Links de pago Webpay", desc: "Integración nativa con Flow/Webpay. Tus clientes pagan con tarjeta de crédito, débito o transferencia." },
-    { icon: Bot, title: "Asistente IA incluido", desc: "Pregúntale: '¿Cuánto recaudé este mes?' o '¿Qué clientes tienen cobros pendientes?'" },
-    { icon: Users, title: "Gestión de clientes", desc: "Organiza tus clientes con RUT, email y teléfono. Ve el historial completo de cobros de cada uno." },
-    { icon: Wallet, title: "Liquidaciones automáticas", desc: "Revisa tus liquidaciones de Flow directamente desde la plataforma. Sin cambiar de pantalla." },
-    { icon: Zap, title: "Notificaciones en tiempo real", desc: "Recibe notificaciones automáticas cuando un cobro cambia de estado. Siempre al día." },
+    { icon: Link2, title: "Links de pago Flow y MercadoPago", desc: "Genera links de pago con Webpay (Flow) y MercadoPago. Tus clientes pagan online con tarjeta o transferencia." },
+    { icon: Wallet, title: "Cobranza manual", desc: "Registra pagos en efectivo, transferencia o cualquier medio. Mantén todos tus cobros en un solo lugar." },
+    { icon: Coins, title: "Pagos parciales y abonos", desc: "Acepta abonos y haz seguimiento automático del saldo hasta completar el monto total del cobro." },
+    { icon: Bell, title: "Recordatorios por email y WhatsApp", desc: "Envía recordatorios a tus clientes para que no se olviden de pagar y reduce la morosidad." },
+    { icon: Bot, title: "Asistente IA incluido", desc: "Pregúntale sobre tu negocio: '¿Cuánto recaudé este mes?' o '¿Qué clientes tienen cobros pendientes?'" },
+    { icon: Users, title: "Gestión de clientes", desc: "Organiza tus clientes con RUT, email y teléfono, con el historial completo de cobros de cada uno." },
   ];
   return (
     <section id="caracteristicas" className="py-20 px-6">
@@ -223,51 +224,35 @@ function PreciosSection() {
     <section id="precios" className="py-20 px-6 bg-muted/20 border-y border-border/50">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold tracking-tight mb-3">Precios simples y transparentes</h2>
+          <h2 className="text-3xl font-bold tracking-tight mb-3">Un precio simple y transparente</h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Comienza gratis. Sin sorpresas ni letras chicas.
+            Prueba 14 días gratis. Sin sorpresas ni letras chicas.
           </p>
         </div>
-        <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
-          <div className="bg-card border rounded-2xl p-8 shadow-sm flex flex-col">
-            <div className="mb-6">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Gratuito</p>
-              <div className="flex items-end gap-1">
-                <span className="text-4xl font-black">$0</span>
-                <span className="text-muted-foreground pb-1 text-sm">/mes</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">Primeros 30 días. Sin tarjeta de crédito.</p>
-            </div>
-            <ul className="space-y-3 flex-1 mb-8">
-              {["Cobros ilimitados", "Links de pago Webpay", "Dashboard en tiempo real", "Gestión de clientes", "Liquidaciones Flow", "Asistente IA básico"].map((item) => (
-                <li key={item} className="flex items-center gap-2.5 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <button
-              onClick={login}
-              className="w-full border border-primary text-primary py-2.5 rounded-lg font-semibold text-sm hover:bg-primary hover:text-primary-foreground transition-colors"
-            >
-              Comenzar gratis
-            </button>
-          </div>
-
+        <div className="max-w-md mx-auto">
           <div className="bg-primary text-primary-foreground rounded-2xl p-8 shadow-xl flex flex-col relative overflow-hidden">
             <div className="absolute top-5 right-5">
-              <span className="bg-white/20 border border-white/30 text-primary-foreground text-xs font-bold px-2.5 py-1 rounded-full">POPULAR</span>
+              <span className="bg-white/20 border border-white/30 text-primary-foreground text-xs font-bold px-2.5 py-1 rounded-full">14 DÍAS GRATIS</span>
             </div>
             <div className="mb-6">
-              <p className="text-xs font-semibold text-primary-foreground/60 uppercase tracking-wider mb-2">Pro</p>
+              <p className="text-xs font-semibold text-primary-foreground/60 uppercase tracking-wider mb-2">Plan Cobro Simple</p>
               <div className="flex items-end gap-1">
-                <span className="text-4xl font-black">$15.000</span>
+                <span className="text-4xl font-black">$18.990</span>
                 <span className="text-primary-foreground/60 pb-1 text-sm">/mes</span>
               </div>
-              <p className="text-sm text-primary-foreground/70 mt-2">CLP · Facturación mensual</p>
+              <p className="text-sm text-primary-foreground/70 mt-2">CLP · Después de tu prueba de 14 días. Cancela cuando quieras.</p>
             </div>
             <ul className="space-y-3 flex-1 mb-8">
-              {["Todo lo del plan gratuito", "Asistente IA sin límites", "Múltiples usuarios", "Exportación CSV avanzada", "Soporte prioritario", "Integraciones personalizadas"].map((item) => (
+              {[
+                "Cobros ilimitados",
+                "Links de pago Flow y MercadoPago",
+                "Cobranza manual",
+                "Pagos parciales y abonos",
+                "Recordatorios por email y WhatsApp",
+                "Asistente IA incluido",
+                "Gestión de clientes",
+                "Dashboard en tiempo real",
+              ].map((item) => (
                 <li key={item} className="flex items-center gap-2.5 text-sm">
                   <CheckCircle2 className="h-4 w-4 text-primary-foreground/70 shrink-0" />
                   {item}
@@ -278,7 +263,7 @@ function PreciosSection() {
               onClick={login}
               className="w-full bg-white text-primary py-2.5 rounded-lg font-semibold text-sm hover:bg-white/90 transition-colors"
             >
-              Comenzar 30 días gratis
+              Comenzar 14 días gratis
             </button>
           </div>
         </div>
@@ -294,26 +279,31 @@ function QuienesSomosSection() {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="text-3xl font-bold tracking-tight mb-5">Quiénes somos</h2>
-            <p className="text-muted-foreground leading-relaxed mb-4">
-              Somos un equipo de emprendedores chilenos que sufrió en carne propia el dolor de cobrar: hojas de cálculo, transferencias perdidas y clientes que "van a pagar la próxima semana".
+            <p className="text-primary font-semibold leading-relaxed mb-4">
+              Una plataforma construida por emprendedores, para emprendedores.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              Creamos Cobro Simple para que cualquier freelancer, pyme o negocio chileno pueda cobrar de forma profesional, con Webpay integrado y sin depender de un contador o programador.
+              Cobro Simple es una plataforma nueva, creada por emprendedores chilenos que vivieron en carne propia el dolor de cobrar: planillas, transferencias perdidas y clientes que "pagan la próxima semana".
+            </p>
+            <p className="text-muted-foreground leading-relaxed mb-4">
+              La hicimos para que cualquier freelancer, pyme o negocio pueda cobrar de forma profesional, con Webpay y MercadoPago integrados y sin depender de un contador o programador.
             </p>
             <p className="font-medium text-foreground leading-relaxed">
-              Nuestra misión: que te paguen a tiempo.
+              Estamos recién comenzando y construimos junto a nuestros primeros usuarios. Tu feedback da forma a lo que viene.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             {[
-              { value: "500+", label: "Usuarios activos" },
-              { value: "$200M", label: "CLP procesados" },
-              { value: "98%", label: "Tasa de cobro" },
-              { value: "24/7", label: "Disponibilidad" },
-            ].map((stat) => (
-              <div key={stat.label} className="bg-card border rounded-2xl p-6 text-center shadow-sm hover:border-primary/30 transition-colors">
-                <p className="text-3xl font-black text-primary mb-1">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
+              { icon: CreditCard, label: "Pagos con Webpay y MercadoPago" },
+              { icon: Bot, label: "Asistente IA incluido" },
+              { icon: Coins, label: "Cobros parciales y seguimiento automático" },
+              { icon: Sparkles, label: "14 días de prueba gratis" },
+            ].map((item) => (
+              <div key={item.label} className="bg-card border rounded-2xl p-5 flex items-center gap-4 shadow-sm hover:border-primary/30 transition-colors">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <p className="text-sm font-medium text-foreground">{item.label}</p>
               </div>
             ))}
           </div>
@@ -330,7 +320,7 @@ function CtaSection() {
       <div className="max-w-2xl mx-auto text-center">
         <h2 className="text-3xl font-bold text-primary-foreground mb-4">Empieza a cobrar hoy mismo</h2>
         <p className="text-primary-foreground/75 text-lg mb-8 leading-relaxed">
-          30 días gratis, sin tarjeta de crédito. Configura tu primer cobro en menos de 5 minutos.
+          14 días de prueba gratis. Configura tu primer cobro en menos de 5 minutos.
         </p>
         <button
           onClick={login}
