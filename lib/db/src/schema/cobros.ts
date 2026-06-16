@@ -6,6 +6,7 @@ import { z } from "zod/v4";
 export const estadoCobroEnum = pgEnum("estado_cobro", [
   "pendiente",
   "pagado",
+  "parcial",
   "fallido",
   "cancelado",
 ]);

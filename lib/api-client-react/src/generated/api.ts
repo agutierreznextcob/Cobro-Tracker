@@ -20,6 +20,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  Abono,
+  AbonoInput,
   AiConversation,
   AiConversationInput,
   AiConversationWithMessages,
@@ -48,6 +50,7 @@ import type {
   LiquidacionDetalle,
   LiquidacionListResponse,
   ListClientesParams,
+  ListCobrosParams,
   ListLiquidacionesParams,
   ListWebhookEventosParams,
   LogoutSuccess,
@@ -1448,21 +1451,28 @@ export function useGetLiquidacion<TData = Awaited<ReturnType<typeof getLiquidaci
 
 
 
-export const getListCobrosUrl = () => {
+export const getListCobrosUrl = (params?: ListCobrosParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/cobros`
+  return stringifiedParams.length > 0 ? `/api/cobros?${stringifiedParams}` : `/api/cobros`
 }
 
 /**
  * Returns all cobros ordered by creation date desc
  * @summary List all cobros
  */
-export const listCobros = async ( options?: RequestInit): Promise<Cobro[]> => {
+export const listCobros = async (params?: ListCobrosParams, options?: RequestInit): Promise<Cobro[]> => {
 
-  return customFetch<Cobro[]>(getListCobrosUrl(),
+  return customFetch<Cobro[]>(getListCobrosUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1475,23 +1485,23 @@ export const listCobros = async ( options?: RequestInit): Promise<Cobro[]> => {
 
 
 
-export const getListCobrosQueryKey = () => {
+export const getListCobrosQueryKey = (params?: ListCobrosParams,) => {
     return [
-    `/api/cobros`
+    `/api/cobros`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListCobrosQueryOptions = <TData = Awaited<ReturnType<typeof listCobros>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCobros>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListCobrosQueryOptions = <TData = Awaited<ReturnType<typeof listCobros>>, TError = ErrorType<unknown>>(params?: ListCobrosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCobros>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListCobrosQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListCobrosQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCobros>>> = ({ signal }) => listCobros({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCobros>>> = ({ signal }) => listCobros(params, { signal, ...requestOptions });
 
 
 
@@ -1509,11 +1519,11 @@ export type ListCobrosQueryError = ErrorType<unknown>
  */
 
 export function useListCobros<TData = Awaited<ReturnType<typeof listCobros>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCobros>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListCobrosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCobros>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListCobrosQueryOptions(options)
+  const queryOptions = getListCobrosQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2345,6 +2355,227 @@ export function useListSeguimientos<TData = Awaited<ReturnType<typeof listSeguim
 
 
 
+
+export const getListAbonosUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/abonos`
+}
+
+/**
+ * @summary List pagos parciales for a cobro
+ */
+export const listAbonos = async (id: number, options?: RequestInit): Promise<Abono[]> => {
+
+  return customFetch<Abono[]>(getListAbonosUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAbonosQueryKey = (id: number,) => {
+    return [
+    `/api/cobros/${id}/abonos`
+    ] as const;
+    }
+
+
+export const getListAbonosQueryOptions = <TData = Awaited<ReturnType<typeof listAbonos>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAbonos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAbonosQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAbonos>>> = ({ signal }) => listAbonos(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAbonos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAbonosQueryResult = NonNullable<Awaited<ReturnType<typeof listAbonos>>>
+export type ListAbonosQueryError = ErrorType<void>
+
+
+/**
+ * @summary List pagos parciales for a cobro
+ */
+
+export function useListAbonos<TData = Awaited<ReturnType<typeof listAbonos>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAbonos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAbonosQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCrearAbonoUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/abonos`
+}
+
+/**
+ * @summary Create a pago parcial for a cobro
+ */
+export const crearAbono = async (id: number,
+    abonoInput: AbonoInput, options?: RequestInit): Promise<Abono> => {
+
+  return customFetch<Abono>(getCrearAbonoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      abonoInput,)
+  }
+);}
+
+
+
+
+export const getCrearAbonoMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof crearAbono>>, TError,{id: number;data: BodyType<AbonoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof crearAbono>>, TError,{id: number;data: BodyType<AbonoInput>}, TContext> => {
+
+const mutationKey = ['crearAbono'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof crearAbono>>, {id: number;data: BodyType<AbonoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  crearAbono(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CrearAbonoMutationResult = NonNullable<Awaited<ReturnType<typeof crearAbono>>>
+    export type CrearAbonoMutationBody = BodyType<AbonoInput>
+    export type CrearAbonoMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Create a pago parcial for a cobro
+ */
+export const useCrearAbono = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof crearAbono>>, TError,{id: number;data: BodyType<AbonoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof crearAbono>>,
+        TError,
+        {id: number;data: BodyType<AbonoInput>},
+        TContext
+      > => {
+      return useMutation(getCrearAbonoMutationOptions(options));
+    }
+
+export const getConfirmarAbonoUrl = (id: number,
+    abonoId: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/abonos/${abonoId}/confirmar`
+}
+
+/**
+ * @summary Manually confirm a pago parcial (for manual-method abonos)
+ */
+export const confirmarAbono = async (id: number,
+    abonoId: number, options?: RequestInit): Promise<Abono> => {
+
+  return customFetch<Abono>(getConfirmarAbonoUrl(id,abonoId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getConfirmarAbonoMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmarAbono>>, TError,{id: number;abonoId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmarAbono>>, TError,{id: number;abonoId: number}, TContext> => {
+
+const mutationKey = ['confirmarAbono'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmarAbono>>, {id: number;abonoId: number}> = (props) => {
+          const {id,abonoId} = props ?? {};
+
+          return  confirmarAbono(id,abonoId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmarAbonoMutationResult = NonNullable<Awaited<ReturnType<typeof confirmarAbono>>>
+
+    export type ConfirmarAbonoMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Manually confirm a pago parcial (for manual-method abonos)
+ */
+export const useConfirmarAbono = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmarAbono>>, TError,{id: number;abonoId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmarAbono>>,
+        TError,
+        {id: number;abonoId: number},
+        TContext
+      > => {
+      return useMutation(getConfirmarAbonoMutationOptions(options));
+    }
 
 export const getGetMpCredentialsUrl = () => {
 

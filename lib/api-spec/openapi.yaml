@@ -451,6 +451,20 @@ paths:
       tags: [cobros]
       summary: List all cobros
       description: Returns all cobros ordered by creation date desc
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pendiente, pagado, parcial, fallido, cancelado]
+        - name: metodo
+          in: query
+          required: false
+          description: "flow=solo Flow, mp=solo MP, link=cualquier pasarela, manual=sin pasarela"
+          schema:
+            type: string
+            enum: [flow, mp, link, manual]
       responses:
         "200":
           description: List of cobros
@@ -727,6 +741,107 @@ paths:
           description: Unauthorized
         "404":
           description: Cobro not found
+
+  /cobros/{id}/abonos:
+    get:
+      operationId: listAbonos
+      tags: [cobros]
+      summary: List pagos parciales for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of abonos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Abono"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Cobro not found
+
+    post:
+      operationId: crearAbono
+      tags: [cobros]
+      summary: Create a pago parcial for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AbonoInput"
+      responses:
+        "201":
+          description: Abono created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Abono"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Cobro not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/{id}/abonos/{abonoId}/confirmar:
+    post:
+      operationId: confirmarAbono
+      tags: [cobros]
+      summary: Manually confirm a pago parcial (for manual-method abonos)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: abonoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Abono confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Abono"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /profile/mp-credentials:
     get:
@@ -1058,7 +1173,7 @@ components:
           type: string
         estado:
           type: string
-          enum: [pendiente, pagado, fallido, cancelado]
+          enum: [pendiente, pagado, parcial, fallido, cancelado]
         referencia:
           type: ["string", "null"]
           description: Optional external reference (e.g. payment provider ID)
@@ -1155,6 +1270,52 @@ components:
           type: string
           format: date-time
 
+    Abono:
+      type: object
+      required: [id, cobroId, monto, metodo, estado, creadoEn]
+      properties:
+        id:
+          type: integer
+        cobroId:
+          type: integer
+        monto:
+          type: number
+        metodo:
+          type: string
+          enum: [flow, mp, manual]
+        estado:
+          type: string
+          enum: [pendiente, confirmado, fallido]
+        linkPago:
+          type: ["string", "null"]
+        flowOrdenId:
+          type: ["string", "null"]
+        mpPreferenceId:
+          type: ["string", "null"]
+        mpPaymentId:
+          type: ["string", "null"]
+        notas:
+          type: ["string", "null"]
+        creadoEn:
+          type: string
+          format: date-time
+        confirmadoEn:
+          type: ["string", "null"]
+          format: date-time
+
+    AbonoInput:
+      type: object
+      required: [monto, metodo]
+      properties:
+        monto:
+          type: number
+          minimum: 0.01
+        metodo:
+          type: string
+          enum: [flow, mp, manual]
+        notas:
+          type: string
+
     MpCredentialsStatus:
       type: object
       required: [configurado]
@@ -1226,7 +1387,7 @@ components:
       properties:
         estado:
           type: string
-          enum: [pendiente, pagado, fallido, cancelado]
+          enum: [pendiente, pagado, parcial, fallido, cancelado]
         descripcion:
           type: string
           minLength: 1

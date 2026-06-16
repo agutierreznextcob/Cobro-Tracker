@@ -12,6 +12,7 @@ export type CobroEstado = typeof CobroEstado[keyof typeof CobroEstado];
 export const CobroEstado = {
   pendiente: 'pendiente',
   pagado: 'pagado',
+  parcial: 'parcial',
   fallido: 'fallido',
   cancelado: 'cancelado',
 } as const;

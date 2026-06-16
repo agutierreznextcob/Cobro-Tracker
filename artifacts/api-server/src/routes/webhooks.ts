@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { Router } from "express";
-import { db, cobrosTable, webhookEventosTable } from "@workspace/db";
+import { db, cobrosTable, webhookEventosTable, pagosParciales } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { ReceiveCobroWebhookBody } from "@workspace/api-zod";
 import { verificarPagoFlow } from "../lib/flow-api";
@@ -76,7 +76,42 @@ webhooksRouter.post("/webhooks/flow", async (req, res) => {
   }
 
   try {
-    // 1. Find the cobro by the stored token (set when creating the Flow order)
+    // 1a. Find a pagosParciales by flowToken (abono payment)
+    const [abono] = await db
+      .select()
+      .from(pagosParciales)
+      .where(eq(pagosParciales.flowToken, token.trim()));
+
+    if (abono) {
+      // It's a partial payment — find its parent cobro
+      const [cobroParcial] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, abono.cobroId));
+      if (!cobroParcial?.responsableId) {
+        res.status(200).json({ ok: false, error: "Cobro sin responsable" });
+        return;
+      }
+      const creds = await getFlowCredentials(cobroParcial.responsableId);
+      if (!creds) { res.status(200).json({ ok: false }); return; }
+      const pagoStatus = await verificarPagoFlow(creds.apiKey, creds.secretKey, token);
+      req.log.info({ abonoId: abono.id, cobroId: abono.cobroId, flowStatus: pagoStatus.status }, "Flow abono payment verified");
+      if (pagoStatus.status === 2) {
+        await db.update(pagosParciales).set({ estado: "confirmado", confirmadoEn: new Date() }).where(eq(pagosParciales.id, abono.id));
+        // Recalculate cobro estado from confirmed abonos
+        const [sumResult] = await db.select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
+          .from(pagosParciales).where(and(eq(pagosParciales.cobroId, abono.cobroId), eq(pagosParciales.estado, "confirmado")));
+        const totalPagado = sumResult?.total ?? 0;
+        const montoTotal = Number(cobroParcial.monto);
+        const nuevoEstadoCobro: "pagado" | "parcial" | "pendiente" = totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
+        await db.update(cobrosTable).set({ estado: nuevoEstadoCobro, actualizadoEn: new Date() }).where(eq(cobrosTable.id, abono.cobroId));
+        await logEvento({ evento: "flow.abono.confirmado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id} confirmado, cobro ahora ${nuevoEstadoCobro}` });
+      } else if (pagoStatus.status === 3 || pagoStatus.status === 4) {
+        await db.update(pagosParciales).set({ estado: "fallido" }).where(eq(pagosParciales.id, abono.id));
+        await logEvento({ evento: "flow.abono.fallido", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id} fallido (status ${pagoStatus.status})` });
+      }
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    // 1b. Find the cobro by the stored token (set when creating the Flow order)
     const [cobro] = await db
       .select()
       .from(cobrosTable)
@@ -204,10 +239,46 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
     const payment = await obtenerPagoMp(globalToken, paymentId);
     req.log.info({ paymentId, status: payment.status, externalRef: payment.external_reference }, "MercadoPago payment verified");
 
+    // Map MP status
+    const estadoMap: Record<string, "pagado" | "fallido" | "cancelado" | "pendiente"> = {
+      approved: "pagado", rejected: "fallido", cancelled: "cancelado", refunded: "cancelado",
+      in_process: "pendiente", pending: "pendiente", authorized: "pendiente",
+    };
+
+    const ref = payment.external_reference ?? "";
+
+    // Check if this is an abono payment "abono-{id}"
+    const abonoMatch = ref.match(/^abono-(\d+)$/);
+    if (abonoMatch) {
+      const abonoId = parseInt(abonoMatch[1], 10);
+      const [abono] = await db.select().from(pagosParciales).where(eq(pagosParciales.id, abonoId));
+      if (!abono) {
+        await logEvento({ evento: "mp.webhook.ignorado", cobroId: null, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId} no encontrado` });
+        res.status(200).json({ ok: true });
+        return;
+      }
+      if (payment.status === "approved") {
+        await db.update(pagosParciales).set({ estado: "confirmado", mpPaymentId: String(paymentId), confirmadoEn: new Date() }).where(eq(pagosParciales.id, abonoId));
+        const [sumResult] = await db.select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
+          .from(pagosParciales).where(and(eq(pagosParciales.cobroId, abono.cobroId), eq(pagosParciales.estado, "confirmado")));
+        const [cobroParcial] = await db.select({ monto: cobrosTable.monto }).from(cobrosTable).where(eq(cobrosTable.id, abono.cobroId));
+        const totalPagado = sumResult?.total ?? 0;
+        const montoTotal = Number(cobroParcial?.monto ?? 0);
+        const nuevoEstadoCobro: "pagado" | "parcial" | "pendiente" = totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
+        await db.update(cobrosTable).set({ estado: nuevoEstadoCobro, actualizadoEn: new Date() }).where(eq(cobrosTable.id, abono.cobroId));
+        await logEvento({ evento: "mp.abono.confirmado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId} confirmado, cobro ahora ${nuevoEstadoCobro}` });
+      } else if (["rejected", "cancelled", "refunded"].includes(payment.status)) {
+        await db.update(pagosParciales).set({ estado: "fallido", mpPaymentId: String(paymentId) }).where(eq(pagosParciales.id, abonoId));
+        await logEvento({ evento: "mp.abono.fallido", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId} fallido (${payment.status})` });
+      }
+      res.status(200).json({ ok: true });
+      return;
+    }
+
     // Parse cobro ID from external_reference "cobro-{id}"
-    const match = payment.external_reference?.match(/^cobro-(\d+)$/);
+    const match = ref.match(/^cobro-(\d+)$/);
     if (!match) {
-      await logEvento({ evento: "mp.webhook.ignorado", cobroId: null, ipOrigen: ip, exitoso: true, detalle: `external_reference desconocida: ${payment.external_reference}` });
+      await logEvento({ evento: "mp.webhook.ignorado", cobroId: null, ipOrigen: ip, exitoso: true, detalle: `external_reference desconocida: ${ref}` });
       res.status(200).json({ ok: true });
       return;
     }
@@ -220,17 +291,6 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
       res.status(200).json({ ok: false, error: "Cobro no encontrado" });
       return;
     }
-
-    // Map MP status to cobro estado
-    const estadoMap: Record<string, "pagado" | "fallido" | "cancelado" | "pendiente"> = {
-      approved: "pagado",
-      rejected: "fallido",
-      cancelled: "cancelado",
-      refunded: "cancelado",
-      in_process: "pendiente",
-      pending: "pendiente",
-      authorized: "pendiente",
-    };
 
     const nuevoEstado = estadoMap[payment.status];
     if (!nuevoEstado || nuevoEstado === "pendiente") {

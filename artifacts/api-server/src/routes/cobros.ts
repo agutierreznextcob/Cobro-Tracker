@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, cobrosTable, clientesTable, seguimientosCobranzaTable } from "@workspace/db";
-import { eq, desc, sql, and, gte } from "drizzle-orm";
+import { db, cobrosTable, clientesTable, seguimientosCobranzaTable, pagosParciales } from "@workspace/db";
+import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt } from "drizzle-orm";
 import {
   CreateCobroBody,
   UpdateCobroBody,
@@ -15,6 +15,23 @@ import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } fro
 
 const cobrosRouter = Router();
 
+async function recalcularEstadoCobro(cobroId: number): Promise<void> {
+  const [result] = await db
+    .select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
+    .from(pagosParciales)
+    .where(and(eq(pagosParciales.cobroId, cobroId), eq(pagosParciales.estado, "confirmado")));
+  const [cobro] = await db
+    .select({ monto: cobrosTable.monto })
+    .from(cobrosTable)
+    .where(eq(cobrosTable.id, cobroId));
+  if (!cobro) return;
+  const totalPagado = result?.total ?? 0;
+  const montoTotal = Number(cobro.monto);
+  const nuevoEstado: "pagado" | "parcial" | "pendiente" =
+    totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
+  await db.update(cobrosTable).set({ estado: nuevoEstado, actualizadoEn: new Date() }).where(eq(cobrosTable.id, cobroId));
+}
+
 cobrosRouter.use((req, res, next) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autorizado" });
@@ -24,11 +41,25 @@ cobrosRouter.use((req, res, next) => {
 });
 
 cobrosRouter.get("/cobros", async (req, res) => {
+  const estado = req.query.estado as string | undefined;
+  const metodo = req.query.metodo as string | undefined;
+
   try {
+    const conditions = [];
+    if (estado && ["pendiente", "pagado", "parcial", "fallido", "cancelado"].includes(estado)) {
+      conditions.push(eq(cobrosTable.estado, estado as "pendiente" | "pagado" | "parcial" | "fallido" | "cancelado"));
+    }
+    if (metodo === "flow") conditions.push(isNotNull(cobrosTable.flowLinkPago));
+    else if (metodo === "mp") conditions.push(isNotNull(cobrosTable.mpPaymentLinkUrl));
+    else if (metodo === "link") conditions.push(or(isNotNull(cobrosTable.flowLinkPago), isNotNull(cobrosTable.mpPaymentLinkUrl))!);
+    else if (metodo === "manual") conditions.push(and(isNull(cobrosTable.flowLinkPago), isNull(cobrosTable.mpPaymentLinkUrl))!);
+
     const cobros = await db
       .select()
       .from(cobrosTable)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(cobrosTable.creadoEn));
+
     res.json(
       cobros.map((c) => ({
         ...c,
@@ -549,6 +580,152 @@ cobrosRouter.get("/dashboard/metrics", async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Error getting dashboard metrics");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+const AbonoInputSchema = z.object({
+  monto: z.number().positive(),
+  metodo: z.enum(["flow", "mp", "manual"]),
+  notas: z.string().optional(),
+  emailPagador: z.string().email().optional(),
+});
+
+cobrosRouter.get("/cobros/:id/abonos", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  try {
+    const [cobro] = await db.select({ id: cobrosTable.id }).from(cobrosTable).where(eq(cobrosTable.id, paramsParsed.data.id));
+    if (!cobro) { res.status(404).json({ error: "Cobro no encontrado" }); return; }
+    const abonos = await db
+      .select()
+      .from(pagosParciales)
+      .where(eq(pagosParciales.cobroId, paramsParsed.data.id))
+      .orderBy(desc(pagosParciales.creadoEn));
+    res.json(abonos.map((a) => ({
+      ...a,
+      monto: Number(a.monto),
+      creadoEn: a.creadoEn.toISOString(),
+      confirmadoEn: a.confirmadoEn?.toISOString() ?? null,
+    })));
+  } catch (err) {
+    req.log.error({ err }, "Error listing abonos");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+cobrosRouter.post("/cobros/:id/abonos", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) { res.status(400).json({ error: "ID inválido" }); return; }
+  const bodyParsed = AbonoInputSchema.safeParse(req.body);
+  if (!bodyParsed.success) { res.status(400).json({ error: bodyParsed.error.message }); return; }
+  const { monto, metodo, notas, emailPagador } = bodyParsed.data;
+  const userId = req.user!.id;
+  try {
+    const [cobro] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, paramsParsed.data.id));
+    if (!cobro) { res.status(404).json({ error: "Cobro no encontrado" }); return; }
+
+    if (metodo === "manual") {
+      const [abono] = await db.insert(pagosParciales).values({
+        cobroId: cobro.id, monto: String(monto), metodo: "manual",
+        estado: "confirmado", notas: notas ?? null, confirmadoEn: new Date(), creadoEn: new Date(),
+      }).returning();
+      await recalcularEstadoCobro(cobro.id);
+      req.log.info({ cobroId: cobro.id, abonoId: abono.id, monto }, "Manual abono confirmed");
+      res.status(201).json({ ...abono, monto: Number(abono.monto), creadoEn: abono.creadoEn.toISOString(), confirmadoEn: abono.confirmadoEn?.toISOString() ?? null });
+      return;
+    }
+
+    if (metodo === "flow") {
+      const creds = await getFlowCredentials(userId);
+      if (!creds) { res.status(400).json({ error: "No tienes credenciales de Flow configuradas." }); return; }
+      const email = emailPagador ?? cobro.emailPagador;
+      if (!email) { res.status(400).json({ error: "Se requiere email del pagador para generar link Flow." }); return; }
+      const [abono] = await db.insert(pagosParciales).values({
+        cobroId: cobro.id, monto: String(monto), metodo: "flow",
+        estado: "pendiente", notas: notas ?? null, creadoEn: new Date(),
+      }).returning();
+      try {
+        const baseUrl = getPublicBaseUrl();
+        const result = await crearOrdenFlow(creds.apiKey, creds.secretKey, {
+          commerceOrder: `abono-${abono.id}`,
+          subject: `Abono: ${cobro.descripcion}`.slice(0, 200),
+          currency: "CLP",
+          amount: Math.round(monto),
+          email,
+          urlConfirmation: `${baseUrl}/api/webhooks/flow`,
+          urlReturn: `${baseUrl}/cobros/${cobro.id}`,
+        });
+        const [updated] = await db.update(pagosParciales).set({
+          flowToken: result.token, flowOrdenId: String(result.flowOrder), linkPago: result.url,
+        }).where(eq(pagosParciales.id, abono.id)).returning();
+        req.log.info({ cobroId: cobro.id, abonoId: abono.id }, "Flow abono link created");
+        res.status(201).json({ ...updated, monto: Number(updated.monto), creadoEn: updated.creadoEn.toISOString(), confirmadoEn: null });
+      } catch (flowErr) {
+        await db.delete(pagosParciales).where(eq(pagosParciales.id, abono.id));
+        throw flowErr;
+      }
+      return;
+    }
+
+    if (metodo === "mp") {
+      const accessToken = await getMpCredentials(userId);
+      if (!accessToken) { res.status(400).json({ error: "No tienes credenciales de MercadoPago configuradas." }); return; }
+      const [abono] = await db.insert(pagosParciales).values({
+        cobroId: cobro.id, monto: String(monto), metodo: "mp",
+        estado: "pendiente", notas: notas ?? null, creadoEn: new Date(),
+      }).returning();
+      try {
+        const baseUrl = getPublicBaseUrl();
+        const result = await crearPreferenciaMp(accessToken, {
+          title: `Abono: ${cobro.descripcion}`.slice(0, 256),
+          quantity: 1,
+          unitPrice: Math.round(monto),
+          externalReference: `abono-${abono.id}`,
+          notificationUrl: `${baseUrl}/api/webhooks/mercadopago`,
+          backUrl: `${baseUrl}/cobros/${cobro.id}`,
+        });
+        const [updated] = await db.update(pagosParciales).set({
+          mpPreferenceId: result.preferenceId, linkPago: result.initPoint,
+        }).where(eq(pagosParciales.id, abono.id)).returning();
+        req.log.info({ cobroId: cobro.id, abonoId: abono.id }, "MP abono link created");
+        res.status(201).json({ ...updated, monto: Number(updated.monto), creadoEn: updated.creadoEn.toISOString(), confirmadoEn: null });
+      } catch (mpErr) {
+        await db.delete(pagosParciales).where(eq(pagosParciales.id, abono.id));
+        throw mpErr;
+      }
+      return;
+    }
+
+    res.status(400).json({ error: "Método no válido" });
+  } catch (err) {
+    req.log.error({ err }, "Error creating abono");
+    res.status(500).json({ error: `Error al crear abono: ${err instanceof Error ? err.message : String(err)}` });
+  }
+});
+
+cobrosRouter.post("/cobros/:id/abonos/:abonoId/confirmar", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  const abonoId = Number(req.params.abonoId);
+  if (!paramsParsed.success || isNaN(abonoId)) { res.status(400).json({ error: "ID inválido" }); return; }
+  try {
+    const [abono] = await db.select().from(pagosParciales).where(
+      and(eq(pagosParciales.id, abonoId), eq(pagosParciales.cobroId, paramsParsed.data.id))
+    );
+    if (!abono) { res.status(404).json({ error: "Abono no encontrado" }); return; }
+    if (abono.estado === "confirmado") { res.status(400).json({ error: "El abono ya está confirmado" }); return; }
+    const [updated] = await db.update(pagosParciales)
+      .set({ estado: "confirmado", confirmadoEn: new Date() })
+      .where(eq(pagosParciales.id, abonoId))
+      .returning();
+    await recalcularEstadoCobro(paramsParsed.data.id);
+    req.log.info({ abonoId, cobroId: paramsParsed.data.id }, "Abono confirmed manually");
+    res.json({ ...updated, monto: Number(updated.monto), creadoEn: updated.creadoEn.toISOString(), confirmadoEn: updated.confirmadoEn?.toISOString() ?? null });
+  } catch (err) {
+    req.log.error({ err }, "Error confirming abono");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

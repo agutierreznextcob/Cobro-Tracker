@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { CobroEstado } from "@workspace/api-client-react";
-import { CheckCircle2, Clock, XCircle, Ban } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Ban, Minus } from "lucide-react";
 
 export function StatusBadge({ status }: { status: string }) {
   switch (status) {
@@ -29,7 +29,14 @@ export function StatusBadge({ status }: { status: string }) {
       return (
         <Badge variant="outline" className="bg-muted text-muted-foreground border-border gap-1.5 font-medium py-1">
           <Ban className="h-3 w-3" />
-          Cancelled
+          Cancelado
+        </Badge>
+      );
+    case "parcial":
+      return (
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900 gap-1.5 font-medium py-1">
+          <Minus className="h-3 w-3" />
+          Parcial
         </Badge>
       );
     default:

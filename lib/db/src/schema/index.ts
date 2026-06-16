@@ -7,3 +7,4 @@ export * from "./mp-credentials";
 export * from "./conversations";
 export * from "./messages";
 export * from "./seguimientos-cobranza";
+export * from "./pagos-parciales";

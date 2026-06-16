@@ -6,6 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './abono';
+export * from './abonoEstado';
+export * from './abonoInput';
+export * from './abonoInputMetodo';
+export * from './abonoMetodo';
 export * from './aiConversation';
 export * from './aiConversationInput';
 export * from './aiConversationWithMessages';
@@ -45,6 +50,9 @@ export * from './liquidacion';
 export * from './liquidacionDetalle';
 export * from './liquidacionListResponse';
 export * from './listClientesParams';
+export * from './listCobrosEstado';
+export * from './listCobrosMetodo';
+export * from './listCobrosParams';
 export * from './listLiquidacionesParams';
 export * from './listWebhookEventosParams';
 export * from './listWebhookEventosResultado';

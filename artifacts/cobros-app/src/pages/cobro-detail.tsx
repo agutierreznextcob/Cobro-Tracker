@@ -10,6 +10,10 @@ import {
   useListSeguimientos,
   getListCobrosQueryKey,
   getGetCobrosSummaryQueryKey,
+  useListAbonos,
+  useCrearAbono,
+  useConfirmarAbono,
+  getListAbonosQueryKey,
 } from "@workspace/api-client-react";
 import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -38,6 +42,11 @@ import {
   CheckCircle2,
   Clock,
   Send,
+  Plus,
+  CreditCard,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
 } from "lucide-react";
 import { CobroUpdateEstado } from "@workspace/api-client-react";
 
@@ -186,6 +195,71 @@ export default function CobroDetail() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  // --- Abonos / pagos parciales ---
+  const { data: abonos, isLoading: isLoadingAbonos } = useListAbonos(id, {
+    query: { enabled: !!id, queryKey: getListAbonosQueryKey(id) },
+  });
+  const crearAbono = useCrearAbono();
+  const confirmarAbono = useConfirmarAbono();
+  const [abonoMonto, setAbonoMonto] = useState("");
+  const [abonoMetodo, setAbonoMetodo] = useState<"flow" | "mp" | "manual">("manual");
+  const [abonoEmail, setAbonoEmail] = useState("");
+  const [abonoNotas, setAbonoNotas] = useState("");
+  const [showAbonoForm, setShowAbonoForm] = useState(false);
+
+  const totalAbonado = (abonos ?? []).filter((a) => a.estado === "confirmado").reduce((acc, a) => acc + a.monto, 0);
+  const saldoPendiente = cobro ? cobro.monto - totalAbonado : 0;
+
+  const handleCrearAbono = () => {
+    const montoNum = parseFloat(abonoMonto.replace(/\./g, "").replace(",", "."));
+    if (!montoNum || montoNum <= 0) {
+      toast({ title: "Monto inválido", description: "Ingresa un monto válido.", variant: "destructive" });
+      return;
+    }
+    const body: { monto: number; metodo: "flow" | "mp" | "manual"; notas?: string; emailPagador?: string } = {
+      monto: montoNum,
+      metodo: abonoMetodo,
+      ...(abonoNotas ? { notas: abonoNotas } : {}),
+      ...(abonoMetodo === "flow" && abonoEmail ? { emailPagador: abonoEmail } : {}),
+    };
+    crearAbono.mutate(
+      { id, data: body },
+      {
+        onSuccess: () => {
+          toast({ title: "Abono registrado", description: abonoMetodo === "manual" ? "Abono manual confirmado." : "Link de pago generado para el abono." });
+          queryClient.invalidateQueries({ queryKey: getListAbonosQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+          setAbonoMonto("");
+          setAbonoNotas("");
+          setAbonoEmail("");
+          setShowAbonoForm(false);
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo registrar el abono.";
+          toast({ title: "Error al crear abono", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const handleConfirmarAbono = (abonoId: number) => {
+    confirmarAbono.mutate(
+      { id, abonoId },
+      {
+        onSuccess: () => {
+          toast({ title: "Abono confirmado", description: "El abono fue marcado como confirmado." });
+          queryClient.invalidateQueries({ queryKey: getListAbonosQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+        },
+        onError: () => {
+          toast({ title: "Error", description: "No se pudo confirmar el abono.", variant: "destructive" });
+        },
+      }
+    );
+  };
+
   // --- Seguimiento de cobranza manual ---
   const avisarCliente = useAvisarCliente();
   const { data: seguimientos, isLoading: isLoadingSeguimientos } = useListSeguimientos(id, {
@@ -309,6 +383,7 @@ export default function CobroDetail() {
               <SelectContent>
                 <SelectItem value={CobroUpdateEstado.pendiente}>Pendiente</SelectItem>
                 <SelectItem value={CobroUpdateEstado.pagado}>Pagado</SelectItem>
+                <SelectItem value="parcial">Parcial</SelectItem>
                 <SelectItem value={CobroUpdateEstado.fallido}>Fallido</SelectItem>
                 <SelectItem value={CobroUpdateEstado.cancelado}>Cancelado</SelectItem>
               </SelectContent>
@@ -726,6 +801,202 @@ export default function CobroDetail() {
           )}
         </div>
       </div>
+
+      {/* Abonos / pagos parciales */}
+      <Card className="shadow-sm border-border/50">
+        <CardHeader className="bg-muted/20 border-b border-border/50 pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-primary" />
+              Pagos parciales (abonos)
+            </CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 h-8 text-xs"
+              onClick={() => setShowAbonoForm((v) => !v)}
+            >
+              {showAbonoForm ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+              {showAbonoForm ? "Ocultar" : "Registrar abono"}
+            </Button>
+          </div>
+
+          {/* Resumen */}
+          {cobro && (
+            <div className="grid grid-cols-3 gap-3 mt-4">
+              <div className="rounded-md bg-background border border-border/50 px-3 py-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Total cobro</p>
+                <p className="text-sm font-semibold font-mono">{formatCurrency(cobro.monto)}</p>
+              </div>
+              <div className="rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2 text-center">
+                <p className="text-[10px] text-emerald-700 uppercase tracking-wide mb-0.5">Pagado</p>
+                <p className="text-sm font-semibold font-mono text-emerald-700">{formatCurrency(totalAbonado)}</p>
+              </div>
+              <div className={`rounded-md border px-3 py-2 text-center ${saldoPendiente > 0 ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
+                <p className={`text-[10px] uppercase tracking-wide mb-0.5 ${saldoPendiente > 0 ? "text-amber-700" : "text-emerald-700"}`}>Saldo</p>
+                <p className={`text-sm font-semibold font-mono ${saldoPendiente > 0 ? "text-amber-700" : "text-emerald-700"}`}>{formatCurrency(Math.max(0, saldoPendiente))}</p>
+              </div>
+            </div>
+          )}
+        </CardHeader>
+
+        <CardContent className="pt-5 space-y-4">
+          {/* Formulario nuevo abono */}
+          {showAbonoForm && (
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-3">
+              <p className="text-sm font-medium text-foreground">Nuevo abono</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Monto (CLP)</Label>
+                  <Input
+                    type="number"
+                    placeholder="Ej: 50000"
+                    value={abonoMonto}
+                    onChange={(e) => setAbonoMonto(e.target.value)}
+                    className="h-8 text-sm"
+                    min="1"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Método</Label>
+                  <Select value={abonoMetodo} onValueChange={(v) => setAbonoMetodo(v as "flow" | "mp" | "manual")}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manual" className="text-xs">Manual / Transferencia</SelectItem>
+                      <SelectItem value="flow" className="text-xs">Link Flow</SelectItem>
+                      <SelectItem value="mp" className="text-xs">Link MercadoPago</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {abonoMetodo === "flow" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Email pagador (para Flow)</Label>
+                  <Input
+                    type="email"
+                    placeholder={cobro?.emailPagador ?? "email@ejemplo.com"}
+                    value={abonoEmail}
+                    onChange={(e) => setAbonoEmail(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                  {!cobro?.emailPagador && (
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      Flow requiere un email del pagador.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <Label className="text-xs">Notas (opcional)</Label>
+                <Input
+                  placeholder="Ej: Abono en efectivo"
+                  value={abonoNotas}
+                  onChange={(e) => setAbonoNotas(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button
+                  size="sm"
+                  className="flex-1 h-8 text-xs"
+                  onClick={handleCrearAbono}
+                  disabled={crearAbono.isPending}
+                >
+                  {crearAbono.isPending ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Registrando...</>
+                  ) : (
+                    <><Plus className="h-3.5 w-3.5 mr-1.5" />{abonoMetodo === "manual" ? "Confirmar abono" : "Generar link de pago"}</>
+                  )}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setShowAbonoForm(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Historial de abonos */}
+          {isLoadingAbonos ? (
+            <div className="space-y-2">
+              {[1, 2].map((i) => <div key={i} className="h-14 bg-muted/40 rounded animate-pulse" />)}
+            </div>
+          ) : !abonos || abonos.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Sin abonos registrados aún.</p>
+          ) : (
+            <div className="space-y-2">
+              {abonos.map((abono) => {
+                const isConfirmado = abono.estado === "confirmado";
+                const isFallido = abono.estado === "fallido";
+                return (
+                  <div
+                    key={abono.id}
+                    className={`flex items-start gap-3 rounded-md border px-3 py-2.5 ${
+                      isConfirmado ? "border-emerald-200 bg-emerald-50/50" :
+                      isFallido ? "border-red-200 bg-red-50/50" :
+                      "border-border/50 bg-background"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold font-mono">{formatCurrency(abono.monto)}</span>
+                        <span className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full border ${
+                          abono.metodo === "flow" ? "bg-blue-100 text-blue-700 border-blue-200" :
+                          abono.metodo === "mp" ? "bg-[#009ee3]/10 text-[#009ee3] border-[#009ee3]/30" :
+                          "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}>
+                          {abono.metodo === "manual" ? "Manual" : abono.metodo === "flow" ? "Flow" : "MP"}
+                        </span>
+                        <span className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full border ${
+                          isConfirmado ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
+                          isFallido ? "bg-red-100 text-red-700 border-red-200" :
+                          "bg-yellow-50 text-yellow-700 border-yellow-200"
+                        }`}>
+                          {isConfirmado ? "Confirmado" : isFallido ? "Fallido" : "Pendiente"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] text-muted-foreground">{formatDate(abono.creadoEn)}</span>
+                        {abono.notas && <span className="text-[10px] text-muted-foreground truncate">· {abono.notas}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {abono.linkPago && (
+                        <a
+                          href={abono.linkPago}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Link
+                        </a>
+                      )}
+                      {abono.estado === "pendiente" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 px-2 text-[10px]"
+                          onClick={() => handleConfirmarAbono(abono.id)}
+                          disabled={confirmarAbono.isPending}
+                        >
+                          {confirmarAbono.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                          Confirmar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -37,6 +37,7 @@ export type CobroEstado = typeof CobroEstado[keyof typeof CobroEstado];
 export const CobroEstado = {
   pendiente: 'pendiente',
   pagado: 'pagado',
+  parcial: 'parcial',
   fallido: 'fallido',
   cancelado: 'cancelado',
 } as const;
@@ -183,6 +184,61 @@ export interface SeguimientoCobranza {
   creadoEn: string;
 }
 
+export type AbonoMetodo = typeof AbonoMetodo[keyof typeof AbonoMetodo];
+
+
+export const AbonoMetodo = {
+  flow: 'flow',
+  mp: 'mp',
+  manual: 'manual',
+} as const;
+
+export type AbonoEstado = typeof AbonoEstado[keyof typeof AbonoEstado];
+
+
+export const AbonoEstado = {
+  pendiente: 'pendiente',
+  confirmado: 'confirmado',
+  fallido: 'fallido',
+} as const;
+
+export interface Abono {
+  id: number;
+  cobroId: number;
+  monto: number;
+  metodo: AbonoMetodo;
+  estado: AbonoEstado;
+  /** @nullable */
+  linkPago?: string | null;
+  /** @nullable */
+  flowOrdenId?: string | null;
+  /** @nullable */
+  mpPreferenceId?: string | null;
+  /** @nullable */
+  mpPaymentId?: string | null;
+  /** @nullable */
+  notas?: string | null;
+  creadoEn: string;
+  /** @nullable */
+  confirmadoEn?: string | null;
+}
+
+export type AbonoInputMetodo = typeof AbonoInputMetodo[keyof typeof AbonoInputMetodo];
+
+
+export const AbonoInputMetodo = {
+  flow: 'flow',
+  mp: 'mp',
+  manual: 'manual',
+} as const;
+
+export interface AbonoInput {
+  /** @minimum 0.01 */
+  monto: number;
+  metodo: AbonoInputMetodo;
+  notas?: string;
+}
+
 export interface MpCredentialsStatus {
   configurado: boolean;
 }
@@ -227,6 +283,7 @@ export type CobroUpdateEstado = typeof CobroUpdateEstado[keyof typeof CobroUpdat
 export const CobroUpdateEstado = {
   pendiente: 'pendiente',
   pagado: 'pagado',
+  parcial: 'parcial',
   fallido: 'fallido',
   cancelado: 'cancelado',
 } as const;
@@ -469,6 +526,35 @@ start?: number;
  */
 limit?: number;
 };
+
+export type ListCobrosParams = {
+estado?: ListCobrosEstado;
+/**
+ * flow=solo Flow, mp=solo MP, link=cualquier pasarela, manual=sin pasarela
+ */
+metodo?: ListCobrosMetodo;
+};
+
+export type ListCobrosEstado = typeof ListCobrosEstado[keyof typeof ListCobrosEstado];
+
+
+export const ListCobrosEstado = {
+  pendiente: 'pendiente',
+  pagado: 'pagado',
+  parcial: 'parcial',
+  fallido: 'fallido',
+  cancelado: 'cancelado',
+} as const;
+
+export type ListCobrosMetodo = typeof ListCobrosMetodo[keyof typeof ListCobrosMetodo];
+
+
+export const ListCobrosMetodo = {
+  flow: 'flow',
+  mp: 'mp',
+  link: 'link',
+  manual: 'manual',
+} as const;
 
 export type GetDashboardMetricsParams = {
 periodo?: GetDashboardMetricsPeriodo;

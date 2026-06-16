@@ -150,7 +150,7 @@ export const GetClienteResponse = zod.object({
   "id": zod.number(),
   "monto": zod.number().describe('Amount in currency units'),
   "descripcion": zod.string(),
-  "estado": zod.enum(['pendiente', 'pagado', 'fallido', 'cancelado']),
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
@@ -329,11 +329,16 @@ export const GetLiquidacionResponse = zod.object({
  * Returns all cobros ordered by creation date desc
  * @summary List all cobros
  */
+export const ListCobrosQueryParams = zod.object({
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).optional(),
+  "metodo": zod.enum(['flow', 'mp', 'link', 'manual']).optional().describe('flow=solo Flow, mp=solo MP, link=cualquier pasarela, manual=sin pasarela')
+})
+
 export const ListCobrosResponseItem = zod.object({
   "id": zod.number(),
   "monto": zod.number().describe('Amount in currency units'),
   "descripcion": zod.string(),
-  "estado": zod.enum(['pendiente', 'pagado', 'fallido', 'cancelado']),
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
@@ -378,7 +383,7 @@ export const GetCobroResponse = zod.object({
   "id": zod.number(),
   "monto": zod.number().describe('Amount in currency units'),
   "descripcion": zod.string(),
-  "estado": zod.enum(['pendiente', 'pagado', 'fallido', 'cancelado']),
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
@@ -405,7 +410,7 @@ export const UpdateCobroParams = zod.object({
 
 
 export const UpdateCobroBody = zod.object({
-  "estado": zod.enum(['pendiente', 'pagado', 'fallido', 'cancelado']).optional(),
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).optional(),
   "descripcion": zod.string().min(1).optional(),
   "referencia": zod.string().optional()
 })
@@ -414,7 +419,7 @@ export const UpdateCobroResponse = zod.object({
   "id": zod.number(),
   "monto": zod.number().describe('Amount in currency units'),
   "descripcion": zod.string(),
-  "estado": zod.enum(['pendiente', 'pagado', 'fallido', 'cancelado']),
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
   "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
   "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
@@ -545,6 +550,72 @@ export const ListSeguimientosResponseItem = zod.object({
   "creadoEn": zod.coerce.date()
 })
 export const ListSeguimientosResponse = zod.array(ListSeguimientosResponseItem)
+
+
+/**
+ * @summary List pagos parciales for a cobro
+ */
+export const ListAbonosParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListAbonosResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "monto": zod.number(),
+  "metodo": zod.enum(['flow', 'mp', 'manual']),
+  "estado": zod.enum(['pendiente', 'confirmado', 'fallido']),
+  "linkPago": zod.string().nullish(),
+  "flowOrdenId": zod.string().nullish(),
+  "mpPreferenceId": zod.string().nullish(),
+  "mpPaymentId": zod.string().nullish(),
+  "notas": zod.string().nullish(),
+  "creadoEn": zod.coerce.date(),
+  "confirmadoEn": zod.coerce.date().nullish()
+})
+export const ListAbonosResponse = zod.array(ListAbonosResponseItem)
+
+
+/**
+ * @summary Create a pago parcial for a cobro
+ */
+export const CrearAbonoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const crearAbonoBodyMontoMin = 0.01;
+
+
+
+export const CrearAbonoBody = zod.object({
+  "monto": zod.number().min(crearAbonoBodyMontoMin),
+  "metodo": zod.enum(['flow', 'mp', 'manual']),
+  "notas": zod.string().optional()
+})
+
+
+/**
+ * @summary Manually confirm a pago parcial (for manual-method abonos)
+ */
+export const ConfirmarAbonoParams = zod.object({
+  "id": zod.coerce.number(),
+  "abonoId": zod.coerce.number()
+})
+
+export const ConfirmarAbonoResponse = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "monto": zod.number(),
+  "metodo": zod.enum(['flow', 'mp', 'manual']),
+  "estado": zod.enum(['pendiente', 'confirmado', 'fallido']),
+  "linkPago": zod.string().nullish(),
+  "flowOrdenId": zod.string().nullish(),
+  "mpPreferenceId": zod.string().nullish(),
+  "mpPaymentId": zod.string().nullish(),
+  "notas": zod.string().nullish(),
+  "creadoEn": zod.coerce.date(),
+  "confirmadoEn": zod.coerce.date().nullish()
+})
 
 
 /**

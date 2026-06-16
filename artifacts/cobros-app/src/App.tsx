@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import NewCobro from "@/pages/new-cobro";
+import CobrosList from "@/pages/cobros-list";
 import CobroDetail from "@/pages/cobro-detail";
 import WebhookLog from "@/pages/webhook-log";
 import SearchPage from "@/pages/search";
@@ -45,6 +46,13 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <Dashboard />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/cobros" nest={false}>
+        <AuthGate>
+          <Layout>
+            <CobrosList />
           </Layout>
         </AuthGate>
       </Route>

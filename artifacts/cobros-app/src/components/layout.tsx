@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut } from "lucide-react";
+import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { AiChat } from "@/components/ai-chat";
@@ -16,6 +16,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
+    { href: "/cobros", label: "Cobros", icon: List },
     { href: "/cobros/nuevo", label: "Nuevo cobro", icon: Plus },
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
     { href: "/clientes", label: "Clientes", icon: Users },

@@ -12,6 +12,7 @@ export type CobroUpdateEstado = typeof CobroUpdateEstado[keyof typeof CobroUpdat
 export const CobroUpdateEstado = {
   pendiente: 'pendiente',
   pagado: 'pagado',
+  parcial: 'parcial',
   fallido: 'fallido',
   cancelado: 'cancelado',
 } as const;
