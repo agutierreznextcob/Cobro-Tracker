@@ -12,6 +12,7 @@ import { getFlowCredentials, getMpCredentials } from "./profile";
 import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
 import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
+import { requireSubscription } from "../middlewares/requireSubscription";
 
 const cobrosRouter = Router();
 
@@ -39,6 +40,7 @@ cobrosRouter.use((req, res, next) => {
   }
   next();
 });
+cobrosRouter.use(requireSubscription);
 
 cobrosRouter.get("/cobros", async (req, res) => {
   const estado = req.query.estado as string | undefined;

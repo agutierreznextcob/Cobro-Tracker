@@ -30,13 +30,13 @@ export interface FlowStatusResult {
   paymentData?: { date: string; media: string; conversionDate: string; conversionRate: number; amount: number; currency: string; fee: number; balance: number; transferDate: string };
 }
 
-function buildSignature(params: Record<string, string | number>, secretKey: string): string {
+export function buildSignature(params: Record<string, string | number>, secretKey: string): string {
   const sorted = Object.keys(params).sort();
   const toSign = sorted.map((k) => `${k}${params[k]}`).join("");
   return createHmac("sha256", secretKey).update(toSign).digest("hex");
 }
 
-function buildSignedBody(params: Record<string, string | number>, secretKey: string): string {
+export function buildSignedBody(params: Record<string, string | number>, secretKey: string): string {
   const s = buildSignature(params, secretKey);
   const searchParams = new URLSearchParams();
   const sorted = Object.keys(params).sort();
@@ -47,7 +47,7 @@ function buildSignedBody(params: Record<string, string | number>, secretKey: str
   return searchParams.toString();
 }
 
-function buildSignedQuery(params: Record<string, string | number>, secretKey: string): string {
+export function buildSignedQuery(params: Record<string, string | number>, secretKey: string): string {
   const s = buildSignature(params, secretKey);
   const searchParams = new URLSearchParams();
   const sorted = Object.keys(params).sort();

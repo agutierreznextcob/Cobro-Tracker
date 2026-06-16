@@ -753,3 +753,25 @@ export const ListWebhookEventosResponse = zod.object({
 })
 
 
+/**
+ * @summary Get the current user's platform subscription status
+ */
+export const GetSubscriptionStatusResponse = zod.object({
+  "status": zod.enum(['prueba', 'activa', 'vencida']),
+  "hasAccess": zod.boolean(),
+  "diasRestantes": zod.number().nullish(),
+  "trialEndsAt": zod.string().nullish(),
+  "periodEnd": zod.string().nullish(),
+  "tieneSuscripcion": zod.boolean(),
+  "precioMensual": zod.number()
+})
+
+
+/**
+ * @summary Start the platform subscription (returns Flow card-registration URL)
+ */
+export const StartSubscriptionResponse = zod.object({
+  "url": zod.string()
+})
+
+

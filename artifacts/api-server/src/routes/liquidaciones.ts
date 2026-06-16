@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getFlowCredentials } from "./profile";
 import { listarLiquidaciones, obtenerDetalleLiquidacion } from "../lib/flow-api";
+import { requireSubscription } from "../middlewares/requireSubscription";
 
 const liquidacionesRouter = Router();
 
@@ -11,6 +12,7 @@ liquidacionesRouter.use((req, res, next) => {
   }
   next();
 });
+liquidacionesRouter.use(requireSubscription);
 
 liquidacionesRouter.get("/liquidaciones", async (req, res) => {
   const userId = req.user!.id;

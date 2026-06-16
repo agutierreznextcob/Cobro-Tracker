@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, clientesTable, cobrosTable } from "@workspace/db";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
 import { z } from "zod";
+import { requireSubscription } from "../middlewares/requireSubscription";
 
 const clientesRouter = Router();
 
@@ -12,6 +13,7 @@ clientesRouter.use((req, res, next) => {
   }
   next();
 });
+clientesRouter.use(requireSubscription);
 
 const ClienteInputSchema = z.object({
   nombre: z.string().min(1).max(200),

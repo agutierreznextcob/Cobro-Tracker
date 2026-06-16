@@ -5,6 +5,29 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+export type SubscriptionStatusStatus = typeof SubscriptionStatusStatus[keyof typeof SubscriptionStatusStatus];
+
+
+export const SubscriptionStatusStatus = {
+  prueba: 'prueba',
+  activa: 'activa',
+  vencida: 'vencida',
+} as const;
+
+export interface SubscriptionStatus {
+  status: SubscriptionStatusStatus;
+  hasAccess: boolean;
+  diasRestantes?: number | null;
+  trialEndsAt?: string | null;
+  periodEnd?: string | null;
+  tieneSuscripcion: boolean;
+  precioMensual: number;
+}
+
+export interface SubscribeResponse {
+  url: string;
+}
+
 export interface HealthStatus {
   status: string;
 }

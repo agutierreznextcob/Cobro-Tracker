@@ -1,11 +1,17 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { Router } from "express";
-import { db, cobrosTable, webhookEventosTable, pagosParciales } from "@workspace/db";
+import { db, cobrosTable, webhookEventosTable, pagosParciales, usersTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { ReceiveCobroWebhookBody } from "@workspace/api-zod";
 import { verificarPagoFlow } from "../lib/flow-api";
 import { obtenerPagoMp } from "../lib/mp-api";
 import { getFlowCredentials } from "./profile";
+import {
+  getFlowAdminCreds,
+  flowAdminConfigured,
+  getSubscription,
+  mapSubscription,
+} from "../lib/flow-subscriptions";
 
 const webhooksRouter = Router();
 
@@ -504,6 +510,89 @@ webhooksRouter.get("/webhooks/eventos/export", (req, res, next) => {
   } catch (err) {
     req.log.error({ err }, "Error exporting webhook eventos");
     res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Flow calls this URL (the plan's urlCallback) on each recurring charge of a
+// platform subscription. We re-fetch the authoritative subscription state from
+// Flow and update the user's subscription_status accordingly. Security: we
+// trust only Flow's API response, never the raw posted body.
+webhooksRouter.post("/webhooks/flow-subscription", async (req, res) => {
+  const ip = getClientIp(req as Parameters<typeof getClientIp>[0]);
+
+  const subscriptionId = (req.body?.subscriptionId ??
+    req.query?.subscriptionId) as string | undefined;
+
+  req.log.info(
+    { subscriptionId, body: req.body, query: req.query },
+    "Flow subscription webhook received",
+  );
+
+  // Always answer 200 so Flow does not keep retrying for unrecoverable cases.
+  if (!subscriptionId || typeof subscriptionId !== "string") {
+    await logEvento({
+      evento: "suscripcion.webhook",
+      exitoso: false,
+      ipOrigen: ip,
+      detalle: "Webhook sin subscriptionId",
+    });
+    res.json({ ok: true });
+    return;
+  }
+
+  if (!flowAdminConfigured()) {
+    req.log.error("Flow admin creds not configured; cannot process subscription webhook");
+    res.json({ ok: true });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.flowSubscriptionId, subscriptionId));
+
+    if (!user) {
+      await logEvento({
+        evento: "suscripcion.webhook",
+        exitoso: false,
+        ipOrigen: ip,
+        detalle: `Sin usuario para subscriptionId ${subscriptionId}`,
+      });
+      res.json({ ok: true });
+      return;
+    }
+
+    const creds = getFlowAdminCreds();
+    const sub = await getSubscription(creds, subscriptionId);
+    const mapped = mapSubscription(sub);
+
+    await db
+      .update(usersTable)
+      .set({
+        subscriptionStatus: mapped.status,
+        subscriptionPeriodEnd: mapped.periodEnd,
+      })
+      .where(eq(usersTable.id, user.id));
+
+    await logEvento({
+      evento: mapped.status === "activa" ? "suscripcion.activa" : "suscripcion.vencida",
+      exitoso: true,
+      ipOrigen: ip,
+      detalle: `Usuario ${user.id} → ${mapped.status}`,
+    });
+
+    req.log.info({ userId: user.id, status: mapped.status }, "Subscription status updated via webhook");
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error processing subscription webhook");
+    await logEvento({
+      evento: "suscripcion.webhook",
+      exitoso: false,
+      ipOrigen: ip,
+      detalle: err instanceof Error ? err.message : "Error desconocido",
+    });
+    res.json({ ok: true });
   }
 });
 

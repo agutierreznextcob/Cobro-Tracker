@@ -3,6 +3,7 @@ import Groq from "groq-sdk";
 import { db, conversationsTable, messagesTable, cobrosTable, clientesTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
+import { requireSubscription } from "../middlewares/requireSubscription";
 
 const aiRouter = Router();
 
@@ -13,6 +14,7 @@ aiRouter.use((req, res, next) => {
   }
   next();
 });
+aiRouter.use(requireSubscription);
 
 function getGroqClient(): Groq {
   const apiKey = process.env.GROQ_API_KEY;
