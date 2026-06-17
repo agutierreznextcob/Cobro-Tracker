@@ -56,14 +56,18 @@ export default function Dashboard() {
 
   const cobrosFiltrados = useMemo(() => {
     if (!cobros) return [];
-    return cobros.filter((c) => {
-      const matchResponsable =
-        filtroResponsable === "todos" ||
-        (filtroResponsable === "sin_asignar" ? !c.responsableId : c.responsableId === filtroResponsable);
-      const matchEstado = filtroEstado === "todos" || c.estado === filtroEstado;
-      return matchResponsable && matchEstado;
-    });
+    return cobros
+      .filter((c) => {
+        const matchResponsable =
+          filtroResponsable === "todos" ||
+          (filtroResponsable === "sin_asignar" ? !c.responsableId : c.responsableId === filtroResponsable);
+        const matchEstado = filtroEstado === "todos" || c.estado === filtroEstado;
+        return matchResponsable && matchEstado;
+      })
+      .sort((a, b) => new Date(b.creadoEn).getTime() - new Date(a.creadoEn).getTime());
   }, [cobros, filtroResponsable, filtroEstado]);
+
+  const cobrosRecientes = useMemo(() => cobrosFiltrados.slice(0, 10), [cobrosFiltrados]);
 
   const hayFiltros = filtroResponsable !== "todos" || filtroEstado !== "todos";
 
@@ -231,7 +235,7 @@ export default function Dashboard() {
                     <TableCell><div className="h-4 w-16 bg-muted rounded ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : cobrosFiltrados.length === 0 ? (
+              ) : cobrosRecientes.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     {hayFiltros
@@ -240,7 +244,7 @@ export default function Dashboard() {
                   </TableCell>
                 </TableRow>
               ) : (
-                cobrosFiltrados.slice(0, 20).map((cobro) => (
+                cobrosRecientes.map((cobro) => (
                   <TableRow key={cobro.id} className="group hover:bg-muted/30 transition-colors">
                     <TableCell className="text-muted-foreground text-sm">
                       {formatShortDate(cobro.creadoEn)}
@@ -282,9 +286,9 @@ export default function Dashboard() {
             </TableBody>
           </Table>
 
-          {cobrosFiltrados.length > 20 && (
+          {cobrosFiltrados.length > 10 && (
             <div className="px-4 py-3 border-t text-sm text-muted-foreground text-center">
-              Mostrando 20 de {cobrosFiltrados.length} cobros
+              Mostrando 10 de {cobrosFiltrados.length} cobros
             </div>
           )}
         </Card>

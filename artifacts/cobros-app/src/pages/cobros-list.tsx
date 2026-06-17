@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useListCobros } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
@@ -6,9 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
-import { ArrowRight, Minus, X } from "lucide-react";
+import { ArrowRight, Minus, Search, X } from "lucide-react";
 import type { ListCobrosParams } from "@workspace/api-client-react";
 
 type EstadoFilter = ListCobrosParams["estado"];
@@ -55,7 +56,14 @@ const METODOS: { value: NonNullable<MetodoFilter>; label: string }[] = [
 export default function CobrosList() {
   const [filterEstado, setFilterEstado] = useState<EstadoFilter>(undefined);
   const [filterMetodo, setFilterMetodo] = useState<MetodoFilter>(undefined);
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [debouncedBusqueda, setDebouncedBusqueda] = useState("");
   const [, navigate] = useLocation();
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedBusqueda(busquedaCliente), 250);
+    return () => clearTimeout(t);
+  }, [busquedaCliente]);
 
   const params: ListCobrosParams = {};
   if (filterEstado) params.estado = filterEstado;
@@ -65,7 +73,14 @@ export default function CobrosList() {
     query: { queryKey: ["listCobros", params] as const },
   });
 
-  const hayFiltros = !!filterEstado || !!filterMetodo;
+  const cobrosFiltrados = useMemo(() => {
+    if (!cobros) return cobros;
+    const q = debouncedBusqueda.trim().toLowerCase();
+    if (!q) return cobros;
+    return cobros.filter((c) => (c.clienteNombre ?? "").toLowerCase().includes(q));
+  }, [cobros, debouncedBusqueda]);
+
+  const hayFiltros = !!filterEstado || !!filterMetodo || busquedaCliente.trim() !== "";
 
   return (
     <div className="space-y-6">
@@ -74,7 +89,7 @@ export default function CobrosList() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cobros</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? "Cargando..." : `${cobros?.length ?? 0} cobro${cobros?.length !== 1 ? "s" : ""}`}
+            {isLoading ? "Cargando..." : `${cobrosFiltrados?.length ?? 0} cobro${cobrosFiltrados?.length !== 1 ? "s" : ""}`}
             {hayFiltros ? " (con filtros)" : ""}
           </p>
         </div>
@@ -117,12 +132,22 @@ export default function CobrosList() {
           </SelectContent>
         </Select>
 
+        <div className="relative w-[180px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={busquedaCliente}
+            onChange={(e) => setBusquedaCliente(e.target.value)}
+            placeholder="Buscar cliente"
+            className="h-8 w-full pl-8 text-xs"
+          />
+        </div>
+
         {hayFiltros && (
           <Button
             size="sm"
             variant="ghost"
             className="h-8 gap-1.5 text-xs text-muted-foreground"
-            onClick={() => { setFilterEstado(undefined); setFilterMetodo(undefined); }}
+            onClick={() => { setFilterEstado(undefined); setFilterMetodo(undefined); setBusquedaCliente(""); setDebouncedBusqueda(""); }}
           >
             <X className="h-3 w-3" />
             Limpiar
@@ -157,14 +182,14 @@ export default function CobrosList() {
                   <TableCell />
                 </TableRow>
               ))
-            ) : !cobros || cobros.length === 0 ? (
+            ) : !cobrosFiltrados || cobrosFiltrados.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-32 text-center text-muted-foreground text-sm">
                   {hayFiltros ? "Ningún cobro coincide con los filtros." : "Sin cobros registrados."}
                 </TableCell>
               </TableRow>
             ) : (
-              cobros.map((cobro) => (
+              cobrosFiltrados.map((cobro) => (
                 <TableRow
                   key={cobro.id}
                   className="cursor-pointer hover:bg-muted/40 transition-colors"
