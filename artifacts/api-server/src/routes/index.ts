@@ -8,6 +8,7 @@ import aiRouter from "./ai";
 import webhooksRouter from "./webhooks";
 import { profileRouter } from "./profile";
 import { subscriptionRouter } from "./subscription";
+import { adminRouter } from "./admin";
 
 const router: IRouter = Router();
 
@@ -23,5 +24,6 @@ router.use(liquidacionesRouter);
 router.use(aiRouter);
 router.use(profileRouter);
 router.use(subscriptionRouter);
+router.use(adminRouter);
 
 export default router;

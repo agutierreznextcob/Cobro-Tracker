@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List } from "lucide-react";
+import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { AiChat } from "@/components/ai-chat";
@@ -13,6 +13,8 @@ function WebhookPoller() {
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+
+  const isAdmin = user?.role === "admin";
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
@@ -70,6 +72,31 @@ export function Layout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+
+          {isAdmin && (
+            <div className="pt-4 mt-3 border-t">
+              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                Administración
+              </p>
+              <Link
+                href="/admin"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
+                  location === "/admin"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+                }`}
+              >
+                <Shield
+                  className={`h-4 w-4 shrink-0 ${
+                    location === "/admin"
+                      ? "text-primary-foreground"
+                      : "text-muted-foreground group-hover:text-foreground"
+                  }`}
+                />
+                <span>Usuarios</span>
+              </Link>
+            </div>
+          )}
         </nav>
 
         {/* User footer */}

@@ -197,6 +197,83 @@ export async function sendAvisoManualEmail(
   return { ok: true };
 }
 
+export interface RenovacionEmailData {
+  email: string;
+  nombre: string | null;
+  estado: "prueba" | "activa" | "vencida";
+  vencido: boolean;
+  vencimiento: string | null;
+  precioMensual: number;
+  ctaUrl: string;
+}
+
+function formatFecha(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-CL", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(d);
+}
+
+export async function sendRenovacionEmail(
+  data: RenovacionEmailData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping renewal reminder email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const nombre = data.nombre || "";
+  const saludo = nombre ? `Hola ${nombre}` : "Hola";
+  const precioFormato = formatCLP(data.precioMensual);
+  const fechaFormato = formatFecha(data.vencimiento);
+
+  const heading = data.vencido
+    ? `${saludo}, tu acceso a Cobro Simple venció ⏰`
+    : `${saludo}, tu acceso a Cobro Simple está por vencer ⏰`;
+
+  const detalle = data.vencido
+    ? `Tu ${data.estado === "activa" ? "suscripción" : "período de prueba"} venció el <strong>${fechaFormato}</strong>. Renueva para seguir usando todas las funciones de Cobro Simple.`
+    : `Tu ${data.estado === "activa" ? "suscripción" : "período de prueba"} vence el <strong>${fechaFormato}</strong>. Renueva ahora para no perder el acceso.`;
+
+  const { error } = await client.emails.send({
+    from: FROM,
+    to: [data.email],
+    subject: data.vencido
+      ? "Tu acceso a Cobro Simple venció — renueva tu suscripción"
+      : "Tu acceso a Cobro Simple está por vencer",
+    html: buildEmailHtml({
+      title: "Renovación de Cobro Simple",
+      previewText: data.vencido
+        ? "Tu acceso venció. Renueva tu suscripción para continuar."
+        : "Tu acceso está por vencer. Renueva tu suscripción.",
+      heading,
+      bodyLines: [
+        detalle,
+        `<span style="display:block;background:#fef9c3;border-radius:8px;padding:12px 16px;font-size:14px;color:#09090b;border-left:3px solid #eab308;">
+          <strong>Plan mensual:</strong> <span style="font-family:monospace;font-weight:700;color:#2563eb;">${precioFormato}</span> / mes
+        </span>`,
+        `Activa o renueva tu suscripción en segundos haciendo clic en el botón a continuación.`,
+      ],
+      ctaText: "Renovar suscripción",
+      ctaUrl: data.ctaUrl,
+      footerNote: "Si ya renovaste, ignora este mensaje. ¡Gracias por usar Cobro Simple!",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending renewal reminder email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
 export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn: (obj: object, msg: string) => void }): Promise<EmailResult> {
   const client = getResend();
   if (!client) {

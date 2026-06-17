@@ -13,6 +13,7 @@ import SearchPage from "@/pages/search";
 import ProfilePage from "@/pages/profile";
 import ClientesPage from "@/pages/clientes";
 import ClienteDetailPage from "@/pages/cliente-detail";
+import AdminPage from "@/pages/admin";
 import LiquidacionesPage from "@/pages/liquidaciones";
 import LiquidacionDetailPage from "@/pages/liquidacion-detail";
 import { Layout } from "@/components/layout";
@@ -56,6 +57,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return <SubscriptionGate>{children}</SubscriptionGate>;
+}
+
+function AdminGate({ children }: { children: React.ReactNode }) {
+  const { isLoading, isAuthenticated, user } = useAuth();
+
+  if (isLoading) {
+    return <FullScreenLoader />;
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect to="/" />;
+  }
+
+  if (user?.role !== "admin") {
+    return <Redirect to="/dashboard" />;
+  }
+
+  return <>{children}</>;
 }
 
 function AppRouter() {
@@ -144,6 +163,13 @@ function AppRouter() {
             <ProfilePage />
           </Layout>
         </AuthGate>
+      </Route>
+      <Route path="/admin">
+        <AdminGate>
+          <Layout>
+            <AdminPage />
+          </Layout>
+        </AdminGate>
       </Route>
       <Route component={NotFound} />
     </Switch>

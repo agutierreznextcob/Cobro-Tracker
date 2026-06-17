@@ -1,17 +1,25 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListClientes, useCreateCliente, getListClientesQueryKey } from "@workspace/api-client-react";
+import {
+  useListClientes,
+  useCreateCliente,
+  getListClientesQueryKey,
+  useListAdminUsuarios,
+  type AdminUsuario,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight } from "lucide-react";
+import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight, Shield } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 
 // Validates Chilean RUT checksum
@@ -163,7 +171,123 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+function formatFecha(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function SuscriptorEstadoBadge({ u }: { u: AdminUsuario }) {
+  if (u.isAdmin) {
+    return (
+      <Badge variant="default" className="gap-1">
+        <Shield className="h-3 w-3" />
+        Admin
+      </Badge>
+    );
+  }
+  if (u.subscriptionStatus === "activa") return <Badge variant="default">Activa</Badge>;
+  if (u.subscriptionStatus === "prueba") return <Badge variant="secondary">Prueba</Badge>;
+  return <Badge variant="destructive">Vencida</Badge>;
+}
+
+function AdminSuscriptoresView() {
+  const [search, setSearch] = useState("");
+  const { data: usuarios, isLoading } = useListAdminUsuarios();
+
+  const term = search.trim().toLowerCase();
+  const filtrados = (usuarios ?? []).filter((u) => {
+    if (!term) return true;
+    return (
+      (u.nombre ?? "").toLowerCase().includes(term) ||
+      (u.email ?? "").toLowerCase().includes(term)
+    );
+  });
+
+  return (
+    <>
+      <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 flex items-start gap-3">
+        <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-semibold text-foreground">Vista de administrador — Suscriptores de la plataforma</p>
+          <p className="text-muted-foreground mt-0.5">
+            Estás viendo todos los usuarios registrados en Cobro Simple, no tu cartera de cobranza.
+          </p>
+        </div>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar suscriptor por nombre o email..."
+          className="pl-9"
+        />
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          Cargando suscriptores...
+        </div>
+      ) : filtrados.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+            <Users className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold mb-1">Sin resultados</h3>
+          <p className="text-muted-foreground text-sm max-w-xs">
+            No se encontraron suscriptores para tu búsqueda.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filtrados.map((u) => (
+            <Card key={u.id} className="shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+                    {(u.nombre || u.email || "?").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-sm truncate">{u.nombre || "Sin nombre"}</p>
+                      <SuscriptorEstadoBadge u={u} />
+                    </div>
+                    <div className="flex flex-col gap-0.5 mt-1.5">
+                      {u.email && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Mail className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{u.email}</span>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Registrado: {formatFecha(u.createdAt)}
+                      </p>
+                      {!u.isAdmin && (
+                        <p className="text-xs text-muted-foreground">
+                          Vence: {formatFecha(u.vencimiento)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function ClientesPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const [vista, setVista] = useState<"mios" | "suscriptores">("mios");
+
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const queryClient = useQueryClient();
@@ -176,6 +300,36 @@ export default function ClientesPage() {
     queryClient.invalidateQueries({ queryKey: getListClientesQueryKey() });
   };
 
+  if (isAdmin && vista === "suscriptores") {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
+            <p className="text-muted-foreground mt-1">Gestiona tu cartera de clientes y su historial de cobros.</p>
+          </div>
+        </div>
+
+        <div className="inline-flex rounded-lg border p-1 bg-card">
+          <button
+            onClick={() => setVista("mios")}
+            className="px-3 py-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Mis clientes
+          </button>
+          <button
+            onClick={() => setVista("suscriptores")}
+            className="px-3 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground"
+          >
+            Suscriptores (admin)
+          </button>
+        </div>
+
+        <AdminSuscriptoresView />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -185,6 +339,23 @@ export default function ClientesPage() {
         </div>
         <NuevoClienteDialog onCreated={handleCreated} />
       </div>
+
+      {isAdmin && (
+        <div className="inline-flex rounded-lg border p-1 bg-card">
+          <button
+            onClick={() => setVista("mios")}
+            className="px-3 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground"
+          >
+            Mis clientes
+          </button>
+          <button
+            onClick={() => setVista("suscriptores")}
+            className="px-3 py-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Suscriptores (admin)
+          </button>
+        </div>
+      )}
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

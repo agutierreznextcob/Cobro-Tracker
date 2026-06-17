@@ -1109,16 +1109,135 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /admin/usuarios:
+    get:
+      operationId: listAdminUsuarios
+      tags: [admin]
+      summary: List all platform users (admin only)
+      responses:
+        "200":
+          description: List of platform users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUsuario"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not an admin)
+
+  /admin/usuarios/{id}/recordatorio-email:
+    post:
+      operationId: sendAdminRecordatorioEmail
+      tags: [admin]
+      summary: Send a subscription renewal reminder email to a user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Reminder sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRecordatorioResult"
+        "400":
+          description: User has no email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRecordatorioResult"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not an admin)
+        "404":
+          description: User not found
+        "502":
+          description: Email delivery failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRecordatorioResult"
+
 components:
   schemas:
+    AdminUsuario:
+      type: object
+      required:
+        [
+          id,
+          nombre,
+          email,
+          role,
+          subscriptionStatus,
+          hasAccess,
+          isAdmin,
+          tieneSuscripcion,
+          createdAt,
+          trialEndsAt,
+          subscriptionPeriodEnd,
+          vencimiento,
+          diasParaVencer,
+          requiereRecordatorio,
+        ]
+      properties:
+        id:
+          type: string
+        nombre:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+          format: email
+        role:
+          type: string
+          enum: [user, admin]
+        subscriptionStatus:
+          type: string
+          enum: [prueba, activa, vencida]
+        hasAccess:
+          type: boolean
+        isAdmin:
+          type: boolean
+        tieneSuscripcion:
+          type: boolean
+        createdAt:
+          type: [string, 'null']
+        trialEndsAt:
+          type: [string, 'null']
+        subscriptionPeriodEnd:
+          type: [string, 'null']
+        vencimiento:
+          type: [string, 'null']
+        diasParaVencer:
+          type: [integer, 'null']
+        requiereRecordatorio:
+          type: boolean
+
+    AdminRecordatorioResult:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: [string, 'null']
+
     SubscriptionStatus:
       type: object
-      required: [status, hasAccess, tieneSuscripcion, precioMensual]
+      required: [status, hasAccess, isAdmin, tieneSuscripcion, precioMensual]
       properties:
         status:
           type: string
           enum: [prueba, activa, vencida]
         hasAccess:
+          type: boolean
+        isAdmin:
           type: boolean
         diasRestantes:
           type: integer
@@ -1728,6 +1847,9 @@ components:
           type: [string, 'null']
         profileImageUrl:
           type: [string, 'null']
+        role:
+          type: string
+          enum: [user, admin]
     AuthUserEnvelope:
       type: object
       required: [user]

@@ -10,6 +10,7 @@ import type { SubscriptionStatusStatus } from './subscriptionStatusStatus';
 export interface SubscriptionStatus {
   status: SubscriptionStatusStatus;
   hasAccess: boolean;
+  isAdmin: boolean;
   diasRestantes?: number | null;
   trialEndsAt?: string | null;
   periodEnd?: string | null;

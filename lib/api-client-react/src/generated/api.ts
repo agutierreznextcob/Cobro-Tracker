@@ -22,6 +22,8 @@ import type {
 import type {
   Abono,
   AbonoInput,
+  AdminRecordatorioResult,
+  AdminUsuario,
   AiConversation,
   AiConversationInput,
   AiConversationWithMessages,
@@ -3383,5 +3385,152 @@ export const useStartSubscription = <TError = ErrorType<ErrorResponse | void>,
         TContext
       > => {
       return useMutation(getStartSubscriptionMutationOptions(options));
+    }
+
+export const getListAdminUsuariosUrl = () => {
+
+
+
+
+  return `/api/admin/usuarios`
+}
+
+/**
+ * @summary List all platform users (admin only)
+ */
+export const listAdminUsuarios = async ( options?: RequestInit): Promise<AdminUsuario[]> => {
+
+  return customFetch<AdminUsuario[]>(getListAdminUsuariosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminUsuariosQueryKey = () => {
+    return [
+    `/api/admin/usuarios`
+    ] as const;
+    }
+
+
+export const getListAdminUsuariosQueryOptions = <TData = Awaited<ReturnType<typeof listAdminUsuarios>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsuarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminUsuariosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminUsuarios>>> = ({ signal }) => listAdminUsuarios({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminUsuarios>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminUsuariosQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminUsuarios>>>
+export type ListAdminUsuariosQueryError = ErrorType<void>
+
+
+/**
+ * @summary List all platform users (admin only)
+ */
+
+export function useListAdminUsuarios<TData = Awaited<ReturnType<typeof listAdminUsuarios>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsuarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminUsuariosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSendAdminRecordatorioEmailUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/usuarios/${id}/recordatorio-email`
+}
+
+/**
+ * @summary Send a subscription renewal reminder email to a user (admin only)
+ */
+export const sendAdminRecordatorioEmail = async (id: string, options?: RequestInit): Promise<AdminRecordatorioResult> => {
+
+  return customFetch<AdminRecordatorioResult>(getSendAdminRecordatorioEmailUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSendAdminRecordatorioEmailMutationOptions = <TError = ErrorType<AdminRecordatorioResult | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendAdminRecordatorioEmail>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendAdminRecordatorioEmail>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['sendAdminRecordatorioEmail'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendAdminRecordatorioEmail>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  sendAdminRecordatorioEmail(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendAdminRecordatorioEmailMutationResult = NonNullable<Awaited<ReturnType<typeof sendAdminRecordatorioEmail>>>
+
+    export type SendAdminRecordatorioEmailMutationError = ErrorType<AdminRecordatorioResult | void>
+
+    /**
+ * @summary Send a subscription renewal reminder email to a user (admin only)
+ */
+export const useSendAdminRecordatorioEmail = <TError = ErrorType<AdminRecordatorioResult | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendAdminRecordatorioEmail>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendAdminRecordatorioEmail>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getSendAdminRecordatorioEmailMutationOptions(options));
     }
 

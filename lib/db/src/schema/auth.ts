@@ -22,6 +22,10 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "vencida",
 ]);
 
+// Platform role. "admin" users have permanent access (no trial/subscription
+// gating) and can see platform-wide admin views. Assigned manually in the DB.
+export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
+
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const usersTable = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -36,6 +40,7 @@ export const usersTable = pgTable("users", {
   subscriptionStatus: subscriptionStatusEnum("subscription_status")
     .notNull()
     .default("prueba"),
+  role: userRoleEnum("role").notNull().default("user"),
   flowCustomerId: varchar("flow_customer_id"),
   flowSubscriptionId: varchar("flow_subscription_id"),
   flowRegisterToken: varchar("flow_register_token"),

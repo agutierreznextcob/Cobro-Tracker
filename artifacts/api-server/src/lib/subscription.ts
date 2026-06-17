@@ -5,6 +5,7 @@ import { PLAN_AMOUNT } from "./flow-subscriptions";
 export interface SubscriptionState {
   status: "prueba" | "activa" | "vencida";
   hasAccess: boolean;
+  isAdmin: boolean;
   trialEndsAt: string | null;
   diasRestantes: number | null;
   periodEnd: string | null;
@@ -17,6 +18,7 @@ export interface UserSubscriptionRow {
   trialEndsAt: Date | null;
   subscriptionPeriodEnd: Date | null;
   flowSubscriptionId: string | null;
+  role: "user" | "admin";
 }
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -28,10 +30,14 @@ export function computeSubscriptionState(row: UserSubscriptionRow): Subscription
   const trialEndsAt = row.trialEndsAt ?? null;
   const periodEnd = row.subscriptionPeriodEnd ?? null;
 
+  const isAdmin = row.role === "admin";
   let hasAccess = false;
   let diasRestantes: number | null = null;
 
-  if (row.subscriptionStatus === "activa") {
+  if (isAdmin) {
+    // Admins have permanent access — no trial/subscription gating.
+    hasAccess = true;
+  } else if (row.subscriptionStatus === "activa") {
     // Active subscription: trust it. Webhook flips to "vencida" on failed charge.
     hasAccess = true;
   } else if (row.subscriptionStatus === "prueba") {
@@ -46,6 +52,7 @@ export function computeSubscriptionState(row: UserSubscriptionRow): Subscription
   return {
     status: row.subscriptionStatus,
     hasAccess,
+    isAdmin,
     trialEndsAt: trialEndsAt ? trialEndsAt.toISOString() : null,
     diasRestantes,
     periodEnd: periodEnd ? periodEnd.toISOString() : null,
@@ -61,6 +68,7 @@ export async function getSubscriptionState(userId: string): Promise<Subscription
       trialEndsAt: usersTable.trialEndsAt,
       subscriptionPeriodEnd: usersTable.subscriptionPeriodEnd,
       flowSubscriptionId: usersTable.flowSubscriptionId,
+      role: usersTable.role,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userId));

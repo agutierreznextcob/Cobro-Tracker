@@ -5,6 +5,53 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+export type AdminUsuarioRole = typeof AdminUsuarioRole[keyof typeof AdminUsuarioRole];
+
+
+export const AdminUsuarioRole = {
+  user: 'user',
+  admin: 'admin',
+} as const;
+
+export type AdminUsuarioSubscriptionStatus = typeof AdminUsuarioSubscriptionStatus[keyof typeof AdminUsuarioSubscriptionStatus];
+
+
+export const AdminUsuarioSubscriptionStatus = {
+  prueba: 'prueba',
+  activa: 'activa',
+  vencida: 'vencida',
+} as const;
+
+export interface AdminUsuario {
+  id: string;
+  /** @nullable */
+  nombre: string | null;
+  /** @nullable */
+  email: string | null;
+  role: AdminUsuarioRole;
+  subscriptionStatus: AdminUsuarioSubscriptionStatus;
+  hasAccess: boolean;
+  isAdmin: boolean;
+  tieneSuscripcion: boolean;
+  /** @nullable */
+  createdAt: string | null;
+  /** @nullable */
+  trialEndsAt: string | null;
+  /** @nullable */
+  subscriptionPeriodEnd: string | null;
+  /** @nullable */
+  vencimiento: string | null;
+  /** @nullable */
+  diasParaVencer: number | null;
+  requiereRecordatorio: boolean;
+}
+
+export interface AdminRecordatorioResult {
+  ok: boolean;
+  /** @nullable */
+  message?: string | null;
+}
+
 export type SubscriptionStatusStatus = typeof SubscriptionStatusStatus[keyof typeof SubscriptionStatusStatus];
 
 
@@ -17,6 +64,7 @@ export const SubscriptionStatusStatus = {
 export interface SubscriptionStatus {
   status: SubscriptionStatusStatus;
   hasAccess: boolean;
+  isAdmin: boolean;
   diasRestantes?: number | null;
   trialEndsAt?: string | null;
   periodEnd?: string | null;
@@ -473,6 +521,14 @@ export type LiquidacionDetalle = Liquidacion & {
   data: PagoLiquidacion[];
 };
 
+export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole];
+
+
+export const AuthUserRole = {
+  user: 'user',
+  admin: 'admin',
+} as const;
+
 export interface AuthUser {
   id: string;
   /** @nullable */
@@ -483,6 +539,7 @@ export interface AuthUser {
   lastName: string | null;
   /** @nullable */
   profileImageUrl: string | null;
+  role?: AuthUserRole;
 }
 
 export interface AuthUserEnvelope {

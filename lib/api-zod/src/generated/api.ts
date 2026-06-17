@@ -21,7 +21,8 @@ export const GetCurrentAuthUserResponse = zod.object({
   "email": zod.string().email().nullable(),
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
-  "profileImageUrl": zod.string().nullable()
+  "profileImageUrl": zod.string().nullable(),
+  "role": zod.enum(['user', 'admin']).optional()
 }),zod.null()])
 })
 
@@ -759,6 +760,7 @@ export const ListWebhookEventosResponse = zod.object({
 export const GetSubscriptionStatusResponse = zod.object({
   "status": zod.enum(['prueba', 'activa', 'vencida']),
   "hasAccess": zod.boolean(),
+  "isAdmin": zod.boolean(),
   "diasRestantes": zod.number().nullish(),
   "trialEndsAt": zod.string().nullish(),
   "periodEnd": zod.string().nullish(),
@@ -772,6 +774,41 @@ export const GetSubscriptionStatusResponse = zod.object({
  */
 export const StartSubscriptionResponse = zod.object({
   "url": zod.string()
+})
+
+
+/**
+ * @summary List all platform users (admin only)
+ */
+export const ListAdminUsuariosResponseItem = zod.object({
+  "id": zod.string(),
+  "nombre": zod.string().nullable(),
+  "email": zod.string().email().nullable(),
+  "role": zod.enum(['user', 'admin']),
+  "subscriptionStatus": zod.enum(['prueba', 'activa', 'vencida']),
+  "hasAccess": zod.boolean(),
+  "isAdmin": zod.boolean(),
+  "tieneSuscripcion": zod.boolean(),
+  "createdAt": zod.string().nullable(),
+  "trialEndsAt": zod.string().nullable(),
+  "subscriptionPeriodEnd": zod.string().nullable(),
+  "vencimiento": zod.string().nullable(),
+  "diasParaVencer": zod.number().nullable(),
+  "requiereRecordatorio": zod.boolean()
+})
+export const ListAdminUsuariosResponse = zod.array(ListAdminUsuariosResponseItem)
+
+
+/**
+ * @summary Send a subscription renewal reminder email to a user (admin only)
+ */
+export const SendAdminRecordatorioEmailParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const SendAdminRecordatorioEmailResponse = zod.object({
+  "ok": zod.boolean(),
+  "message": zod.string().nullish()
 })
 
 

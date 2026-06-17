@@ -1,6 +1,1 @@
-- [Router ordering — auth middleware](router-auth-order.md) — webhooksRouter must be mounted BEFORE cobrosRouter in routes/index.ts
-- [Orval hook params — direct args](orval-hook-params.md) — hooks take params directly as first arg, NOT wrapped in { params: {} }
-- [Groq AI integration](groq-integration.md) — AI chat uses Groq SDK + llama-3.3-70b-versatile, credentials via GROQ_API_KEY secret
-- [Abonos / pagos parciales](abonos.md) — pagosParciales table + routes + webhook dispatch; recalcularEstadoCobro as shared inline pattern
-- [Cobros list filters](cobros-filters.md) — GET /cobros: estado=pendiente|pagado|parcial|fallido|cancelado, metodo=flow|mp|link|manual
-- [Platform subscription](platform-subscription.md) — Flow Subscriptions w/ PLATFORM admin creds (FLOW_ADMIN_*); 14d trial, requireSubscription 402 gate on all feature routers
+- [Admin role & access bypass](admin-role.md) — role lives in DB, enriched into /auth/user (not session); admin bypass centralized in computeSubscriptionState; requireAdmin is the real security boundary.
