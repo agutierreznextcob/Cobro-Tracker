@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield } from "lucide-react";
+import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield, BarChart3 } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { AiChat } from "@/components/ai-chat";
@@ -21,6 +21,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/cobros", label: "Cobros", icon: List },
     { href: "/cobros/nuevo", label: "Nuevo cobro", icon: Plus },
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
+    { href: "/cobros/informes", label: "Informes", icon: BarChart3 },
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/liquidaciones", label: "Liquidaciones", icon: Landmark },
     { href: "/webhooks/log", label: "Log webhooks", icon: Webhook },

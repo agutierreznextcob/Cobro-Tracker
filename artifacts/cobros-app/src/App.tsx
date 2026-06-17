@@ -10,6 +10,7 @@ import CobrosList from "@/pages/cobros-list";
 import CobroDetail from "@/pages/cobro-detail";
 import WebhookLog from "@/pages/webhook-log";
 import SearchPage from "@/pages/search";
+import Informes from "@/pages/informes";
 import ProfilePage from "@/pages/profile";
 import ClientesPage from "@/pages/clientes";
 import ClienteDetailPage from "@/pages/cliente-detail";
@@ -125,6 +126,13 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <SearchPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/cobros/informes">
+        <AuthGate>
+          <Layout>
+            <Informes />
           </Layout>
         </AuthGate>
       </Route>
