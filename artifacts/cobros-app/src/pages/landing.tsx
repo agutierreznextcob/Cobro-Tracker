@@ -283,13 +283,13 @@ function QuienesSomosSection() {
               Una plataforma construida por emprendedores, para emprendedores.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              Cobro Simple es una plataforma nueva, creada por emprendedores chilenos que vivieron en carne propia el dolor de cobrar: planillas, transferencias perdidas y clientes que "pagan la próxima semana".
+              Construimos Cobro Simple porque sabíamos exactamente lo que las pymes y profesionales independientes necesitaban: una forma simple y profesional de cobrar, sin depender de programadores ni contadores.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              La hicimos para que cualquier freelancer, pyme o negocio pueda cobrar de forma profesional, con Webpay y MercadoPago integrados y sin depender de un contador o programador.
+              Integramos Webpay, MercadoPago y un asistente IA para que tú te enfoques en tu negocio, no en perseguir pagos.
             </p>
             <p className="font-medium text-foreground leading-relaxed">
-              Estamos recién comenzando y construimos junto a nuestros primeros usuarios. Tu feedback da forma a lo que viene.
+              Nuestra misión: que te paguen a tiempo, siempre.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4">
