@@ -23,6 +23,49 @@ const EVENTO_A_ESTADO: Record<string, "pagado" | "fallido" | "cancelado" | "pend
   "pago.pendiente": "pendiente",
 };
 
+type CobroEstado = "pendiente" | "pagado" | "parcial" | "fallido" | "cancelado";
+
+// Estados que representan dinero efectivamente recibido. Una vez que un cobro
+// llega a uno de estos, el estado real del dinero tiene prioridad.
+const ESTADOS_CON_DINERO: ReadonlySet<CobroEstado> = new Set(["pagado", "parcial"]);
+
+/**
+ * Aplica un estado proveniente de un webhook respetando la prioridad del estado
+ * real del dinero. La protección es ATÓMICA en SQL (no select-then-update) para
+ * evitar condiciones de carrera entre webhooks concurrentes/fuera de orden.
+ *
+ * Reglas:
+ *  - Una confirmación de pago real (pagado/parcial) SIEMPRE se aplica, aunque el
+ *    cobro haya sido marcado manualmente como fallido/cancelado/pendiente antes.
+ *  - Un estado sin dinero (pendiente/fallido/cancelado) NO degrada un cobro que
+ *    ya refleja dinero recibido (pagado/parcial), salvo que sea un reembolso real
+ *    confirmado por el proveedor (esReembolso).
+ *
+ * Devuelve true si la fila fue actualizada, false si la actualización fue
+ * ignorada por precedencia (el cobro ya reflejaba un pago confirmado).
+ */
+async function aplicarEstadoCobro(
+  cobroId: number,
+  nuevoEstado: CobroEstado,
+  opts?: { esReembolso?: boolean; extra?: Record<string, unknown> },
+): Promise<boolean> {
+  const protegerDinero = !ESTADOS_CON_DINERO.has(nuevoEstado) && !opts?.esReembolso;
+  const where = protegerDinero
+    ? and(
+        eq(cobrosTable.id, cobroId),
+        sql`${cobrosTable.estado} not in ('pagado', 'parcial')`,
+      )
+    : eq(cobrosTable.id, cobroId);
+
+  const filas = await db
+    .update(cobrosTable)
+    .set({ estado: nuevoEstado, actualizadoEn: new Date(), ...(opts?.extra ?? {}) })
+    .where(where)
+    .returning({ id: cobrosTable.id });
+
+  return filas.length > 0;
+}
+
 function verifySignature(rawBody: Buffer, signatureHeader: string, secret: string): boolean {
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
   const expectedBuf = Buffer.from(`sha256=${expected}`, "utf8");
@@ -176,11 +219,23 @@ webhooksRouter.post("/webhooks/flow", async (req, res) => {
       return;
     }
 
-    // 4. Update cobro with the verified status
-    await db
-      .update(cobrosTable)
-      .set({ estado: nuevoEstado, actualizadoEn: new Date() })
-      .where(eq(cobrosTable.id, cobro.id));
+    // 4. Update cobro with the verified status — el estado real del dinero
+    // siempre tiene prioridad: nunca degradamos un cobro ya pagado/parcial por
+    // una notificación de rechazo/cancelación tardía (protección atómica en SQL).
+    const aplicado = await aplicarEstadoCobro(cobro.id, nuevoEstado);
+
+    if (!aplicado) {
+      await logEvento({
+        evento: "flow.pago.ignorado",
+        cobroId: cobro.id,
+        ipOrigen: ip,
+        exitoso: true,
+        detalle: `Flow status ${pagoStatus.status} → ${nuevoEstado} ignorado: el cobro ya refleja un pago confirmado (pagado/parcial tiene prioridad). Token: ${token}`,
+      });
+      req.log.info({ cobroId: cobro.id, propuesto: nuevoEstado }, "Flow webhook: estado ignorado para proteger pago confirmado");
+      res.status(200).json({ ok: true });
+      return;
+    }
 
     await logEvento({
       evento: `flow.pago.${nuevoEstado}`,
@@ -306,10 +361,25 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
       return;
     }
 
-    await db
-      .update(cobrosTable)
-      .set({ estado: nuevoEstado, actualizadoEn: new Date() })
-      .where(eq(cobrosTable.id, cobro.id));
+    // El estado real del dinero siempre tiene prioridad: una confirmación de pago
+    // (approved) gana sobre cualquier estado manual previo, y un rechazo/cancelación
+    // no degrada un cobro ya pagado/parcial — salvo un reembolso real (refunded).
+    // La protección es atómica en SQL para soportar webhooks concurrentes.
+    const esReembolso = payment.status === "refunded";
+    const aplicado = await aplicarEstadoCobro(cobro.id, nuevoEstado, { esReembolso });
+
+    if (!aplicado) {
+      await logEvento({
+        evento: "mp.pago.ignorado",
+        cobroId: cobro.id,
+        ipOrigen: ip,
+        exitoso: true,
+        detalle: `MP payment ${paymentId} status=${payment.status} → ${nuevoEstado} ignorado: el cobro ya refleja un pago confirmado (pagado/parcial tiene prioridad)`,
+      });
+      req.log.info({ cobroId: cobro.id, propuesto: nuevoEstado }, "MercadoPago webhook: estado ignorado para proteger pago confirmado");
+      res.status(200).json({ ok: true });
+      return;
+    }
 
     await logEvento({
       evento: `mp.pago.${nuevoEstado}`,
@@ -375,24 +445,25 @@ webhooksRouter.post("/webhooks/cobro", async (req, res) => {
   }
 
   try {
-    const updates: Record<string, unknown> = {
-      estado: nuevoEstado,
-      actualizadoEn: new Date(),
-    };
+    const [existente] = await db.select({ id: cobrosTable.id }).from(cobrosTable).where(eq(cobrosTable.id, cobroId));
 
-    if (referencia) {
-      updates.referencia = referencia;
-    }
-
-    const [cobro] = await db
-      .update(cobrosTable)
-      .set(updates)
-      .where(eq(cobrosTable.id, cobroId))
-      .returning();
-
-    if (!cobro) {
+    if (!existente) {
       await logEvento({ evento, cobroId, ipOrigen: ip, exitoso: false, detalle: `Cobro #${cobroId} no encontrado` });
       res.status(400).json({ error: "Cobro no encontrado" });
+      return;
+    }
+
+    // El estado real del dinero siempre tiene prioridad: no degradamos un cobro
+    // ya pagado/parcial por un evento de fallo/cancelación/pendiente posterior
+    // (protección atómica en SQL frente a webhooks concurrentes).
+    const aplicado = await aplicarEstadoCobro(cobroId, nuevoEstado, {
+      extra: referencia ? { referencia } : undefined,
+    });
+
+    if (!aplicado) {
+      await logEvento({ evento, cobroId, ipOrigen: ip, exitoso: true, detalle: `Evento ${evento} → ${nuevoEstado} ignorado: el cobro ya refleja un pago confirmado (pagado/parcial tiene prioridad)` });
+      req.log.info({ cobroId, propuesto: nuevoEstado }, "Webhook: estado ignorado para proteger pago confirmado");
+      res.json({ recibido: true, cobroActualizado: false });
       return;
     }
 
