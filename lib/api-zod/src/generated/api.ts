@@ -22,7 +22,12 @@ export const GetCurrentAuthUserResponse = zod.object({
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
   "profileImageUrl": zod.string().nullable(),
-  "role": zod.enum(['user', 'admin']).optional()
+  "role": zod.enum(['user', 'admin']).optional(),
+  "profileCompleted": zod.boolean().optional(),
+  "rut": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "companyName": zod.string().nullish()
 }),zod.null()])
 })
 
@@ -501,6 +506,40 @@ export const SaveFlowCredentialsResponse = zod.object({
  */
 export const DeleteFlowCredentialsResponse = zod.object({
   "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Save mandatory profile data and mark the profile as completed
+ */
+
+
+
+
+
+
+
+export const CompletarPerfilBody = zod.object({
+  "firstName": zod.string().min(1),
+  "lastName": zod.string().min(1),
+  "rut": zod.string().min(1),
+  "phone": zod.string().min(1),
+  "address": zod.string().min(1),
+  "companyName": zod.string().nullish()
+})
+
+export const CompletarPerfilResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email().nullable(),
+  "firstName": zod.string().nullable(),
+  "lastName": zod.string().nullable(),
+  "profileImageUrl": zod.string().nullable(),
+  "role": zod.enum(['user', 'admin']).optional(),
+  "profileCompleted": zod.boolean().optional(),
+  "rut": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "companyName": zod.string().nullish()
 })
 
 

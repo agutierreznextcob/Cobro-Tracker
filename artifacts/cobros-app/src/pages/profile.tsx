@@ -10,6 +10,7 @@ import {
   useGetSubscriptionStatus,
   useStartSubscription,
   getGetSubscriptionStatusQueryKey,
+  useCompletarPerfil,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -18,7 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles } from "lucide-react";
+import { isValidRut, formatRut } from "@/lib/rut";
+import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail } from "lucide-react";
 
 function formatCLP(value: number): string {
   return new Intl.NumberFormat("es-CL", {
@@ -33,7 +35,165 @@ function formatFecha(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" });
 }
 
+function OnboardingForm({
+  email,
+  initialFirstName,
+  initialLastName,
+}: {
+  email: string | null | undefined;
+  initialFirstName: string | null | undefined;
+  initialLastName: string | null | undefined;
+}) {
+  const { toast } = useToast();
+  const completarPerfil = useCompletarPerfil();
+
+  const [firstName, setFirstName] = useState(initialFirstName ?? "");
+  const [lastName, setLastName] = useState(initialLastName ?? "");
+  const [rut, setRut] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [rutError, setRutError] = useState<string | null>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!firstName.trim() || !lastName.trim() || !rut.trim() || !phone.trim() || !address.trim()) {
+      toast({ title: "Campos requeridos", description: "Completa todos los campos obligatorios.", variant: "destructive" });
+      return;
+    }
+    if (!isValidRut(rut)) {
+      setRutError("El RUT ingresado no es válido.");
+      return;
+    }
+    setRutError(null);
+
+    completarPerfil.mutate(
+      {
+        data: {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          rut: rut.trim(),
+          phone: phone.trim(),
+          address: address.trim(),
+          companyName: companyName.trim() || null,
+        },
+      },
+      {
+        onSuccess: () => {
+          // useAuth refetches /auth/user only on mount, so reload to pick up
+          // the now-completed profile and unlock the rest of the platform.
+          const base = import.meta.env.BASE_URL.replace(/\/+$/, "");
+          window.location.href = `${base}/dashboard`;
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo guardar tu perfil.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto py-8 px-4 animate-in fade-in duration-300">
+      <div className="mb-6 text-center">
+        <h1 className="text-3xl font-bold tracking-tight">Completa tu perfil</h1>
+        <p className="text-muted-foreground mt-2">
+          Necesitamos algunos datos para activar tu cuenta. Esto solo se pide una vez.
+        </p>
+      </div>
+
+      <Card className="shadow-sm border-border/50">
+        <CardHeader className="bg-muted/20 border-b border-border/50">
+          <CardTitle className="flex items-center gap-2">
+            <IdCard className="h-4 w-4 text-primary" />
+            Datos personales
+          </CardTitle>
+          <CardDescription>Los campos marcados con * son obligatorios.</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                Correo electrónico
+              </Label>
+              <Input value={email ?? ""} disabled readOnly className="bg-muted/40" />
+              <p className="text-xs text-muted-foreground">Obtenido de tu cuenta. No se puede modificar.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">Nombre *</Label>
+                <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Juan" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Apellido *</Label>
+                <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Pérez" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rut">RUT *</Label>
+              <Input
+                id="rut"
+                value={rut}
+                onChange={(e) => {
+                  setRut(formatRut(e.target.value));
+                  setRutError(null);
+                }}
+                placeholder="12.345.678-5"
+                inputMode="text"
+              />
+              {rutError && <p className="text-xs text-destructive">{rutError}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Teléfono *</Label>
+              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+56 9 1234 5678" inputMode="tel" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Dirección *</Label>
+              <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Av. Siempre Viva 742, Santiago" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="companyName">Nombre de la empresa (opcional)</Label>
+              <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Mi Empresa SpA" />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={completarPerfil.isPending}>
+              {completarPerfil.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Guardando...</>
+              ) : (
+                "Guardar y continuar"
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
+  const { user } = useAuth();
+
+  if (user && !user.profileCompleted) {
+    return (
+      <OnboardingForm
+        email={user.email}
+        initialFirstName={user.firstName}
+        initialLastName={user.lastName}
+      />
+    );
+  }
+
+  return <ProfileSettings />;
+}
+
+function ProfileSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -201,6 +361,29 @@ export default function ProfilePage() {
               {user?.email && <p className="text-sm text-muted-foreground">{user.email}</p>}
             </div>
           </div>
+
+          <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-t border-border/50 pt-6">
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Correo electrónico</dt>
+              <dd className="text-sm mt-0.5">{user?.email || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">RUT</dt>
+              <dd className="text-sm mt-0.5">{user?.rut || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Teléfono</dt>
+              <dd className="text-sm mt-0.5">{user?.phone || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Empresa</dt>
+              <dd className="text-sm mt-0.5">{user?.companyName || "—"}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Dirección</dt>
+              <dd className="text-sm mt-0.5">{user?.address || "—"}</dd>
+            </div>
+          </dl>
         </CardContent>
       </Card>
 

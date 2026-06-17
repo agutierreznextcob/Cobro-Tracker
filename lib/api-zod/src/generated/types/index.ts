@@ -38,6 +38,7 @@ export * from './cobroInput';
 export * from './cobrosSummary';
 export * from './cobroUpdate';
 export * from './cobroUpdateEstado';
+export * from './completarPerfilInput';
 export * from './dashboardMetricas';
 export * from './dashboardMetricasPeriodo';
 export * from './errorEnvelope';

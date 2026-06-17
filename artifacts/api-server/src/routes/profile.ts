@@ -1,8 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db, flowCredencialesTable, mpCredencialesTable } from "@workspace/db";
+import { db, flowCredencialesTable, mpCredencialesTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { CompletarPerfilBody } from "@workspace/api-zod";
 import { encrypt, decrypt } from "../lib/encrypt";
+import { normalizeRut } from "../lib/rut";
 
 const profileRouter = Router();
 
@@ -12,6 +14,75 @@ profileRouter.use((req, res, next) => {
     return;
   }
   next();
+});
+
+// Save the mandatory profile data collected on first login and mark the
+// profile as completed so the user can access the rest of the platform.
+profileRouter.put("/profile/datos", async (req, res) => {
+  const userId = req.user!.id;
+  const parsed = CompletarPerfilBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Datos de perfil inválidos" });
+    return;
+  }
+
+  const firstName = parsed.data.firstName.trim();
+  const lastName = parsed.data.lastName.trim();
+  const phone = parsed.data.phone.trim();
+  const address = parsed.data.address.trim();
+  const companyName = parsed.data.companyName?.trim() || null;
+
+  // Reject required fields that are blank after trimming (e.g. "   "), which
+  // would otherwise pass min(1) and mark the profile complete with empty data.
+  if (!firstName || !lastName || !phone || !address) {
+    res.status(400).json({ error: "Todos los campos obligatorios deben tener contenido" });
+    return;
+  }
+
+  const normalizedRut = normalizeRut(parsed.data.rut);
+  if (!normalizedRut) {
+    res.status(400).json({ error: "El RUT ingresado no es válido" });
+    return;
+  }
+
+  try {
+    const [updated] = await db
+      .update(usersTable)
+      .set({
+        firstName,
+        lastName,
+        rut: normalizedRut,
+        phone,
+        address,
+        companyName,
+        profileCompleted: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(usersTable.id, userId))
+      .returning();
+
+    if (!updated) {
+      res.status(401).json({ error: "No autorizado" });
+      return;
+    }
+
+    res.json({
+      id: updated.id,
+      email: updated.email,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+      profileImageUrl: updated.profileImageUrl,
+      role: updated.role,
+      profileCompleted: updated.profileCompleted,
+      rut: updated.rut,
+      phone: updated.phone,
+      address: updated.address,
+      companyName: updated.companyName,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error saving profile data");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
 });
 
 const FlowCredencialesInput = z.object({

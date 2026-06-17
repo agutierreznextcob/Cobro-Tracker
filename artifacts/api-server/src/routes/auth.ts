@@ -89,22 +89,58 @@ router.get("/auth/user", async (req: Request, res: Response) => {
     return;
   }
 
-  // Enrich the session user with the current DB role so the frontend can gate
-  // admin-only UI. The session does not store role (set manually in the DB).
+  // Enrich the session user with the current DB role and profile data so the
+  // frontend can gate admin-only UI and the mandatory profile-completion flow.
+  // The session only stores identity fields populated from the OIDC claims.
   let role: "user" | "admin" = "user";
+  let profileCompleted = false;
+  let rut: string | null = null;
+  let phone: string | null = null;
+  let address: string | null = null;
+  let companyName: string | null = null;
+  let firstName = req.user.firstName;
+  let lastName = req.user.lastName;
   try {
     const [row] = await db
-      .select({ role: usersTable.role })
+      .select({
+        role: usersTable.role,
+        profileCompleted: usersTable.profileCompleted,
+        rut: usersTable.rut,
+        phone: usersTable.phone,
+        address: usersTable.address,
+        companyName: usersTable.companyName,
+        firstName: usersTable.firstName,
+        lastName: usersTable.lastName,
+      })
       .from(usersTable)
       .where(eq(usersTable.id, req.user.id));
-    if (row) role = row.role;
+    if (row) {
+      role = row.role;
+      profileCompleted = row.profileCompleted;
+      rut = row.rut;
+      phone = row.phone;
+      address = row.address;
+      companyName = row.companyName;
+      firstName = row.firstName ?? firstName;
+      lastName = row.lastName ?? lastName;
+    }
   } catch (err) {
-    req.log.error({ err }, "Error loading user role");
+    req.log.error({ err }, "Error loading user profile");
   }
 
   res.json(
     GetCurrentAuthUserResponse.parse({
-      user: { ...req.user, role },
+      user: {
+        ...req.user,
+        firstName,
+        lastName,
+        role,
+        profileCompleted,
+        rut,
+        phone,
+        address,
+        companyName,
+      },
     }),
   );
 });

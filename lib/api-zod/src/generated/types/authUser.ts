@@ -18,4 +18,13 @@ export interface AuthUser {
   /** @nullable */
   profileImageUrl: string | null;
   role?: AuthUserRole;
+  profileCompleted?: boolean;
+  /** @nullable */
+  rut?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  companyName?: string | null;
 }

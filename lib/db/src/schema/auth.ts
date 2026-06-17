@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgEnum, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgEnum, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const sessionsTable = pgTable(
@@ -41,6 +41,13 @@ export const usersTable = pgTable("users", {
     .notNull()
     .default("prueba"),
   role: userRoleEnum("role").notNull().default("user"),
+  // Mandatory profile fields collected on first login. profileCompleted gates
+  // access to the rest of the platform until the onboarding form is submitted.
+  rut: varchar("rut"),
+  phone: varchar("phone"),
+  address: varchar("address"),
+  companyName: varchar("company_name"),
+  profileCompleted: boolean("profile_completed").notNull().default(false),
   flowCustomerId: varchar("flow_customer_id"),
   flowSubscriptionId: varchar("flow_subscription_id"),
   flowRegisterToken: varchar("flow_register_token"),

@@ -540,6 +540,30 @@ export interface AuthUser {
   /** @nullable */
   profileImageUrl: string | null;
   role?: AuthUserRole;
+  profileCompleted?: boolean;
+  /** @nullable */
+  rut?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  companyName?: string | null;
+}
+
+export interface CompletarPerfilInput {
+  /** @minLength 1 */
+  firstName: string;
+  /** @minLength 1 */
+  lastName: string;
+  /** @minLength 1 */
+  rut: string;
+  /** @minLength 1 */
+  phone: string;
+  /** @minLength 1 */
+  address: string;
+  /** @nullable */
+  companyName?: string | null;
 }
 
 export interface AuthUserEnvelope {

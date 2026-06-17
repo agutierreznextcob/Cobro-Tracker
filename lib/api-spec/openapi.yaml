@@ -645,6 +645,33 @@ paths:
         "401":
           description: Unauthorized
 
+  /profile/datos:
+    put:
+      operationId: completarPerfil
+      tags: [profile]
+      summary: Save mandatory profile data and mark the profile as completed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompletarPerfilInput"
+      responses:
+        "200":
+          description: Profile saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+
   /cobros/{id}/recordatorio-email:
     post:
       operationId: enviarRecordatorioEmail
@@ -1850,6 +1877,37 @@ components:
         role:
           type: string
           enum: [user, admin]
+        profileCompleted:
+          type: boolean
+        rut:
+          type: [string, 'null']
+        phone:
+          type: [string, 'null']
+        address:
+          type: [string, 'null']
+        companyName:
+          type: [string, 'null']
+    CompletarPerfilInput:
+      type: object
+      required: [firstName, lastName, rut, phone, address]
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+        lastName:
+          type: string
+          minLength: 1
+        rut:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+          minLength: 1
+        address:
+          type: string
+          minLength: 1
+        companyName:
+          type: [string, 'null']
     AuthUserEnvelope:
       type: object
       required: [user]

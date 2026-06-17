@@ -28,6 +28,7 @@ import type {
   AiConversationInput,
   AiConversationWithMessages,
   AiMessageInput,
+  AuthUser,
   AuthUserEnvelope,
   AvisarClienteInput,
   AvisarClienteResult,
@@ -39,6 +40,7 @@ import type {
   CobroInput,
   CobroUpdate,
   CobrosSummary,
+  CompletarPerfilInput,
   DashboardMetricas,
   ErrorEnvelope,
   ErrorResponse,
@@ -2139,6 +2141,77 @@ export const useDeleteFlowCredentials = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeleteFlowCredentialsMutationOptions(options));
+    }
+
+export const getCompletarPerfilUrl = () => {
+
+
+
+
+  return `/api/profile/datos`
+}
+
+/**
+ * @summary Save mandatory profile data and mark the profile as completed
+ */
+export const completarPerfil = async (completarPerfilInput: CompletarPerfilInput, options?: RequestInit): Promise<AuthUser> => {
+
+  return customFetch<AuthUser>(getCompletarPerfilUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      completarPerfilInput,)
+  }
+);}
+
+
+
+
+export const getCompletarPerfilMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completarPerfil>>, TError,{data: BodyType<CompletarPerfilInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completarPerfil>>, TError,{data: BodyType<CompletarPerfilInput>}, TContext> => {
+
+const mutationKey = ['completarPerfil'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completarPerfil>>, {data: BodyType<CompletarPerfilInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  completarPerfil(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompletarPerfilMutationResult = NonNullable<Awaited<ReturnType<typeof completarPerfil>>>
+    export type CompletarPerfilMutationBody = BodyType<CompletarPerfilInput>
+    export type CompletarPerfilMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Save mandatory profile data and mark the profile as completed
+ */
+export const useCompletarPerfil = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completarPerfil>>, TError,{data: BodyType<CompletarPerfilInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completarPerfil>>,
+        TError,
+        {data: BodyType<CompletarPerfilInput>},
+        TContext
+      > => {
+      return useMutation(getCompletarPerfilMutationOptions(options));
     }
 
 export const getEnviarRecordatorioEmailUrl = (id: number,) => {

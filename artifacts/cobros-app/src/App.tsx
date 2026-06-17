@@ -45,8 +45,17 @@ function SubscriptionGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isLoading, isAuthenticated } = useAuth();
+function AuthGate({
+  children,
+  skipProfile = false,
+}: {
+  children: React.ReactNode;
+  skipProfile?: boolean;
+}) {
+  // Single source of resolved auth state for this chain. We deliberately read
+  // user/isLoading/isAuthenticated from ONE useAuth() call so the profile gate
+  // can't race a separate, still-loading instance and leak protected content.
+  const { isLoading, isAuthenticated, user } = useAuth();
 
   if (isLoading) {
     return <FullScreenLoader />;
@@ -54,6 +63,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Redirect to="/" />;
+  }
+
+  // Force first-login users through the mandatory profile-completion form.
+  if (!skipProfile && user && !user.profileCompleted) {
+    return <Redirect to="/perfil" />;
   }
 
   return <SubscriptionGate>{children}</SubscriptionGate>;
@@ -68,6 +82,11 @@ function AdminGate({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Redirect to="/" />;
+  }
+
+  // Admins must also complete their profile before reaching any section.
+  if (user && !user.profileCompleted) {
+    return <Redirect to="/perfil" />;
   }
 
   if (user?.role !== "admin") {
@@ -158,7 +177,7 @@ function AppRouter() {
         </AuthGate>
       </Route>
       <Route path="/perfil">
-        <AuthGate>
+        <AuthGate skipProfile>
           <Layout>
             <ProfilePage />
           </Layout>
