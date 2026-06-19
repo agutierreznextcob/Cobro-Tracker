@@ -2219,7 +2219,7 @@ components:
 
     RecordatoriosRunResult:
       type: object
-      required: [ok, fecha, emailsEnviados, notificacionesCreadas, errores]
+      required: [ok, fecha, emailsEnviados, whatsappsEnviados, notificacionesCreadas, errores]
       properties:
         ok:
           type: boolean
@@ -2227,6 +2227,8 @@ components:
           type: string
           format: date
         emailsEnviados:
+          type: integer
+        whatsappsEnviados:
           type: integer
         notificacionesCreadas:
           type: integer

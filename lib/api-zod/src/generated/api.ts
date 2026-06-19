@@ -1131,6 +1131,7 @@ export const RunRecordatoriosResponse = zod.object({
   "ok": zod.boolean(),
   "fecha": zod.coerce.date(),
   "emailsEnviados": zod.number(),
+  "whatsappsEnviados": zod.number(),
   "notificacionesCreadas": zod.number(),
   "errores": zod.number()
 })

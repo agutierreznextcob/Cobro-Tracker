@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { and, eq, isNotNull, inArray } from "drizzle-orm";
 import { sendSecuenciaRecordatorioEmail } from "./email";
+import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "./whatsapp";
 
 type Canal = "email" | "whatsapp" | "ambos";
 type Momento = "antes" | "dia" | "despues" | "recurrente";
@@ -24,6 +25,7 @@ export interface RecordatoriosRunResult {
   ok: boolean;
   fecha: string;
   emailsEnviados: number;
+  whatsappsEnviados: number;
   notificacionesCreadas: number;
   errores: number;
 }
@@ -64,13 +66,6 @@ function esDueHoy(momento: Momento, diasOffset: number, vencimiento: string, hoy
 }
 
 // --- WhatsApp helpers ---
-
-function sanitizePhone(tel: string): string {
-  let d = tel.replace(/\D/g, "");
-  if (d.length === 9 && d.startsWith("9")) d = "56" + d;
-  else if (d.length === 8) d = "569" + d;
-  return d;
-}
 
 function buildWaMensaje(cobro: typeof cobrosTable.$inferSelect, linkPago: string | null): string {
   const nombre = cobro.clienteNombre || "cliente";
@@ -202,6 +197,7 @@ export async function procesarRecordatorios(
 ): Promise<RecordatoriosRunResult> {
   const hoy = todayArg ?? fechaHoySantiago();
   let emailsEnviados = 0;
+  let whatsappsEnviados = 0;
   let notificacionesCreadas = 0;
   let errores = 0;
 
@@ -268,7 +264,9 @@ export async function procesarRecordatorios(
             await marcarEnvio(envioId, "fallido", result.error ?? "Error al enviar email");
           }
         } else {
-          // WhatsApp = notificación in-app "listo para enviar"
+          // WhatsApp: envío automático vía proveedor (Cloud API). Si no hay
+          // proveedor configurado o falta el teléfono, cae al flujo de
+          // notificación in-app "listo para enviar".
           if (!cobro.responsableId) {
             await marcarEnvio(envioId, "fallido", "El cobro no tiene responsable.");
             errores++;
@@ -283,26 +281,45 @@ export async function procesarRecordatorios(
             telefono = cliente?.telefono ?? null;
           }
           const mensaje = buildWaMensaje(cobro, linkPago);
-          const waUrl = buildWaUrl(telefono, mensaje);
-          await db.insert(notificacionesTable).values({
-            userId: cobro.responsableId,
-            cobroId: cobro.id,
-            tipo: "whatsapp",
-            titulo: `WhatsApp listo para enviar a ${cobro.clienteNombre || "cliente"}`,
-            mensaje,
-            waUrl,
-          });
-          notificacionesCreadas++;
-          await marcarEnvio(envioId, "pendiente", "WhatsApp listo para enviar.");
+
+          if (isWhatsAppConfigured() && telefono && sanitizePhone(telefono)) {
+            const result = await sendWhatsAppMensaje({ telefono, mensaje }, log);
+            if (result.ok) {
+              whatsappsEnviados++;
+              await marcarEnvio(
+                envioId,
+                "enviado",
+                result.messageId
+                  ? `WhatsApp enviado automáticamente (id ${result.messageId}).`
+                  : "WhatsApp enviado automáticamente.",
+              );
+            } else {
+              errores++;
+              await marcarEnvio(envioId, "fallido", result.error ?? "Error al enviar WhatsApp");
+            }
+          } else {
+            // Fallback: notificación in-app con botón "Abrir WhatsApp".
+            const waUrl = buildWaUrl(telefono, mensaje);
+            await db.insert(notificacionesTable).values({
+              userId: cobro.responsableId,
+              cobroId: cobro.id,
+              tipo: "whatsapp",
+              titulo: `WhatsApp listo para enviar a ${cobro.clienteNombre || "cliente"}`,
+              mensaje,
+              waUrl,
+            });
+            notificacionesCreadas++;
+            await marcarEnvio(envioId, "pendiente", "WhatsApp listo para enviar.");
+          }
         }
       }
     }
   }
 
   log.info(
-    { fecha: hoy, emailsEnviados, notificacionesCreadas, errores },
+    { fecha: hoy, emailsEnviados, whatsappsEnviados, notificacionesCreadas, errores },
     "Recordatorios procesados",
   );
 
-  return { ok: true, fecha: hoy, emailsEnviados, notificacionesCreadas, errores };
+  return { ok: true, fecha: hoy, emailsEnviados, whatsappsEnviados, notificacionesCreadas, errores };
 }

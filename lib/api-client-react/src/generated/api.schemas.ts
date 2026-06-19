@@ -708,6 +708,7 @@ export interface RecordatoriosRunResult {
   ok: boolean;
   fecha: string;
   emailsEnviados: number;
+  whatsappsEnviados: number;
   notificacionesCreadas: number;
   errores: number;
 }

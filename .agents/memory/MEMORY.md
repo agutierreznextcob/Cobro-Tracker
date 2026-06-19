@@ -4,3 +4,4 @@
 - [Webhook estado precedence](webhook-estado-precedencia.md) — payment webhooks: money state (pagado/parcial) always wins over manual/stale; protect against downgrade atomically in SQL (except MP refund).
 - [Cobro ownership gap](cobro-ownership-gap.md) — /cobros/:id/* endpoints don't check responsableId ownership; convention is no check — closing it is a dedicated all-endpoints security task, not a drive-by.
 - [Cobro descuentos](cobro-descuentos.md) — monto stays ORIGINAL; montoDescuento=absolute; montoACobrar=monto-montoDescuento; each discount replaces field + inserts history; links/reports use montoACobrar.
+- [WhatsApp reminder auto-send](whatsapp-reminders.md) — whatsapp canal auto-sends via Meta Cloud API when configured, else in-app fallback; estado enviado=sent, pendiente=manual-click fallback.
