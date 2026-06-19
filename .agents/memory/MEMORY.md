@@ -5,3 +5,4 @@
 - [Cobro & cliente authz model](cobro-ownership-gap.md) — org-aware per-record access: admin_org=whole org, ejecutivo=own; guard every :id route (404 not 403) + aggregate/POST paths via lib/org.ts helpers.
 - [Cobro descuentos](cobro-descuentos.md) — monto stays ORIGINAL; montoDescuento=absolute; montoACobrar=monto-montoDescuento; each discount replaces field + inserts history; links/reports use montoACobrar.
 - [WhatsApp reminder auto-send](whatsapp-reminders.md) — whatsapp canal auto-sends via Meta Cloud API when configured, else in-app fallback; estado enviado=sent, pendiente=manual-click fallback.
+- [Email From/Reply-To](email-remitente.md) — every email via buildRemitente(): From="<sender> via Cobro Simple" on platform addr, Reply-To=sender email; new emails must route through it.

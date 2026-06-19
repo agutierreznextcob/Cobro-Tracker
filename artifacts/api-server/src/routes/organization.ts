@@ -389,6 +389,7 @@ organizationRouter.post(
           email,
           organizacionNombre: org?.nombre ?? "tu organización",
           invitadoPorNombre,
+          invitadoPorEmail: req.user!.email ?? null,
           orgRole,
           ctaUrl: `${getPublicBaseUrl()}/api/login?returnTo=${encodeURIComponent("/perfil")}`,
         },

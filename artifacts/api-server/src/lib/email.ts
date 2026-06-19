@@ -12,7 +12,28 @@ function getResend(): Resend | null {
   return resend;
 }
 
-const FROM = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+
+// Builds the "De:" (From) header and optional Reply-To for outbound emails.
+// The display name reads "<Nombre del remitente> via Cobro Simple" so the
+// recipient sees who sent it, while the address stays on the platform domain.
+// Reply-To is set to the sender's own email so replies reach them directly,
+// not Cobro Simple. Header values are sanitized against CRLF/quote injection.
+function buildRemitente(remitente?: {
+  nombre?: string | null;
+  email?: string | null;
+}): { from: string; replyTo?: string } {
+  const nombre = remitente?.nombre?.replace(/[\r\n]/g, "").trim();
+  const displayName = nombre ? `${nombre} via Cobro Simple` : "Cobro Simple";
+  const safeName = displayName.replace(/"/g, "").trim();
+  const from = `"${safeName}" <${FROM_EMAIL}>`;
+
+  const email = remitente?.email?.replace(/[\r\n]/g, "").trim();
+  const replyTo =
+    email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : undefined;
+
+  return replyTo ? { from, replyTo } : { from };
+}
 
 function formatCLP(amount: number): string {
   return new Intl.NumberFormat("es-CL", {
@@ -99,6 +120,8 @@ export interface CobrosEmailData {
   monto: number;
   linkPago: string;
   comercioNombre: string;
+  remitenteNombre?: string | null;
+  remitenteEmail?: string | null;
 }
 
 export interface EmailResult {
@@ -117,7 +140,7 @@ export async function sendPaymentLinkEmail(data: CobrosEmailData, log?: { warn: 
   const nombre = data.clienteNombre || "cliente";
 
   const { error } = await client.emails.send({
-    from: FROM,
+    ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
     to: [data.emailPagador],
     subject: `Tienes un cobro pendiente de ${montoFormato} — ${data.comercioNombre}`,
     html: buildEmailHtml({
@@ -152,6 +175,8 @@ export interface AvisoManualEmailData {
   descripcion: string;
   monto: number;
   comercioNombre: string;
+  remitenteNombre?: string | null;
+  remitenteEmail?: string | null;
 }
 
 export async function sendAvisoManualEmail(
@@ -168,7 +193,7 @@ export async function sendAvisoManualEmail(
   const nombre = data.clienteNombre || "cliente";
 
   const { error } = await client.emails.send({
-    from: FROM,
+    ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
     to: [data.emailPagador],
     subject: `Cobro pendiente de ${montoFormato} — ${data.comercioNombre}`,
     html: buildEmailHtml({
@@ -242,7 +267,7 @@ export async function sendRenovacionEmail(
     : `Tu ${data.estado === "activa" ? "suscripción" : "período de prueba"} vence el <strong>${fechaFormato}</strong>. Renueva ahora para no perder el acceso.`;
 
   const { error } = await client.emails.send({
-    from: FROM,
+    ...buildRemitente(),
     to: [data.email],
     subject: data.vencido
       ? "Tu acceso a Cobro Simple venció — renueva tu suscripción"
@@ -283,6 +308,8 @@ export interface SecuenciaRecordatorioData {
   linkPago?: string | null;
   /** Días respecto al vencimiento: negativo = antes, 0 = vence hoy, positivo = vencido hace N días */
   diasVencido: number;
+  remitenteNombre?: string | null;
+  remitenteEmail?: string | null;
 }
 
 export async function sendSecuenciaRecordatorioEmail(
@@ -320,7 +347,7 @@ export async function sendSecuenciaRecordatorioEmail(
   const tieneLink = !!data.linkPago;
 
   const { error } = await client.emails.send({
-    from: FROM,
+    ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
     to: [data.emailPagador],
     subject,
     html: buildEmailHtml({
@@ -355,6 +382,7 @@ export interface InvitacionEmailData {
   email: string;
   organizacionNombre: string;
   invitadoPorNombre: string | null;
+  invitadoPorEmail?: string | null;
   orgRole: "admin_org" | "ejecutivo";
   ctaUrl: string;
 }
@@ -373,7 +401,7 @@ export async function sendInvitacionEmail(
   const rolTexto = data.orgRole === "admin_org" ? "administrador" : "ejecutivo";
 
   const { error } = await client.emails.send({
-    from: FROM,
+    ...buildRemitente({ nombre: data.invitadoPorNombre, email: data.invitadoPorEmail }),
     to: [data.email],
     subject: `Te invitaron a unirte a ${data.organizacionNombre} en Cobro Simple`,
     html: buildEmailHtml({
@@ -410,7 +438,7 @@ export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn:
   const nombre = data.clienteNombre || "cliente";
 
   const { error } = await client.emails.send({
-    from: FROM,
+    ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
     to: [data.emailPagador],
     subject: `Recordatorio: Cobro pendiente de ${montoFormato} — ${data.comercioNombre}`,
     html: buildEmailHtml({

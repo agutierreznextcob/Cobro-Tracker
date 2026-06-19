@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { and, eq, isNotNull, inArray } from "drizzle-orm";
 import { sendSecuenciaRecordatorioEmail } from "./email";
+import { getRemitenteContacto } from "./org";
 import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "./whatsapp";
 
 type Canal = "email" | "whatsapp" | "ambos";
@@ -244,6 +245,7 @@ export async function procesarRecordatorios(
             errores++;
             continue;
           }
+          const remitente = await getRemitenteContacto(cobro.responsableId);
           const result = await sendSecuenciaRecordatorioEmail(
             {
               emailPagador: cobro.emailPagador,
@@ -253,6 +255,8 @@ export async function procesarRecordatorios(
               comercioNombre: cobro.responsableNombre || "Cobro Simple",
               linkPago,
               diasVencido,
+              remitenteNombre: remitente.nombre || cobro.responsableNombre,
+              remitenteEmail: remitente.email,
             },
             log,
           );

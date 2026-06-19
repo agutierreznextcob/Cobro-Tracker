@@ -28,7 +28,7 @@ import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro } from "../lib/recordatorios";
-import { getOrgContext, cobroScopeCondition, userCanAccessCobro, userCanAccessCliente } from "../lib/org";
+import { getOrgContext, cobroScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto } from "../lib/org";
 
 const cobrosRouter = Router();
 
@@ -497,6 +497,7 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
     req.log.info({ cobroId: cobro.id, flowOrder: result.flowOrder }, "Flow payment link created");
 
     // Send payment link email asynchronously (non-blocking)
+    const remitente = await getRemitenteContacto(cobro.responsableId);
     sendPaymentLinkEmail({
       emailPagador: bodyParsed.data.emailPagador,
       clienteNombre: cobro.clienteNombre,
@@ -504,6 +505,8 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
       monto: montoACobrar(cobro),
       linkPago: result.url,
       comercioNombre: cobro.responsableNombre || "Cobro Simple",
+      remitenteNombre: remitente.nombre || cobro.responsableNombre,
+      remitenteEmail: remitente.email,
     }, req.log).catch((err) => {
       req.log.warn({ err }, "Unhandled error in payment link email");
     });
@@ -614,6 +617,7 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
       return;
     }
 
+    const remitente = await getRemitenteContacto(cobro.responsableId);
     const result = await sendRecordatorioEmail({
       emailPagador: cobro.emailPagador,
       clienteNombre: cobro.clienteNombre,
@@ -621,6 +625,8 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
       monto: Number(cobro.monto),
       linkPago: cobro.flowLinkPago,
       comercioNombre: cobro.responsableNombre || "Cobro Simple",
+      remitenteNombre: remitente.nombre || cobro.responsableNombre,
+      remitenteEmail: remitente.email,
     }, req.log);
 
     if (!result.ok) {
@@ -677,6 +683,7 @@ cobrosRouter.post("/cobros/:id/avisar", async (req, res) => {
         res.status(400).json({ error: "El cobro no tiene email del pagador registrado." });
         return;
       }
+      const remitente = await getRemitenteContacto(cobro.responsableId);
       const emailResult = await sendAvisoManualEmail(
         {
           emailPagador: cobro.emailPagador,
@@ -684,6 +691,8 @@ cobrosRouter.post("/cobros/:id/avisar", async (req, res) => {
           descripcion: cobro.descripcion,
           monto: Number(cobro.monto),
           comercioNombre: cobro.responsableNombre ?? "Cobro Simple",
+          remitenteNombre: remitente.nombre || cobro.responsableNombre,
+          remitenteEmail: remitente.email,
         },
         req.log,
       );

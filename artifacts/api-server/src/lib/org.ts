@@ -34,6 +34,26 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
   };
 }
 
+// Looks up the display name and email of a user, used as the "remitente" (sender)
+// of outbound emails so the "De:" header reads "<Nombre> via Cobro Simple" and
+// replies route back to the user via Reply-To. Returns nulls when unavailable.
+export async function getRemitenteContacto(
+  userId: string | null | undefined,
+): Promise<{ nombre: string | null; email: string | null }> {
+  if (!userId) return { nombre: null, email: null };
+  const [u] = await db
+    .select({
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      email: usersTable.email,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+  if (!u) return { nombre: null, email: null };
+  const nombre = [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || null;
+  return { nombre, email: u.email ?? null };
+}
+
 // Builds the WHERE condition that scopes cobros to what the user may see:
 // - admin_org: every cobro in their organization
 // - ejecutivo (or no org yet): only cobros assigned to them (responsableId)
