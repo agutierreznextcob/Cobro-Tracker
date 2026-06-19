@@ -21,6 +21,10 @@ import {
   useListRecordatoriosHistorial,
   getListRecordatoriosQueryKey,
   getListRecordatoriosHistorialQueryKey,
+  useAplicarDescuento,
+  useListDescuentos,
+  getListDescuentosQueryKey,
+  AplicarDescuentoInputTipo,
   type RecordatorioInputCanal,
   type RecordatorioInputMomento,
 } from "@workspace/api-client-react";
@@ -60,6 +64,8 @@ import {
   Trash2,
   CalendarClock,
   Pencil,
+  TicketPercent,
+  History,
 } from "lucide-react";
 import { CobroUpdateEstado } from "@workspace/api-client-react";
 
@@ -134,6 +140,66 @@ export default function CobroDetail() {
     setLinkTipo("total");
     setLinkMonto("");
     setLinkEmail("");
+  };
+
+  // --- Descuento / negociación ---
+  const aplicarDescuento = useAplicarDescuento();
+  const { data: descuentos, isLoading: isLoadingDescuentos } = useListDescuentos(id, {
+    query: { enabled: !!id, queryKey: getListDescuentosQueryKey(id) },
+  });
+  const [showDescuentoModal, setShowDescuentoModal] = useState(false);
+  const [descuentoTipo, setDescuentoTipo] = useState<"porcentaje" | "fijo">("porcentaje");
+  const [descuentoValor, setDescuentoValor] = useState("");
+  const [descuentoMotivo, setDescuentoMotivo] = useState("");
+  const [descuentoFechaVigencia, setDescuentoFechaVigencia] = useState("");
+
+  const resetDescuentoModal = () => {
+    setShowDescuentoModal(false);
+    setDescuentoTipo("porcentaje");
+    setDescuentoValor("");
+    setDescuentoMotivo("");
+    setDescuentoFechaVigencia("");
+  };
+
+  const handleAplicarDescuento = () => {
+    const valorNum = parseFloat(descuentoValor.replace(/\./g, "").replace(",", "."));
+    if (!valorNum || valorNum <= 0) {
+      toast({ title: "Valor inválido", description: "Ingresa un valor de descuento mayor a 0.", variant: "destructive" });
+      return;
+    }
+    if (descuentoTipo === "porcentaje" && valorNum > 100) {
+      toast({ title: "Porcentaje inválido", description: "El porcentaje no puede ser mayor a 100.", variant: "destructive" });
+      return;
+    }
+    if (!descuentoMotivo.trim()) {
+      toast({ title: "Motivo requerido", description: "Ingresa el motivo del descuento.", variant: "destructive" });
+      return;
+    }
+    aplicarDescuento.mutate(
+      {
+        id,
+        data: {
+          tipo: descuentoTipo === "porcentaje" ? AplicarDescuentoInputTipo.porcentaje : AplicarDescuentoInputTipo.fijo,
+          valor: valorNum,
+          motivo: descuentoMotivo.trim(),
+          ...(descuentoFechaVigencia ? { fechaVigencia: descuentoFechaVigencia } : {}),
+        },
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Descuento aplicado", description: "El descuento fue aplicado al cobro." });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListDescuentosQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
+          resetDescuentoModal();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo aplicar el descuento.";
+          toast({ title: "Error al aplicar descuento", description: msg, variant: "destructive" });
+        },
+      }
+    );
   };
 
   const handleStatusChange = (newStatus: string) => {
@@ -312,7 +378,8 @@ export default function CobroDetail() {
   const [showAbonoForm, setShowAbonoForm] = useState(false);
 
   const totalAbonado = (abonos ?? []).filter((a) => a.estado === "confirmado").reduce((acc, a) => acc + a.monto, 0);
-  const saldoPendiente = cobro ? cobro.monto - totalAbonado : 0;
+  const montoACobrar = cobro ? cobro.montoACobrar ?? cobro.monto - (cobro.montoDescuento ?? 0) : 0;
+  const saldoPendiente = cobro ? montoACobrar - totalAbonado : 0;
 
   const handleCrearAbono = () => {
     const montoNum = parseFloat(abonoMonto.replace(/\./g, "").replace(",", "."));
@@ -691,14 +758,178 @@ export default function CobroDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold font-mono text-primary tracking-tight">
-                {formatCurrency(cobro.monto)}
-              </div>
-              <div className="mt-6 pt-6 border-t border-primary/10">
+              {cobro.montoDescuento && cobro.montoDescuento > 0 ? (
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-muted-foreground">Monto original</span>
+                    <span className="text-sm font-mono text-muted-foreground line-through">
+                      {formatCurrency(cobro.monto)}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-amber-700">Descuento</span>
+                    <span className="text-sm font-mono text-amber-700">
+                      −{formatCurrency(cobro.montoDescuento)}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between pt-2 border-t border-primary/10">
+                    <span className="text-xs font-medium text-primary">Monto a cobrar</span>
+                    <span className="text-3xl font-bold font-mono text-primary tracking-tight">
+                      {formatCurrency(montoACobrar)}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-4xl font-bold font-mono text-primary tracking-tight">
+                  {formatCurrency(cobro.monto)}
+                </div>
+              )}
+              <div className="mt-6 pt-6 border-t border-primary/10 flex items-center justify-between gap-2">
                 <StatusBadge status={cobro.estado} />
+                {(cobro.estado === "pendiente" || cobro.estado === "parcial") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs border-amber-600/40 text-amber-700 hover:bg-amber-50 hover:border-amber-600"
+                    onClick={() => setShowDescuentoModal(true)}
+                  >
+                    <TicketPercent className="h-3.5 w-3.5 mr-1.5" />
+                    {cobro.montoDescuento && cobro.montoDescuento > 0 ? "Cambiar descuento" : "Aplicar descuento"}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
+
+          {/* Descuento modal */}
+          {showDescuentoModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+              onClick={resetDescuentoModal}
+            >
+              <Card
+                className="w-full max-w-md shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TicketPercent className="h-4 w-4 text-amber-600" />
+                    Aplicar descuento
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-md bg-muted/40 px-3 py-2 text-sm flex items-center justify-between">
+                    <span className="text-muted-foreground">Monto original</span>
+                    <span className="font-mono font-medium">{formatCurrency(cobro.monto)}</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Tipo de descuento</Label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDescuentoTipo("porcentaje")}
+                        className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${descuentoTipo === "porcentaje" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                      >
+                        Porcentaje (%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDescuentoTipo("fijo")}
+                        className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${descuentoTipo === "fijo" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                      >
+                        Monto fijo ($)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="descuentoValor" className="text-xs">
+                      {descuentoTipo === "porcentaje" ? "Porcentaje a descontar" : "Monto a descontar"}
+                    </Label>
+                    <Input
+                      id="descuentoValor"
+                      type="number"
+                      placeholder={descuentoTipo === "porcentaje" ? "Ej: 10" : "Ej: 5000"}
+                      min={descuentoTipo === "porcentaje" ? 1 : 1}
+                      max={descuentoTipo === "porcentaje" ? 100 : undefined}
+                      value={descuentoValor}
+                      onChange={(e) => setDescuentoValor(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+
+                  {(() => {
+                    const v = parseFloat(descuentoValor.replace(/\./g, "").replace(",", "."));
+                    if (!v || v <= 0) return null;
+                    const desc =
+                      descuentoTipo === "porcentaje"
+                        ? Math.round((cobro.monto * v) / 100)
+                        : Math.round(v);
+                    const final = cobro.monto - desc;
+                    return (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm space-y-1">
+                        <div className="flex justify-between text-amber-700">
+                          <span>Descuento</span>
+                          <span className="font-mono">−{formatCurrency(desc)}</span>
+                        </div>
+                        <div className="flex justify-between font-medium">
+                          <span>Monto a cobrar</span>
+                          <span className="font-mono">{formatCurrency(final > 0 ? final : 0)}</span>
+                        </div>
+                        {final <= 0 && (
+                          <p className="text-xs text-destructive pt-1">
+                            El descuento no puede ser igual o mayor al monto original.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="space-y-1">
+                    <Label htmlFor="descuentoMotivo" className="text-xs">Motivo</Label>
+                    <Input
+                      id="descuentoMotivo"
+                      placeholder="Ej: Negociación con el cliente"
+                      value={descuentoMotivo}
+                      onChange={(e) => setDescuentoMotivo(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="descuentoFecha" className="text-xs">
+                      Vigente hasta <span className="text-muted-foreground">(opcional)</span>
+                    </Label>
+                    <Input
+                      id="descuentoFecha"
+                      type="date"
+                      value={descuentoFechaVigencia}
+                      onChange={(e) => setDescuentoFechaVigencia(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="outline" className="flex-1" onClick={resetDescuentoModal}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={handleAplicarDescuento}
+                      disabled={aplicarDescuento.isPending}
+                    >
+                      {aplicarDescuento.isPending ? (
+                        <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Aplicando...</>
+                      ) : (
+                        "Aplicar descuento"
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Flow payment card */}
           <Card className="shadow-sm border-border/50">
@@ -1585,6 +1816,53 @@ export default function CobroDetail() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Historial de descuentos */}
+      <Card className="shadow-sm border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <History className="h-4 w-4 text-amber-600" />
+            Historial de descuentos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingDescuentos ? (
+            <div className="space-y-2">
+              {[1, 2].map((i) => <div key={i} className="h-14 bg-muted/40 rounded animate-pulse" />)}
+            </div>
+          ) : !descuentos || descuentos.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Sin descuentos aplicados.</p>
+          ) : (
+            <div className="space-y-2">
+              {descuentos.map((d) => (
+                <div key={d.id} className="rounded-md border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-sm font-semibold font-mono text-amber-700">
+                      −{formatCurrency(d.montoDescuento)}
+                    </span>
+                    <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full border bg-amber-100 text-amber-700 border-amber-200">
+                      {d.tipo === "porcentaje" ? `${d.valor}%` : "Monto fijo"}
+                    </span>
+                    <span className="text-xs font-mono text-muted-foreground ml-auto">
+                      {formatCurrency(d.montoOriginal)} → {formatCurrency(d.montoFinal)}
+                    </span>
+                  </div>
+                  <p className="text-xs mt-1">{d.motivo}</p>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <span className="text-[10px] text-muted-foreground">{formatDate(d.creadoEn)}</span>
+                    {d.aplicadoPorNombre && (
+                      <span className="text-[10px] text-muted-foreground">· {d.aplicadoPorNombre}</span>
+                    )}
+                    {d.fechaVigencia && (
+                      <span className="text-[10px] text-muted-foreground">· Vigente hasta {formatDateOnly(d.fechaVigencia)}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

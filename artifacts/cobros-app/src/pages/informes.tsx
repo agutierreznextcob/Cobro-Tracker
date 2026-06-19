@@ -37,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/format";
-import { Download, TrendingUp, Receipt, Percent, ListChecks } from "lucide-react";
+import { Download, TrendingUp, Receipt, Percent, ListChecks, TicketPercent, RefreshCcw } from "lucide-react";
 
 type Estado = "pendiente" | "pagado" | "parcial" | "fallido" | "cancelado";
 type Gran = "dia" | "semana" | "mes";
@@ -166,7 +166,8 @@ export default function Informes() {
     for (const c of filtered) {
       if (c.estado !== "pagado") continue;
       const key = bucketStart(parseISO(c.creadoEn), gran).getTime();
-      buckets.set(key, (buckets.get(key) ?? 0) + c.monto);
+      const recaudado = c.montoACobrar ?? c.monto - (c.montoDescuento ?? 0);
+      buckets.set(key, (buckets.get(key) ?? 0) + recaudado);
     }
     return [...buckets.entries()]
       .sort((a, b) => a[0] - b[0])
@@ -206,14 +207,57 @@ export default function Informes() {
     }));
   }, [filtered]);
 
+  const montoCobrar = (c: Cobro) => c.montoACobrar ?? c.monto - (c.montoDescuento ?? 0);
+  const tieneDescuento = (c: Cobro) => (c.montoDescuento ?? 0) > 0;
+
   const summary = useMemo(() => {
     const pagados = filtered.filter((c) => c.estado === "pagado");
-    const totalRecaudado = pagados.reduce((a, c) => a + c.monto, 0);
+    const totalRecaudado = pagados.reduce((a, c) => a + montoCobrar(c), 0);
     const countPagado = pagados.length;
     const totalCobros = filtered.length;
     const ticket = countPagado > 0 ? totalRecaudado / countPagado : 0;
     const tasa = totalCobros > 0 ? (countPagado / totalCobros) * 100 : 0;
-    return { totalRecaudado, countPagado, totalCobros, ticket, tasa };
+
+    // Discount metrics across all filtered cobros.
+    const conDescuento = filtered.filter(tieneDescuento);
+    const countConDescuento = conDescuento.length;
+    const totalDescuento = conDescuento.reduce((a, c) => a + (c.montoDescuento ?? 0), 0);
+
+    // Recovery rate: amount actually collected on paid cobros vs their original value.
+    const originalPagado = pagados.reduce((a, c) => a + c.monto, 0);
+    const tasaRecuperacion = originalPagado > 0 ? (totalRecaudado / originalPagado) * 100 : 0;
+
+    return {
+      totalRecaudado,
+      countPagado,
+      totalCobros,
+      ticket,
+      tasa,
+      countConDescuento,
+      totalDescuento,
+      tasaRecuperacion,
+    };
+  }, [filtered]);
+
+  // Paid cobros: full price vs. with discount (for the chart).
+  const recuperacionData = useMemo(() => {
+    const pagados = filtered.filter((c) => c.estado === "pagado");
+    const completos = pagados.filter((c) => !tieneDescuento(c));
+    const conDescuento = pagados.filter(tieneDescuento);
+    return [
+      {
+        name: "Pago completo",
+        cantidad: completos.length,
+        monto: completos.reduce((a, c) => a + montoCobrar(c), 0),
+        color: "#16a34a",
+      },
+      {
+        name: "Pago con descuento",
+        cantidad: conDescuento.length,
+        monto: conDescuento.reduce((a, c) => a + montoCobrar(c), 0),
+        color: "#f59e0b",
+      },
+    ];
   }, [filtered]);
 
   async function exportExcel() {
@@ -222,7 +266,9 @@ export default function Informes() {
       Fecha: format(parseISO(c.creadoEn), "dd-MM-yyyy HH:mm", { locale: es }),
       Descripción: c.descripcion,
       Cliente: c.clienteNombre ?? "",
-      Monto: c.monto,
+      "Monto original": c.monto,
+      "Descuento aplicado": c.montoDescuento ?? 0,
+      "Monto a cobrar": montoCobrar(c),
       Estado: ESTADO_META[c.estado as Estado]?.label ?? c.estado,
       Método: metodoLabel(c),
       Referencia: c.referencia ?? "",
@@ -232,6 +278,8 @@ export default function Informes() {
       { wch: 18 },
       { wch: 40 },
       { wch: 24 },
+      { wch: 14 },
+      { wch: 16 },
       { wch: 14 },
       { wch: 12 },
       { wch: 18 },
@@ -247,6 +295,9 @@ export default function Informes() {
       ["Total de cobros generados", summary.totalCobros],
       ["Ticket promedio (CLP)", Math.round(summary.ticket)],
       ["Tasa de cobro efectiva (%)", Number(summary.tasa.toFixed(1))],
+      ["Cobros con descuento", summary.countConDescuento],
+      ["Total descontado (CLP)", Math.round(summary.totalDescuento)],
+      ["Tasa de recuperación (%)", Number(summary.tasaRecuperacion.toFixed(1))],
       [],
       ["Cobros por estado", "Cantidad"],
       ...estadoData.map((e) => [e.label, e.cantidad]),
@@ -351,7 +402,7 @@ export default function Informes() {
       </Card>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <SummaryCard
           icon={<TrendingUp className="h-4 w-4" />}
           label="Total recaudado"
@@ -368,6 +419,20 @@ export default function Informes() {
           label="Tasa de cobro efectiva"
           value={`${summary.tasa.toFixed(1)}%`}
           sub={`${summary.countPagado} de ${summary.totalCobros} pagados`}
+        />
+        <SummaryCard
+          icon={<RefreshCcw className="h-4 w-4" />}
+          label="Tasa de recuperación"
+          value={`${summary.tasaRecuperacion.toFixed(1)}%`}
+          sub="Recaudado vs. monto original (pagados)"
+          accent="text-emerald-600"
+        />
+        <SummaryCard
+          icon={<TicketPercent className="h-4 w-4" />}
+          label="Cobros con descuento"
+          value={String(summary.countConDescuento)}
+          sub={`${formatCurrency(summary.totalDescuento)} descontado`}
+          accent="text-amber-600"
         />
         <SummaryCard
           icon={<ListChecks className="h-4 w-4" />}
@@ -497,6 +562,40 @@ export default function Informes() {
           )}
         </Card>
       </div>
+
+      {/* Recuperación: pago completo vs. con descuento */}
+      <Card className="p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold">Cobros pagados: completo vs. con descuento</h2>
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+            Monto recaudado
+          </span>
+        </div>
+        {sinDatos || summary.countPagado === 0 ? (
+          <EmptyChart />
+        ) : (
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={recuperacionData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={compactCLP} width={48} />
+              <Tooltip
+                formatter={(v: number, _n, item) => [
+                  `${formatCurrency(v)} · ${item?.payload?.cantidad ?? 0} cobro${(item?.payload?.cantidad ?? 0) !== 1 ? "s" : ""}`,
+                  "Recaudado",
+                ]}
+                contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                cursor={{ fill: "hsl(var(--muted))" }}
+              />
+              <Bar dataKey="monto" radius={[3, 3, 0, 0]}>
+                {recuperacionData.map((d) => (
+                  <Cell key={d.name} fill={d.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </Card>
     </div>
   );
 }

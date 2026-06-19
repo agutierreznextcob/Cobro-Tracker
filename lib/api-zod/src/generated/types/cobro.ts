@@ -9,8 +9,15 @@ import type { CobroEstado } from './cobroEstado';
 
 export interface Cobro {
   id: number;
-  /** Amount in currency units */
+  /** Original amount in currency units */
   monto: number;
+  /**
+     * Current effective discount amount in currency units (absolute)
+     * @nullable
+     */
+  montoDescuento?: number | null;
+  /** Net amount to charge after the current discount (monto - montoDescuento) */
+  montoACobrar?: number;
   descripcion: string;
   estado: CobroEstado;
   /**

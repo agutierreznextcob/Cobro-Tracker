@@ -115,8 +115,15 @@ export const CobroEstado = {
 
 export interface Cobro {
   id: number;
-  /** Amount in currency units */
+  /** Original amount in currency units */
   monto: number;
+  /**
+     * Current effective discount amount in currency units (absolute)
+     * @nullable
+     */
+  montoDescuento?: number | null;
+  /** Net amount to charge after the current discount (monto - montoDescuento) */
+  montoACobrar?: number;
   descripcion: string;
   estado: CobroEstado;
   /**
@@ -227,6 +234,57 @@ export interface CobroInput {
      * @pattern ^\d{4}-\d{2}-\d{2}$
      */
   fechaVencimiento?: string;
+}
+
+export type AplicarDescuentoInputTipo = typeof AplicarDescuentoInputTipo[keyof typeof AplicarDescuentoInputTipo];
+
+
+export const AplicarDescuentoInputTipo = {
+  porcentaje: 'porcentaje',
+  fijo: 'fijo',
+} as const;
+
+export interface AplicarDescuentoInput {
+  tipo: AplicarDescuentoInputTipo;
+  /**
+     * Percentage (1-100) when tipo=porcentaje, or fixed currency amount when tipo=fijo
+     * @minimum 0.01
+     */
+  valor: number;
+  /**
+     * Reason for the discount (e.g. negotiation)
+     * @minLength 1
+     */
+  motivo: string;
+  /**
+     * Optional validity date (YYYY-MM-DD) until which the discount is valid
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  fechaVigencia?: string;
+}
+
+export type DescuentoTipo = typeof DescuentoTipo[keyof typeof DescuentoTipo];
+
+
+export const DescuentoTipo = {
+  porcentaje: 'porcentaje',
+  fijo: 'fijo',
+} as const;
+
+export interface Descuento {
+  id: number;
+  cobroId: number;
+  tipo: DescuentoTipo;
+  valor: number;
+  montoDescuento: number;
+  montoOriginal: number;
+  montoFinal: number;
+  motivo: string;
+  /** @nullable */
+  fechaVigencia?: string | null;
+  /** @nullable */
+  aplicadoPorNombre?: string | null;
+  creadoEn: string;
 }
 
 export type AvisarClienteInputTipo = typeof AvisarClienteInputTipo[keyof typeof AvisarClienteInputTipo];

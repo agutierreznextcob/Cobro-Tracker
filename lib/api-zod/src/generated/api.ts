@@ -157,7 +157,9 @@ export const GetClienteResponse = zod.object({
   "actualizadoEn": zod.coerce.date(),
   "cobros": zod.array(zod.object({
   "id": zod.number(),
-  "monto": zod.number().describe('Amount in currency units'),
+  "monto": zod.number().describe('Original amount in currency units'),
+  "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
+  "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
@@ -349,7 +351,9 @@ export const listCobrosResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{
 
 export const ListCobrosResponseItem = zod.object({
   "id": zod.number(),
-  "monto": zod.number().describe('Amount in currency units'),
+  "monto": zod.number().describe('Original amount in currency units'),
+  "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
+  "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
@@ -400,7 +404,9 @@ export const getCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}
 
 export const GetCobroResponse = zod.object({
   "id": zod.number(),
-  "monto": zod.number().describe('Amount in currency units'),
+  "monto": zod.number().describe('Original amount in currency units'),
+  "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
+  "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
@@ -442,7 +448,9 @@ export const updateCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d
 
 export const UpdateCobroResponse = zod.object({
   "id": zod.number(),
-  "monto": zod.number().describe('Amount in currency units'),
+  "monto": zod.number().describe('Original amount in currency units'),
+  "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
+  "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
@@ -676,6 +684,75 @@ export const ConfirmarAbonoResponse = zod.object({
   "notas": zod.string().nullish(),
   "creadoEn": zod.coerce.date(),
   "confirmadoEn": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary List discount history for a cobro
+ */
+export const ListDescuentosParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListDescuentosResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "tipo": zod.enum(['porcentaje', 'fijo']),
+  "valor": zod.number(),
+  "montoDescuento": zod.number(),
+  "montoOriginal": zod.number(),
+  "montoFinal": zod.number(),
+  "motivo": zod.string(),
+  "fechaVigencia": zod.string().nullish(),
+  "aplicadoPorNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListDescuentosResponse = zod.array(ListDescuentosResponseItem)
+
+
+/**
+ * @summary Apply a discount to a cobro
+ */
+export const AplicarDescuentoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const aplicarDescuentoBodyValorMin = 0.01;
+
+
+export const aplicarDescuentoBodyFechaVigenciaRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const AplicarDescuentoBody = zod.object({
+  "tipo": zod.enum(['porcentaje', 'fijo']),
+  "valor": zod.number().min(aplicarDescuentoBodyValorMin).describe('Percentage (1-100) when tipo=porcentaje, or fixed currency amount when tipo=fijo'),
+  "motivo": zod.string().min(1).describe('Reason for the discount (e.g. negotiation)'),
+  "fechaVigencia": zod.string().regex(aplicarDescuentoBodyFechaVigenciaRegExp).optional().describe('Optional validity date (YYYY-MM-DD) until which the discount is valid')
+})
+
+export const aplicarDescuentoResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const AplicarDescuentoResponse = zod.object({
+  "id": zod.number(),
+  "monto": zod.number().describe('Original amount in currency units'),
+  "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
+  "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
+  "descripcion": zod.string(),
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
+  "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
+  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
+  "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
+  "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "fechaVencimiento": zod.string().regex(aplicarDescuentoResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
+  "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
+  "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
+  "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date().optional()
 })
 
 

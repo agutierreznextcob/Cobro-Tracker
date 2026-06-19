@@ -28,6 +28,7 @@ import type {
   AiConversationInput,
   AiConversationWithMessages,
   AiMessageInput,
+  AplicarDescuentoInput,
   AuthUser,
   AuthUserEnvelope,
   AvisarClienteInput,
@@ -42,6 +43,7 @@ import type {
   CobrosSummary,
   CompletarPerfilInput,
   DashboardMetricas,
+  Descuento,
   ErrorEnvelope,
   ErrorResponse,
   FlowCredentialsInput,
@@ -2661,6 +2663,155 @@ export const useConfirmarAbono = <TError = ErrorType<ErrorResponse | void>,
         TContext
       > => {
       return useMutation(getConfirmarAbonoMutationOptions(options));
+    }
+
+export const getListDescuentosUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/descuentos`
+}
+
+/**
+ * @summary List discount history for a cobro
+ */
+export const listDescuentos = async (id: number, options?: RequestInit): Promise<Descuento[]> => {
+
+  return customFetch<Descuento[]>(getListDescuentosUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDescuentosQueryKey = (id: number,) => {
+    return [
+    `/api/cobros/${id}/descuentos`
+    ] as const;
+    }
+
+
+export const getListDescuentosQueryOptions = <TData = Awaited<ReturnType<typeof listDescuentos>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDescuentos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDescuentosQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDescuentos>>> = ({ signal }) => listDescuentos(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDescuentos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDescuentosQueryResult = NonNullable<Awaited<ReturnType<typeof listDescuentos>>>
+export type ListDescuentosQueryError = ErrorType<void>
+
+
+/**
+ * @summary List discount history for a cobro
+ */
+
+export function useListDescuentos<TData = Awaited<ReturnType<typeof listDescuentos>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDescuentos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDescuentosQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAplicarDescuentoUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/descuentos`
+}
+
+/**
+ * @summary Apply a discount to a cobro
+ */
+export const aplicarDescuento = async (id: number,
+    aplicarDescuentoInput: AplicarDescuentoInput, options?: RequestInit): Promise<Cobro> => {
+
+  return customFetch<Cobro>(getAplicarDescuentoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      aplicarDescuentoInput,)
+  }
+);}
+
+
+
+
+export const getAplicarDescuentoMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aplicarDescuento>>, TError,{id: number;data: BodyType<AplicarDescuentoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof aplicarDescuento>>, TError,{id: number;data: BodyType<AplicarDescuentoInput>}, TContext> => {
+
+const mutationKey = ['aplicarDescuento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof aplicarDescuento>>, {id: number;data: BodyType<AplicarDescuentoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  aplicarDescuento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AplicarDescuentoMutationResult = NonNullable<Awaited<ReturnType<typeof aplicarDescuento>>>
+    export type AplicarDescuentoMutationBody = BodyType<AplicarDescuentoInput>
+    export type AplicarDescuentoMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Apply a discount to a cobro
+ */
+export const useAplicarDescuento = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aplicarDescuento>>, TError,{id: number;data: BodyType<AplicarDescuentoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof aplicarDescuento>>,
+        TError,
+        {id: number;data: BodyType<AplicarDescuentoInput>},
+        TContext
+      > => {
+      return useMutation(getAplicarDescuentoMutationOptions(options));
     }
 
 export const getGetMpCredentialsUrl = () => {

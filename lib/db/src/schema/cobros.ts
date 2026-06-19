@@ -14,6 +14,7 @@ export const estadoCobroEnum = pgEnum("estado_cobro", [
 export const cobrosTable = pgTable("cobros", {
   id: serial("id").primaryKey(),
   monto: numeric("monto", { precision: 12, scale: 2 }).notNull(),
+  montoDescuento: numeric("monto_descuento", { precision: 12, scale: 2 }),
   descripcion: text("descripcion").notNull(),
   estado: estadoCobroEnum("estado").notNull().default("pendiente"),
   referencia: text("referencia"),

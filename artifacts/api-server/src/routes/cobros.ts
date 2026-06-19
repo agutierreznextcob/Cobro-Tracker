@@ -2,12 +2,14 @@ import { Router } from "express";
 import {
   db,
   cobrosTable,
+  cobroDescuentosTable,
   clientesTable,
   seguimientosCobranzaTable,
   pagosParciales,
   recordatoriosTable,
   recordatoriosEnviadosTable,
 } from "@workspace/db";
+import type { Cobro, CobroDescuento } from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt } from "drizzle-orm";
 import {
   CreateCobroBody,
@@ -16,6 +18,7 @@ import {
   UpdateCobroParams,
   CreateRecordatorioBody,
   UpdateRecordatorioBody,
+  AplicarDescuentoBody,
 } from "@workspace/api-zod";
 import { z } from "zod";
 import { getFlowCredentials, getMpCredentials } from "./profile";
@@ -27,18 +30,52 @@ import { aplicarDefaultsACobro } from "../lib/recordatorios";
 
 const cobrosRouter = Router();
 
+// Net amount to charge after the current effective discount.
+function montoACobrar(cobro: Pick<Cobro, "monto" | "montoDescuento">): number {
+  return Number(cobro.monto) - Number(cobro.montoDescuento ?? 0);
+}
+
+// Standard JSON serialization for a cobro response (numeric + date conversions
+// plus the derived montoACobrar field).
+function serializeCobro(cobro: Cobro) {
+  return {
+    ...cobro,
+    monto: Number(cobro.monto),
+    montoDescuento: cobro.montoDescuento != null ? Number(cobro.montoDescuento) : null,
+    montoACobrar: montoACobrar(cobro),
+    creadoEn: cobro.creadoEn.toISOString(),
+    actualizadoEn: cobro.actualizadoEn.toISOString(),
+  };
+}
+
+function serializeDescuento(d: CobroDescuento) {
+  return {
+    id: d.id,
+    cobroId: d.cobroId,
+    tipo: d.tipo,
+    valor: Number(d.valor),
+    montoDescuento: Number(d.montoDescuento),
+    montoOriginal: Number(d.montoOriginal),
+    montoFinal: Number(d.montoFinal),
+    motivo: d.motivo,
+    fechaVigencia: d.fechaVigencia ?? null,
+    aplicadoPorNombre: d.aplicadoPorNombre ?? null,
+    creadoEn: d.creadoEn.toISOString(),
+  };
+}
+
 async function recalcularEstadoCobro(cobroId: number): Promise<void> {
   const [result] = await db
     .select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
     .from(pagosParciales)
     .where(and(eq(pagosParciales.cobroId, cobroId), eq(pagosParciales.estado, "confirmado")));
   const [cobro] = await db
-    .select({ monto: cobrosTable.monto })
+    .select({ monto: cobrosTable.monto, montoDescuento: cobrosTable.montoDescuento })
     .from(cobrosTable)
     .where(eq(cobrosTable.id, cobroId));
   if (!cobro) return;
   const totalPagado = result?.total ?? 0;
-  const montoTotal = Number(cobro.monto);
+  const montoTotal = montoACobrar(cobro);
   const nuevoEstado: "pagado" | "parcial" | "pendiente" =
     totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
   await db.update(cobrosTable).set({ estado: nuevoEstado, actualizadoEn: new Date() }).where(eq(cobrosTable.id, cobroId));
@@ -73,14 +110,7 @@ cobrosRouter.get("/cobros", async (req, res) => {
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(cobrosTable.creadoEn));
 
-    res.json(
-      cobros.map((c) => ({
-        ...c,
-        monto: Number(c.monto),
-        creadoEn: c.creadoEn.toISOString(),
-        actualizadoEn: c.actualizadoEn.toISOString(),
-      })),
-    );
+    res.json(cobros.map(serializeCobro));
   } catch (err) {
     req.log.error({ err }, "Error listing cobros");
     res.status(500).json({ error: "Error interno del servidor" });
@@ -136,12 +166,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
       }
     }
 
-    res.status(201).json({
-      ...cobro,
-      monto: Number(cobro.monto),
-      creadoEn: cobro.creadoEn.toISOString(),
-      actualizadoEn: cobro.actualizadoEn.toISOString(),
-    });
+    res.status(201).json(serializeCobro(cobro));
   } catch (err) {
     req.log.error({ err }, "Error creating cobro");
     res.status(500).json({ error: "Error interno del servidor" });
@@ -195,14 +220,122 @@ cobrosRouter.get("/cobros/:id", async (req, res) => {
       return;
     }
 
-    res.json({
-      ...cobro,
-      monto: Number(cobro.monto),
-      creadoEn: cobro.creadoEn.toISOString(),
-      actualizadoEn: cobro.actualizadoEn.toISOString(),
-    });
+    res.json(serializeCobro(cobro));
   } catch (err) {
     req.log.error({ err }, "Error getting cobro");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// --- Descuentos ---
+
+cobrosRouter.get("/cobros/:id/descuentos", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  try {
+    const [cobro] = await db
+      .select({ id: cobrosTable.id })
+      .from(cobrosTable)
+      .where(eq(cobrosTable.id, paramsParsed.data.id));
+    if (!cobro) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+    const descuentos = await db
+      .select()
+      .from(cobroDescuentosTable)
+      .where(eq(cobroDescuentosTable.cobroId, paramsParsed.data.id))
+      .orderBy(desc(cobroDescuentosTable.creadoEn));
+    res.json(descuentos.map(serializeDescuento));
+  } catch (err) {
+    req.log.error({ err }, "Error listing descuentos");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+cobrosRouter.post("/cobros/:id/descuentos", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const bodyParsed = AplicarDescuentoBody.safeParse(req.body);
+  if (!bodyParsed.success) {
+    res.status(400).json({ error: bodyParsed.error.message });
+    return;
+  }
+  const { tipo, valor, motivo, fechaVigencia } = bodyParsed.data;
+
+  try {
+    const [cobro] = await db
+      .select()
+      .from(cobrosTable)
+      .where(eq(cobrosTable.id, paramsParsed.data.id));
+    if (!cobro) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+    if (cobro.estado === "pagado" || cobro.estado === "cancelado") {
+      res.status(400).json({ error: "No se puede aplicar un descuento a un cobro pagado o cancelado." });
+      return;
+    }
+
+    const montoOriginal = Number(cobro.monto);
+    if (tipo === "porcentaje" && valor > 100) {
+      res.status(400).json({ error: "El porcentaje de descuento no puede ser mayor a 100." });
+      return;
+    }
+
+    const descuentoAbsoluto =
+      tipo === "porcentaje" ? Math.round((montoOriginal * valor) / 100) : Math.round(valor);
+
+    if (descuentoAbsoluto <= 0) {
+      res.status(400).json({ error: "El descuento debe ser mayor a 0." });
+      return;
+    }
+    if (descuentoAbsoluto >= montoOriginal) {
+      res.status(400).json({ error: "El descuento no puede ser igual o mayor al monto original del cobro." });
+      return;
+    }
+
+    const montoFinal = montoOriginal - descuentoAbsoluto;
+    const user = req.user!;
+    const aplicadoPorNombre =
+      [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null;
+
+    await db.insert(cobroDescuentosTable).values({
+      cobroId: cobro.id,
+      tipo,
+      valor: String(valor),
+      montoDescuento: String(descuentoAbsoluto),
+      montoOriginal: String(montoOriginal),
+      montoFinal: String(montoFinal),
+      motivo,
+      fechaVigencia: fechaVigencia ?? null,
+      aplicadoPorId: user.id,
+      aplicadoPorNombre,
+    });
+
+    const [updated] = await db
+      .update(cobrosTable)
+      .set({ montoDescuento: String(descuentoAbsoluto), actualizadoEn: new Date() })
+      .where(eq(cobrosTable.id, cobro.id))
+      .returning();
+
+    // Re-evaluate estado in case confirmed abonos already cover the new lower amount.
+    await recalcularEstadoCobro(cobro.id);
+    const [refreshed] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, cobro.id));
+
+    req.log.info(
+      { cobroId: cobro.id, tipo, descuentoAbsoluto, montoFinal },
+      "Descuento aplicado al cobro",
+    );
+    res.json(serializeCobro(refreshed ?? updated));
+  } catch (err) {
+    req.log.error({ err }, "Error applying descuento");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });
@@ -256,7 +389,7 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
       commerceOrder: `cobro-${cobro.id}`,
       subject: cobro.descripcion.slice(0, 200),
       currency: "CLP",
-      amount: Math.round(Number(cobro.monto)),
+      amount: Math.round(montoACobrar(cobro)),
       email: bodyParsed.data.emailPagador,
       urlConfirmation: `${baseUrl}/api/webhooks/flow`,
       urlReturn: `${baseUrl}/cobros/${cobro.id}`,
@@ -281,7 +414,7 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
       emailPagador: bodyParsed.data.emailPagador,
       clienteNombre: cobro.clienteNombre,
       descripcion: cobro.descripcion,
-      monto: Number(cobro.monto),
+      monto: montoACobrar(cobro),
       linkPago: result.url,
       comercioNombre: cobro.responsableNombre || "Cobro Simple",
     }, req.log).catch((err) => {
@@ -332,7 +465,7 @@ cobrosRouter.post("/cobros/:id/mp-link", async (req, res) => {
     const result = await crearPreferenciaMp(accessToken, {
       title: cobro.descripcion.slice(0, 256),
       quantity: 1,
-      unitPrice: Math.round(Number(cobro.monto)),
+      unitPrice: Math.round(montoACobrar(cobro)),
       externalReference: `cobro-${cobro.id}`,
       notificationUrl: `${baseUrl}/api/webhooks/mercadopago`,
       backUrl: `${baseUrl}/cobros/${cobro.id}`,
@@ -558,12 +691,7 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
       }
     }
 
-    res.json({
-      ...cobro,
-      monto: Number(cobro.monto),
-      creadoEn: cobro.creadoEn.toISOString(),
-      actualizadoEn: cobro.actualizadoEn.toISOString(),
-    });
+    res.json(serializeCobro(cobro));
   } catch (err) {
     req.log.error({ err }, "Error updating cobro");
     res.status(500).json({ error: "Error interno del servidor" });

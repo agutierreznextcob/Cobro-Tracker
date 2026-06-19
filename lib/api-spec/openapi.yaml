@@ -870,6 +870,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /cobros/{id}/descuentos:
+    get:
+      operationId: listDescuentos
+      tags: [cobros]
+      summary: List discount history for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of discounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Descuento"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Cobro not found
+
+    post:
+      operationId: aplicarDescuento
+      tags: [cobros]
+      summary: Apply a discount to a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AplicarDescuentoInput"
+      responses:
+        "200":
+          description: Discount applied, returns updated cobro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cobro"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Cobro not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /profile/mp-credentials:
     get:
       operationId: getMpCredentials
@@ -1618,7 +1681,13 @@ components:
           type: integer
         monto:
           type: number
-          description: Amount in currency units
+          description: Original amount in currency units
+        montoDescuento:
+          type: ["number", "null"]
+          description: Current effective discount amount in currency units (absolute)
+        montoACobrar:
+          type: number
+          description: Net amount to charge after the current discount (monto - montoDescuento)
         descripcion:
           type: string
         estado:
@@ -1687,6 +1756,55 @@ components:
           type: string
           pattern: '^\d{4}-\d{2}-\d{2}$'
           description: Due date (YYYY-MM-DD) used to schedule reminders
+
+    AplicarDescuentoInput:
+      type: object
+      required: [tipo, valor, motivo]
+      properties:
+        tipo:
+          type: string
+          enum: [porcentaje, fijo]
+        valor:
+          type: number
+          minimum: 0.01
+          description: Percentage (1-100) when tipo=porcentaje, or fixed currency amount when tipo=fijo
+        motivo:
+          type: string
+          minLength: 1
+          description: Reason for the discount (e.g. negotiation)
+        fechaVigencia:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Optional validity date (YYYY-MM-DD) until which the discount is valid
+
+    Descuento:
+      type: object
+      required: [id, cobroId, tipo, valor, montoDescuento, montoOriginal, montoFinal, motivo, creadoEn]
+      properties:
+        id:
+          type: integer
+        cobroId:
+          type: integer
+        tipo:
+          type: string
+          enum: [porcentaje, fijo]
+        valor:
+          type: number
+        montoDescuento:
+          type: number
+        montoOriginal:
+          type: number
+        montoFinal:
+          type: number
+        motivo:
+          type: string
+        fechaVigencia:
+          type: ["string", "null"]
+        aplicadoPorNombre:
+          type: ["string", "null"]
+        creadoEn:
+          type: string
+          format: date-time
 
     AvisarClienteInput:
       type: object
