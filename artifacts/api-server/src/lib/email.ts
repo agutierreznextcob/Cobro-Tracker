@@ -274,6 +274,83 @@ export async function sendRenovacionEmail(
   return { ok: true };
 }
 
+export interface SecuenciaRecordatorioData {
+  emailPagador: string;
+  clienteNombre: string | null;
+  descripcion: string;
+  monto: number;
+  comercioNombre: string;
+  linkPago?: string | null;
+  /** Días respecto al vencimiento: negativo = antes, 0 = vence hoy, positivo = vencido hace N días */
+  diasVencido: number;
+}
+
+export async function sendSecuenciaRecordatorioEmail(
+  data: SecuenciaRecordatorioData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping sequence reminder email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const montoFormato = formatCLP(data.monto);
+  const nombre = data.clienteNombre || "cliente";
+  const d = data.diasVencido;
+
+  let subject: string;
+  let heading: string;
+  let intro: string;
+  if (d < 0) {
+    const dias = Math.abs(d);
+    subject = `Tu pago de ${montoFormato} vence ${dias === 1 ? "mañana" : `en ${dias} días`} — ${data.comercioNombre}`;
+    heading = `Recordatorio: tu pago vence pronto ⏰`;
+    intro = `Te recordamos que tienes un cobro de <strong>${data.comercioNombre}</strong> que vence ${dias === 1 ? "<strong>mañana</strong>" : `en <strong>${dias} días</strong>`}:`;
+  } else if (d === 0) {
+    subject = `Tu pago de ${montoFormato} vence hoy — ${data.comercioNombre}`;
+    heading = `Tu pago vence hoy, ${nombre} 🔔`;
+    intro = `Hoy es el último día para pagar tu cobro de <strong>${data.comercioNombre}</strong>:`;
+  } else {
+    subject = `Pago vencido de ${montoFormato} — ${data.comercioNombre}`;
+    heading = `Tu pago está vencido, ${nombre}`;
+    intro = `Tu cobro de <strong>${data.comercioNombre}</strong> venció hace <strong>${d} ${d === 1 ? "día" : "días"}</strong>. Te pedimos regularizarlo a la brevedad:`;
+  }
+
+  const tieneLink = !!data.linkPago;
+
+  const { error } = await client.emails.send({
+    from: FROM,
+    to: [data.emailPagador],
+    subject,
+    html: buildEmailHtml({
+      title: subject,
+      previewText: `${intro.replace(/<[^>]+>/g, "")}`,
+      heading,
+      bodyLines: [
+        intro,
+        `<span style="display:block;background:#fef9c3;border-radius:8px;padding:12px 16px;font-size:14px;color:#09090b;border-left:3px solid #eab308;">
+          <strong>Concepto:</strong> ${data.descripcion}<br/>
+          <strong>Monto:</strong> <span style="font-family:monospace;font-weight:700;color:#2563eb;">${montoFormato}</span>
+        </span>`,
+        tieneLink
+          ? `Puedes pagar de forma rápida y segura haciendo clic en el botón a continuación.`
+          : `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
+      ],
+      ctaText: tieneLink ? `Pagar ${montoFormato}` : `Responder al cobro`,
+      ctaUrl: tieneLink ? data.linkPago! : `mailto:hola@cobrosimple.cl`,
+      footerNote: `Si ya realizaste el pago, ignora este mensaje.`,
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending sequence reminder email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
 export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn: (obj: object, msg: string) => void }): Promise<EmailResult> {
   const client = getResend();
   if (!client) {

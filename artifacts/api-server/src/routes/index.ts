@@ -6,6 +6,8 @@ import clientesRouter from "./clientes";
 import liquidacionesRouter from "./liquidaciones";
 import aiRouter from "./ai";
 import webhooksRouter from "./webhooks";
+import recordatoriosRouter from "./recordatorios";
+import notificacionesRouter from "./notificaciones";
 import { profileRouter } from "./profile";
 import { subscriptionRouter } from "./subscription";
 import { adminRouter } from "./admin";
@@ -18,6 +20,8 @@ router.use(authRouter);
 // auth middleware (Router.use without a path) that would otherwise intercept
 // every request including public webhook paths like /webhooks/flow.
 router.use(webhooksRouter);
+router.use(recordatoriosRouter);
+router.use(notificacionesRouter);
 router.use(cobrosRouter);
 router.use(clientesRouter);
 router.use(liquidacionesRouter);

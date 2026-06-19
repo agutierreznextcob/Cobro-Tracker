@@ -15,4 +15,6 @@ export interface CobroInput {
   /** Associate an existing cliente */
   clienteId?: number;
   emailPagador?: string;
+  /** Due date (YYYY-MM-DD) used to schedule reminders */
+  fechaVencimiento?: Date;
 }

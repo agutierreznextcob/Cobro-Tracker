@@ -56,6 +56,7 @@ import type {
   ListClientesParams,
   ListCobrosParams,
   ListLiquidacionesParams,
+  ListNotificacionesParams,
   ListWebhookEventosParams,
   LogoutSuccess,
   MobileTokenExchangeRequest,
@@ -63,7 +64,14 @@ import type {
   MpCredentialsInput,
   MpCredentialsStatus,
   MpLinkResponse,
+  Notificacion,
   OkResponse,
+  Recordatorio,
+  RecordatorioDefault,
+  RecordatorioEnviado,
+  RecordatorioInput,
+  RecordatoriosDefaultInput,
+  RecordatoriosRunResult,
   SeguimientoCobranza,
   SubscribeResponse,
   SubscriptionStatus,
@@ -3605,5 +3613,675 @@ export const useSendAdminRecordatorioEmail = <TError = ErrorType<AdminRecordator
         TContext
       > => {
       return useMutation(getSendAdminRecordatorioEmailMutationOptions(options));
+    }
+
+export const getListRecordatoriosUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/recordatorios`
+}
+
+/**
+ * @summary List automatic reminder rules for a cobro
+ */
+export const listRecordatorios = async (id: number, options?: RequestInit): Promise<Recordatorio[]> => {
+
+  return customFetch<Recordatorio[]>(getListRecordatoriosUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRecordatoriosQueryKey = (id: number,) => {
+    return [
+    `/api/cobros/${id}/recordatorios`
+    ] as const;
+    }
+
+
+export const getListRecordatoriosQueryOptions = <TData = Awaited<ReturnType<typeof listRecordatorios>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRecordatorios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRecordatoriosQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRecordatorios>>> = ({ signal }) => listRecordatorios(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRecordatorios>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRecordatoriosQueryResult = NonNullable<Awaited<ReturnType<typeof listRecordatorios>>>
+export type ListRecordatoriosQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List automatic reminder rules for a cobro
+ */
+
+export function useListRecordatorios<TData = Awaited<ReturnType<typeof listRecordatorios>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRecordatorios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRecordatoriosQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateRecordatorioUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/recordatorios`
+}
+
+/**
+ * @summary Add an automatic reminder rule to a cobro
+ */
+export const createRecordatorio = async (id: number,
+    recordatorioInput: RecordatorioInput, options?: RequestInit): Promise<Recordatorio> => {
+
+  return customFetch<Recordatorio>(getCreateRecordatorioUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      recordatorioInput,)
+  }
+);}
+
+
+
+
+export const getCreateRecordatorioMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRecordatorio>>, TError,{id: number;data: BodyType<RecordatorioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRecordatorio>>, TError,{id: number;data: BodyType<RecordatorioInput>}, TContext> => {
+
+const mutationKey = ['createRecordatorio'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRecordatorio>>, {id: number;data: BodyType<RecordatorioInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createRecordatorio(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRecordatorioMutationResult = NonNullable<Awaited<ReturnType<typeof createRecordatorio>>>
+    export type CreateRecordatorioMutationBody = BodyType<RecordatorioInput>
+    export type CreateRecordatorioMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Add an automatic reminder rule to a cobro
+ */
+export const useCreateRecordatorio = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRecordatorio>>, TError,{id: number;data: BodyType<RecordatorioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRecordatorio>>,
+        TError,
+        {id: number;data: BodyType<RecordatorioInput>},
+        TContext
+      > => {
+      return useMutation(getCreateRecordatorioMutationOptions(options));
+    }
+
+export const getDeleteRecordatorioUrl = (id: number,
+    recordatorioId: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/recordatorios/${recordatorioId}`
+}
+
+/**
+ * @summary Delete an automatic reminder rule
+ */
+export const deleteRecordatorio = async (id: number,
+    recordatorioId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteRecordatorioUrl(id,recordatorioId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteRecordatorioMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecordatorio>>, TError,{id: number;recordatorioId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteRecordatorio>>, TError,{id: number;recordatorioId: number}, TContext> => {
+
+const mutationKey = ['deleteRecordatorio'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteRecordatorio>>, {id: number;recordatorioId: number}> = (props) => {
+          const {id,recordatorioId} = props ?? {};
+
+          return  deleteRecordatorio(id,recordatorioId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteRecordatorioMutationResult = NonNullable<Awaited<ReturnType<typeof deleteRecordatorio>>>
+
+    export type DeleteRecordatorioMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete an automatic reminder rule
+ */
+export const useDeleteRecordatorio = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecordatorio>>, TError,{id: number;recordatorioId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteRecordatorio>>,
+        TError,
+        {id: number;recordatorioId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteRecordatorioMutationOptions(options));
+    }
+
+export const getListRecordatoriosHistorialUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/recordatorios/historial`
+}
+
+/**
+ * @summary List the reminder sending history for a cobro
+ */
+export const listRecordatoriosHistorial = async (id: number, options?: RequestInit): Promise<RecordatorioEnviado[]> => {
+
+  return customFetch<RecordatorioEnviado[]>(getListRecordatoriosHistorialUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRecordatoriosHistorialQueryKey = (id: number,) => {
+    return [
+    `/api/cobros/${id}/recordatorios/historial`
+    ] as const;
+    }
+
+
+export const getListRecordatoriosHistorialQueryOptions = <TData = Awaited<ReturnType<typeof listRecordatoriosHistorial>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRecordatoriosHistorial>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRecordatoriosHistorialQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRecordatoriosHistorial>>> = ({ signal }) => listRecordatoriosHistorial(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRecordatoriosHistorial>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRecordatoriosHistorialQueryResult = NonNullable<Awaited<ReturnType<typeof listRecordatoriosHistorial>>>
+export type ListRecordatoriosHistorialQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the reminder sending history for a cobro
+ */
+
+export function useListRecordatoriosHistorial<TData = Awaited<ReturnType<typeof listRecordatoriosHistorial>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRecordatoriosHistorial>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRecordatoriosHistorialQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRecordatoriosDefaultUrl = () => {
+
+
+
+
+  return `/api/recordatorios/default`
+}
+
+/**
+ * @summary Get the editable default reminder sequence for the current user
+ */
+export const getRecordatoriosDefault = async ( options?: RequestInit): Promise<RecordatorioDefault[]> => {
+
+  return customFetch<RecordatorioDefault[]>(getGetRecordatoriosDefaultUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRecordatoriosDefaultQueryKey = () => {
+    return [
+    `/api/recordatorios/default`
+    ] as const;
+    }
+
+
+export const getGetRecordatoriosDefaultQueryOptions = <TData = Awaited<ReturnType<typeof getRecordatoriosDefault>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecordatoriosDefault>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRecordatoriosDefaultQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecordatoriosDefault>>> = ({ signal }) => getRecordatoriosDefault({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecordatoriosDefault>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRecordatoriosDefaultQueryResult = NonNullable<Awaited<ReturnType<typeof getRecordatoriosDefault>>>
+export type GetRecordatoriosDefaultQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the editable default reminder sequence for the current user
+ */
+
+export function useGetRecordatoriosDefault<TData = Awaited<ReturnType<typeof getRecordatoriosDefault>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecordatoriosDefault>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRecordatoriosDefaultQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateRecordatoriosDefaultUrl = () => {
+
+
+
+
+  return `/api/recordatorios/default`
+}
+
+/**
+ * @summary Replace the default reminder sequence for the current user
+ */
+export const updateRecordatoriosDefault = async (recordatoriosDefaultInput: RecordatoriosDefaultInput, options?: RequestInit): Promise<RecordatorioDefault[]> => {
+
+  return customFetch<RecordatorioDefault[]>(getUpdateRecordatoriosDefaultUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      recordatoriosDefaultInput,)
+  }
+);}
+
+
+
+
+export const getUpdateRecordatoriosDefaultMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRecordatoriosDefault>>, TError,{data: BodyType<RecordatoriosDefaultInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRecordatoriosDefault>>, TError,{data: BodyType<RecordatoriosDefaultInput>}, TContext> => {
+
+const mutationKey = ['updateRecordatoriosDefault'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRecordatoriosDefault>>, {data: BodyType<RecordatoriosDefaultInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateRecordatoriosDefault(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRecordatoriosDefaultMutationResult = NonNullable<Awaited<ReturnType<typeof updateRecordatoriosDefault>>>
+    export type UpdateRecordatoriosDefaultMutationBody = BodyType<RecordatoriosDefaultInput>
+    export type UpdateRecordatoriosDefaultMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Replace the default reminder sequence for the current user
+ */
+export const useUpdateRecordatoriosDefault = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRecordatoriosDefault>>, TError,{data: BodyType<RecordatoriosDefaultInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRecordatoriosDefault>>,
+        TError,
+        {data: BodyType<RecordatoriosDefaultInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateRecordatoriosDefaultMutationOptions(options));
+    }
+
+export const getListNotificacionesUrl = (params?: ListNotificacionesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/notificaciones?${stringifiedParams}` : `/api/notificaciones`
+}
+
+/**
+ * @summary List in-app notifications for the current user
+ */
+export const listNotificaciones = async (params?: ListNotificacionesParams, options?: RequestInit): Promise<Notificacion[]> => {
+
+  return customFetch<Notificacion[]>(getListNotificacionesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListNotificacionesQueryKey = (params?: ListNotificacionesParams,) => {
+    return [
+    `/api/notificaciones`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListNotificacionesQueryOptions = <TData = Awaited<ReturnType<typeof listNotificaciones>>, TError = ErrorType<unknown>>(params?: ListNotificacionesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotificaciones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListNotificacionesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listNotificaciones>>> = ({ signal }) => listNotificaciones(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listNotificaciones>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListNotificacionesQueryResult = NonNullable<Awaited<ReturnType<typeof listNotificaciones>>>
+export type ListNotificacionesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List in-app notifications for the current user
+ */
+
+export function useListNotificaciones<TData = Awaited<ReturnType<typeof listNotificaciones>>, TError = ErrorType<unknown>>(
+ params?: ListNotificacionesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotificaciones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListNotificacionesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getMarcarNotificacionLeidaUrl = (id: number,) => {
+
+
+
+
+  return `/api/notificaciones/${id}/leida`
+}
+
+/**
+ * @summary Mark a notification as read
+ */
+export const marcarNotificacionLeida = async (id: number, options?: RequestInit): Promise<Notificacion> => {
+
+  return customFetch<Notificacion>(getMarcarNotificacionLeidaUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMarcarNotificacionLeidaMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof marcarNotificacionLeida>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof marcarNotificacionLeida>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['marcarNotificacionLeida'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof marcarNotificacionLeida>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  marcarNotificacionLeida(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarcarNotificacionLeidaMutationResult = NonNullable<Awaited<ReturnType<typeof marcarNotificacionLeida>>>
+
+    export type MarcarNotificacionLeidaMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Mark a notification as read
+ */
+export const useMarcarNotificacionLeida = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof marcarNotificacionLeida>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof marcarNotificacionLeida>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getMarcarNotificacionLeidaMutationOptions(options));
+    }
+
+export const getRunRecordatoriosUrl = () => {
+
+
+
+
+  return `/api/recordatorios/run`
+}
+
+/**
+ * @summary Manually trigger the daily reminder engine (admin or cron secret)
+ */
+export const runRecordatorios = async ( options?: RequestInit): Promise<RecordatoriosRunResult> => {
+
+  return customFetch<RecordatoriosRunResult>(getRunRecordatoriosUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRunRecordatoriosMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runRecordatorios>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runRecordatorios>>, TError,void, TContext> => {
+
+const mutationKey = ['runRecordatorios'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runRecordatorios>>, void> = () => {
+
+
+          return  runRecordatorios(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunRecordatoriosMutationResult = NonNullable<Awaited<ReturnType<typeof runRecordatorios>>>
+
+    export type RunRecordatoriosMutationError = ErrorType<void>
+
+    /**
+ * @summary Manually trigger the daily reminder engine (admin or cron secret)
+ */
+export const useRunRecordatorios = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runRecordatorios>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runRecordatorios>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRunRecordatoriosMutationOptions(options));
     }
 

@@ -21,6 +21,7 @@ const formSchema = z.object({
   referencia: z.string().optional(),
   clienteId: z.coerce.number().optional(),
   emailPagador: z.string().email("Email inválido").optional().or(z.literal("")),
+  fechaVencimiento: z.string().optional().or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -41,6 +42,7 @@ export default function NewCobro() {
       referencia: "",
       clienteId: undefined,
       emailPagador: "",
+      fechaVencimiento: "",
     },
   });
 
@@ -61,6 +63,7 @@ export default function NewCobro() {
       referencia: values.referencia || undefined,
       emailPagador: values.emailPagador || selectedCliente?.email || undefined,
       clienteId: values.clienteId || undefined,
+      fechaVencimiento: values.fechaVencimiento || undefined,
     };
 
     createCobro.mutate({ data: payload }, {
@@ -217,6 +220,24 @@ export default function NewCobro() {
                       {selectedCliente?.email
                         ? `Se usará el email del cliente (${selectedCliente.email}) al generar el link de pago si no ingresas otro.`
                         : "Se usará al generar el link de pago con Flow."}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fechaVencimiento"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fecha de vencimiento (opcional)</FormLabel>
+                    <FormControl>
+                      <Input type="date" className="text-sm" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Si la indicas, se aplicará automáticamente tu secuencia de recordatorios para
+                      avisar al cliente antes y después del vencimiento.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

@@ -150,6 +150,11 @@ export interface Cobro {
      */
   emailPagador?: string | null;
   /**
+     * Due date (YYYY-MM-DD) used to schedule reminders
+     * @nullable
+     */
+  fechaVencimiento?: string | null;
+  /**
      * Flow order ID returned after creating payment
      * @nullable
      */
@@ -216,6 +221,8 @@ export interface CobroInput {
   /** Associate an existing cliente */
   clienteId?: number;
   emailPagador?: string;
+  /** Due date (YYYY-MM-DD) used to schedule reminders */
+  fechaVencimiento?: string;
 }
 
 export type AvisarClienteInputTipo = typeof AvisarClienteInputTipo[keyof typeof AvisarClienteInputTipo];
@@ -365,6 +372,11 @@ export interface CobroUpdate {
   /** @minLength 1 */
   descripcion?: string;
   referencia?: string;
+  /**
+     * Due date (YYYY-MM-DD); null clears it
+     * @nullable
+     */
+  fechaVencimiento?: string | null;
 }
 
 export interface EstadoCount {
@@ -431,6 +443,180 @@ export interface WebhookEventosPage {
   offset: number;
   /** Distinct event types present in the full dataset */
   eventosUnicos?: string[];
+}
+
+export type RecordatorioCanal = typeof RecordatorioCanal[keyof typeof RecordatorioCanal];
+
+
+export const RecordatorioCanal = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+  ambos: 'ambos',
+} as const;
+
+/**
+ * antes/despues use diasOffset days before/after due date; dia = on due date; recurrente = every diasOffset days after due date
+ */
+export type RecordatorioMomento = typeof RecordatorioMomento[keyof typeof RecordatorioMomento];
+
+
+export const RecordatorioMomento = {
+  antes: 'antes',
+  dia: 'dia',
+  despues: 'despues',
+  recurrente: 'recurrente',
+} as const;
+
+export interface Recordatorio {
+  id: number;
+  cobroId: number;
+  canal: RecordatorioCanal;
+  /** antes/despues use diasOffset days before/after due date; dia = on due date; recurrente = every diasOffset days after due date */
+  momento: RecordatorioMomento;
+  /** Number of days for the chosen momento */
+  diasOffset: number;
+  activo: boolean;
+  creadoEn: string;
+}
+
+export type RecordatorioInputCanal = typeof RecordatorioInputCanal[keyof typeof RecordatorioInputCanal];
+
+
+export const RecordatorioInputCanal = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+  ambos: 'ambos',
+} as const;
+
+export type RecordatorioInputMomento = typeof RecordatorioInputMomento[keyof typeof RecordatorioInputMomento];
+
+
+export const RecordatorioInputMomento = {
+  antes: 'antes',
+  dia: 'dia',
+  despues: 'despues',
+  recurrente: 'recurrente',
+} as const;
+
+export interface RecordatorioInput {
+  canal: RecordatorioInputCanal;
+  momento: RecordatorioInputMomento;
+  /**
+     * Required (>=1) for antes/despues/recurrente; ignored for dia
+     * @minimum 0
+     */
+  diasOffset?: number;
+}
+
+export type RecordatorioDefaultCanal = typeof RecordatorioDefaultCanal[keyof typeof RecordatorioDefaultCanal];
+
+
+export const RecordatorioDefaultCanal = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+  ambos: 'ambos',
+} as const;
+
+export type RecordatorioDefaultMomento = typeof RecordatorioDefaultMomento[keyof typeof RecordatorioDefaultMomento];
+
+
+export const RecordatorioDefaultMomento = {
+  antes: 'antes',
+  dia: 'dia',
+  despues: 'despues',
+  recurrente: 'recurrente',
+} as const;
+
+export interface RecordatorioDefault {
+  id: number;
+  canal: RecordatorioDefaultCanal;
+  momento: RecordatorioDefaultMomento;
+  diasOffset: number;
+  activo: boolean;
+  orden: number;
+}
+
+export type RecordatorioDefaultItemCanal = typeof RecordatorioDefaultItemCanal[keyof typeof RecordatorioDefaultItemCanal];
+
+
+export const RecordatorioDefaultItemCanal = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+  ambos: 'ambos',
+} as const;
+
+export type RecordatorioDefaultItemMomento = typeof RecordatorioDefaultItemMomento[keyof typeof RecordatorioDefaultItemMomento];
+
+
+export const RecordatorioDefaultItemMomento = {
+  antes: 'antes',
+  dia: 'dia',
+  despues: 'despues',
+  recurrente: 'recurrente',
+} as const;
+
+export interface RecordatorioDefaultItem {
+  canal: RecordatorioDefaultItemCanal;
+  momento: RecordatorioDefaultItemMomento;
+  /** @minimum 0 */
+  diasOffset?: number;
+  activo?: boolean;
+}
+
+export interface RecordatoriosDefaultInput {
+  items: RecordatorioDefaultItem[];
+}
+
+export type RecordatorioEnviadoCanal = typeof RecordatorioEnviadoCanal[keyof typeof RecordatorioEnviadoCanal];
+
+
+export const RecordatorioEnviadoCanal = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export type RecordatorioEnviadoEstado = typeof RecordatorioEnviadoEstado[keyof typeof RecordatorioEnviadoEstado];
+
+
+export const RecordatorioEnviadoEstado = {
+  enviado: 'enviado',
+  fallido: 'fallido',
+  pendiente: 'pendiente',
+} as const;
+
+export interface RecordatorioEnviado {
+  id: number;
+  cobroId: number;
+  /** @nullable */
+  recordatorioId?: number | null;
+  canal: RecordatorioEnviadoCanal;
+  estado: RecordatorioEnviadoEstado;
+  /** @nullable */
+  detalle?: string | null;
+  fecha: string;
+  creadoEn: string;
+}
+
+export interface Notificacion {
+  id: number;
+  /** @nullable */
+  cobroId?: number | null;
+  tipo: string;
+  titulo: string;
+  /** @nullable */
+  mensaje?: string | null;
+  /** @nullable */
+  waUrl?: string | null;
+  leida: boolean;
+  creadoEn: string;
+}
+
+export interface RecordatoriosRunResult {
+  ok: boolean;
+  fecha: string;
+  emailsEnviados: number;
+  notificacionesCreadas: number;
+  errores: number;
 }
 
 export interface ErrorResponse {
@@ -695,4 +881,8 @@ export const ListWebhookEventosResultado = {
   exitoso: 'exitoso',
   fallido: 'fallido',
 } as const;
+
+export type ListNotificacionesParams = {
+soloNoLeidas?: boolean;
+};
 

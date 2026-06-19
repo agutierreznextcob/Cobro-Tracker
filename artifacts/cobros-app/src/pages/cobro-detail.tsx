@@ -14,6 +14,14 @@ import {
   useCrearAbono,
   useConfirmarAbono,
   getListAbonosQueryKey,
+  useListRecordatorios,
+  useCreateRecordatorio,
+  useDeleteRecordatorio,
+  useListRecordatoriosHistorial,
+  getListRecordatoriosQueryKey,
+  getListRecordatoriosHistorialQueryKey,
+  type RecordatorioInputCanal,
+  type RecordatorioInputMomento,
 } from "@workspace/api-client-react";
 import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateOnly } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import {
   ArrowLeft,
@@ -47,6 +55,9 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Bell,
+  Trash2,
+  CalendarClock,
 } from "lucide-react";
 import { CobroUpdateEstado } from "@workspace/api-client-react";
 
@@ -69,6 +80,29 @@ function buildWhatsappUrl(opts: {
     `Puedes pagar aquí: ${opts.linkPago}`;
 
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
+}
+
+function describirRecordatorio(canal: string, momento: string, diasOffset: number): string {
+  const canalLabel = canal === "ambos" ? "Email y WhatsApp" : canal === "whatsapp" ? "WhatsApp" : "Email";
+  const dias = diasOffset === 1 ? "1 día" : `${diasOffset} días`;
+  let cuando: string;
+  switch (momento) {
+    case "antes":
+      cuando = `${dias} antes del vencimiento`;
+      break;
+    case "dia":
+      cuando = "el día del vencimiento";
+      break;
+    case "despues":
+      cuando = `${dias} después del vencimiento`;
+      break;
+    case "recurrente":
+      cuando = `cada ${dias} tras el vencimiento`;
+      break;
+    default:
+      cuando = momento;
+  }
+  return `${canalLabel} · ${cuando}`;
 }
 
 export default function CobroDetail() {
@@ -368,6 +402,63 @@ export default function CobroDetail() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["listSeguimientos", id] });
+        },
+      }
+    );
+  };
+
+  // --- Recordatorios automáticos ---
+  const { data: recordatorios, isLoading: isLoadingRecordatorios } = useListRecordatorios(id, {
+    query: { enabled: !!id, queryKey: getListRecordatoriosQueryKey(id) },
+  });
+  const { data: recordatoriosHistorial, isLoading: isLoadingHistorial } = useListRecordatoriosHistorial(id, {
+    query: { enabled: !!id, queryKey: getListRecordatoriosHistorialQueryKey(id) },
+  });
+  const crearRecordatorio = useCreateRecordatorio();
+  const eliminarRecordatorio = useDeleteRecordatorio();
+
+  const [nuevoCanal, setNuevoCanal] = useState<RecordatorioInputCanal>("email");
+  const [nuevoMomento, setNuevoMomento] = useState<RecordatorioInputMomento>("despues");
+  const [nuevoDias, setNuevoDias] = useState<string>("3");
+
+  const invalidarRecordatorios = () => {
+    queryClient.invalidateQueries({ queryKey: getListRecordatoriosQueryKey(id) });
+    queryClient.invalidateQueries({ queryKey: getListRecordatoriosHistorialQueryKey(id) });
+  };
+
+  const handleAgregarRecordatorio = () => {
+    const dias = nuevoMomento === "dia" ? 0 : parseInt(nuevoDias || "0", 10);
+    if (nuevoMomento !== "dia" && (isNaN(dias) || dias < 1)) {
+      toast({ title: "Días inválidos", description: "Indica un número de días mayor a 0.", variant: "destructive" });
+      return;
+    }
+    crearRecordatorio.mutate(
+      { id, data: { canal: nuevoCanal, momento: nuevoMomento, diasOffset: dias } },
+      {
+        onSuccess: () => {
+          toast({ title: "Recordatorio agregado", description: "Se programó el recordatorio automático." });
+          setNuevoDias("3");
+          invalidarRecordatorios();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo agregar el recordatorio.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const handleEliminarRecordatorio = (recordatorioId: number) => {
+    eliminarRecordatorio.mutate(
+      { id, recordatorioId },
+      {
+        onSuccess: () => {
+          toast({ title: "Recordatorio eliminado", description: "El recordatorio fue eliminado." });
+          invalidarRecordatorios();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo eliminar el recordatorio.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
         },
       }
     );
@@ -963,6 +1054,175 @@ export default function CobroDetail() {
           )}
         </div>
       </div>
+
+      {/* Recordatorios automáticos */}
+      <Card className="shadow-sm border-border/50">
+        <CardHeader className="bg-muted/20 border-b border-border/50 pb-4">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Bell className="h-4 w-4 text-primary" />
+            Recordatorios automáticos
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-5">
+          {!cobro?.fechaVencimiento ? (
+            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50/50 px-3 py-3">
+              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800">
+                Agrega una fecha de vencimiento a este cobro para programar recordatorios automáticos.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Formulario para agregar */}
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3 rounded-md border border-border/50 bg-muted/20 p-3">
+                <div className="space-y-1.5 flex-1">
+                  <Label className="text-xs">Canal</Label>
+                  <Select value={nuevoCanal} onValueChange={(v) => setNuevoCanal(v as RecordatorioInputCanal)}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                      <SelectItem value="ambos">Ambos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <Label className="text-xs">Momento</Label>
+                  <Select value={nuevoMomento} onValueChange={(v) => setNuevoMomento(v as RecordatorioInputMomento)}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="antes">Antes del vencimiento</SelectItem>
+                      <SelectItem value="dia">El día del vencimiento</SelectItem>
+                      <SelectItem value="despues">Después del vencimiento</SelectItem>
+                      <SelectItem value="recurrente">Recurrente (cada X días)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {nuevoMomento !== "dia" && (
+                  <div className="space-y-1.5 w-full sm:w-24">
+                    <Label className="text-xs">Días</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={nuevoDias}
+                      onChange={(e) => setNuevoDias(e.target.value)}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                )}
+                <Button
+                  onClick={handleAgregarRecordatorio}
+                  disabled={crearRecordatorio.isPending}
+                  className="h-9 gap-1.5"
+                >
+                  {crearRecordatorio.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Agregar
+                </Button>
+              </div>
+
+              {/* Lista de recordatorios */}
+              {isLoadingRecordatorios ? (
+                <div className="space-y-2">
+                  {[1, 2].map((i) => <div key={i} className="h-12 bg-muted/40 rounded animate-pulse" />)}
+                </div>
+              ) : !recordatorios || recordatorios.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">
+                  No hay recordatorios programados para este cobro.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {recordatorios.map((r) => (
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-background px-3 py-2.5"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {r.canal === "whatsapp" ? (
+                          <MessageCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                        ) : r.canal === "ambos" ? (
+                          <Send className="h-4 w-4 text-primary shrink-0" />
+                        ) : (
+                          <Mail className="h-4 w-4 text-primary shrink-0" />
+                        )}
+                        <span className="text-sm truncate">{describirRecordatorio(r.canal, r.momento, r.diasOffset)}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => handleEliminarRecordatorio(r.id)}
+                        disabled={eliminarRecordatorio.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Historial de recordatorios */}
+      <Card className="shadow-sm border-border/50">
+        <CardHeader className="bg-muted/20 border-b border-border/50 pb-4">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-primary" />
+            Historial de recordatorios
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {isLoadingHistorial ? (
+            <div className="space-y-2">
+              {[1, 2].map((i) => <div key={i} className="h-12 bg-muted/40 rounded animate-pulse" />)}
+            </div>
+          ) : !recordatoriosHistorial || recordatoriosHistorial.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-3">
+              Aún no se han enviado recordatorios para este cobro.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {recordatoriosHistorial.map((h) => {
+                const isEnviado = h.estado === "enviado";
+                const isFallido = h.estado === "fallido";
+                return (
+                  <div
+                    key={h.id}
+                    className={`flex items-start gap-3 rounded-md border px-3 py-2.5 ${
+                      isEnviado ? "border-emerald-200 bg-emerald-50/50" :
+                      isFallido ? "border-red-200 bg-red-50/50" :
+                      "border-border/50 bg-background"
+                    }`}
+                  >
+                    {h.canal === "whatsapp" ? (
+                      <MessageCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <Mail className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium capitalize">{h.canal}</span>
+                        <span className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full border ${
+                          isEnviado ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
+                          isFallido ? "bg-red-100 text-red-700 border-red-200" :
+                          "bg-yellow-50 text-yellow-700 border-yellow-200"
+                        }`}>
+                          {isEnviado ? "Enviado" : isFallido ? "Fallido" : "Pendiente"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] text-muted-foreground">{formatDateOnly(h.fecha)}</span>
+                        {h.detalle && <span className="text-[10px] text-muted-foreground truncate">· {h.detalle}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Abonos / pagos parciales */}
       <Card className="shadow-sm border-border/50">

@@ -163,6 +163,7 @@ export const GetClienteResponse = zod.object({
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
@@ -351,6 +352,7 @@ export const ListCobrosResponseItem = zod.object({
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
@@ -374,7 +376,8 @@ export const CreateCobroBody = zod.object({
   "descripcion": zod.string().min(1),
   "referencia": zod.string().optional(),
   "clienteId": zod.number().optional().describe('Associate an existing cliente'),
-  "emailPagador": zod.string().email().optional()
+  "emailPagador": zod.string().email().optional(),
+  "fechaVencimiento": zod.coerce.date().optional().describe('Due date (YYYY-MM-DD) used to schedule reminders')
 })
 
 
@@ -396,6 +399,7 @@ export const GetCobroResponse = zod.object({
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
@@ -418,7 +422,8 @@ export const UpdateCobroParams = zod.object({
 export const UpdateCobroBody = zod.object({
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).optional(),
   "descripcion": zod.string().min(1).optional(),
-  "referencia": zod.string().optional()
+  "referencia": zod.string().optional(),
+  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD); null clears it')
 })
 
 export const UpdateCobroResponse = zod.object({
@@ -432,6 +437,7 @@ export const UpdateCobroResponse = zod.object({
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
@@ -848,6 +854,164 @@ export const SendAdminRecordatorioEmailParams = zod.object({
 export const SendAdminRecordatorioEmailResponse = zod.object({
   "ok": zod.boolean(),
   "message": zod.string().nullish()
+})
+
+
+/**
+ * @summary List automatic reminder rules for a cobro
+ */
+export const ListRecordatoriosParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListRecordatoriosResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "canal": zod.enum(['email', 'whatsapp', 'ambos']),
+  "momento": zod.enum(['antes', 'dia', 'despues', 'recurrente']).describe('antes\/despues use diasOffset days before\/after due date; dia = on due date; recurrente = every diasOffset days after due date'),
+  "diasOffset": zod.number().describe('Number of days for the chosen momento'),
+  "activo": zod.boolean(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListRecordatoriosResponse = zod.array(ListRecordatoriosResponseItem)
+
+
+/**
+ * @summary Add an automatic reminder rule to a cobro
+ */
+export const CreateRecordatorioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const createRecordatorioBodyDiasOffsetMin = 0;
+
+
+
+export const CreateRecordatorioBody = zod.object({
+  "canal": zod.enum(['email', 'whatsapp', 'ambos']),
+  "momento": zod.enum(['antes', 'dia', 'despues', 'recurrente']),
+  "diasOffset": zod.number().min(createRecordatorioBodyDiasOffsetMin).optional().describe('Required (>=1) for antes\/despues\/recurrente; ignored for dia')
+})
+
+
+/**
+ * @summary Delete an automatic reminder rule
+ */
+export const DeleteRecordatorioParams = zod.object({
+  "id": zod.coerce.number(),
+  "recordatorioId": zod.coerce.number()
+})
+
+
+/**
+ * @summary List the reminder sending history for a cobro
+ */
+export const ListRecordatoriosHistorialParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListRecordatoriosHistorialResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "recordatorioId": zod.number().nullish(),
+  "canal": zod.enum(['email', 'whatsapp']),
+  "estado": zod.enum(['enviado', 'fallido', 'pendiente']),
+  "detalle": zod.string().nullish(),
+  "fecha": zod.coerce.date(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListRecordatoriosHistorialResponse = zod.array(ListRecordatoriosHistorialResponseItem)
+
+
+/**
+ * @summary Get the editable default reminder sequence for the current user
+ */
+export const GetRecordatoriosDefaultResponseItem = zod.object({
+  "id": zod.number(),
+  "canal": zod.enum(['email', 'whatsapp', 'ambos']),
+  "momento": zod.enum(['antes', 'dia', 'despues', 'recurrente']),
+  "diasOffset": zod.number(),
+  "activo": zod.boolean(),
+  "orden": zod.number()
+})
+export const GetRecordatoriosDefaultResponse = zod.array(GetRecordatoriosDefaultResponseItem)
+
+
+/**
+ * @summary Replace the default reminder sequence for the current user
+ */
+export const updateRecordatoriosDefaultBodyItemsItemDiasOffsetMin = 0;
+
+
+
+export const UpdateRecordatoriosDefaultBody = zod.object({
+  "items": zod.array(zod.object({
+  "canal": zod.enum(['email', 'whatsapp', 'ambos']),
+  "momento": zod.enum(['antes', 'dia', 'despues', 'recurrente']),
+  "diasOffset": zod.number().min(updateRecordatoriosDefaultBodyItemsItemDiasOffsetMin).optional(),
+  "activo": zod.boolean().optional()
+}))
+})
+
+export const UpdateRecordatoriosDefaultResponseItem = zod.object({
+  "id": zod.number(),
+  "canal": zod.enum(['email', 'whatsapp', 'ambos']),
+  "momento": zod.enum(['antes', 'dia', 'despues', 'recurrente']),
+  "diasOffset": zod.number(),
+  "activo": zod.boolean(),
+  "orden": zod.number()
+})
+export const UpdateRecordatoriosDefaultResponse = zod.array(UpdateRecordatoriosDefaultResponseItem)
+
+
+/**
+ * @summary List in-app notifications for the current user
+ */
+export const ListNotificacionesQueryParams = zod.object({
+  "soloNoLeidas": zod.coerce.boolean().optional()
+})
+
+export const ListNotificacionesResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number().nullish(),
+  "tipo": zod.string(),
+  "titulo": zod.string(),
+  "mensaje": zod.string().nullish(),
+  "waUrl": zod.string().nullish(),
+  "leida": zod.boolean(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListNotificacionesResponse = zod.array(ListNotificacionesResponseItem)
+
+
+/**
+ * @summary Mark a notification as read
+ */
+export const MarcarNotificacionLeidaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MarcarNotificacionLeidaResponse = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number().nullish(),
+  "tipo": zod.string(),
+  "titulo": zod.string(),
+  "mensaje": zod.string().nullish(),
+  "waUrl": zod.string().nullish(),
+  "leida": zod.boolean(),
+  "creadoEn": zod.coerce.date()
+})
+
+
+/**
+ * @summary Manually trigger the daily reminder engine (admin or cron secret)
+ */
+export const RunRecordatoriosResponse = zod.object({
+  "ok": zod.boolean(),
+  "fecha": zod.coerce.date(),
+  "emailsEnviados": zod.number(),
+  "notificacionesCreadas": zod.number(),
+  "errores": zod.number()
 })
 
 

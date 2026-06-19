@@ -1,11 +1,20 @@
 import { Router } from "express";
-import { db, cobrosTable, clientesTable, seguimientosCobranzaTable, pagosParciales } from "@workspace/db";
+import {
+  db,
+  cobrosTable,
+  clientesTable,
+  seguimientosCobranzaTable,
+  pagosParciales,
+  recordatoriosTable,
+  recordatoriosEnviadosTable,
+} from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt } from "drizzle-orm";
 import {
   CreateCobroBody,
   UpdateCobroBody,
   GetCobroParams,
   UpdateCobroParams,
+  CreateRecordatorioBody,
 } from "@workspace/api-zod";
 import { z } from "zod";
 import { getFlowCredentials, getMpCredentials } from "./profile";
@@ -13,6 +22,7 @@ import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
 import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
 import { requireSubscription } from "../middlewares/requireSubscription";
+import { aplicarDefaultsACobro } from "../lib/recordatorios";
 
 const cobrosRouter = Router();
 
@@ -86,6 +96,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
   const { monto, descripcion, referencia } = parsed.data;
   const emailPagador = (parsed.data as Record<string, unknown>).emailPagador as string | undefined;
   const clienteId = (parsed.data as Record<string, unknown>).clienteId as number | undefined;
+  const fechaVencimiento = (parsed.data as Record<string, unknown>).fechaVencimiento as string | undefined;
   const user = req.isAuthenticated() ? req.user : null;
   const responsableNombre = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null
@@ -111,8 +122,18 @@ cobrosRouter.post("/cobros", async (req, res) => {
         clienteId: clienteId ?? null,
         clienteNombre,
         emailPagador: emailPagador ?? null,
+        fechaVencimiento: fechaVencimiento ?? null,
       })
       .returning();
+
+    // Seed the user's default reminder sequence onto cobros that have a due date.
+    if (cobro.fechaVencimiento && user?.id) {
+      try {
+        await aplicarDefaultsACobro(cobro.id, user.id);
+      } catch (err) {
+        req.log.warn({ err, cobroId: cobro.id }, "No se pudo aplicar la secuencia de recordatorios por defecto");
+      }
+    }
 
     res.status(201).json({
       ...cobro,
@@ -504,9 +525,15 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
     actualizadoEn: new Date(),
   };
 
+  const fechaVencimiento = (bodyParsed.data as Record<string, unknown>).fechaVencimiento as
+    | string
+    | null
+    | undefined;
+
   if (bodyParsed.data.estado !== undefined) updates.estado = bodyParsed.data.estado;
   if (bodyParsed.data.descripcion !== undefined) updates.descripcion = bodyParsed.data.descripcion;
   if (bodyParsed.data.referencia !== undefined) updates.referencia = bodyParsed.data.referencia;
+  if (fechaVencimiento !== undefined) updates.fechaVencimiento = fechaVencimiento;
 
   try {
     const [cobro] = await db
@@ -518,6 +545,16 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
     if (!cobro) {
       res.status(404).json({ error: "Cobro no encontrado" });
       return;
+    }
+
+    // If a due date was just set, seed the user's default reminder sequence
+    // (only when this cobro has no reminder rules yet).
+    if (fechaVencimiento && cobro.responsableId) {
+      try {
+        await aplicarDefaultsACobro(cobro.id, cobro.responsableId);
+      } catch (err) {
+        req.log.warn({ err, cobroId: cobro.id }, "No se pudo aplicar la secuencia de recordatorios por defecto");
+      }
     }
 
     res.json({
@@ -728,6 +765,135 @@ cobrosRouter.post("/cobros/:id/abonos/:abonoId/confirmar", async (req, res) => {
     res.json({ ...updated, monto: Number(updated.monto), creadoEn: updated.creadoEn.toISOString(), confirmadoEn: updated.confirmadoEn?.toISOString() ?? null });
   } catch (err) {
     req.log.error({ err }, "Error confirming abono");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// --- Per-cobro automatic reminder rules ---
+
+function mapRecordatorio(r: typeof recordatoriosTable.$inferSelect) {
+  return {
+    id: r.id,
+    cobroId: r.cobroId,
+    canal: r.canal,
+    momento: r.momento,
+    diasOffset: r.diasOffset,
+    activo: r.activo,
+    creadoEn: r.creadoEn.toISOString(),
+  };
+}
+
+cobrosRouter.get("/cobros/:id/recordatorios", async (req, res) => {
+  const parsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!parsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  try {
+    const rows = await db
+      .select()
+      .from(recordatoriosTable)
+      .where(eq(recordatoriosTable.cobroId, parsed.data.id))
+      .orderBy(recordatoriosTable.id);
+    res.json(rows.map(mapRecordatorio));
+  } catch (err) {
+    req.log.error({ err }, "Error listing recordatorios");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+cobrosRouter.get("/cobros/:id/recordatorios/historial", async (req, res) => {
+  const parsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!parsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  try {
+    const rows = await db
+      .select()
+      .from(recordatoriosEnviadosTable)
+      .where(eq(recordatoriosEnviadosTable.cobroId, parsed.data.id))
+      .orderBy(desc(recordatoriosEnviadosTable.creadoEn));
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        cobroId: r.cobroId,
+        recordatorioId: r.recordatorioId,
+        canal: r.canal,
+        estado: r.estado,
+        detalle: r.detalle,
+        fecha: r.fecha,
+        creadoEn: r.creadoEn.toISOString(),
+      })),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Error listing reminder history");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+cobrosRouter.post("/cobros/:id/recordatorios", async (req, res) => {
+  const parsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!parsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const bodyParsed = CreateRecordatorioBody.safeParse(req.body);
+  if (!bodyParsed.success) {
+    res.status(400).json({ error: bodyParsed.error.message });
+    return;
+  }
+  const { canal, momento } = bodyParsed.data;
+  const diasOffset = bodyParsed.data.diasOffset ?? 0;
+  if (momento !== "dia" && diasOffset < 1) {
+    res.status(400).json({ error: "Debes indicar la cantidad de días (mínimo 1) para este tipo de recordatorio." });
+    return;
+  }
+  try {
+    const [cobro] = await db
+      .select({ id: cobrosTable.id })
+      .from(cobrosTable)
+      .where(eq(cobrosTable.id, parsed.data.id));
+    if (!cobro) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+    const [created] = await db
+      .insert(recordatoriosTable)
+      .values({
+        cobroId: parsed.data.id,
+        canal,
+        momento,
+        diasOffset: momento === "dia" ? 0 : diasOffset,
+        activo: true,
+      })
+      .returning();
+    res.status(201).json(mapRecordatorio(created));
+  } catch (err) {
+    req.log.error({ err }, "Error creating recordatorio");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+cobrosRouter.delete("/cobros/:id/recordatorios/:recordatorioId", async (req, res) => {
+  const id = Number(req.params.id);
+  const recordatorioId = Number(req.params.recordatorioId);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(recordatorioId) || recordatorioId <= 0) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  try {
+    const [deleted] = await db
+      .delete(recordatoriosTable)
+      .where(and(eq(recordatoriosTable.id, recordatorioId), eq(recordatoriosTable.cobroId, id)))
+      .returning();
+    if (!deleted) {
+      res.status(404).json({ error: "Recordatorio no encontrado" });
+      return;
+    }
+    res.status(204).end();
+  } catch (err) {
+    req.log.error({ err }, "Error deleting recordatorio");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

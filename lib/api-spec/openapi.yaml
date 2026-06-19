@@ -1192,6 +1192,198 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminRecordatorioResult"
 
+  /cobros/{id}/recordatorios:
+    get:
+      operationId: listRecordatorios
+      tags: [recordatorios]
+      summary: List automatic reminder rules for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reminder rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Recordatorio"
+    post:
+      operationId: createRecordatorio
+      tags: [recordatorios]
+      summary: Add an automatic reminder rule to a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordatorioInput"
+      responses:
+        "201":
+          description: Created reminder rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recordatorio"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/{id}/recordatorios/{recordatorioId}:
+    delete:
+      operationId: deleteRecordatorio
+      tags: [recordatorios]
+      summary: Delete an automatic reminder rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: recordatorioId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/{id}/recordatorios/historial:
+    get:
+      operationId: listRecordatoriosHistorial
+      tags: [recordatorios]
+      summary: List the reminder sending history for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reminder history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecordatorioEnviado"
+
+  /recordatorios/default:
+    get:
+      operationId: getRecordatoriosDefault
+      tags: [recordatorios]
+      summary: Get the editable default reminder sequence for the current user
+      responses:
+        "200":
+          description: Default reminder sequence
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecordatorioDefault"
+    put:
+      operationId: updateRecordatoriosDefault
+      tags: [recordatorios]
+      summary: Replace the default reminder sequence for the current user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordatoriosDefaultInput"
+      responses:
+        "200":
+          description: Updated default reminder sequence
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecordatorioDefault"
+
+  /notificaciones:
+    get:
+      operationId: listNotificaciones
+      tags: [notificaciones]
+      summary: List in-app notifications for the current user
+      parameters:
+        - name: soloNoLeidas
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notificacion"
+
+  /notificaciones/{id}/leida:
+    post:
+      operationId: marcarNotificacionLeida
+      tags: [notificaciones]
+      summary: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notificacion"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /recordatorios/run:
+    post:
+      operationId: runRecordatorios
+      tags: [recordatorios]
+      summary: Manually trigger the daily reminder engine (admin or cron secret)
+      responses:
+        "200":
+          description: Run result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordatoriosRunResult"
+        "401":
+          description: Unauthorized
+
 components:
   schemas:
     AdminUsuario:
@@ -1410,6 +1602,10 @@ components:
         emailPagador:
           type: ["string", "null"]
           description: Email of the payer for Flow payment link
+        fechaVencimiento:
+          type: ["string", "null"]
+          format: date
+          description: Due date (YYYY-MM-DD) used to schedule reminders
         flowOrdenId:
           type: ["string", "null"]
           description: Flow order ID returned after creating payment
@@ -1447,6 +1643,10 @@ components:
         emailPagador:
           type: string
           format: email
+        fechaVencimiento:
+          type: string
+          format: date
+          description: Due date (YYYY-MM-DD) used to schedule reminders
 
     AvisarClienteInput:
       type: object
@@ -1614,6 +1814,10 @@ components:
           minLength: 1
         referencia:
           type: string
+        fechaVencimiento:
+          type: ["string", "null"]
+          format: date
+          description: Due date (YYYY-MM-DD); null clears it
 
     CobrosSummary:
       type: object
@@ -1708,6 +1912,152 @@ components:
         creadoEn:
           type: string
           format: date-time
+
+    Recordatorio:
+      type: object
+      required: [id, cobroId, canal, momento, diasOffset, activo, creadoEn]
+      properties:
+        id:
+          type: integer
+        cobroId:
+          type: integer
+        canal:
+          type: string
+          enum: [email, whatsapp, ambos]
+        momento:
+          type: string
+          enum: [antes, dia, despues, recurrente]
+          description: antes/despues use diasOffset days before/after due date; dia = on due date; recurrente = every diasOffset days after due date
+        diasOffset:
+          type: integer
+          description: Number of days for the chosen momento
+        activo:
+          type: boolean
+        creadoEn:
+          type: string
+          format: date-time
+
+    RecordatorioInput:
+      type: object
+      required: [canal, momento]
+      properties:
+        canal:
+          type: string
+          enum: [email, whatsapp, ambos]
+        momento:
+          type: string
+          enum: [antes, dia, despues, recurrente]
+        diasOffset:
+          type: integer
+          minimum: 0
+          description: Required (>=1) for antes/despues/recurrente; ignored for dia
+
+    RecordatorioDefault:
+      type: object
+      required: [id, canal, momento, diasOffset, activo, orden]
+      properties:
+        id:
+          type: integer
+        canal:
+          type: string
+          enum: [email, whatsapp, ambos]
+        momento:
+          type: string
+          enum: [antes, dia, despues, recurrente]
+        diasOffset:
+          type: integer
+        activo:
+          type: boolean
+        orden:
+          type: integer
+
+    RecordatoriosDefaultInput:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecordatorioDefaultItem"
+
+    RecordatorioDefaultItem:
+      type: object
+      required: [canal, momento]
+      properties:
+        canal:
+          type: string
+          enum: [email, whatsapp, ambos]
+        momento:
+          type: string
+          enum: [antes, dia, despues, recurrente]
+        diasOffset:
+          type: integer
+          minimum: 0
+        activo:
+          type: boolean
+
+    RecordatorioEnviado:
+      type: object
+      required: [id, cobroId, canal, estado, fecha, creadoEn]
+      properties:
+        id:
+          type: integer
+        cobroId:
+          type: integer
+        recordatorioId:
+          type: ["integer", "null"]
+        canal:
+          type: string
+          enum: [email, whatsapp]
+        estado:
+          type: string
+          enum: [enviado, fallido, pendiente]
+        detalle:
+          type: ["string", "null"]
+        fecha:
+          type: string
+          format: date
+        creadoEn:
+          type: string
+          format: date-time
+
+    Notificacion:
+      type: object
+      required: [id, tipo, titulo, leida, creadoEn]
+      properties:
+        id:
+          type: integer
+        cobroId:
+          type: ["integer", "null"]
+        tipo:
+          type: string
+        titulo:
+          type: string
+        mensaje:
+          type: ["string", "null"]
+        waUrl:
+          type: ["string", "null"]
+        leida:
+          type: boolean
+        creadoEn:
+          type: string
+          format: date-time
+
+    RecordatoriosRunResult:
+      type: object
+      required: [ok, fecha, emailsEnviados, notificacionesCreadas, errores]
+      properties:
+        ok:
+          type: boolean
+        fecha:
+          type: string
+          format: date
+        emailsEnviados:
+          type: integer
+        notificacionesCreadas:
+          type: integer
+        errores:
+          type: integer
 
     ErrorResponse:
       type: object

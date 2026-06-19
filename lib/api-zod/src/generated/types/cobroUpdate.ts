@@ -12,4 +12,9 @@ export interface CobroUpdate {
   /** @minLength 1 */
   descripcion?: string;
   referencia?: string;
+  /**
+     * Due date (YYYY-MM-DD); null clears it
+     * @nullable
+     */
+  fechaVencimiento?: Date | null;
 }

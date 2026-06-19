@@ -17,6 +17,8 @@ import ClienteDetailPage from "@/pages/cliente-detail";
 import AdminPage from "@/pages/admin";
 import LiquidacionesPage from "@/pages/liquidaciones";
 import LiquidacionDetailPage from "@/pages/liquidacion-detail";
+import Notificaciones from "@/pages/notificaciones";
+import RecordatoriosConfig from "@/pages/recordatorios-config";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -176,6 +178,20 @@ function AppRouter() {
             </Layout>
           </AuthGate>
         )}
+      </Route>
+      <Route path="/notificaciones">
+        <AuthGate>
+          <Layout>
+            <Notificaciones />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/recordatorios/config">
+        <AuthGate>
+          <Layout>
+            <RecordatoriosConfig />
+          </Layout>
+        </AuthGate>
       </Route>
       <Route path="/webhooks/log">
         <AuthGate>

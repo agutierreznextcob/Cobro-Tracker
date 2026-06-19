@@ -1,12 +1,18 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield, BarChart3 } from "lucide-react";
+import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield, BarChart3, Bell, CalendarClock } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
+import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
 import { AiChat } from "@/components/ai-chat";
 
 function WebhookPoller() {
   useWebhookPolling();
+  return null;
+}
+
+function NotificacionesPoller() {
+  useNotificacionesPolling();
   return null;
 }
 
@@ -24,6 +30,8 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/cobros/informes", label: "Informes", icon: BarChart3 },
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/liquidaciones", label: "Liquidaciones", icon: Landmark },
+    { href: "/notificaciones", label: "Notificaciones", icon: Bell },
+    { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock },
     { href: "/webhooks/log", label: "Log webhooks", icon: Webhook },
     { href: "/perfil", label: "Perfil", icon: UserCircle },
   ];
@@ -39,6 +47,7 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-[100dvh] flex bg-background text-foreground">
       <WebhookPoller />
+      <NotificacionesPoller />
 
       {/* Sidebar */}
       <aside className="w-60 shrink-0 flex flex-col border-r bg-card">
