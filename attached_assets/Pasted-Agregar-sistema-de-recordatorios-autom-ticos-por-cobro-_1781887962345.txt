@@ -1,0 +1,45 @@
+Agregar sistema de recordatorios automáticos por cobro con 
+calendario configurable. Funcionalidades:
+
+1. CALENDARIO DE RECORDATORIOS POR COBRO:
+En el detalle de cada cobro, agregar sección "Recordatorios 
+automáticos" donde el usuario pueda programar envíos automáticos.
+Opciones configurables:
+- Tipo: Email, WhatsApp (wa.me), o ambos
+- Momento: X días antes del vencimiento, el día del vencimiento, 
+  o X días después del vencimiento
+- Frecuencia post-vencimiento: cada X días mientras el cobro 
+  siga pendiente/vencido
+- El usuario puede agregar múltiples recordatorios con distintas 
+  configuraciones para el mismo cobro
+- Mostrar calendario/lista de recordatorios programados con 
+  opción de eliminar cada uno
+
+2. EJECUCIÓN AUTOMÁTICA:
+Crear un job/cron que se ejecute diariamente y revise todos 
+los cobros pendientes/vencidos. Para cada cobro, verificar 
+si hay recordatorios programados para ese día y enviarlos 
+automáticamente:
+- Email: usar Resend con el email del pagador del cobro
+- WhatsApp: generar link wa.me con mensaje pre-redactado 
+  incluyendo nombre del cliente, concepto del cobro, monto 
+  y link de pago (si existe). Como no es bidireccional aún, 
+  abrir el link automáticamente no es posible desde el servidor, 
+  así que mostrar al usuario una notificación en la plataforma 
+  diciendo "WhatsApp listo para enviar a [cliente]" con botón 
+  para abrirlo con un click
+
+3. SECUENCIA DE EMAILS POST-VENCIMIENTO:
+Para cobros que pasen su fecha de vencimiento sin pagar, 
+enviar automáticamente emails de recordatorio según esta 
+secuencia predeterminada (el usuario puede modificarla):
+- Día 1 post-vencimiento: "Tu pago venció, aún puedes pagarlo"
+- Día 3 post-vencimiento: "Recordatorio: tienes un pago pendiente"  
+- Día 7 post-vencimiento: "Tu cobro por [concepto] sigue pendiente"
+- Cada 7 días después: recordatorio periódico
+Estos emails deben detenerse automáticamente cuando el cobro 
+se marque como "Pagado"
+
+4. HISTORIAL DE RECORDATORIOS ENVIADOS:
+En el detalle del cobro, mostrar log de todos los recordatorios 
+enviados: fecha, tipo (email/WhatsApp), estado (enviado/fallido)
