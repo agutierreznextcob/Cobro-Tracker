@@ -8,7 +8,7 @@ import {
   notificacionesTable,
   type RecordatorioDefault,
 } from "@workspace/db";
-import { and, eq, isNotNull, notInArray } from "drizzle-orm";
+import { and, eq, isNotNull, inArray } from "drizzle-orm";
 import { sendSecuenciaRecordatorioEmail } from "./email";
 
 type Canal = "email" | "whatsapp" | "ambos";
@@ -55,7 +55,9 @@ function esDueHoy(momento: Momento, diasOffset: number, vencimiento: string, hoy
     case "despues":
       return diasOffset > 0 && diff === diasOffset;
     case "recurrente":
-      return diasOffset > 0 && diff > 0 && diff % diasOffset === 0;
+      // Empieza estrictamente DESPUÉS del primer ciclo (p. ej. con 7 → día 14, 21…)
+      // para no duplicar un "despues" que caiga el mismo día (día 7).
+      return diasOffset > 0 && diff > diasOffset && diff % diasOffset === 0;
     default:
       return false;
   }
@@ -209,7 +211,8 @@ export async function procesarRecordatorios(
     .where(
       and(
         isNotNull(cobrosTable.fechaVencimiento),
-        notInArray(cobrosTable.estado, ["pagado", "cancelado"]),
+        // Solo cobros vigentes por cobrar: excluye pagado, cancelado y fallido.
+        inArray(cobrosTable.estado, ["pendiente", "parcial"]),
       ),
     );
 
