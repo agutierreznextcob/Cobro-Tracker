@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateCobro, useListClientes, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, type CobroInput } from "@workspace/api-client-react";
+import { useCreateCobro, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, type CobroInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ const formSchema = z.object({
   clienteId: z.coerce.number().optional(),
   emailPagador: z.string().email("Email inválido").optional().or(z.literal("")),
   fechaVencimiento: z.string().optional().or(z.literal("")),
+  responsableId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -31,8 +33,14 @@ export default function NewCobro() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createCobro = useCreateCobro();
+  const { user } = useAuth();
+  const isOrgAdmin = user?.orgRole === "admin_org";
 
   const { data: clientes } = useListClientes();
+  const { data: miembros } = useListMiembros({
+    query: { enabled: isOrgAdmin, queryKey: getListMiembrosQueryKey() },
+  });
+  const miembrosActivos = miembros?.filter((m) => m.activo) ?? [];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -43,6 +51,7 @@ export default function NewCobro() {
       clienteId: undefined,
       emailPagador: "",
       fechaVencimiento: "",
+      responsableId: undefined,
     },
   });
 
@@ -64,6 +73,7 @@ export default function NewCobro() {
       emailPagador: values.emailPagador || selectedCliente?.email || undefined,
       clienteId: values.clienteId || undefined,
       fechaVencimiento: values.fechaVencimiento || undefined,
+      responsableId: isOrgAdmin ? values.responsableId || undefined : undefined,
     };
 
     createCobro.mutate({ data: payload }, {
@@ -201,6 +211,50 @@ export default function NewCobro() {
                   </FormItem>
                 )}
               />
+
+              {isOrgAdmin && miembrosActivos.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="responsableId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" />
+                        Ejecutivo responsable
+                      </FormLabel>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === "yo" ? undefined : v)}
+                        value={field.value ?? "yo"}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Asignar a..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="yo">Yo (asignármelo)</SelectItem>
+                          {miembrosActivos
+                            .filter((m) => m.id !== user?.id)
+                            .map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                <div className="flex flex-col items-start">
+                                  <span>{m.nombre || m.email}</span>
+                                  {m.nombre && m.email && (
+                                    <span className="text-xs text-muted-foreground">{m.email}</span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Asigna este cobro a un miembro de tu equipo para su seguimiento.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

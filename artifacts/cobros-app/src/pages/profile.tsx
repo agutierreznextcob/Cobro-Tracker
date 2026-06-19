@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isValidRut, formatRut } from "@/lib/rut";
+import { TeamSection } from "@/components/team-section";
 import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail } from "lucide-react";
 
 function formatCLP(value: number): string {
@@ -456,6 +457,8 @@ function ProfileSettings() {
           )}
         </CardContent>
       </Card>
+
+      {user?.orgRole === "admin_org" && <TeamSection />}
 
       <Card className="shadow-sm border-border/50">
         <CardHeader className="bg-muted/20 border-b border-border/50">

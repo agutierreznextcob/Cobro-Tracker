@@ -132,12 +132,17 @@ export interface Cobro {
      */
   referencia?: string | null;
   /**
-     * User ID of the person who created this cobro
+     * Organization this cobro belongs to
+     * @nullable
+     */
+  organizationId?: number | null;
+  /**
+     * User ID of the ejecutivo/admin this cobro is assigned to
      * @nullable
      */
   responsableId?: string | null;
   /**
-     * Display name of the person who created this cobro
+     * Display name of the assigned ejecutivo/admin
      * @nullable
      */
   responsableNombre?: string | null;
@@ -228,6 +233,8 @@ export interface CobroInput {
   referencia?: string;
   /** Associate an existing cliente */
   clienteId?: number;
+  /** Assign the cobro to an ejecutivo/admin of the organization (admin only). Defaults to the creator. */
+  responsableId?: string;
   emailPagador?: string;
   /**
      * Due date (YYYY-MM-DD) used to schedule reminders
@@ -809,6 +816,18 @@ export const AuthUserRole = {
   admin: 'admin',
 } as const;
 
+/**
+ * Role within the user's organization
+ * @nullable
+ */
+export type AuthUserOrgRole = typeof AuthUserOrgRole[keyof typeof AuthUserOrgRole] | null;
+
+
+export const AuthUserOrgRole = {
+  admin_org: 'admin_org',
+  ejecutivo: 'ejecutivo',
+} as const;
+
 export interface AuthUser {
   id: string;
   /** @nullable */
@@ -820,6 +839,13 @@ export interface AuthUser {
   /** @nullable */
   profileImageUrl: string | null;
   role?: AuthUserRole;
+  /**
+     * Role within the user's organization
+     * @nullable
+     */
+  orgRole?: AuthUserOrgRole;
+  /** @nullable */
+  organizationId?: number | null;
   profileCompleted?: boolean;
   /** @nullable */
   rut?: string | null;
@@ -874,6 +900,148 @@ export type LogoutSuccess = typeof LogoutSuccessValue;
 
 export interface ErrorEnvelope {
   error: string;
+}
+
+export interface OrganizacionInfo {
+  id: number;
+  nombre: string;
+  /** Whether the current user is an admin_org of this organization */
+  esAdmin: boolean;
+  /** Number of active members in the organization */
+  miembrosActivos: number;
+  /** Monthly base plan price (currency units) covering the first seat */
+  planBase: number;
+  /** Monthly price per additional seat (currency units) */
+  costoUsuarioAdicional: number;
+  /** Number of seats beyond the first */
+  usuariosAdicionales: number;
+  /** Estimated monthly total (planBase + usuariosAdicionales * costoUsuarioAdicional) */
+  totalMensual: number;
+}
+
+/**
+ * @nullable
+ */
+export type MiembroEquipoOrgRole = typeof MiembroEquipoOrgRole[keyof typeof MiembroEquipoOrgRole] | null;
+
+
+export const MiembroEquipoOrgRole = {
+  admin_org: 'admin_org',
+  ejecutivo: 'ejecutivo',
+} as const;
+
+export interface MiembroEquipo {
+  id: string;
+  /** @nullable */
+  nombre: string | null;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  orgRole: MiembroEquipoOrgRole;
+  activo: boolean;
+  /** Whether this member is the organization owner */
+  esOwner: boolean;
+  /** @nullable */
+  createdAt?: string | null;
+}
+
+export type InvitacionOrgRole = typeof InvitacionOrgRole[keyof typeof InvitacionOrgRole];
+
+
+export const InvitacionOrgRole = {
+  admin_org: 'admin_org',
+  ejecutivo: 'ejecutivo',
+} as const;
+
+export type InvitacionEstado = typeof InvitacionEstado[keyof typeof InvitacionEstado];
+
+
+export const InvitacionEstado = {
+  pendiente: 'pendiente',
+  aceptada: 'aceptada',
+  cancelada: 'cancelada',
+  expirada: 'expirada',
+} as const;
+
+export interface Invitacion {
+  id: number;
+  email: string;
+  orgRole: InvitacionOrgRole;
+  estado: InvitacionEstado;
+  /** @nullable */
+  invitadoPorNombre?: string | null;
+  creadoEn: string;
+  /** @nullable */
+  expiraEn?: string | null;
+}
+
+export type InvitarUsuarioInputOrgRole = typeof InvitarUsuarioInputOrgRole[keyof typeof InvitarUsuarioInputOrgRole];
+
+
+export const InvitarUsuarioInputOrgRole = {
+  admin_org: 'admin_org',
+  ejecutivo: 'ejecutivo',
+} as const;
+
+export interface InvitarUsuarioInput {
+  email: string;
+  orgRole: InvitarUsuarioInputOrgRole;
+}
+
+export type ActualizarMiembroInputOrgRole = typeof ActualizarMiembroInputOrgRole[keyof typeof ActualizarMiembroInputOrgRole];
+
+
+export const ActualizarMiembroInputOrgRole = {
+  admin_org: 'admin_org',
+  ejecutivo: 'ejecutivo',
+} as const;
+
+export interface ActualizarMiembroInput {
+  orgRole?: ActualizarMiembroInputOrgRole;
+  activo?: boolean;
+}
+
+export type InvitacionPublicaOrgRole = typeof InvitacionPublicaOrgRole[keyof typeof InvitacionPublicaOrgRole];
+
+
+export const InvitacionPublicaOrgRole = {
+  admin_org: 'admin_org',
+  ejecutivo: 'ejecutivo',
+} as const;
+
+export interface InvitacionPublica {
+  valida: boolean;
+  email: string;
+  orgRole: InvitacionPublicaOrgRole;
+  organizacionNombre: string;
+}
+
+/**
+ * @nullable
+ */
+export type RendimientoEjecutivoOrgRole = typeof RendimientoEjecutivoOrgRole[keyof typeof RendimientoEjecutivoOrgRole] | null;
+
+
+export const RendimientoEjecutivoOrgRole = {
+  admin_org: 'admin_org',
+  ejecutivo: 'ejecutivo',
+} as const;
+
+export interface RendimientoEjecutivo {
+  usuarioId: string;
+  /** @nullable */
+  nombre: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  orgRole: RendimientoEjecutivoOrgRole;
+  cobrosAsignados: number;
+  cobrosPagados: number;
+  cobrosPendientes: number;
+  /** Total paid amount attributed to this ejecutivo (currency units) */
+  montoRecaudado: number;
+  /** Total outstanding amount attributed to this ejecutivo (currency units) */
+  montoPendiente: number;
 }
 
 /**
@@ -943,6 +1111,10 @@ export const ListCobrosMetodo = {
 
 export type GetDashboardMetricsParams = {
 periodo?: GetDashboardMetricsPeriodo;
+/**
+ * Filter by a specific ejecutivo (org admins only)
+ */
+responsable?: string;
 };
 
 export type GetDashboardMetricsPeriodo = typeof GetDashboardMetricsPeriodo[keyof typeof GetDashboardMetricsPeriodo];

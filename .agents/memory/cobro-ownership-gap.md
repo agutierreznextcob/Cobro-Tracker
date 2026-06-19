@@ -1,18 +1,25 @@
 ---
-name: Cobro endpoint ownership gap
-description: Cobro mutation/read-by-id endpoints don't verify per-user ownership; new endpoints follow this same pattern.
+name: Cobro & cliente authorization model
+description: How per-record access is enforced on cobros/clientes detail and mutation endpoints (org-aware).
 ---
 
-Cobro endpoints in `artifacts/api-server/src/routes/cobros.ts` (e.g. flow-link, mp-link,
-descuentos, and other `/cobros/:id/*` handlers) fetch the cobro by id and proceed WITHOUT
-checking `cobro.responsableId === req.user.id`. They only require an authenticated, subscribed
-user. So any authenticated subscriber who guesses/knows an id can read or mutate another user's
-cobro.
+Access to a single cobro or cliente is org-aware, not owner-only:
+- **admin_org** may access any record in their own organization.
+- **ejecutivo** (or a user with no org yet) may access only records assigned to them
+  (cobro `responsableId` / cliente `userId`).
 
-**Why:** This is an established, codebase-wide convention — not specific to one feature. When
-adding a new `/cobros/:id/*` endpoint, match it (no ownership check) for consistency; do NOT add
-ownership checks to only one endpoint, which creates an inconsistent and misleading surface.
+The shared predicates live in `lib/org.ts` (`getOrgContext`, `userCanAccessCobro`,
+`userCanAccessCliente`, `cobroScopeCondition`). Every `/cobros/:id/*` detail/mutation route
+must call the access guard after id validation and return **404** (not 403) on
+missing-or-forbidden so existence is not leaked. List/stats/dashboard queries scope with
+`cobroScopeCondition`. `POST /cobros` must validate any incoming `clienteId` and assigned
+`responsableId` against the caller's org before persisting, to prevent cross-tenant association.
 
-**How to apply:** Closing this gap properly is a broad, dedicated security task: add
-`responsableId === req.user.id` (or 404/403) to ALL cobro read-by-id and mutation endpoints at
-once. Treat it as its own task, not a drive-by change inside a feature.
+**Why:** A multi-tenant org model was added; the earlier "no ownership check" convention was a
+real cross-tenant IDOR hole and is no longer acceptable. Two architect rounds caught missed
+spots (`/cobros/stats/summary`, `POST /cobros` clienteId) — easy to forget the aggregate and
+create paths.
+
+**How to apply:** When adding ANY new endpoint that touches a cobro/cliente by id or aggregates
+them, wire in the org-scope guard/condition from `lib/org.ts`. Never fetch by bare id and
+proceed. Audit non-`:id` aggregate routes too — they leak just as easily.

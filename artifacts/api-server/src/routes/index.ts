@@ -11,6 +11,7 @@ import notificacionesRouter from "./notificaciones";
 import { profileRouter } from "./profile";
 import { subscriptionRouter } from "./subscription";
 import { adminRouter } from "./admin";
+import { organizationRouter } from "./organization";
 
 const router: IRouter = Router();
 
@@ -29,5 +30,6 @@ router.use(aiRouter);
 router.use(profileRouter);
 router.use(subscriptionRouter);
 router.use(adminRouter);
+router.use(organizationRouter);
 
 export default router;

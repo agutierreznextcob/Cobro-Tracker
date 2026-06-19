@@ -1,6 +1,12 @@
 import { useMemo, useState } from "react";
-import { useListCobros } from "@workspace/api-client-react";
+import {
+  useListCobros,
+  useGetRendimientoEquipo,
+  getGetRendimientoEquipoQueryKey,
+} from "@workspace/api-client-react";
 import type { Cobro } from "@workspace/api-client-react";
+import { useAuth } from "@workspace/replit-auth-web";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   ResponsiveContainer,
   BarChart,
@@ -93,10 +99,17 @@ export default function Informes() {
   const [customHasta, setCustomHasta] = useState("");
   const [granSel, setGranSel] = useState<Gran | "auto">("auto");
 
+  const { user } = useAuth();
+  const isOrgAdmin = user?.orgRole === "admin_org";
+
   const { data: cobros, isLoading } = useListCobros(
     {},
     { query: { queryKey: ["listCobros", {}] as const } },
   );
+
+  const { data: rendimiento } = useGetRendimientoEquipo({
+    query: { enabled: isOrgAdmin, queryKey: getGetRendimientoEquipoQueryKey() },
+  });
 
   const minDate = useMemo(() => {
     if (!cobros || cobros.length === 0) return null;
@@ -271,6 +284,7 @@ export default function Informes() {
       "Monto a cobrar": montoCobrar(c),
       Estado: ESTADO_META[c.estado as Estado]?.label ?? c.estado,
       Método: metodoLabel(c),
+      ...(isOrgAdmin ? { "Ejecutivo responsable": c.responsableNombre ?? "Sin asignar" } : {}),
       Referencia: c.referencia ?? "",
     }));
     const wsDetalle = XLSX.utils.json_to_sheet(detalle);
@@ -283,6 +297,7 @@ export default function Informes() {
       { wch: 14 },
       { wch: 12 },
       { wch: 18 },
+      ...(isOrgAdmin ? [{ wch: 24 }] : []),
       { wch: 22 },
     ];
 
@@ -596,6 +611,50 @@ export default function Informes() {
           </ResponsiveContainer>
         )}
       </Card>
+
+      {/* Team performance (admin only) */}
+      {isOrgAdmin && rendimiento && rendimiento.length > 0 && (
+        <Card className="p-5 shadow-sm">
+          <h2 className="text-sm font-semibold mb-4">Rendimiento del equipo</h2>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ejecutivo</TableHead>
+                  <TableHead className="text-right">Asignados</TableHead>
+                  <TableHead className="text-right">Pagados</TableHead>
+                  <TableHead className="text-right">Pendientes</TableHead>
+                  <TableHead className="text-right">Recaudado</TableHead>
+                  <TableHead className="text-right">Por cobrar</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rendimiento.map((r) => (
+                  <TableRow key={r.usuarioId}>
+                    <TableCell className="font-medium">
+                      {r.nombre ?? r.email ?? "—"}
+                      {r.orgRole === "admin_org" && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Admin
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">{r.cobrosAsignados}</TableCell>
+                    <TableCell className="text-right text-emerald-600">{r.cobrosPagados}</TableCell>
+                    <TableCell className="text-right text-amber-600">{r.cobrosPendientes}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(r.montoRecaudado)}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {formatCurrency(r.montoPendiente)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

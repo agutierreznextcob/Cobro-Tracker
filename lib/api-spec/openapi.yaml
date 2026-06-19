@@ -582,6 +582,12 @@ paths:
             type: string
             enum: [hoy, semana, mes, total]
             default: mes
+        - name: responsable
+          in: query
+          required: false
+          description: Filter by a specific ejecutivo (org admins only)
+          schema:
+            type: string
       responses:
         "200":
           description: Dashboard metrics
@@ -1255,6 +1261,215 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminRecordatorioResult"
 
+  /organization:
+    get:
+      operationId: getOrganization
+      tags: [organization]
+      summary: Get the current user's organization info and pricing breakdown
+      responses:
+        "200":
+          description: Organization info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizacionInfo"
+        "401":
+          description: Unauthorized
+
+  /organization/usuarios:
+    get:
+      operationId: listMiembros
+      tags: [organization]
+      summary: List members of the current user's organization
+      responses:
+        "200":
+          description: Team members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MiembroEquipo"
+        "401":
+          description: Unauthorized
+
+  /organization/usuarios/{id}:
+    patch:
+      operationId: updateMiembro
+      tags: [organization]
+      summary: Update a team member's role or active state (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActualizarMiembroInput"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MiembroEquipo"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not an org admin)
+        "404":
+          description: Member not found
+    delete:
+      operationId: deactivateMiembro
+      tags: [organization]
+      summary: Deactivate (remove access for) a team member (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deactivated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MiembroEquipo"
+        "400":
+          description: Cannot remove yourself or last admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not an org admin)
+        "404":
+          description: Member not found
+
+  /organization/invitaciones:
+    get:
+      operationId: listInvitaciones
+      tags: [organization]
+      summary: List pending invitations for the organization (admin only)
+      responses:
+        "200":
+          description: Invitations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invitacion"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not an org admin)
+    post:
+      operationId: invitarUsuario
+      tags: [organization]
+      summary: Invite a user to the organization by email (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitarUsuarioInput"
+      responses:
+        "201":
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitacion"
+        "400":
+          description: Validation error or user already in an organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not an org admin)
+
+  /organization/invitaciones/{id}:
+    delete:
+      operationId: cancelarInvitacion
+      tags: [organization]
+      summary: Cancel a pending invitation (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cancelled invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitacion"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not an org admin)
+        "404":
+          description: Invitation not found
+
+  /organization/rendimiento:
+    get:
+      operationId: getRendimientoEquipo
+      tags: [organization]
+      summary: Team performance per ejecutivo (admin only)
+      responses:
+        "200":
+          description: Performance rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RendimientoEjecutivo"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not an org admin)
+
+  /invitaciones/{token}:
+    get:
+      operationId: getInvitacionPublica
+      tags: [organization]
+      summary: Validate an invitation token (used by the signup landing page)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invitation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitacionPublica"
+        "404":
+          description: Invitation not found or no longer valid
+
   /cobros/{id}/recordatorios:
     get:
       operationId: listRecordatorios
@@ -1696,12 +1911,15 @@ components:
         referencia:
           type: ["string", "null"]
           description: Optional external reference (e.g. payment provider ID)
+        organizationId:
+          type: ["integer", "null"]
+          description: Organization this cobro belongs to
         responsableId:
           type: ["string", "null"]
-          description: User ID of the person who created this cobro
+          description: User ID of the ejecutivo/admin this cobro is assigned to
         responsableNombre:
           type: ["string", "null"]
-          description: Display name of the person who created this cobro
+          description: Display name of the assigned ejecutivo/admin
         clienteId:
           type: ["integer", "null"]
           description: ID of the associated cliente
@@ -1749,6 +1967,9 @@ components:
         clienteId:
           type: integer
           description: Associate an existing cliente
+        responsableId:
+          type: string
+          description: Assign the cobro to an ejecutivo/admin of the organization (admin only). Defaults to the creator.
         emailPagador:
           type: string
           format: email
@@ -2403,6 +2624,12 @@ components:
         role:
           type: string
           enum: [user, admin]
+        orgRole:
+          type: [string, 'null']
+          enum: [admin_org, ejecutivo, null]
+          description: Role within the user's organization
+        organizationId:
+          type: [integer, 'null']
         profileCompleted:
           type: boolean
         rut:
@@ -2481,6 +2708,161 @@ components:
       properties:
         error:
           type: string
+
+    OrganizacionInfo:
+      type: object
+      required:
+        [
+          id,
+          nombre,
+          esAdmin,
+          miembrosActivos,
+          planBase,
+          costoUsuarioAdicional,
+          usuariosAdicionales,
+          totalMensual,
+        ]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        esAdmin:
+          type: boolean
+          description: Whether the current user is an admin_org of this organization
+        miembrosActivos:
+          type: integer
+          description: Number of active members in the organization
+        planBase:
+          type: number
+          description: Monthly base plan price (currency units) covering the first seat
+        costoUsuarioAdicional:
+          type: number
+          description: Monthly price per additional seat (currency units)
+        usuariosAdicionales:
+          type: integer
+          description: Number of seats beyond the first
+        totalMensual:
+          type: number
+          description: Estimated monthly total (planBase + usuariosAdicionales * costoUsuarioAdicional)
+
+    MiembroEquipo:
+      type: object
+      required: [id, nombre, email, orgRole, activo, esOwner]
+      properties:
+        id:
+          type: string
+        nombre:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+          format: email
+        orgRole:
+          type: [string, 'null']
+          enum: [admin_org, ejecutivo, null]
+        activo:
+          type: boolean
+        esOwner:
+          type: boolean
+          description: Whether this member is the organization owner
+        createdAt:
+          type: [string, 'null']
+
+    Invitacion:
+      type: object
+      required: [id, email, orgRole, estado, creadoEn]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        orgRole:
+          type: string
+          enum: [admin_org, ejecutivo]
+        estado:
+          type: string
+          enum: [pendiente, aceptada, cancelada, expirada]
+        invitadoPorNombre:
+          type: [string, 'null']
+        creadoEn:
+          type: string
+          format: date-time
+        expiraEn:
+          type: [string, 'null']
+          format: date-time
+
+    InvitarUsuarioInput:
+      type: object
+      required: [email, orgRole]
+      properties:
+        email:
+          type: string
+          format: email
+        orgRole:
+          type: string
+          enum: [admin_org, ejecutivo]
+
+    ActualizarMiembroInput:
+      type: object
+      properties:
+        orgRole:
+          type: string
+          enum: [admin_org, ejecutivo]
+        activo:
+          type: boolean
+
+    InvitacionPublica:
+      type: object
+      required: [valida, email, orgRole, organizacionNombre]
+      properties:
+        valida:
+          type: boolean
+        email:
+          type: string
+          format: email
+        orgRole:
+          type: string
+          enum: [admin_org, ejecutivo]
+        organizacionNombre:
+          type: string
+
+    RendimientoEjecutivo:
+      type: object
+      required:
+        [
+          usuarioId,
+          nombre,
+          orgRole,
+          cobrosAsignados,
+          cobrosPagados,
+          cobrosPendientes,
+          montoRecaudado,
+          montoPendiente,
+        ]
+      properties:
+        usuarioId:
+          type: string
+        nombre:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+          format: email
+        orgRole:
+          type: [string, 'null']
+          enum: [admin_org, ejecutivo, null]
+        cobrosAsignados:
+          type: integer
+        cobrosPagados:
+          type: integer
+        cobrosPendientes:
+          type: integer
+        montoRecaudado:
+          type: number
+          description: Total paid amount attributed to this ejecutivo (currency units)
+        montoPendiente:
+          type: number
+          description: Total outstanding amount attributed to this ejecutivo (currency units)
 
   parameters:
     AuthorizationSessionHeader:

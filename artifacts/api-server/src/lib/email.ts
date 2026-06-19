@@ -351,6 +351,54 @@ export async function sendSecuenciaRecordatorioEmail(
   return { ok: true };
 }
 
+export interface InvitacionEmailData {
+  email: string;
+  organizacionNombre: string;
+  invitadoPorNombre: string | null;
+  orgRole: "admin_org" | "ejecutivo";
+  ctaUrl: string;
+}
+
+export async function sendInvitacionEmail(
+  data: InvitacionEmailData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping invitation email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const invitador = data.invitadoPorNombre || "El equipo";
+  const rolTexto = data.orgRole === "admin_org" ? "administrador" : "ejecutivo";
+
+  const { error } = await client.emails.send({
+    from: FROM,
+    to: [data.email],
+    subject: `Te invitaron a unirte a ${data.organizacionNombre} en Cobro Simple`,
+    html: buildEmailHtml({
+      title: `Invitación a ${data.organizacionNombre}`,
+      previewText: `${invitador} te invitó a unirte a ${data.organizacionNombre} en Cobro Simple.`,
+      heading: `Te invitaron a ${data.organizacionNombre} 👋`,
+      bodyLines: [
+        `<strong>${invitador}</strong> te invitó a unirte a <strong>${data.organizacionNombre}</strong> en Cobro Simple como <strong>${rolTexto}</strong>.`,
+        `Para aceptar la invitación, inicia sesión con este mismo correo (<strong>${data.email}</strong>) haciendo clic en el botón a continuación.`,
+      ],
+      ctaText: "Aceptar invitación",
+      ctaUrl: data.ctaUrl,
+      footerNote:
+        "Si no esperabas esta invitación, puedes ignorar este correo.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending invitation email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
 export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn: (obj: object, msg: string) => void }): Promise<EmailResult> {
   const client = getResend();
   if (!client) {

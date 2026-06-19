@@ -26,12 +26,17 @@ export interface Cobro {
      */
   referencia?: string | null;
   /**
-     * User ID of the person who created this cobro
+     * Organization this cobro belongs to
+     * @nullable
+     */
+  organizationId?: number | null;
+  /**
+     * User ID of the ejecutivo/admin this cobro is assigned to
      * @nullable
      */
   responsableId?: string | null;
   /**
-     * Display name of the person who created this cobro
+     * Display name of the assigned ejecutivo/admin
      * @nullable
      */
   responsableNombre?: string | null;

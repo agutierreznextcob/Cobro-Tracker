@@ -18,6 +18,9 @@ export const cobrosTable = pgTable("cobros", {
   descripcion: text("descripcion").notNull(),
   estado: estadoCobroEnum("estado").notNull().default("pendiente"),
   referencia: text("referencia"),
+  // Organization the cobro belongs to (denormalized for fast org-wide queries).
+  organizationId: integer("organization_id"),
+  // The user (ejecutivo or admin) the cobro is assigned to / responsible for.
   responsableId: text("responsable_id"),
   responsableNombre: text("responsable_nombre"),
   clienteId: integer("cliente_id").references(() => clientesTable.id, { onDelete: "set null" }),

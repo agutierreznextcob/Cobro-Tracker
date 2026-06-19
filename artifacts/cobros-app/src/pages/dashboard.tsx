@@ -40,7 +40,14 @@ export default function Dashboard() {
   const [filtroResponsable, setFiltroResponsable] = useState<string>("todos");
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
 
-  const { data: metrics, isLoading: isLoadingMetrics } = useGetDashboardMetrics({ periodo });
+  const responsableParam =
+    filtroResponsable !== "todos" && filtroResponsable !== "sin_asignar"
+      ? filtroResponsable
+      : undefined;
+  const { data: metrics, isLoading: isLoadingMetrics } = useGetDashboardMetrics({
+    periodo,
+    ...(responsableParam ? { responsable: responsableParam } : {}),
+  });
   const { data: cobros, isLoading: isLoadingCobros } = useListCobros();
 
   const responsablesUnicos = useMemo(() => {

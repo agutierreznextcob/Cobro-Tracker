@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, jsonb, pgEnum, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgEnum, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { orgRoleEnum } from "./organizaciones";
 
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const sessionsTable = pgTable(
@@ -41,6 +42,13 @@ export const usersTable = pgTable("users", {
     .notNull()
     .default("prueba"),
   role: userRoleEnum("role").notNull().default("user"),
+  // Multi-tenant organization fields. organizationId links the user to their
+  // organization; orgRole is their role within it (admin_org sees everything,
+  // ejecutivo only their assigned cobros/clientes). activo=false disables a
+  // team member without deleting their data. No hard FK by convention.
+  organizationId: integer("organization_id"),
+  orgRole: orgRoleEnum("org_role"),
+  activo: boolean("activo").notNull().default(true),
   // Mandatory profile fields collected on first login. profileCompleted gates
   // access to the rest of the platform until the onboarding form is submitted.
   rut: varchar("rut"),

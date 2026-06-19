@@ -5,6 +5,7 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+import type { AuthUserOrgRole } from './authUserOrgRole';
 import type { AuthUserRole } from './authUserRole';
 
 export interface AuthUser {
@@ -18,6 +19,13 @@ export interface AuthUser {
   /** @nullable */
   profileImageUrl: string | null;
   role?: AuthUserRole;
+  /**
+     * Role within the user's organization
+     * @nullable
+     */
+  orgRole?: AuthUserOrgRole;
+  /** @nullable */
+  organizationId?: number | null;
   profileCompleted?: boolean;
   /** @nullable */
   rut?: string | null;

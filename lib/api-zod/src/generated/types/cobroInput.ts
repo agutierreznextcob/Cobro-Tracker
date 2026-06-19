@@ -14,6 +14,8 @@ export interface CobroInput {
   referencia?: string;
   /** Associate an existing cliente */
   clienteId?: number;
+  /** Assign the cobro to an ejecutivo/admin of the organization (admin only). Defaults to the creator. */
+  responsableId?: string;
   emailPagador?: string;
   /**
      * Due date (YYYY-MM-DD) used to schedule reminders

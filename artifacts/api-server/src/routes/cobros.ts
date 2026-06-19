@@ -8,6 +8,7 @@ import {
   pagosParciales,
   recordatoriosTable,
   recordatoriosEnviadosTable,
+  usersTable,
 } from "@workspace/db";
 import type { Cobro, CobroDescuento } from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt } from "drizzle-orm";
@@ -27,6 +28,7 @@ import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro } from "../lib/recordatorios";
+import { getOrgContext, cobroScopeCondition, userCanAccessCobro, userCanAccessCliente } from "../lib/org";
 
 const cobrosRouter = Router();
 
@@ -81,6 +83,23 @@ async function recalcularEstadoCobro(cobroId: number): Promise<void> {
   await db.update(cobrosTable).set({ estado: nuevoEstado, actualizadoEn: new Date() }).where(eq(cobrosTable.id, cobroId));
 }
 
+// Authorization guard for any /cobros/:id/* route. Loads the org context and the
+// cobro's scope fields, returning true only when the user may access it
+// (admin_org in same org, or the assigned ejecutivo). Returns false for both
+// missing and forbidden cobros so callers respond 404 without leaking existence.
+async function userMayAccessCobroId(userId: string, cobroId: number): Promise<boolean> {
+  const ctx = await getOrgContext(userId);
+  const [row] = await db
+    .select({
+      organizationId: cobrosTable.organizationId,
+      responsableId: cobrosTable.responsableId,
+    })
+    .from(cobrosTable)
+    .where(eq(cobrosTable.id, cobroId));
+  if (!row) return false;
+  return userCanAccessCobro(ctx, userId, row);
+}
+
 cobrosRouter.use((req, res, next) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autorizado" });
@@ -93,9 +112,14 @@ cobrosRouter.use(requireSubscription);
 cobrosRouter.get("/cobros", async (req, res) => {
   const estado = req.query.estado as string | undefined;
   const metodo = req.query.metodo as string | undefined;
+  const responsable = typeof req.query.responsable === "string" ? req.query.responsable : undefined;
+  const userId = req.user!.id;
 
   try {
+    const ctx = await getOrgContext(userId);
     const conditions = [];
+    const scope = cobroScopeCondition(ctx, userId, responsable);
+    if (scope) conditions.push(scope);
     if (estado && ["pendiente", "pagado", "parcial", "fallido", "cancelado"].includes(estado)) {
       conditions.push(eq(cobrosTable.estado, estado as "pendiente" | "pagado" | "parcial" | "fallido" | "cancelado"));
     }
@@ -128,17 +152,54 @@ cobrosRouter.post("/cobros", async (req, res) => {
   const emailPagador = (parsed.data as Record<string, unknown>).emailPagador as string | undefined;
   const clienteId = (parsed.data as Record<string, unknown>).clienteId as number | undefined;
   const fechaVencimiento = (parsed.data as Record<string, unknown>).fechaVencimiento as string | undefined;
+  const responsableIdInput = (parsed.data as Record<string, unknown>).responsableId as string | undefined;
   const user = req.isAuthenticated() ? req.user : null;
-  const responsableNombre = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null
-    : null;
 
   try {
-    // Optionally resolve client name if clienteId provided
+    const ctx = user ? await getOrgContext(user.id) : null;
+
+    // Determine who the cobro is assigned to. Only org admins may assign a cobro
+    // to another member of their organization; otherwise it defaults to the
+    // creator. The assignee must belong to the same organization.
+    let responsableId: string | null = user?.id ?? null;
+    let responsableNombre: string | null = user
+      ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null
+      : null;
+
+    if (responsableIdInput && responsableIdInput !== user?.id) {
+      if (!ctx?.isOrgAdmin || ctx.organizationId == null) {
+        res.status(403).json({ error: "No puedes asignar cobros a otros usuarios." });
+        return;
+      }
+      const [assignee] = await db
+        .select()
+        .from(usersTable)
+        .where(
+          and(
+            eq(usersTable.id, responsableIdInput),
+            eq(usersTable.organizationId, ctx.organizationId),
+          ),
+        );
+      if (!assignee) {
+        res.status(400).json({ error: "El responsable no pertenece a tu organización." });
+        return;
+      }
+      responsableId = assignee.id;
+      responsableNombre =
+        [assignee.firstName, assignee.lastName].filter(Boolean).join(" ") || assignee.email || null;
+    }
+
+    // Optionally resolve client name if clienteId provided. The client must be
+    // accessible to the creator (own client, or any client in the org for
+    // admin_org) to prevent cross-tenant association/leakage.
     let clienteNombre: string | null = null;
     if (clienteId) {
       const [cliente] = await db.select().from(clientesTable).where(eq(clientesTable.id, clienteId));
-      if (cliente) clienteNombre = cliente.nombre;
+      if (!cliente || !ctx || !userCanAccessCliente(ctx, user!.id, cliente)) {
+        res.status(404).json({ error: "Cliente no encontrado" });
+        return;
+      }
+      clienteNombre = cliente.nombre;
     }
 
     const [cobro] = await db
@@ -148,8 +209,9 @@ cobrosRouter.post("/cobros", async (req, res) => {
         descripcion,
         referencia: referencia ?? null,
         estado: "pendiente",
-        responsableId: user?.id ?? null,
+        responsableId,
         responsableNombre,
+        organizationId: ctx?.organizationId ?? null,
         clienteId: clienteId ?? null,
         clienteNombre,
         emailPagador: emailPagador ?? null,
@@ -174,7 +236,11 @@ cobrosRouter.post("/cobros", async (req, res) => {
 });
 
 cobrosRouter.get("/cobros/stats/summary", async (req, res) => {
+  const userId = req.user!.id;
+  const responsable = typeof req.query.responsable === "string" ? req.query.responsable : undefined;
   try {
+    const ctx = await getOrgContext(userId);
+    const scope = cobroScopeCondition(ctx, userId, responsable);
     const rows = await db
       .select({
         estado: cobrosTable.estado,
@@ -182,6 +248,7 @@ cobrosRouter.get("/cobros/stats/summary", async (req, res) => {
         monto: sql<number>`sum(${cobrosTable.monto})::float`,
       })
       .from(cobrosTable)
+      .where(scope)
       .groupBy(cobrosTable.estado);
 
     const total = rows.reduce((acc, r) => acc + r.cantidad, 0);
@@ -209,6 +276,12 @@ cobrosRouter.get("/cobros/:id", async (req, res) => {
     return;
   }
 
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, parsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
+
   try {
     const [cobro] = await db
       .select()
@@ -233,6 +306,11 @@ cobrosRouter.get("/cobros/:id/descuentos", async (req, res) => {
   const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
   if (!paramsParsed.success) {
     res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
     return;
   }
   try {
@@ -268,6 +346,11 @@ cobrosRouter.post("/cobros/:id/descuentos", async (req, res) => {
     return;
   }
   const { tipo, valor, motivo, fechaVigencia } = bodyParsed.data;
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
 
   try {
     const [cobro] = await db
@@ -359,6 +442,10 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
 
   const { emailPagador } = bodyParsed.data;
   const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
 
   try {
     const [cobro] = await db
@@ -436,6 +523,10 @@ cobrosRouter.post("/cobros/:id/mp-link", async (req, res) => {
   }
 
   const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
 
   try {
     const [cobro] = await db
@@ -493,6 +584,12 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
   const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
   if (!paramsParsed.success) {
     res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
     return;
   }
 
@@ -559,6 +656,11 @@ cobrosRouter.post("/cobros/:id/avisar", async (req, res) => {
   }
 
   const { tipo, notas } = bodyParsed.data;
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
 
   try {
     const [cobro] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, paramsParsed.data.id));
@@ -614,6 +716,12 @@ cobrosRouter.get("/cobros/:id/seguimientos", async (req, res) => {
     return;
   }
 
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
+
   try {
     const [cobro] = await db
       .select({ id: cobrosTable.id })
@@ -652,6 +760,12 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
   const bodyParsed = UpdateCobroBody.safeParse(req.body);
   if (!bodyParsed.success) {
     res.status(400).json({ error: bodyParsed.error.message });
+    return;
+  }
+
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
     return;
   }
 
@@ -702,6 +816,7 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
 cobrosRouter.get("/dashboard/metrics", async (req, res) => {
   const userId = req.user!.id;
   const periodo = (req.query.periodo as string) || "mes";
+  const responsable = typeof req.query.responsable === "string" ? req.query.responsable : undefined;
 
   let periodStart: Date | null = null;
   const now = new Date();
@@ -717,9 +832,11 @@ cobrosRouter.get("/dashboard/metrics", async (req, res) => {
   // "total" => no date filter
 
   try {
+    const ctx = await getOrgContext(userId);
+    const scope = cobroScopeCondition(ctx, userId, responsable);
     const baseConditions = periodStart
-      ? and(eq(cobrosTable.responsableId, userId), gte(cobrosTable.creadoEn, periodStart))
-      : eq(cobrosTable.responsableId, userId);
+      ? and(scope, gte(cobrosTable.creadoEn, periodStart))
+      : scope;
 
     const rows = await db
       .select({
@@ -765,6 +882,11 @@ cobrosRouter.get("/cobros/:id/abonos", async (req, res) => {
     res.status(400).json({ error: "ID inválido" });
     return;
   }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
   try {
     const [cobro] = await db.select({ id: cobrosTable.id }).from(cobrosTable).where(eq(cobrosTable.id, paramsParsed.data.id));
     if (!cobro) { res.status(404).json({ error: "Cobro no encontrado" }); return; }
@@ -792,6 +914,10 @@ cobrosRouter.post("/cobros/:id/abonos", async (req, res) => {
   if (!bodyParsed.success) { res.status(400).json({ error: bodyParsed.error.message }); return; }
   const { monto, metodo, notas, emailPagador } = bodyParsed.data;
   const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
   try {
     const [cobro] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, paramsParsed.data.id));
     if (!cobro) { res.status(404).json({ error: "Cobro no encontrado" }); return; }
@@ -879,6 +1005,11 @@ cobrosRouter.post("/cobros/:id/abonos/:abonoId/confirmar", async (req, res) => {
   const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
   const abonoId = Number(req.params.abonoId);
   if (!paramsParsed.success || isNaN(abonoId)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
   try {
     const [abono] = await db.select().from(pagosParciales).where(
       and(eq(pagosParciales.id, abonoId), eq(pagosParciales.cobroId, paramsParsed.data.id))
@@ -918,6 +1049,11 @@ cobrosRouter.get("/cobros/:id/recordatorios", async (req, res) => {
     res.status(400).json({ error: "ID inválido" });
     return;
   }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, parsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
   try {
     const rows = await db
       .select()
@@ -935,6 +1071,11 @@ cobrosRouter.get("/cobros/:id/recordatorios/historial", async (req, res) => {
   const parsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
   if (!parsed.success) {
     res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, parsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
     return;
   }
   try {
@@ -965,6 +1106,11 @@ cobrosRouter.post("/cobros/:id/recordatorios", async (req, res) => {
   const parsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
   if (!parsed.success) {
     res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, parsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
     return;
   }
   const bodyParsed = CreateRecordatorioBody.safeParse(req.body);
@@ -1016,6 +1162,11 @@ cobrosRouter.patch("/cobros/:id/recordatorios/:recordatorioId", async (req, res)
     res.status(400).json({ error: bodyParsed.error.message });
     return;
   }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
   try {
     const [existing] = await db
       .select()
@@ -1060,6 +1211,11 @@ cobrosRouter.delete("/cobros/:id/recordatorios/:recordatorioId", async (req, res
   const recordatorioId = Number(req.params.recordatorioId);
   if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(recordatorioId) || recordatorioId <= 0) {
     res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
     return;
   }
   try {

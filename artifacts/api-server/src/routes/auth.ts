@@ -6,8 +6,9 @@ import {
   ExchangeMobileAuthorizationCodeResponse,
   LogoutMobileSessionResponse,
 } from "@workspace/api-zod";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, invitacionesTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
+import { createSoloOrganization } from "../lib/org";
 import {
   clearSession,
   getOidcConfig,
@@ -80,7 +81,60 @@ async function upsertUser(claims: Record<string, unknown>) {
       },
     })
     .returning();
+
+  // Multi-tenant onboarding: a user with no organization either joins one via a
+  // pending invitation matching their email, or gets their own solo org.
+  if (user.organizationId == null) {
+    await assignOrganization(user);
+  }
+
   return user;
+}
+
+// Resolves the organization a newly-seen user should belong to. If a pending
+// invitation matches their email, they join that org with the invited role and
+// the invitation is marked accepted. Otherwise they become admin_org of a new
+// solo organization. Best-effort: failures are swallowed so login still works.
+async function assignOrganization(user: {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+}): Promise<void> {
+  try {
+    const email = user.email?.trim().toLowerCase();
+    if (email) {
+      const [inv] = await db
+        .select()
+        .from(invitacionesTable)
+        .where(
+          and(
+            eq(invitacionesTable.email, email),
+            eq(invitacionesTable.estado, "pendiente"),
+          ),
+        );
+      const expirada =
+        inv?.expiraEn != null && inv.expiraEn.getTime() < Date.now();
+      if (inv && !expirada) {
+        await db
+          .update(usersTable)
+          .set({
+            organizationId: inv.organizationId,
+            orgRole: inv.orgRole,
+            activo: true,
+          })
+          .where(eq(usersTable.id, user.id));
+        await db
+          .update(invitacionesTable)
+          .set({ estado: "aceptada", aceptadaEn: new Date() })
+          .where(eq(invitacionesTable.id, inv.id));
+        return;
+      }
+    }
+    await createSoloOrganization(user);
+  } catch {
+    // Non-fatal: the user can still log in; org assignment retries next login.
+  }
 }
 
 router.get("/auth/user", async (req: Request, res: Response) => {
@@ -100,6 +154,8 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   let companyName: string | null = null;
   let firstName = req.user.firstName;
   let lastName = req.user.lastName;
+  let orgRole: "admin_org" | "ejecutivo" | null = null;
+  let organizationId: number | null = null;
   try {
     const [row] = await db
       .select({
@@ -111,6 +167,8 @@ router.get("/auth/user", async (req: Request, res: Response) => {
         companyName: usersTable.companyName,
         firstName: usersTable.firstName,
         lastName: usersTable.lastName,
+        orgRole: usersTable.orgRole,
+        organizationId: usersTable.organizationId,
       })
       .from(usersTable)
       .where(eq(usersTable.id, req.user.id));
@@ -123,6 +181,8 @@ router.get("/auth/user", async (req: Request, res: Response) => {
       companyName = row.companyName;
       firstName = row.firstName ?? firstName;
       lastName = row.lastName ?? lastName;
+      orgRole = row.orgRole;
+      organizationId = row.organizationId;
     }
   } catch (err) {
     req.log.error({ err }, "Error loading user profile");
@@ -140,6 +200,8 @@ router.get("/auth/user", async (req: Request, res: Response) => {
         phone,
         address,
         companyName,
+        orgRole,
+        organizationId,
       },
     }),
   );

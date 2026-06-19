@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db, clientesTable, cobrosTable } from "@workspace/db";
-import { eq, and, or, ilike, desc } from "drizzle-orm";
+import { eq, and, or, ilike, desc, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
+import { getOrgContext, userCanAccessCliente } from "../lib/org";
 
 const clientesRouter = Router();
 
@@ -27,7 +28,12 @@ clientesRouter.get("/clientes", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : undefined;
 
   try {
-    const baseWhere = eq(clientesTable.userId, userId);
+    const ctx = await getOrgContext(userId);
+    // admin_org sees every client in the organization; everyone else only their own.
+    const baseWhere: SQL =
+      ctx.isOrgAdmin && ctx.organizationId != null
+        ? eq(clientesTable.organizationId, ctx.organizationId)
+        : eq(clientesTable.userId, userId);
     const rows = await db
       .select()
       .from(clientesTable)
@@ -54,6 +60,7 @@ clientesRouter.post("/clientes", async (req, res) => {
   }
 
   try {
+    const ctx = await getOrgContext(userId);
     const { nombre, rut, email, telefono } = parsed.data;
     const [created] = await db
       .insert(clientesTable)
@@ -63,6 +70,7 @@ clientesRouter.post("/clientes", async (req, res) => {
         email: email || null,
         telefono: telefono || null,
         userId,
+        organizationId: ctx.organizationId ?? null,
       })
       .returning();
 
@@ -83,12 +91,13 @@ clientesRouter.get("/clientes/:id", async (req, res) => {
   }
 
   try {
+    const ctx = await getOrgContext(userId);
     const [cliente] = await db
       .select()
       .from(clientesTable)
-      .where(and(eq(clientesTable.id, id), eq(clientesTable.userId, userId)));
+      .where(eq(clientesTable.id, id));
 
-    if (!cliente) {
+    if (!cliente || !userCanAccessCliente(ctx, userId, cliente)) {
       res.status(404).json({ error: "Cliente no encontrado" });
       return;
     }
@@ -121,12 +130,13 @@ clientesRouter.patch("/clientes/:id", async (req, res) => {
   }
 
   try {
+    const ctx = await getOrgContext(userId);
     const [existing] = await db
       .select()
       .from(clientesTable)
-      .where(and(eq(clientesTable.id, id), eq(clientesTable.userId, userId)));
+      .where(eq(clientesTable.id, id));
 
-    if (!existing) {
+    if (!existing || !userCanAccessCliente(ctx, userId, existing)) {
       res.status(404).json({ error: "Cliente no encontrado" });
       return;
     }

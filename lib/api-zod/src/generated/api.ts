@@ -23,6 +23,8 @@ export const GetCurrentAuthUserResponse = zod.object({
   "lastName": zod.string().nullable(),
   "profileImageUrl": zod.string().nullable(),
   "role": zod.enum(['user', 'admin']).optional(),
+  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('ejecutivo'),zod.literal(null)]).nullish().describe('Role within the user\'s organization'),
+  "organizationId": zod.number().nullish(),
   "profileCompleted": zod.boolean().optional(),
   "rut": zod.string().nullish(),
   "phone": zod.string().nullish(),
@@ -163,8 +165,9 @@ export const GetClienteResponse = zod.object({
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
-  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
-  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "organizationId": zod.number().nullish().describe('Organization this cobro belongs to'),
+  "responsableId": zod.string().nullish().describe('User ID of the ejecutivo\/admin this cobro is assigned to'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the assigned ejecutivo\/admin'),
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
@@ -357,8 +360,9 @@ export const ListCobrosResponseItem = zod.object({
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
-  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
-  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "organizationId": zod.number().nullish().describe('Organization this cobro belongs to'),
+  "responsableId": zod.string().nullish().describe('User ID of the ejecutivo\/admin this cobro is assigned to'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the assigned ejecutivo\/admin'),
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
@@ -387,6 +391,7 @@ export const CreateCobroBody = zod.object({
   "descripcion": zod.string().min(1),
   "referencia": zod.string().optional(),
   "clienteId": zod.number().optional().describe('Associate an existing cliente'),
+  "responsableId": zod.string().optional().describe('Assign the cobro to an ejecutivo\/admin of the organization (admin only). Defaults to the creator.'),
   "emailPagador": zod.string().email().optional(),
   "fechaVencimiento": zod.string().regex(createCobroBodyFechaVencimientoRegExp).optional().describe('Due date (YYYY-MM-DD) used to schedule reminders')
 })
@@ -410,8 +415,9 @@ export const GetCobroResponse = zod.object({
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
-  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
-  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "organizationId": zod.number().nullish().describe('Organization this cobro belongs to'),
+  "responsableId": zod.string().nullish().describe('User ID of the ejecutivo\/admin this cobro is assigned to'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the assigned ejecutivo\/admin'),
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
@@ -454,8 +460,9 @@ export const UpdateCobroResponse = zod.object({
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
-  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
-  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "organizationId": zod.number().nullish().describe('Organization this cobro belongs to'),
+  "responsableId": zod.string().nullish().describe('User ID of the ejecutivo\/admin this cobro is assigned to'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the assigned ejecutivo\/admin'),
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
@@ -491,7 +498,8 @@ export const GetCobrosSummaryResponse = zod.object({
 export const getDashboardMetricsQueryPeriodoDefault = `mes`;
 
 export const GetDashboardMetricsQueryParams = zod.object({
-  "periodo": zod.enum(['hoy', 'semana', 'mes', 'total']).default(getDashboardMetricsQueryPeriodoDefault)
+  "periodo": zod.enum(['hoy', 'semana', 'mes', 'total']).default(getDashboardMetricsQueryPeriodoDefault),
+  "responsable": zod.coerce.string().optional().describe('Filter by a specific ejecutivo (org admins only)')
 })
 
 export const GetDashboardMetricsResponse = zod.object({
@@ -563,6 +571,8 @@ export const CompletarPerfilResponse = zod.object({
   "lastName": zod.string().nullable(),
   "profileImageUrl": zod.string().nullable(),
   "role": zod.enum(['user', 'admin']).optional(),
+  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('ejecutivo'),zod.literal(null)]).nullish().describe('Role within the user\'s organization'),
+  "organizationId": zod.number().nullish(),
   "profileCompleted": zod.boolean().optional(),
   "rut": zod.string().nullish(),
   "phone": zod.string().nullish(),
@@ -741,8 +751,9 @@ export const AplicarDescuentoResponse = zod.object({
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
-  "responsableId": zod.string().nullish().describe('User ID of the person who created this cobro'),
-  "responsableNombre": zod.string().nullish().describe('Display name of the person who created this cobro'),
+  "organizationId": zod.number().nullish().describe('Organization this cobro belongs to'),
+  "responsableId": zod.string().nullish().describe('User ID of the ejecutivo\/admin this cobro is assigned to'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the assigned ejecutivo\/admin'),
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
@@ -945,6 +956,151 @@ export const SendAdminRecordatorioEmailParams = zod.object({
 export const SendAdminRecordatorioEmailResponse = zod.object({
   "ok": zod.boolean(),
   "message": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get the current user's organization info and pricing breakdown
+ */
+export const GetOrganizationResponse = zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "esAdmin": zod.boolean().describe('Whether the current user is an admin_org of this organization'),
+  "miembrosActivos": zod.number().describe('Number of active members in the organization'),
+  "planBase": zod.number().describe('Monthly base plan price (currency units) covering the first seat'),
+  "costoUsuarioAdicional": zod.number().describe('Monthly price per additional seat (currency units)'),
+  "usuariosAdicionales": zod.number().describe('Number of seats beyond the first'),
+  "totalMensual": zod.number().describe('Estimated monthly total (planBase + usuariosAdicionales \* costoUsuarioAdicional)')
+})
+
+
+/**
+ * @summary List members of the current user's organization
+ */
+export const ListMiembrosResponseItem = zod.object({
+  "id": zod.string(),
+  "nombre": zod.string().nullable(),
+  "email": zod.string().email().nullable(),
+  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
+  "activo": zod.boolean(),
+  "esOwner": zod.boolean().describe('Whether this member is the organization owner'),
+  "createdAt": zod.string().nullish()
+})
+export const ListMiembrosResponse = zod.array(ListMiembrosResponseItem)
+
+
+/**
+ * @summary Update a team member's role or active state (admin only)
+ */
+export const UpdateMiembroParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateMiembroBody = zod.object({
+  "orgRole": zod.enum(['admin_org', 'ejecutivo']).optional(),
+  "activo": zod.boolean().optional()
+})
+
+export const UpdateMiembroResponse = zod.object({
+  "id": zod.string(),
+  "nombre": zod.string().nullable(),
+  "email": zod.string().email().nullable(),
+  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
+  "activo": zod.boolean(),
+  "esOwner": zod.boolean().describe('Whether this member is the organization owner'),
+  "createdAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Deactivate (remove access for) a team member (admin only)
+ */
+export const DeactivateMiembroParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeactivateMiembroResponse = zod.object({
+  "id": zod.string(),
+  "nombre": zod.string().nullable(),
+  "email": zod.string().email().nullable(),
+  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
+  "activo": zod.boolean(),
+  "esOwner": zod.boolean().describe('Whether this member is the organization owner'),
+  "createdAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary List pending invitations for the organization (admin only)
+ */
+export const ListInvitacionesResponseItem = zod.object({
+  "id": zod.number(),
+  "email": zod.string().email(),
+  "orgRole": zod.enum(['admin_org', 'ejecutivo']),
+  "estado": zod.enum(['pendiente', 'aceptada', 'cancelada', 'expirada']),
+  "invitadoPorNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date(),
+  "expiraEn": zod.coerce.date().nullish()
+})
+export const ListInvitacionesResponse = zod.array(ListInvitacionesResponseItem)
+
+
+/**
+ * @summary Invite a user to the organization by email (admin only)
+ */
+export const InvitarUsuarioBody = zod.object({
+  "email": zod.string().email(),
+  "orgRole": zod.enum(['admin_org', 'ejecutivo'])
+})
+
+
+/**
+ * @summary Cancel a pending invitation (admin only)
+ */
+export const CancelarInvitacionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CancelarInvitacionResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string().email(),
+  "orgRole": zod.enum(['admin_org', 'ejecutivo']),
+  "estado": zod.enum(['pendiente', 'aceptada', 'cancelada', 'expirada']),
+  "invitadoPorNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date(),
+  "expiraEn": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary Team performance per ejecutivo (admin only)
+ */
+export const GetRendimientoEquipoResponseItem = zod.object({
+  "usuarioId": zod.string(),
+  "nombre": zod.string().nullable(),
+  "email": zod.string().email().nullish(),
+  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
+  "cobrosAsignados": zod.number(),
+  "cobrosPagados": zod.number(),
+  "cobrosPendientes": zod.number(),
+  "montoRecaudado": zod.number().describe('Total paid amount attributed to this ejecutivo (currency units)'),
+  "montoPendiente": zod.number().describe('Total outstanding amount attributed to this ejecutivo (currency units)')
+})
+export const GetRendimientoEquipoResponse = zod.array(GetRendimientoEquipoResponseItem)
+
+
+/**
+ * @summary Validate an invitation token (used by the signup landing page)
+ */
+export const GetInvitacionPublicaParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const GetInvitacionPublicaResponse = zod.object({
+  "valida": zod.boolean(),
+  "email": zod.string().email(),
+  "orgRole": zod.enum(['admin_org', 'ejecutivo']),
+  "organizacionNombre": zod.string()
 })
 
 
