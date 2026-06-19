@@ -909,6 +909,36 @@ export const CreateRecordatorioBody = zod.object({
 
 
 /**
+ * @summary Update an automatic reminder rule
+ */
+export const UpdateRecordatorioParams = zod.object({
+  "id": zod.coerce.number(),
+  "recordatorioId": zod.coerce.number()
+})
+
+export const updateRecordatorioBodyDiasOffsetMin = 0;
+
+
+
+export const UpdateRecordatorioBody = zod.object({
+  "canal": zod.enum(['email', 'whatsapp', 'ambos']).optional(),
+  "momento": zod.enum(['antes', 'dia', 'despues', 'recurrente']).optional(),
+  "diasOffset": zod.number().min(updateRecordatorioBodyDiasOffsetMin).optional().describe('Required (>=1) for antes\/despues\/recurrente; ignored for dia'),
+  "activo": zod.boolean().optional()
+})
+
+export const UpdateRecordatorioResponse = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "canal": zod.enum(['email', 'whatsapp', 'ambos']),
+  "momento": zod.enum(['antes', 'dia', 'despues', 'recurrente']).describe('antes\/despues use diasOffset days before\/after due date; dia = on due date; recurrente = every diasOffset days after due date'),
+  "diasOffset": zod.number().describe('Number of days for the chosen momento'),
+  "activo": zod.boolean(),
+  "creadoEn": zod.coerce.date()
+})
+
+
+/**
  * @summary Delete an automatic reminder rule
  */
 export const DeleteRecordatorioParams = zod.object({

@@ -59,6 +59,15 @@ recordatoriosRouter.put(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
+    const invalido = parsed.data.items.some(
+      (item) => item.momento !== "dia" && (item.diasOffset ?? 0) < 1,
+    );
+    if (invalido) {
+      res.status(400).json({
+        error: "Debes indicar la cantidad de días (mínimo 1) para los recordatorios antes/después/recurrente.",
+      });
+      return;
+    }
     const userId = req.user!.id;
     try {
       await db.transaction(async (tx) => {
@@ -69,7 +78,7 @@ recordatoriosRouter.put(
               userId,
               canal: item.canal,
               momento: item.momento,
-              diasOffset: item.diasOffset ?? 0,
+              diasOffset: item.momento === "dia" ? 0 : (item.diasOffset ?? 0),
               activo: item.activo ?? true,
               orden: i,
             })),

@@ -70,6 +70,7 @@ import type {
   RecordatorioDefault,
   RecordatorioEnviado,
   RecordatorioInput,
+  RecordatorioUpdate,
   RecordatoriosDefaultInput,
   RecordatoriosRunResult,
   SeguimientoCobranza,
@@ -3762,6 +3763,80 @@ export const useCreateRecordatorio = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCreateRecordatorioMutationOptions(options));
+    }
+
+export const getUpdateRecordatorioUrl = (id: number,
+    recordatorioId: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/recordatorios/${recordatorioId}`
+}
+
+/**
+ * @summary Update an automatic reminder rule
+ */
+export const updateRecordatorio = async (id: number,
+    recordatorioId: number,
+    recordatorioUpdate: RecordatorioUpdate, options?: RequestInit): Promise<Recordatorio> => {
+
+  return customFetch<Recordatorio>(getUpdateRecordatorioUrl(id,recordatorioId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      recordatorioUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateRecordatorioMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRecordatorio>>, TError,{id: number;recordatorioId: number;data: BodyType<RecordatorioUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRecordatorio>>, TError,{id: number;recordatorioId: number;data: BodyType<RecordatorioUpdate>}, TContext> => {
+
+const mutationKey = ['updateRecordatorio'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRecordatorio>>, {id: number;recordatorioId: number;data: BodyType<RecordatorioUpdate>}> = (props) => {
+          const {id,recordatorioId,data} = props ?? {};
+
+          return  updateRecordatorio(id,recordatorioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRecordatorioMutationResult = NonNullable<Awaited<ReturnType<typeof updateRecordatorio>>>
+    export type UpdateRecordatorioMutationBody = BodyType<RecordatorioUpdate>
+    export type UpdateRecordatorioMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update an automatic reminder rule
+ */
+export const useUpdateRecordatorio = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRecordatorio>>, TError,{id: number;recordatorioId: number;data: BodyType<RecordatorioUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRecordatorio>>,
+        TError,
+        {id: number;recordatorioId: number;data: BodyType<RecordatorioUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateRecordatorioMutationOptions(options));
     }
 
 export const getDeleteRecordatorioUrl = (id: number,

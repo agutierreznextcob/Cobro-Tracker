@@ -513,6 +513,36 @@ export interface RecordatorioInput {
   diasOffset?: number;
 }
 
+export type RecordatorioUpdateCanal = typeof RecordatorioUpdateCanal[keyof typeof RecordatorioUpdateCanal];
+
+
+export const RecordatorioUpdateCanal = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+  ambos: 'ambos',
+} as const;
+
+export type RecordatorioUpdateMomento = typeof RecordatorioUpdateMomento[keyof typeof RecordatorioUpdateMomento];
+
+
+export const RecordatorioUpdateMomento = {
+  antes: 'antes',
+  dia: 'dia',
+  despues: 'despues',
+  recurrente: 'recurrente',
+} as const;
+
+export interface RecordatorioUpdate {
+  canal?: RecordatorioUpdateCanal;
+  momento?: RecordatorioUpdateMomento;
+  /**
+     * Required (>=1) for antes/despues/recurrente; ignored for dia
+     * @minimum 0
+     */
+  diasOffset?: number;
+  activo?: boolean;
+}
+
 export type RecordatorioDefaultCanal = typeof RecordatorioDefaultCanal[keyof typeof RecordatorioDefaultCanal];
 
 

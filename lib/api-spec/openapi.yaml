@@ -1243,6 +1243,46 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
   /cobros/{id}/recordatorios/{recordatorioId}:
+    patch:
+      operationId: updateRecordatorio
+      tags: [recordatorios]
+      summary: Update an automatic reminder rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: recordatorioId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordatorioUpdate"
+      responses:
+        "200":
+          description: Updated reminder rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recordatorio"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     delete:
       operationId: deleteRecordatorio
       tags: [recordatorios]
@@ -1951,6 +1991,22 @@ components:
           type: integer
           minimum: 0
           description: Required (>=1) for antes/despues/recurrente; ignored for dia
+
+    RecordatorioUpdate:
+      type: object
+      properties:
+        canal:
+          type: string
+          enum: [email, whatsapp, ambos]
+        momento:
+          type: string
+          enum: [antes, dia, despues, recurrente]
+        diasOffset:
+          type: integer
+          minimum: 0
+          description: Required (>=1) for antes/despues/recurrente; ignored for dia
+        activo:
+          type: boolean
 
     RecordatorioDefault:
       type: object

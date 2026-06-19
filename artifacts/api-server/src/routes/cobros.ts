@@ -15,6 +15,7 @@ import {
   GetCobroParams,
   UpdateCobroParams,
   CreateRecordatorioBody,
+  UpdateRecordatorioBody,
 } from "@workspace/api-zod";
 import { z } from "zod";
 import { getFlowCredentials, getMpCredentials } from "./profile";
@@ -871,6 +872,57 @@ cobrosRouter.post("/cobros/:id/recordatorios", async (req, res) => {
     res.status(201).json(mapRecordatorio(created));
   } catch (err) {
     req.log.error({ err }, "Error creating recordatorio");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+cobrosRouter.patch("/cobros/:id/recordatorios/:recordatorioId", async (req, res) => {
+  const id = Number(req.params.id);
+  const recordatorioId = Number(req.params.recordatorioId);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(recordatorioId) || recordatorioId <= 0) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const bodyParsed = UpdateRecordatorioBody.safeParse(req.body);
+  if (!bodyParsed.success) {
+    res.status(400).json({ error: bodyParsed.error.message });
+    return;
+  }
+  try {
+    const [existing] = await db
+      .select()
+      .from(recordatoriosTable)
+      .where(and(eq(recordatoriosTable.id, recordatorioId), eq(recordatoriosTable.cobroId, id)));
+    if (!existing) {
+      res.status(404).json({ error: "Recordatorio no encontrado" });
+      return;
+    }
+
+    const canal = bodyParsed.data.canal ?? existing.canal;
+    const momento = bodyParsed.data.momento ?? existing.momento;
+    const diasOffset =
+      bodyParsed.data.diasOffset ?? existing.diasOffset;
+    const finalDiasOffset = momento === "dia" ? 0 : diasOffset;
+    if (momento !== "dia" && finalDiasOffset < 1) {
+      res.status(400).json({ error: "Debes indicar la cantidad de días (mínimo 1) para este tipo de recordatorio." });
+      return;
+    }
+
+    const updates: Record<string, unknown> = {
+      canal,
+      momento,
+      diasOffset: finalDiasOffset,
+    };
+    if (bodyParsed.data.activo !== undefined) updates.activo = bodyParsed.data.activo;
+
+    const [updated] = await db
+      .update(recordatoriosTable)
+      .set(updates)
+      .where(and(eq(recordatoriosTable.id, recordatorioId), eq(recordatoriosTable.cobroId, id)))
+      .returning();
+    res.json(mapRecordatorio(updated));
+  } catch (err) {
+    req.log.error({ err }, "Error updating recordatorio");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

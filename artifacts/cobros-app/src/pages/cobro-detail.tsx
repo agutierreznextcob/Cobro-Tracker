@@ -16,6 +16,7 @@ import {
   getListAbonosQueryKey,
   useListRecordatorios,
   useCreateRecordatorio,
+  useUpdateRecordatorio,
   useDeleteRecordatorio,
   useListRecordatoriosHistorial,
   getListRecordatoriosQueryKey,
@@ -58,6 +59,7 @@ import {
   Bell,
   Trash2,
   CalendarClock,
+  Pencil,
 } from "lucide-react";
 import { CobroUpdateEstado } from "@workspace/api-client-react";
 
@@ -415,12 +417,17 @@ export default function CobroDetail() {
     query: { enabled: !!id, queryKey: getListRecordatoriosHistorialQueryKey(id) },
   });
   const crearRecordatorio = useCreateRecordatorio();
+  const actualizarRecordatorio = useUpdateRecordatorio();
   const eliminarRecordatorio = useDeleteRecordatorio();
 
   const [nuevoCanal, setNuevoCanal] = useState<RecordatorioInputCanal>("email");
   const [nuevoMomento, setNuevoMomento] = useState<RecordatorioInputMomento>("despues");
   const [nuevoDias, setNuevoDias] = useState<string>("3");
   const [fechaVencimientoInput, setFechaVencimientoInput] = useState<string>("");
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [editCanal, setEditCanal] = useState<RecordatorioInputCanal>("email");
+  const [editMomento, setEditMomento] = useState<RecordatorioInputMomento>("despues");
+  const [editDias, setEditDias] = useState<string>("3");
 
   useEffect(() => {
     setFechaVencimientoInput(cobro?.fechaVencimiento ?? "");
@@ -486,6 +493,39 @@ export default function CobroDetail() {
         },
         onError: (err: unknown) => {
           const msg = err instanceof Error ? err.message : "No se pudo eliminar el recordatorio.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const handleIniciarEdicion = (r: { id: number; canal: string; momento: string; diasOffset: number }) => {
+    setEditandoId(r.id);
+    setEditCanal(r.canal as RecordatorioInputCanal);
+    setEditMomento(r.momento as RecordatorioInputMomento);
+    setEditDias(r.momento === "dia" ? "0" : String(r.diasOffset || 1));
+  };
+
+  const handleCancelarEdicion = () => {
+    setEditandoId(null);
+  };
+
+  const handleGuardarEdicion = (recordatorioId: number) => {
+    const dias = editMomento === "dia" ? 0 : parseInt(editDias || "0", 10);
+    if (editMomento !== "dia" && (isNaN(dias) || dias < 1)) {
+      toast({ title: "Días inválidos", description: "Indica un número de días mayor a 0.", variant: "destructive" });
+      return;
+    }
+    actualizarRecordatorio.mutate(
+      { id, recordatorioId, data: { canal: editCanal, momento: editMomento, diasOffset: dias } },
+      {
+        onSuccess: () => {
+          toast({ title: "Recordatorio actualizado", description: "Se guardaron los cambios." });
+          setEditandoId(null);
+          invalidarRecordatorios();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo actualizar el recordatorio.";
           toast({ title: "Error", description: msg, variant: "destructive" });
         },
       }
@@ -1194,32 +1234,99 @@ export default function CobroDetail() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {recordatorios.map((r) => (
-                    <div
-                      key={r.id}
-                      className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-background px-3 py-2.5"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        {r.canal === "whatsapp" ? (
-                          <MessageCircle className="h-4 w-4 text-emerald-600 shrink-0" />
-                        ) : r.canal === "ambos" ? (
-                          <Send className="h-4 w-4 text-primary shrink-0" />
-                        ) : (
-                          <Mail className="h-4 w-4 text-primary shrink-0" />
-                        )}
-                        <span className="text-sm truncate">{describirRecordatorio(r.canal, r.momento, r.diasOffset)}</span>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
-                        onClick={() => handleEliminarRecordatorio(r.id)}
-                        disabled={eliminarRecordatorio.isPending}
+                  {recordatorios.map((r) =>
+                    editandoId === r.id ? (
+                      <div
+                        key={r.id}
+                        className="flex flex-col sm:flex-row sm:items-end gap-3 rounded-md border border-primary/40 bg-primary/5 p-3"
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="space-y-1.5 flex-1">
+                          <Label className="text-xs">Canal</Label>
+                          <Select value={editCanal} onValueChange={(v) => setEditCanal(v as RecordatorioInputCanal)}>
+                            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="email">Email</SelectItem>
+                              <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                              <SelectItem value="ambos">Ambos</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5 flex-1">
+                          <Label className="text-xs">Momento</Label>
+                          <Select value={editMomento} onValueChange={(v) => setEditMomento(v as RecordatorioInputMomento)}>
+                            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="antes">Antes del vencimiento</SelectItem>
+                              <SelectItem value="dia">El día del vencimiento</SelectItem>
+                              <SelectItem value="despues">Después del vencimiento</SelectItem>
+                              <SelectItem value="recurrente">Recurrente (cada X días)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {editMomento !== "dia" && (
+                          <div className="space-y-1.5 w-full sm:w-24">
+                            <Label className="text-xs">Días</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={editDias}
+                              onChange={(e) => setEditDias(e.target.value)}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleGuardarEdicion(r.id)}
+                            disabled={actualizarRecordatorio.isPending}
+                            className="h-9 gap-1.5"
+                          >
+                            {actualizarRecordatorio.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Guardar
+                          </Button>
+                          <Button variant="outline" onClick={handleCancelarEdicion} className="h-9">
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        key={r.id}
+                        className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-background px-3 py-2.5"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {r.canal === "whatsapp" ? (
+                            <MessageCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                          ) : r.canal === "ambos" ? (
+                            <Send className="h-4 w-4 text-primary shrink-0" />
+                          ) : (
+                            <Mail className="h-4 w-4 text-primary shrink-0" />
+                          )}
+                          <span className="text-sm truncate">{describirRecordatorio(r.canal, r.momento, r.diasOffset)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                            onClick={() => handleIniciarEdicion(r)}
+                            disabled={eliminarRecordatorio.isPending}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleEliminarRecordatorio(r.id)}
+                            disabled={eliminarRecordatorio.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  )}
                 </div>
               )}
             </>
