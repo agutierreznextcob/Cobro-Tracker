@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useGetCobro,
   getGetCobroQueryKey,
@@ -420,6 +420,34 @@ export default function CobroDetail() {
   const [nuevoCanal, setNuevoCanal] = useState<RecordatorioInputCanal>("email");
   const [nuevoMomento, setNuevoMomento] = useState<RecordatorioInputMomento>("despues");
   const [nuevoDias, setNuevoDias] = useState<string>("3");
+  const [fechaVencimientoInput, setFechaVencimientoInput] = useState<string>("");
+
+  useEffect(() => {
+    setFechaVencimientoInput(cobro?.fechaVencimiento ?? "");
+  }, [cobro?.fechaVencimiento]);
+
+  const handleGuardarVencimiento = (valor: string | null) => {
+    updateCobro.mutate(
+      { id, data: { fechaVencimiento: valor } },
+      {
+        onSuccess: () => {
+          toast({
+            title: valor ? "Fecha de vencimiento actualizada" : "Fecha de vencimiento eliminada",
+            description: valor
+              ? "Se actualizó la fecha de vencimiento del cobro."
+              : "El cobro ya no tiene fecha de vencimiento.",
+          });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+          invalidarRecordatorios();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo actualizar la fecha de vencimiento.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
 
   const invalidarRecordatorios = () => {
     queryClient.invalidateQueries({ queryKey: getListRecordatoriosQueryKey(id) });
@@ -1064,6 +1092,41 @@ export default function CobroDetail() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6 space-y-5">
+          {/* Editar fecha de vencimiento */}
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 rounded-md border border-border/50 bg-muted/20 p-3">
+            <div className="space-y-1.5 flex-1">
+              <Label className="text-xs">Fecha de vencimiento</Label>
+              <Input
+                type="date"
+                value={fechaVencimientoInput}
+                onChange={(e) => setFechaVencimientoInput(e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+            <Button
+              onClick={() => handleGuardarVencimiento(fechaVencimientoInput || null)}
+              disabled={
+                updateCobro.isPending ||
+                !fechaVencimientoInput ||
+                fechaVencimientoInput === (cobro?.fechaVencimiento ?? "")
+              }
+              className="h-9 gap-1.5"
+            >
+              {updateCobro.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Guardar
+            </Button>
+            {cobro?.fechaVencimiento ? (
+              <Button
+                variant="outline"
+                onClick={() => handleGuardarVencimiento(null)}
+                disabled={updateCobro.isPending}
+                className="h-9"
+              >
+                Quitar
+              </Button>
+            ) : null}
+          </div>
+
           {!cobro?.fechaVencimiento ? (
             <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50/50 px-3 py-3">
               <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />

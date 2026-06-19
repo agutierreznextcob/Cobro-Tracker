@@ -1604,7 +1604,7 @@ components:
           description: Email of the payer for Flow payment link
         fechaVencimiento:
           type: ["string", "null"]
-          format: date
+          pattern: '^\d{4}-\d{2}-\d{2}$'
           description: Due date (YYYY-MM-DD) used to schedule reminders
         flowOrdenId:
           type: ["string", "null"]
@@ -1645,7 +1645,7 @@ components:
           format: email
         fechaVencimiento:
           type: string
-          format: date
+          pattern: '^\d{4}-\d{2}-\d{2}$'
           description: Due date (YYYY-MM-DD) used to schedule reminders
 
     AvisarClienteInput:
@@ -1816,7 +1816,7 @@ components:
           type: string
         fechaVencimiento:
           type: ["string", "null"]
-          format: date
+          pattern: '^\d{4}-\d{2}-\d{2}$'
           description: Due date (YYYY-MM-DD); null clears it
 
     CobrosSummary:

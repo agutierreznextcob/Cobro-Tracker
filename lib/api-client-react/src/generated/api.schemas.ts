@@ -152,6 +152,7 @@ export interface Cobro {
   /**
      * Due date (YYYY-MM-DD) used to schedule reminders
      * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
      */
   fechaVencimiento?: string | null;
   /**
@@ -221,7 +222,10 @@ export interface CobroInput {
   /** Associate an existing cliente */
   clienteId?: number;
   emailPagador?: string;
-  /** Due date (YYYY-MM-DD) used to schedule reminders */
+  /**
+     * Due date (YYYY-MM-DD) used to schedule reminders
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
   fechaVencimiento?: string;
 }
 
@@ -375,6 +379,7 @@ export interface CobroUpdate {
   /**
      * Due date (YYYY-MM-DD); null clears it
      * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
      */
   fechaVencimiento?: string | null;
 }

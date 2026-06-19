@@ -46,8 +46,9 @@ export interface Cobro {
   /**
      * Due date (YYYY-MM-DD) used to schedule reminders
      * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
      */
-  fechaVencimiento?: Date | null;
+  fechaVencimiento?: string | null;
   /**
      * Flow order ID returned after creating payment
      * @nullable

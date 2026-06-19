@@ -15,6 +15,7 @@ export interface CobroUpdate {
   /**
      * Due date (YYYY-MM-DD); null clears it
      * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
      */
-  fechaVencimiento?: Date | null;
+  fechaVencimiento?: string | null;
 }

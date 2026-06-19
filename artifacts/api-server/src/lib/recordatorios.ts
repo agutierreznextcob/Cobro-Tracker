@@ -8,7 +8,7 @@ import {
   notificacionesTable,
   type RecordatorioDefault,
 } from "@workspace/db";
-import { and, eq, inArray, isNotNull, notInArray } from "drizzle-orm";
+import { and, eq, isNotNull, notInArray } from "drizzle-orm";
 import { sendSecuenciaRecordatorioEmail } from "./email";
 
 type Canal = "email" | "whatsapp" | "ambos";
@@ -149,22 +149,49 @@ export async function aplicarDefaultsACobro(cobroId: number, userId: string): Pr
 
 // --- The engine ---
 
-async function logEnviado(
+// Atomically claim the right to send for (cobro, regla, canal, día). Relies on the
+// unique index ux_recordatorios_enviados_dia to make concurrent runs race-safe.
+// Returns the row id when the caller wins the claim, or null if another run already
+// sent it (estado enviado/pendiente). A previous "fallido" can be re-claimed for retry.
+async function claimEnvio(
   cobroId: number,
-  recordatorioId: number | null,
+  recordatorioId: number,
   canal: "email" | "whatsapp",
+  fecha: string,
+): Promise<number | null> {
+  const inserted = await db
+    .insert(recordatoriosEnviadosTable)
+    .values({ cobroId, recordatorioId, canal, estado: "pendiente", detalle: null, fecha })
+    .onConflictDoNothing()
+    .returning({ id: recordatoriosEnviadosTable.id });
+  if (inserted.length > 0) return inserted[0].id;
+
+  // A row already exists. Only re-claim if the prior attempt failed.
+  const reclaimed = await db
+    .update(recordatoriosEnviadosTable)
+    .set({ estado: "pendiente", detalle: null, creadoEn: new Date() })
+    .where(
+      and(
+        eq(recordatoriosEnviadosTable.cobroId, cobroId),
+        eq(recordatoriosEnviadosTable.recordatorioId, recordatorioId),
+        eq(recordatoriosEnviadosTable.canal, canal),
+        eq(recordatoriosEnviadosTable.fecha, fecha),
+        eq(recordatoriosEnviadosTable.estado, "fallido"),
+      ),
+    )
+    .returning({ id: recordatoriosEnviadosTable.id });
+  return reclaimed.length > 0 ? reclaimed[0].id : null;
+}
+
+async function marcarEnvio(
+  id: number,
   estado: "enviado" | "fallido" | "pendiente",
   detalle: string | null,
-  fecha: string,
 ): Promise<void> {
-  await db.insert(recordatoriosEnviadosTable).values({
-    cobroId,
-    recordatorioId,
-    canal,
-    estado,
-    detalle,
-    fecha,
-  });
+  await db
+    .update(recordatoriosEnviadosTable)
+    .set({ estado, detalle })
+    .where(eq(recordatoriosEnviadosTable.id, id));
 }
 
 export async function procesarRecordatorios(
@@ -204,28 +231,17 @@ export async function procesarRecordatorios(
         regla.canal === "ambos" ? ["email", "whatsapp"] : [regla.canal as "email" | "whatsapp"];
 
       for (const canal of canales) {
-        // Idempotencia: si ya hay un envío exitoso/pendiente hoy para esta regla+canal, saltar.
-        const yaEnviado = await db
-          .select({ id: recordatoriosEnviadosTable.id })
-          .from(recordatoriosEnviadosTable)
-          .where(
-            and(
-              eq(recordatoriosEnviadosTable.cobroId, cobro.id),
-              eq(recordatoriosEnviadosTable.recordatorioId, regla.id),
-              eq(recordatoriosEnviadosTable.canal, canal),
-              eq(recordatoriosEnviadosTable.fecha, hoy),
-              inArray(recordatoriosEnviadosTable.estado, ["enviado", "pendiente"]),
-            ),
-          )
-          .limit(1);
-        if (yaEnviado.length > 0) continue;
+        // Idempotencia race-safe: reclamar el envío del día. Si otro run ya lo tomó
+        // (enviado/pendiente), claimEnvio devuelve null y saltamos.
+        const envioId = await claimEnvio(cobro.id, regla.id, canal, hoy);
+        if (envioId === null) continue;
 
         const diasVencido = diffDays(hoy, vencimiento);
         const linkPago = cobro.flowLinkPago || cobro.mpPaymentLinkUrl || null;
 
         if (canal === "email") {
           if (!cobro.emailPagador) {
-            await logEnviado(cobro.id, regla.id, "email", "fallido", "El cobro no tiene email del pagador.", hoy);
+            await marcarEnvio(envioId, "fallido", "El cobro no tiene email del pagador.");
             errores++;
             continue;
           }
@@ -243,15 +259,15 @@ export async function procesarRecordatorios(
           );
           if (result.ok) {
             emailsEnviados++;
-            await logEnviado(cobro.id, regla.id, "email", "enviado", null, hoy);
+            await marcarEnvio(envioId, "enviado", null);
           } else {
             errores++;
-            await logEnviado(cobro.id, regla.id, "email", "fallido", result.error ?? "Error al enviar email", hoy);
+            await marcarEnvio(envioId, "fallido", result.error ?? "Error al enviar email");
           }
         } else {
           // WhatsApp = notificación in-app "listo para enviar"
           if (!cobro.responsableId) {
-            await logEnviado(cobro.id, regla.id, "whatsapp", "fallido", "El cobro no tiene responsable.", hoy);
+            await marcarEnvio(envioId, "fallido", "El cobro no tiene responsable.");
             errores++;
             continue;
           }
@@ -274,7 +290,7 @@ export async function procesarRecordatorios(
             waUrl,
           });
           notificacionesCreadas++;
-          await logEnviado(cobro.id, regla.id, "whatsapp", "pendiente", "WhatsApp listo para enviar.", hoy);
+          await marcarEnvio(envioId, "pendiente", "WhatsApp listo para enviar.");
         }
       }
     }

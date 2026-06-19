@@ -143,6 +143,9 @@ export const GetClienteParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const getClienteResponseCobrosItemFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
 export const GetClienteResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
@@ -163,7 +166,7 @@ export const GetClienteResponse = zod.object({
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
-  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "fechaVencimiento": zod.string().regex(getClienteResponseCobrosItemFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
@@ -341,6 +344,9 @@ export const ListCobrosQueryParams = zod.object({
   "metodo": zod.enum(['flow', 'mp', 'link', 'manual']).optional().describe('flow=solo Flow, mp=solo MP, link=cualquier pasarela, manual=sin pasarela')
 })
 
+export const listCobrosResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
 export const ListCobrosResponseItem = zod.object({
   "id": zod.number(),
   "monto": zod.number().describe('Amount in currency units'),
@@ -352,7 +358,7 @@ export const ListCobrosResponseItem = zod.object({
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
-  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "fechaVencimiento": zod.string().regex(listCobrosResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
@@ -369,6 +375,7 @@ export const ListCobrosResponse = zod.array(ListCobrosResponseItem)
 export const createCobroBodyMontoMin = 0.01;
 
 
+export const createCobroBodyFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const CreateCobroBody = zod.object({
@@ -377,7 +384,7 @@ export const CreateCobroBody = zod.object({
   "referencia": zod.string().optional(),
   "clienteId": zod.number().optional().describe('Associate an existing cliente'),
   "emailPagador": zod.string().email().optional(),
-  "fechaVencimiento": zod.coerce.date().optional().describe('Due date (YYYY-MM-DD) used to schedule reminders')
+  "fechaVencimiento": zod.string().regex(createCobroBodyFechaVencimientoRegExp).optional().describe('Due date (YYYY-MM-DD) used to schedule reminders')
 })
 
 
@@ -387,6 +394,9 @@ export const CreateCobroBody = zod.object({
 export const GetCobroParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const getCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
 
 export const GetCobroResponse = zod.object({
   "id": zod.number(),
@@ -399,7 +409,7 @@ export const GetCobroResponse = zod.object({
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
-  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "fechaVencimiento": zod.string().regex(getCobroResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
@@ -417,14 +427,18 @@ export const UpdateCobroParams = zod.object({
 })
 
 
+export const updateCobroBodyFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const UpdateCobroBody = zod.object({
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).optional(),
   "descripcion": zod.string().min(1).optional(),
   "referencia": zod.string().optional(),
-  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD); null clears it')
+  "fechaVencimiento": zod.string().regex(updateCobroBodyFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD); null clears it')
 })
+
+export const updateCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
 
 export const UpdateCobroResponse = zod.object({
   "id": zod.number(),
@@ -437,7 +451,7 @@ export const UpdateCobroResponse = zod.object({
   "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
-  "fechaVencimiento": zod.coerce.date().nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "fechaVencimiento": zod.string().regex(updateCobroResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
