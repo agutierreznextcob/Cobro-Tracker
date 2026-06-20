@@ -1,5 +1,6 @@
 import { useAuth } from "@workspace/replit-auth-web";
 import { Redirect } from "wouter";
+import { LandingChat } from "@/components/landing-chat";
 import {
   Activity,
   ArrowRight,
@@ -405,6 +406,7 @@ export default function LandingPage() {
       <QuienesSomosSection />
       <CtaSection />
       <Footer />
+      <LandingChat />
     </div>
   );
 }

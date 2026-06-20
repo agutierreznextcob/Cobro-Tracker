@@ -5,6 +5,7 @@ import cobrosRouter from "./cobros";
 import clientesRouter from "./clientes";
 import liquidacionesRouter from "./liquidaciones";
 import aiRouter from "./ai";
+import publicChatRouter from "./public-chat";
 import webhooksRouter from "./webhooks";
 import recordatoriosRouter from "./recordatorios";
 import notificacionesRouter from "./notificaciones";
@@ -17,6 +18,9 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+// publicChatRouter is unauthenticated (landing-page sales assistant); mount it
+// before aiRouter, which gates every route behind auth + subscription.
+router.use(publicChatRouter);
 // webhooksRouter must come BEFORE cobrosRouter — cobrosRouter has a blanket
 // auth middleware (Router.use without a path) that would otherwise intercept
 // every request including public webhook paths like /webhooks/flow.
