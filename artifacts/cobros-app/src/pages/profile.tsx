@@ -410,7 +410,7 @@ function ProfileSettings() {
                 <p className="text-xs text-green-600 dark:text-green-400">
                   {subStatus.periodEnd
                     ? `Próximo cobro: ${formatFecha(subStatus.periodEnd)}`
-                    : `Plan mensual ${formatCLP(subStatus.precioMensual)}/mes`}
+                    : `Plan mensual ${formatCLP(subStatus.precioNeto)} + IVA/mes`}
                 </p>
                 <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-0.5">
                   Neto {formatCLP(subStatus.precioNeto)} + IVA {formatCLP(subStatus.precioIva)} = Total {formatCLP(subStatus.precioMensual)} (IVA incl.)
@@ -437,7 +437,7 @@ function ProfileSettings() {
                 {startSubscription.isPending ? (
                   <><Loader2 className="h-4 w-4 animate-spin mr-2" />Redirigiendo...</>
                 ) : (
-                  `Suscribirme - ${formatCLP(subStatus.precioMensual)}/mes`
+                  `Suscribirme - ${formatCLP(subStatus.precioNeto)} + IVA/mes`
                 )}
               </Button>
             </>
@@ -456,7 +456,7 @@ function ProfileSettings() {
                 {startSubscription.isPending ? (
                   <><Loader2 className="h-4 w-4 animate-spin mr-2" />Redirigiendo...</>
                 ) : (
-                  `Suscribirme - ${formatCLP(subStatus?.precioMensual ?? 22598)}/mes`
+                  `Suscribirme - ${formatCLP(subStatus?.precioNeto ?? 18990)} + IVA/mes`
                 )}
               </Button>
             </>

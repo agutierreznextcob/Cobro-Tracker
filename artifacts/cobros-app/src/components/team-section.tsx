@@ -194,7 +194,7 @@ export function TeamSection() {
               <span className="text-muted-foreground">
                 Plan base (1 usuario)
               </span>
-              <span className="font-medium">{formatCLP(org.planBase)}</span>
+              <span className="font-medium">{formatCLP(org.planBaseNeto)} + IVA</span>
             </div>
             <p className="text-[11px] text-muted-foreground -mt-1">
               Neto {formatCLP(org.planBaseNeto)} + IVA {formatCLP(org.planBaseIva)} = Total {formatCLP(org.planBase)}
@@ -203,7 +203,7 @@ export function TeamSection() {
               <>
                 <div className="flex items-center justify-between text-sm pt-1">
                   <span className="text-muted-foreground">
-                    Usuarios adicionales ({org.usuariosAdicionales} × {formatCLP(org.costoUsuarioAdicional)})
+                    Usuarios adicionales ({org.usuariosAdicionales} × {formatCLP(org.costoUsuarioAdicionalNeto)} + IVA)
                   </span>
                   <span className="font-medium">
                     {formatCLP(org.usuariosAdicionales * org.costoUsuarioAdicional)}

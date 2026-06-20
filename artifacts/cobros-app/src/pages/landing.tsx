@@ -86,7 +86,7 @@ function HeroSection() {
           </a>
         </div>
         <p className="text-sm text-muted-foreground mt-5">
-          14 días de prueba gratis · Luego $22.598 CLP/mes (IVA incluido)
+          14 días de prueba gratis · Luego $18.990 + IVA ($22.598 total) CLP/mes
         </p>
 
         {/* App preview mockup */}

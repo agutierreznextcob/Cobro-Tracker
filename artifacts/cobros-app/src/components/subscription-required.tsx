@@ -49,11 +49,11 @@ export function SubscriptionRequired() {
 
         <div className="mt-8 rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
           <div className="flex items-baseline justify-center gap-1">
-            <span className="text-4xl font-bold tracking-tight">{formatCLP(precio)}</span>
+            <span className="text-4xl font-bold tracking-tight">{formatCLP(precioNeto)} + IVA</span>
             <span className="text-muted-foreground">/mes</span>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Neto {formatCLP(precioNeto)} + IVA {formatCLP(precioIva)} = Total {formatCLP(precio)} (IVA incluido)
+            Neto {formatCLP(precioNeto)} + IVA {formatCLP(precioIva)} = Total {formatCLP(precio)}/mes (IVA incluido)
           </p>
           <ul className="mt-5 space-y-2 text-left text-sm text-muted-foreground">
             <li className="flex items-center gap-2">
@@ -81,7 +81,7 @@ export function SubscriptionRequired() {
                 Redirigiendo...
               </>
             ) : (
-              `Suscribirme - ${formatCLP(precio)}/mes`
+              `Suscribirme - ${formatCLP(precioNeto)} + IVA/mes`
             )}
           </Button>
         </div>
