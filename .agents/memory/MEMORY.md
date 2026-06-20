@@ -3,6 +3,7 @@
 - [Informes reporting page](informes-reporting.md) — Cobros>Informes reuses useListCobros + aggregates client-side (no report endpoint); method pie precedence Flow>MP>Manual; route must precede /cobros/:id.
 - [Webhook estado precedence](webhook-estado-precedencia.md) — payment webhooks: money state (pagado/parcial) always wins over manual/stale; protect against downgrade atomically in SQL (except MP refund).
 - [Cobro & cliente authz model](cobro-ownership-gap.md) — org-aware per-record access: admin_org=whole org, ejecutivo=own; guard every :id route (404 not 403) + aggregate/POST paths via lib/org.ts helpers.
-- [Cobro descuentos](cobro-descuentos.md) — monto stays ORIGINAL; montoDescuento=absolute; montoACobrar=monto-montoDescuento; each discount replaces field + inserts history; links/reports use montoACobrar.
+- [Cobro descuentos](cobro-descuentos.md) — monto=charged total (incl IVA when incluyeIva); montoDescuento=absolute; montoACobrar=monto-montoDescuento; discounts replace field + insert history; links/reports use montoACobrar.
+- [Cobro IVA (19%)](cobro-iva.md) — optional Chilean VAT: server computes from entered neto, monto=neto+iva; incluyeIva/montoNeto/montoIva columns; off = current behavior unchanged.
 - [WhatsApp reminder auto-send](whatsapp-reminders.md) — whatsapp canal auto-sends via Meta Cloud API when configured, else in-app fallback; estado enviado=sent, pendiente=manual-click fallback.
 - [Email From/Reply-To](email-remitente.md) — every email via buildRemitente(): From="<sender> via Cobro Simple" on platform addr, Reply-To=sender email; new emails must route through it.

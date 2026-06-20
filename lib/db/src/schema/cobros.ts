@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, timestamp, pgEnum, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, timestamp, pgEnum, integer, date, boolean } from "drizzle-orm/pg-core";
 import { clientesTable } from "./clientes";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -15,6 +15,12 @@ export const cobrosTable = pgTable("cobros", {
   id: serial("id").primaryKey(),
   monto: numeric("monto", { precision: 12, scale: 2 }).notNull(),
   montoDescuento: numeric("monto_descuento", { precision: 12, scale: 2 }),
+  // IVA (Chilean VAT 19%). When incluyeIva is true, `monto` holds the total
+  // charged amount (neto + iva), and montoNeto/montoIva keep the breakdown.
+  // When false, montoNeto/montoIva are null and `monto` is the final charge.
+  incluyeIva: boolean("incluye_iva").notNull().default(false),
+  montoNeto: numeric("monto_neto", { precision: 12, scale: 2 }),
+  montoIva: numeric("monto_iva", { precision: 12, scale: 2 }),
   descripcion: text("descripcion").notNull(),
   estado: estadoCobroEnum("estado").notNull().default("pendiente"),
   referencia: text("referencia"),

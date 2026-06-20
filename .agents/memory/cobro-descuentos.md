@@ -6,7 +6,10 @@ description: How discounts/negotiation work on cobros — amount derivation, his
 Discount/negotiation feature on cobros.
 
 **Model:**
-- `cobros.monto` always stays the ORIGINAL amount — never overwritten by a discount.
+- `cobros.monto` is the canonical CHARGED total (what links/discount math operate on), never
+  overwritten by a discount. Caveat: when `incluyeIva=true`, `monto` = neto + IVA (the IVA-inclusive
+  total), and `montoNeto`/`montoIva` hold the breakdown; when `incluyeIva=false`, `monto` is the raw
+  entered amount. So `monto` is the "original price to charge", which already includes IVA when applied.
 - `cobros.montoDescuento` = current effective ABSOLUTE discount (CLP integer), nullable.
 - `montoACobrar = monto - (montoDescuento ?? 0)` — the amount actually owed/charged.
 - `cobro_descuentos` is an append-only history table (tipo porcentaje|fijo, valor, montoDescuento,

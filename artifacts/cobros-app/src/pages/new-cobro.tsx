@@ -13,11 +13,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { formatCurrency } from "@/lib/format";
 import { Loader2, ArrowLeft, Users } from "lucide-react";
 import { Link } from "wouter";
 
+const IVA_RATE = 0.19;
+
 const formSchema = z.object({
   monto: z.coerce.number().int("El monto debe ser un número entero").min(1, "El monto debe ser mayor a $0"),
+  incluyeIva: z.boolean().default(false),
   descripcion: z.string().min(1, "La descripción es obligatoria").max(255),
   referencia: z.string().optional(),
   clienteId: z.coerce.number().optional(),
@@ -46,6 +51,7 @@ export default function NewCobro() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       monto: 0,
+      incluyeIva: false,
       descripcion: "",
       referencia: "",
       clienteId: undefined,
@@ -58,6 +64,12 @@ export default function NewCobro() {
   const selectedClienteId = form.watch("clienteId");
   const selectedCliente = clientes?.find((c) => c.id === selectedClienteId);
 
+  const montoWatch = form.watch("monto");
+  const incluyeIvaWatch = form.watch("incluyeIva");
+  const netoNum = Number(montoWatch) || 0;
+  const ivaNum = incluyeIvaWatch ? Math.round(netoNum * IVA_RATE) : 0;
+  const totalNum = incluyeIvaWatch ? netoNum + ivaNum : netoNum;
+
   // Auto-fill email when a client is selected
   useEffect(() => {
     if (selectedCliente?.email) {
@@ -68,6 +80,7 @@ export default function NewCobro() {
   const onSubmit = (values: FormValues) => {
     const payload: CobroInput = {
       monto: values.monto,
+      incluyeIva: values.incluyeIva,
       descripcion: values.descripcion,
       referencia: values.referencia || undefined,
       emailPagador: values.emailPagador || selectedCliente?.email || undefined,
@@ -118,7 +131,7 @@ export default function NewCobro() {
                   name="monto"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Monto</FormLabel>
+                      <FormLabel>{incluyeIvaWatch ? "Monto neto (sin IVA)" : "Monto"}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
@@ -152,6 +165,43 @@ export default function NewCobro() {
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="incluyeIva"
+                render={({ field }) => (
+                  <FormItem className="rounded-lg border border-border/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm">Incluir IVA (19%)</FormLabel>
+                        <FormDescription>
+                          Si lo activas, el monto ingresado es el neto y se agrega el IVA al total a cobrar.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </div>
+
+                    {incluyeIvaWatch && (
+                      <div className="rounded-md bg-muted/50 p-3 space-y-1.5 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Neto</span>
+                          <span className="font-mono">{formatCurrency(netoNum)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">IVA (19%)</span>
+                          <span className="font-mono">{formatCurrency(ivaNum)}</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1.5 border-t border-border/60">
+                          <span className="font-medium text-primary">Total a cobrar</span>
+                          <span className="font-mono font-bold text-primary">{formatCurrency(totalNum)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}

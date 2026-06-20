@@ -760,8 +760,26 @@ export default function CobroDetail() {
             <CardContent>
               {cobro.montoDescuento && cobro.montoDescuento > 0 ? (
                 <div className="space-y-2">
+                  {cobro.incluyeIva && (
+                    <>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-muted-foreground">Neto</span>
+                        <span className="text-sm font-mono text-muted-foreground">
+                          {formatCurrency(cobro.montoNeto ?? 0)}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-muted-foreground">IVA (19%)</span>
+                        <span className="text-sm font-mono text-muted-foreground">
+                          {formatCurrency(cobro.montoIva ?? 0)}
+                        </span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">Monto original</span>
+                    <span className="text-xs text-muted-foreground">
+                      {cobro.incluyeIva ? "Total (con IVA)" : "Monto original"}
+                    </span>
                     <span className="text-sm font-mono text-muted-foreground line-through">
                       {formatCurrency(cobro.monto)}
                     </span>
@@ -776,6 +794,27 @@ export default function CobroDetail() {
                     <span className="text-xs font-medium text-primary">Monto a cobrar</span>
                     <span className="text-3xl font-bold font-mono text-primary tracking-tight">
                       {formatCurrency(montoACobrar)}
+                    </span>
+                  </div>
+                </div>
+              ) : cobro.incluyeIva ? (
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-muted-foreground">Neto</span>
+                    <span className="text-sm font-mono text-muted-foreground">
+                      {formatCurrency(cobro.montoNeto ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-muted-foreground">IVA (19%)</span>
+                    <span className="text-sm font-mono text-muted-foreground">
+                      {formatCurrency(cobro.montoIva ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between pt-2 border-t border-primary/10">
+                    <span className="text-xs font-medium text-primary">Total a cobrar</span>
+                    <span className="text-3xl font-bold font-mono text-primary tracking-tight">
+                      {formatCurrency(cobro.monto)}
                     </span>
                   </div>
                 </div>

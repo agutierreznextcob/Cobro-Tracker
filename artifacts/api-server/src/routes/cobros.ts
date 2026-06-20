@@ -45,6 +45,9 @@ function serializeCobro(cobro: Cobro) {
     monto: Number(cobro.monto),
     montoDescuento: cobro.montoDescuento != null ? Number(cobro.montoDescuento) : null,
     montoACobrar: montoACobrar(cobro),
+    incluyeIva: cobro.incluyeIva,
+    montoNeto: cobro.montoNeto != null ? Number(cobro.montoNeto) : null,
+    montoIva: cobro.montoIva != null ? Number(cobro.montoIva) : null,
     creadoEn: cobro.creadoEn.toISOString(),
     actualizadoEn: cobro.actualizadoEn.toISOString(),
   };
@@ -149,6 +152,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
   }
 
   const { monto, descripcion, referencia } = parsed.data;
+  const incluyeIva = (parsed.data as Record<string, unknown>).incluyeIva === true;
   const emailPagador = (parsed.data as Record<string, unknown>).emailPagador as string | undefined;
   const clienteId = (parsed.data as Record<string, unknown>).clienteId as number | undefined;
   const fechaVencimiento = (parsed.data as Record<string, unknown>).fechaVencimiento as string | undefined;
@@ -202,10 +206,25 @@ cobrosRouter.post("/cobros", async (req, res) => {
       clienteNombre = cliente.nombre;
     }
 
+    // IVA (Chilean VAT 19%). When enabled, the entered `monto` is the NETO; the
+    // server computes IVA and total so CLP integer rounding stays server-side.
+    // The charged amount (`monto` column) is always the total to charge.
+    let montoFinal = monto;
+    let montoNeto: number | null = null;
+    let montoIva: number | null = null;
+    if (incluyeIva) {
+      montoNeto = Math.round(monto);
+      montoIva = Math.round(montoNeto * 0.19);
+      montoFinal = montoNeto + montoIva;
+    }
+
     const [cobro] = await db
       .insert(cobrosTable)
       .values({
-        monto: String(monto),
+        monto: String(montoFinal),
+        incluyeIva,
+        montoNeto: montoNeto != null ? String(montoNeto) : null,
+        montoIva: montoIva != null ? String(montoIva) : null,
         descripcion,
         referencia: referencia ?? null,
         estado: "pendiente",

@@ -124,6 +124,18 @@ export interface Cobro {
   montoDescuento?: number | null;
   /** Net amount to charge after the current discount (monto - montoDescuento) */
   montoACobrar?: number;
+  /** Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva). */
+  incluyeIva?: boolean;
+  /**
+     * Net amount before IVA (only set when incluyeIva is true)
+     * @nullable
+     */
+  montoNeto?: number | null;
+  /**
+     * IVA amount (19% of montoNeto, only set when incluyeIva is true)
+     * @nullable
+     */
+  montoIva?: number | null;
   descripcion: string;
   estado: CobroEstado;
   /**
@@ -226,8 +238,13 @@ export interface DashboardMetricas {
 }
 
 export interface CobroInput {
-  /** @minimum 0.01 */
+  /**
+     * Amount entered by the user. When incluyeIva is true this is the NETO (pre-IVA); the server computes iva and total. When false, this is the final charge.
+     * @minimum 0.01
+     */
   monto: number;
+  /** Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. */
+  incluyeIva?: boolean;
   /** @minLength 1 */
   descripcion: string;
   referencia?: string;

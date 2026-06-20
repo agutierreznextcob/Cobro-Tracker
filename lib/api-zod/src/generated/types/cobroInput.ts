@@ -7,8 +7,13 @@
  */
 
 export interface CobroInput {
-  /** @minimum 0.01 */
+  /**
+     * Amount entered by the user. When incluyeIva is true this is the NETO (pre-IVA); the server computes iva and total. When false, this is the final charge.
+     * @minimum 0.01
+     */
   monto: number;
+  /** Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. */
+  incluyeIva?: boolean;
   /** @minLength 1 */
   descripcion: string;
   referencia?: string;
