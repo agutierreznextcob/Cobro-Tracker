@@ -237,11 +237,11 @@ function PreciosSection() {
             <div className="mb-6">
               <p className="text-xs font-semibold text-primary-foreground/60 uppercase tracking-wider mb-2">Plan Cobro Simple</p>
               <div className="flex items-end gap-1">
-                <span className="text-4xl font-black">$22.598</span>
+                <span className="text-4xl font-black">$18.990 + IVA</span>
                 <span className="text-primary-foreground/60 pb-1 text-sm">/mes</span>
               </div>
               <p className="text-sm text-primary-foreground/80 mt-2 font-medium">
-                Neto $18.990 + IVA $3.608 = Total $22.598
+                Neto $18.990 + IVA $3.608 = Total $22.598/mes
               </p>
               <p className="text-sm text-primary-foreground/70 mt-1">CLP · IVA incluido · Después de tu prueba de 14 días. Cancela cuando quieras.</p>
             </div>
