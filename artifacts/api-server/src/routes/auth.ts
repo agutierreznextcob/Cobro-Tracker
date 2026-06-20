@@ -8,7 +8,12 @@ import {
 } from "@workspace/api-zod";
 import { db, usersTable, invitacionesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { createSoloOrganization } from "../lib/org";
+import {
+  createSoloOrganization,
+  backfillUserOrgRecords,
+  getOrgContext,
+} from "../lib/org";
+import { logger } from "../lib/logger";
 import {
   clearSession,
   getOidcConfig,
@@ -86,6 +91,27 @@ async function upsertUser(claims: Record<string, unknown>) {
   // pending invitation matching their email, or gets their own solo org.
   if (user.organizationId == null) {
     await assignOrganization(user);
+  }
+
+  // Self-heal legacy data: link the user's pre-organizations cobros/clientes to
+  // their org. Idempotent (only touches null-org rows), so it costs nothing once
+  // healed but fixes environments where the one-time backfill never ran (prod).
+  // Restricted to org owners (admin_org): an invited member's pre-existing
+  // personal records must NOT be absorbed into the inviting org — they stay
+  // private to the member, who still sees them via responsableId scoping.
+  const ctx = await getOrgContext(user.id);
+  if (ctx.organizationId != null && ctx.isOrgAdmin) {
+    try {
+      const healed = await backfillUserOrgRecords(user.id, ctx.organizationId);
+      if (healed.cobros > 0 || healed.clientes > 0) {
+        logger.info(
+          { userId: user.id, organizationId: ctx.organizationId, ...healed },
+          "Backfilled organizationId on legacy records",
+        );
+      }
+    } catch (err) {
+      logger.warn({ err, userId: user.id }, "No se pudo backfillear organizationId");
+    }
   }
 
   return user;

@@ -1,6 +1,6 @@
 import { db, usersTable, organizacionesTable } from "@workspace/db";
-import { eq, and, type SQL } from "drizzle-orm";
-import { cobrosTable } from "@workspace/db";
+import { eq, and, isNull, type SQL } from "drizzle-orm";
+import { cobrosTable, clientesTable } from "@workspace/db";
 import { PLAN_AMOUNT } from "./flow-subscriptions";
 
 // Per-seat pricing (structure only — no real billing yet). The base plan covers
@@ -137,4 +137,33 @@ export async function createSoloOrganization(user: {
     .where(eq(usersTable.id, user.id));
 
   return org.id;
+}
+
+// Self-heals records created before the organizations feature shipped: any cobro
+// or cliente owned by the user that still has a null organizationId is linked to
+// their organization. Idempotent — it only touches rows where organizationId IS
+// NULL, so it no-ops once everything is healed. This is what keeps environments
+// where the one-time backfill never ran (e.g. production) consistent: on login a
+// user's legacy records get attached to their org so org-scoped lists show them.
+export async function backfillUserOrgRecords(
+  userId: string,
+  organizationId: number,
+): Promise<{ cobros: number; clientes: number }> {
+  const cobros = await db
+    .update(cobrosTable)
+    .set({ organizationId })
+    .where(
+      and(eq(cobrosTable.responsableId, userId), isNull(cobrosTable.organizationId)),
+    )
+    .returning({ id: cobrosTable.id });
+
+  const clientes = await db
+    .update(clientesTable)
+    .set({ organizationId })
+    .where(
+      and(eq(clientesTable.userId, userId), isNull(clientesTable.organizationId)),
+    )
+    .returning({ id: clientesTable.id });
+
+  return { cobros: cobros.length, clientes: clientes.length };
 }

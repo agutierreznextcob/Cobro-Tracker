@@ -23,3 +23,13 @@ create paths.
 **How to apply:** When adding ANY new endpoint that touches a cobro/cliente by id or aggregates
 them, wire in the org-scope guard/condition from `lib/org.ts`. Never fetch by bare id and
 proceed. Audit non-`:id` aggregate routes too — they leak just as easily.
+
+**Backfill / prod gotcha:** Pre-org rows must have `organizationId` set or org-scoped lists
+return empty for admin_org. A one-time backfill script runs ONLY in the dev DB — production
+data is never migrated by it (and prod DB writes are read-only to the agent). So legacy-data
+fixes must self-heal at runtime: `backfillUserOrgRecords(userId, orgId)` in `lib/org.ts` runs in
+`auth.ts upsertUser` on every login, gated to `isOrgAdmin` (admin_org owners) so an invited
+ejecutivo's pre-existing personal rows are NOT absorbed into the inviting org. It is idempotent
+(only updates `organizationId IS NULL` rows owned by the user). Requires the user to re-login on
+prod after deploy. Symptom this fixes: "Sin cobros registrados" in published app despite rows
+existing in the prod DB.
