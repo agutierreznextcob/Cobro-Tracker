@@ -196,21 +196,31 @@ export function TeamSection() {
               </span>
               <span className="font-medium">{formatCLP(org.planBase)}</span>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                Usuarios adicionales ({org.usuariosAdicionales} × {formatCLP(org.costoUsuarioAdicional)})
-              </span>
-              <span className="font-medium">
-                {formatCLP(org.usuariosAdicionales * org.costoUsuarioAdicional)}
-              </span>
-            </div>
+            <p className="text-[11px] text-muted-foreground -mt-1">
+              Neto {formatCLP(org.planBaseNeto)} + IVA {formatCLP(org.planBaseIva)} = Total {formatCLP(org.planBase)}
+            </p>
+            {org.usuariosAdicionales > 0 && (
+              <>
+                <div className="flex items-center justify-between text-sm pt-1">
+                  <span className="text-muted-foreground">
+                    Usuarios adicionales ({org.usuariosAdicionales} × {formatCLP(org.costoUsuarioAdicional)})
+                  </span>
+                  <span className="font-medium">
+                    {formatCLP(org.usuariosAdicionales * org.costoUsuarioAdicional)}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground -mt-1">
+                  Cada usuario: Neto {formatCLP(org.costoUsuarioAdicionalNeto)} + IVA {formatCLP(org.costoUsuarioAdicionalIva)} = Total {formatCLP(org.costoUsuarioAdicional)}
+                </p>
+              </>
+            )}
             <div className="flex items-center justify-between border-t border-border/50 pt-2 text-sm">
               <span className="font-semibold">Total mensual estimado</span>
               <span className="font-bold">{formatCLP(org.totalMensual)}</span>
             </div>
             <p className="text-[11px] text-muted-foreground pt-1">
               {org.miembrosActivos} usuario{org.miembrosActivos !== 1 ? "s" : ""} activo
-              {org.miembrosActivos !== 1 ? "s" : ""} en tu organización.
+              {org.miembrosActivos !== 1 ? "s" : ""} en tu organización. Precios con IVA incluido.
             </p>
           </div>
         )}
@@ -380,7 +390,7 @@ export function TeamSection() {
             </div>
             {org && (
               <p className="text-xs text-muted-foreground rounded-md bg-muted/40 p-3">
-                Agregar un usuario suma {formatCLP(org.costoUsuarioAdicional)}/mes a tu plan.
+                Agregar un usuario suma {formatCLP(org.costoUsuarioAdicional)}/mes a tu plan (IVA incluido).
               </p>
             )}
           </div>

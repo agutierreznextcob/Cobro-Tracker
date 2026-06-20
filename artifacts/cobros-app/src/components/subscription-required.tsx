@@ -19,7 +19,9 @@ export function SubscriptionRequired() {
   const { data: status } = useGetSubscriptionStatus();
   const startSubscription = useStartSubscription();
 
-  const precio = status?.precioMensual ?? 18990;
+  const precio = status?.precioMensual ?? 22598;
+  const precioNeto = status?.precioNeto ?? 18990;
+  const precioIva = status?.precioIva ?? 3608;
 
   const handleSubscribe = () => {
     startSubscription.mutate(undefined, {
@@ -50,6 +52,9 @@ export function SubscriptionRequired() {
             <span className="text-4xl font-bold tracking-tight">{formatCLP(precio)}</span>
             <span className="text-muted-foreground">/mes</span>
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Neto {formatCLP(precioNeto)} + IVA {formatCLP(precioIva)} = Total {formatCLP(precio)} (IVA incluido)
+          </p>
           <ul className="mt-5 space-y-2 text-left text-sm text-muted-foreground">
             <li className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary shrink-0" />

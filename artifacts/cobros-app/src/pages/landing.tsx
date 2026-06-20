@@ -86,7 +86,7 @@ function HeroSection() {
           </a>
         </div>
         <p className="text-sm text-muted-foreground mt-5">
-          14 días de prueba gratis · Luego $18.990 CLP/mes
+          14 días de prueba gratis · Luego $22.598 CLP/mes (IVA incluido)
         </p>
 
         {/* App preview mockup */}
@@ -237,10 +237,13 @@ function PreciosSection() {
             <div className="mb-6">
               <p className="text-xs font-semibold text-primary-foreground/60 uppercase tracking-wider mb-2">Plan Cobro Simple</p>
               <div className="flex items-end gap-1">
-                <span className="text-4xl font-black">$18.990</span>
+                <span className="text-4xl font-black">$22.598</span>
                 <span className="text-primary-foreground/60 pb-1 text-sm">/mes</span>
               </div>
-              <p className="text-sm text-primary-foreground/70 mt-2">CLP · Después de tu prueba de 14 días. Cancela cuando quieras.</p>
+              <p className="text-sm text-primary-foreground/80 mt-2 font-medium">
+                Neto $18.990 + IVA $3.608 = Total $22.598
+              </p>
+              <p className="text-sm text-primary-foreground/70 mt-1">CLP · IVA incluido · Después de tu prueba de 14 días. Cancela cuando quieras.</p>
             </div>
             <ul className="space-y-3 flex-1 mb-8">
               {[

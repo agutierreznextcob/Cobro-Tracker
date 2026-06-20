@@ -15,5 +15,10 @@ export interface SubscriptionStatus {
   trialEndsAt?: string | null;
   periodEnd?: string | null;
   tieneSuscripcion: boolean;
+  /** Monthly charged total in CLP, IVA included (neto + IVA) */
   precioMensual: number;
+  /** Monthly net price in CLP, before IVA */
+  precioNeto: number;
+  /** Monthly IVA (19%) amount in CLP */
+  precioIva: number;
 }

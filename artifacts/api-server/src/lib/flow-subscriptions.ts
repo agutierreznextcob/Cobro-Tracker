@@ -3,9 +3,20 @@ import { buildSignedBody, buildSignedQuery, getPublicBaseUrl } from "./flow-api"
 const FLOW_API_URL = "https://www.flow.cl/api";
 
 // Platform plan: monthly recurring charge to the platform's own Flow account.
-export const PLAN_ID = "cobrosimple_mensual";
+// NOTE: Flow does not let `ensurePlan` change the price of an EXISTING planId
+// (it swallows the "already exists" error). To roll out a new price you MUST bump
+// this id so a fresh plan is created at the new PLAN_AMOUNT. The "_iva19" suffix
+// corresponds to the IVA-inclusive price (neto + IVA). Existing subscribers stay
+// on their original plan until they re-subscribe.
+export const PLAN_ID = "cobrosimple_mensual_iva19";
 export const PLAN_NAME = "Cobro Simple - Plan Mensual";
-export const PLAN_AMOUNT = 18990; // CLP
+// Pricing is IVA-inclusive (Chilean VAT 19%): the customer is charged PLAN_AMOUNT
+// (neto + IVA). PLAN_NETO/PLAN_IVA are exposed so the UI can show a transparent
+// breakdown ("Neto $18.990 + IVA $3.608 = Total $22.598").
+export const IVA_RATE = 0.19;
+export const PLAN_NETO = 18990; // CLP, neto (sin IVA)
+export const PLAN_IVA = Math.round(PLAN_NETO * IVA_RATE); // CLP, 3608
+export const PLAN_AMOUNT = PLAN_NETO + PLAN_IVA; // CLP, 22598 (total cobrado, IVA incl.)
 export const PLAN_CURRENCY = "CLP";
 // Flow plan interval: 1=Diario, 2=Semanal, 3=Mensual, 4=Anual
 const PLAN_INTERVAL_MONTHLY = 3;

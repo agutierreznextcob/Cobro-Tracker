@@ -928,7 +928,9 @@ export const GetSubscriptionStatusResponse = zod.object({
   "trialEndsAt": zod.string().nullish(),
   "periodEnd": zod.string().nullish(),
   "tieneSuscripcion": zod.boolean(),
-  "precioMensual": zod.number()
+  "precioMensual": zod.number().describe('Monthly charged total in CLP, IVA included (neto + IVA)'),
+  "precioNeto": zod.number().describe('Monthly net price in CLP, before IVA'),
+  "precioIva": zod.number().describe('Monthly IVA (19%) amount in CLP')
 })
 
 
@@ -983,10 +985,14 @@ export const GetOrganizationResponse = zod.object({
   "nombre": zod.string(),
   "esAdmin": zod.boolean().describe('Whether the current user is an admin_org of this organization'),
   "miembrosActivos": zod.number().describe('Number of active members in the organization'),
-  "planBase": zod.number().describe('Monthly base plan price (currency units) covering the first seat'),
-  "costoUsuarioAdicional": zod.number().describe('Monthly price per additional seat (currency units)'),
+  "planBaseNeto": zod.number().describe('Base plan net price (currency units), before IVA, covering the first seat'),
+  "planBaseIva": zod.number().describe('Base plan IVA (19%) amount (currency units)'),
+  "planBase": zod.number().describe('Monthly base plan total (currency units), IVA included (neto + IVA)'),
+  "costoUsuarioAdicionalNeto": zod.number().describe('Net price per additional seat (currency units), before IVA'),
+  "costoUsuarioAdicionalIva": zod.number().describe('IVA (19%) amount per additional seat (currency units)'),
+  "costoUsuarioAdicional": zod.number().describe('Monthly total per additional seat (currency units), IVA included'),
   "usuariosAdicionales": zod.number().describe('Number of seats beyond the first'),
-  "totalMensual": zod.number().describe('Estimated monthly total (planBase + usuariosAdicionales \* costoUsuarioAdicional)')
+  "totalMensual": zod.number().describe('Estimated monthly total, IVA included (planBase + usuariosAdicionales \* costoUsuarioAdicional)')
 })
 
 

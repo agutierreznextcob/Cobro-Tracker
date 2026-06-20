@@ -412,6 +412,9 @@ function ProfileSettings() {
                     ? `Próximo cobro: ${formatFecha(subStatus.periodEnd)}`
                     : `Plan mensual ${formatCLP(subStatus.precioMensual)}/mes`}
                 </p>
+                <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-0.5">
+                  Neto {formatCLP(subStatus.precioNeto)} + IVA {formatCLP(subStatus.precioIva)} = Total {formatCLP(subStatus.precioMensual)} (IVA incl.)
+                </p>
               </div>
             </div>
           ) : subStatus?.status === "prueba" ? (
@@ -424,6 +427,9 @@ function ProfileSettings() {
                     {subStatus.trialEndsAt
                       ? `Tu prueba termina el ${formatFecha(subStatus.trialEndsAt)}`
                       : "Estás en tu periodo de prueba"}
+                  </p>
+                  <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-0.5">
+                    Luego: Neto {formatCLP(subStatus.precioNeto)} + IVA {formatCLP(subStatus.precioIva)} = Total {formatCLP(subStatus.precioMensual)}/mes (IVA incl.)
                   </p>
                 </div>
               </div>
@@ -450,7 +456,7 @@ function ProfileSettings() {
                 {startSubscription.isPending ? (
                   <><Loader2 className="h-4 w-4 animate-spin mr-2" />Redirigiendo...</>
                 ) : (
-                  `Suscribirme - ${formatCLP(subStatus?.precioMensual ?? 18990)}/mes`
+                  `Suscribirme - ${formatCLP(subStatus?.precioMensual ?? 22598)}/mes`
                 )}
               </Button>
             </>

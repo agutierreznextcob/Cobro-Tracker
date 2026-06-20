@@ -13,12 +13,20 @@ export interface OrganizacionInfo {
   esAdmin: boolean;
   /** Number of active members in the organization */
   miembrosActivos: number;
-  /** Monthly base plan price (currency units) covering the first seat */
+  /** Base plan net price (currency units), before IVA, covering the first seat */
+  planBaseNeto: number;
+  /** Base plan IVA (19%) amount (currency units) */
+  planBaseIva: number;
+  /** Monthly base plan total (currency units), IVA included (neto + IVA) */
   planBase: number;
-  /** Monthly price per additional seat (currency units) */
+  /** Net price per additional seat (currency units), before IVA */
+  costoUsuarioAdicionalNeto: number;
+  /** IVA (19%) amount per additional seat (currency units) */
+  costoUsuarioAdicionalIva: number;
+  /** Monthly total per additional seat (currency units), IVA included */
   costoUsuarioAdicional: number;
   /** Number of seats beyond the first */
   usuariosAdicionales: number;
-  /** Estimated monthly total (planBase + usuariosAdicionales * costoUsuarioAdicional) */
+  /** Estimated monthly total, IVA included (planBase + usuariosAdicionales * costoUsuarioAdicional) */
   totalMensual: number;
 }

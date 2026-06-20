@@ -1,6 +1,6 @@
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { PLAN_AMOUNT } from "./flow-subscriptions";
+import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA } from "./flow-subscriptions";
 
 export interface SubscriptionState {
   status: "prueba" | "activa" | "vencida";
@@ -11,6 +11,8 @@ export interface SubscriptionState {
   periodEnd: string | null;
   tieneSuscripcion: boolean;
   precioMensual: number;
+  precioNeto: number;
+  precioIva: number;
 }
 
 export interface UserSubscriptionRow {
@@ -58,6 +60,8 @@ export function computeSubscriptionState(row: UserSubscriptionRow): Subscription
     periodEnd: periodEnd ? periodEnd.toISOString() : null,
     tieneSuscripcion: Boolean(row.flowSubscriptionId),
     precioMensual: PLAN_AMOUNT,
+    precioNeto: PLAN_NETO,
+    precioIva: PLAN_IVA,
   };
 }
 

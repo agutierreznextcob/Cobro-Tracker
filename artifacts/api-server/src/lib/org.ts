@@ -1,12 +1,20 @@
 import { db, usersTable, organizacionesTable } from "@workspace/db";
 import { eq, and, isNull, type SQL } from "drizzle-orm";
 import { cobrosTable, clientesTable } from "@workspace/db";
-import { PLAN_AMOUNT } from "./flow-subscriptions";
+import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA, IVA_RATE } from "./flow-subscriptions";
 
-// Per-seat pricing (structure only — no real billing yet). The base plan covers
-// the first seat; each additional active member adds COSTO_USUARIO_ADICIONAL.
-export const PLAN_BASE = PLAN_AMOUNT; // CLP, first seat
-export const COSTO_USUARIO_ADICIONAL = 9990; // CLP, per extra seat
+// Per-seat pricing (structure only — no real billing yet). Amounts are
+// IVA-inclusive (Chilean VAT 19%): *Neto + *Iva = the charged total. The base
+// plan covers the first seat; each additional active member adds the per-seat total.
+export const PLAN_BASE_NETO = PLAN_NETO; // CLP, 18990
+export const PLAN_BASE_IVA = PLAN_IVA; // CLP, 3608
+export const PLAN_BASE = PLAN_AMOUNT; // CLP, 22598 total (IVA incl.)
+export const COSTO_USUARIO_ADICIONAL_NETO = 9990; // CLP neto, per extra seat
+export const COSTO_USUARIO_ADICIONAL_IVA = Math.round(
+  COSTO_USUARIO_ADICIONAL_NETO * IVA_RATE,
+); // CLP, 1898
+export const COSTO_USUARIO_ADICIONAL =
+  COSTO_USUARIO_ADICIONAL_NETO + COSTO_USUARIO_ADICIONAL_IVA; // CLP, 11888 total
 
 export interface OrgContext {
   organizationId: number | null;
@@ -104,7 +112,11 @@ export function userCanAccessCliente(
 export function computePricing(miembrosActivos: number) {
   const usuariosAdicionales = Math.max(0, miembrosActivos - 1);
   return {
+    planBaseNeto: PLAN_BASE_NETO,
+    planBaseIva: PLAN_BASE_IVA,
     planBase: PLAN_BASE,
+    costoUsuarioAdicionalNeto: COSTO_USUARIO_ADICIONAL_NETO,
+    costoUsuarioAdicionalIva: COSTO_USUARIO_ADICIONAL_IVA,
     costoUsuarioAdicional: COSTO_USUARIO_ADICIONAL,
     usuariosAdicionales,
     totalMensual: PLAN_BASE + usuariosAdicionales * COSTO_USUARIO_ADICIONAL,
