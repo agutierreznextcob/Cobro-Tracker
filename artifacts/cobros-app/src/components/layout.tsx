@@ -1,6 +1,6 @@
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield, BarChart3, Bell, CalendarClock } from "lucide-react";
+import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Menu, X } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
@@ -19,6 +19,7 @@ function NotificacionesPoller() {
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isAdmin = user?.role === "admin";
 
@@ -44,19 +45,57 @@ export function Layout({ children }: { children: ReactNode }) {
     ? ([user.firstName, user.lastName].filter(Boolean).map((n) => n![0].toUpperCase()).join("") || "U")
     : "U";
 
+  const closeMobile = () => setMobileOpen(false);
+
+  // Close drawer on Escape and lock background scroll while open (mobile only)
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [mobileOpen]);
+
   return (
     <div className="min-h-[100dvh] flex bg-background text-foreground">
       <WebhookPoller />
       <NotificacionesPoller />
 
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={closeMobile}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-60 shrink-0 flex flex-col border-r bg-card">
+      <aside
+        id="sidebar-nav"
+        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col border-r bg-card transform transition-transform duration-200 md:static md:z-auto md:w-60 md:shrink-0 md:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         {/* Brand */}
         <div className="h-16 flex items-center gap-3 px-5 border-b">
           <div className="h-8 w-8 rounded bg-primary flex items-center justify-center text-primary-foreground shadow-sm shrink-0">
             <Activity className="h-4 w-4" />
           </div>
-          <span className="font-bold text-lg tracking-tight">Cobros App</span>
+          <span className="font-bold text-lg tracking-tight flex-1">Cobros App</span>
+          <button
+            onClick={closeMobile}
+            className="md:hidden p-1.5 -mr-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+            aria-label="Cerrar menú"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Nav */}
@@ -67,6 +106,7 @@ export function Layout({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={closeMobile}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
                   isActive
                     ? "bg-primary text-primary-foreground"
@@ -90,6 +130,7 @@ export function Layout({ children }: { children: ReactNode }) {
               </p>
               <Link
                 href="/admin"
+                onClick={closeMobile}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
                   location === "/admin"
                     ? "bg-primary text-primary-foreground"
@@ -141,7 +182,26 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <main className="flex-1 px-8 py-8 overflow-y-auto">
+        {/* Mobile top bar */}
+        <header className="md:hidden sticky top-0 z-30 h-14 flex items-center gap-3 px-4 border-b bg-card/95 backdrop-blur">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-2 -ml-2 rounded-md text-foreground hover:bg-secondary/80 transition-colors"
+            aria-label="Abrir menú"
+            aria-expanded={mobileOpen}
+            aria-controls="sidebar-nav"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded bg-primary flex items-center justify-center text-primary-foreground shadow-sm shrink-0">
+              <Activity className="h-3.5 w-3.5" />
+            </div>
+            <span className="font-bold tracking-tight">Cobros App</span>
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-8 overflow-y-auto">
           {children}
         </main>
       </div>

@@ -82,10 +82,10 @@ export default function Dashboard() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Métricas y resumen de tu actividad.</p>
         </div>
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg overflow-x-auto max-w-full">
           {PERIODOS.map((p) => (
             <button
               key={p.value}
