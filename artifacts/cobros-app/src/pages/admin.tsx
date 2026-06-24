@@ -74,8 +74,8 @@ function buildWhatsappRenovacionUrl(u: AdminUsuario): string {
   const vencido = u.subscriptionStatus === "vencida" || !u.hasAccess;
   const fecha = formatFecha(u.vencimiento);
   const msg = vencido
-    ? `${saludo}, te escribimos de Cobro Simple. Tu acceso venció el ${fecha}. Renueva tu suscripción para seguir usando la plataforma. ¡Gracias!`
-    : `${saludo}, te escribimos de Cobro Simple. Tu acceso vence el ${fecha}. Renueva tu suscripción para no perder el acceso. ¡Gracias!`;
+    ? `${saludo}, te escribimos de NextCob. Tu acceso venció el ${fecha}. Renueva tu suscripción para seguir usando la plataforma. ¡Gracias!`
+    : `${saludo}, te escribimos de NextCob. Tu acceso vence el ${fecha}. Renueva tu suscripción para no perder el acceso. ¡Gracias!`;
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 

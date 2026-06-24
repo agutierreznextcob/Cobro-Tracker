@@ -252,7 +252,7 @@ export async function procesarRecordatorios(
               clienteNombre: cobro.clienteNombre,
               descripcion: cobro.descripcion,
               monto: Number(cobro.monto),
-              comercioNombre: cobro.responsableNombre || "Cobro Simple",
+              comercioNombre: cobro.responsableNombre || "NextCob",
               linkPago,
               diasVencido,
               remitenteNombre: remitente.nombre || cobro.responsableNombre,

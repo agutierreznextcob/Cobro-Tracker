@@ -15,6 +15,7 @@ import ProfilePage from "@/pages/profile";
 import ClientesPage from "@/pages/clientes";
 import ClienteDetailPage from "@/pages/cliente-detail";
 import AdminPage from "@/pages/admin";
+import LeadsPage from "@/pages/leads";
 import LiquidacionesPage from "@/pages/liquidaciones";
 import LiquidacionDetailPage from "@/pages/liquidacion-detail";
 import Notificaciones from "@/pages/notificaciones";
@@ -211,6 +212,13 @@ function AppRouter() {
         <AdminGate>
           <Layout>
             <AdminPage />
+          </Layout>
+        </AdminGate>
+      </Route>
+      <Route path="/leads">
+        <AdminGate>
+          <Layout>
+            <LeadsPage />
           </Layout>
         </AdminGate>
       </Route>

@@ -1,9 +1,10 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Menu, X } from "lucide-react";
+import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
+import { useLeadsCountPolling } from "@/hooks/use-leads-count-polling";
 import { AiChat } from "@/components/ai-chat";
 
 function WebhookPoller() {
@@ -14,6 +15,44 @@ function WebhookPoller() {
 function NotificacionesPoller() {
   useNotificacionesPolling();
   return null;
+}
+
+function LeadsNavItem({
+  location,
+  onNavigate,
+}: {
+  location: string;
+  onNavigate: () => void;
+}) {
+  const nuevos = useLeadsCountPolling(true);
+  const active = location === "/leads";
+  return (
+    <Link
+      href="/leads"
+      onClick={onNavigate}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+      }`}
+    >
+      <Inbox
+        className={`h-4 w-4 shrink-0 ${
+          active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+        }`}
+      />
+      <span>Leads</span>
+      {nuevos > 0 && (
+        <span
+          className={`ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold ${
+            active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground"
+          }`}
+        >
+          {nuevos > 99 ? "99+" : nuevos}
+        </span>
+      )}
+    </Link>
+  );
 }
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -88,7 +127,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <div className="h-8 w-8 rounded bg-primary flex items-center justify-center text-primary-foreground shadow-sm shrink-0">
             <Activity className="h-4 w-4" />
           </div>
-          <span className="font-bold text-lg tracking-tight flex-1">Cobros App</span>
+          <span className="font-bold text-lg tracking-tight flex-1">NextCob</span>
           <button
             onClick={closeMobile}
             className="md:hidden p-1.5 -mr-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
@@ -146,6 +185,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 />
                 <span>Usuarios</span>
               </Link>
+              <LeadsNavItem location={location} onNavigate={closeMobile} />
             </div>
           )}
         </nav>
@@ -197,7 +237,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <div className="h-7 w-7 rounded bg-primary flex items-center justify-center text-primary-foreground shadow-sm shrink-0">
               <Activity className="h-3.5 w-3.5" />
             </div>
-            <span className="font-bold tracking-tight">Cobros App</span>
+            <span className="font-bold tracking-tight">NextCob</span>
           </div>
         </header>
 

@@ -206,7 +206,7 @@ export function LandingChat() {
               <Sparkles className="h-4 w-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm leading-tight">Asistente Cobro Simple</p>
+              <p className="font-semibold text-sm leading-tight">Asistente NextCob</p>
               <p className="text-xs text-white/80">Resolvemos tus dudas al instante</p>
             </div>
           </div>
@@ -224,7 +224,7 @@ export function LandingChat() {
                   </div>
                   <p className="font-medium text-foreground">¡Hola! 👋 ¿En qué te ayudo?</p>
                   <p className="text-xs mt-1 opacity-80">
-                    Pregúntame sobre Cobro Simple: precios, funciones, seguridad o cómo empezar tu prueba gratis.
+                    Pregúntame sobre NextCob: precios, funciones, seguridad o cómo empezar tu prueba gratis.
                   </p>
                   <div className="flex flex-wrap gap-2 justify-center mt-4">
                     {SUGERENCIAS.map((s) => (

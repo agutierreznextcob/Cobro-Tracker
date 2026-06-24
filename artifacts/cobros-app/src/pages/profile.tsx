@@ -239,7 +239,7 @@ function ProfileSettings() {
     const result = params.get("suscripcion");
     if (!result) return;
     if (result === "exito") {
-      toast({ title: "¡Suscripción activada!", description: "Gracias por suscribirte a Cobro Simple." });
+      toast({ title: "¡Suscripción activada!", description: "Gracias por suscribirte a NextCob." });
       queryClient.invalidateQueries({ queryKey: getGetSubscriptionStatusQueryKey() });
     } else if (result === "error") {
       toast({
@@ -394,7 +394,7 @@ function ProfileSettings() {
             <CreditCard className="h-4 w-4 text-primary" />
             Suscripción
           </CardTitle>
-          <CardDescription>Tu plan de Cobro Simple.</CardDescription>
+          <CardDescription>Tu plan de NextCob.</CardDescription>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
           {subLoading ? (
@@ -448,7 +448,7 @@ function ProfileSettings() {
                 <div>
                   <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Suscripción vencida</p>
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Reactiva tu suscripción para seguir usando Cobro Simple.
+                    Reactiva tu suscripción para seguir usando NextCob.
                   </p>
                 </div>
               </div>

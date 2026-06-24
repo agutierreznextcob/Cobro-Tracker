@@ -4,7 +4,7 @@ import { z } from "zod";
 
 const publicChatRouter: IRouter = Router();
 
-const CONTACTO_EMAIL = "hola@cobrosimple.cl";
+const CONTACTO_EMAIL = "contacto@nextcob.com";
 
 // ---- Abuse protection for the unauthenticated AI endpoint -------------------
 // Simple in-memory fixed-window rate limiter. Per-IP cap stops a single visitor
@@ -55,7 +55,7 @@ function getGroqClient(): Groq {
   return new Groq({ apiKey });
 }
 
-const SYSTEM_COMERCIAL = `Eres el asistente comercial de "Cobro Simple", una plataforma chilena de gestión de cobros y pagos. Hablas con visitantes del sitio web que aún NO están registrados y evalúan si usar el producto.
+const SYSTEM_COMERCIAL = `Eres el asistente comercial de "NextCob", una plataforma chilena de gestión de cobros y pagos. Hablas con visitantes del sitio web que aún NO están registrados y evalúan si usar el producto.
 
 Tu objetivo: resolver dudas de forma clara y persuasiva para que el visitante inicie su prueba gratis de 14 días. Eres cercano, honesto y nunca insistente.
 
@@ -67,7 +67,7 @@ Reglas:
 - Si el visitante pide algo que no puedes resolver (soporte técnico específico, casos comerciales, integraciones a medida, facturación), sugiere escribir a ${CONTACTO_EMAIL}.
 - No prometas plazos, descuentos ni condiciones que no estén descritas aquí.
 
-## Qué es Cobro Simple
+## Qué es NextCob
 Una herramienta para que negocios y profesionales en Chile cobren a sus clientes sin complicaciones: crear cobros, compartir links de pago, y hacer seguimiento automático del estado de cada cobro, todo desde un panel en tiempo real.
 
 ## Cómo funciona
@@ -96,7 +96,7 @@ Una herramienta para que negocios y profesionales en Chile cobren a sus clientes
 Hacer clic en "Comenzar gratis" o "Crear cuenta" en esta misma página. El registro toma menos de un minuto y la prueba de 14 días empieza al instante.
 
 ## Pagos y seguridad (FAQ)
-- Los pagos se procesan a través de Flow (Webpay) y MercadoPago, proveedores establecidos en Chile. Cobro Simple no almacena los datos de la tarjeta del pagador.
+- Los pagos se procesan a través de Flow (Webpay) y MercadoPago, proveedores establecidos en Chile. NextCob no almacena los datos de la tarjeta del pagador.
 - Los datos sensibles se manejan de forma cifrada.
 - Tú recibes el dinero según las condiciones de tu cuenta en Flow/MercadoPago.
 - Para dudas comerciales o de soporte que no pueda resolver aquí: ${CONTACTO_EMAIL}.`;

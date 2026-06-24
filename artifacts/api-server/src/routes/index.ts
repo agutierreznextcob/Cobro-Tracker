@@ -9,6 +9,7 @@ import publicChatRouter from "./public-chat";
 import webhooksRouter from "./webhooks";
 import recordatoriosRouter from "./recordatorios";
 import notificacionesRouter from "./notificaciones";
+import leadsRouter from "./leads";
 import { profileRouter } from "./profile";
 import { subscriptionRouter } from "./subscription";
 import { adminRouter } from "./admin";
@@ -27,6 +28,10 @@ router.use(publicChatRouter);
 router.use(webhooksRouter);
 router.use(recordatoriosRouter);
 router.use(notificacionesRouter);
+// leadsRouter has a public POST (/public/leads) plus admin-gated /leads routes;
+// mount before cobrosRouter, whose blanket auth middleware would otherwise
+// intercept the public lead-submission path.
+router.use(leadsRouter);
 router.use(cobrosRouter);
 router.use(clientesRouter);
 router.use(liquidacionesRouter);

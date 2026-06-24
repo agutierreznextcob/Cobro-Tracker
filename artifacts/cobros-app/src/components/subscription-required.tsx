@@ -44,7 +44,7 @@ export function SubscriptionRequired() {
         <h1 className="text-2xl font-bold tracking-tight">Tu prueba terminó</h1>
         <p className="mt-3 text-muted-foreground">
           Suscríbete para seguir creando cobros, enviando links de pago y usando todas las
-          funciones de Cobro Simple.
+          funciones de NextCob.
         </p>
 
         <div className="mt-8 rounded-2xl border border-border/60 bg-card p-6 shadow-sm">

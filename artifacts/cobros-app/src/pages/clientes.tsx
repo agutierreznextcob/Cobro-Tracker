@@ -212,7 +212,7 @@ function AdminSuscriptoresView() {
         <div className="text-sm">
           <p className="font-semibold text-foreground">Vista de administrador — Suscriptores de la plataforma</p>
           <p className="text-muted-foreground mt-0.5">
-            Estás viendo todos los usuarios registrados en Cobro Simple, no tu cartera de cobranza.
+            Estás viendo todos los usuarios registrados en NextCob, no tu cartera de cobranza.
           </p>
         </div>
       </div>

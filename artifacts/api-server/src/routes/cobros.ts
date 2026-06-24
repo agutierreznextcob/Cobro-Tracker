@@ -523,7 +523,7 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
       descripcion: cobro.descripcion,
       monto: montoACobrar(cobro),
       linkPago: result.url,
-      comercioNombre: cobro.responsableNombre || "Cobro Simple",
+      comercioNombre: cobro.responsableNombre || "NextCob",
       remitenteNombre: remitente.nombre || cobro.responsableNombre,
       remitenteEmail: remitente.email,
     }, req.log).catch((err) => {
@@ -643,7 +643,7 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
       descripcion: cobro.descripcion,
       monto: Number(cobro.monto),
       linkPago: cobro.flowLinkPago,
-      comercioNombre: cobro.responsableNombre || "Cobro Simple",
+      comercioNombre: cobro.responsableNombre || "NextCob",
       remitenteNombre: remitente.nombre || cobro.responsableNombre,
       remitenteEmail: remitente.email,
     }, req.log);
@@ -709,7 +709,7 @@ cobrosRouter.post("/cobros/:id/avisar", async (req, res) => {
           clienteNombre: cobro.clienteNombre,
           descripcion: cobro.descripcion,
           monto: Number(cobro.monto),
-          comercioNombre: cobro.responsableNombre ?? "Cobro Simple",
+          comercioNombre: cobro.responsableNombre ?? "NextCob",
           remitenteNombre: remitente.nombre || cobro.responsableNombre,
           remitenteEmail: remitente.email,
         },

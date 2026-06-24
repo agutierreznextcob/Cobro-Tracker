@@ -1,5 +1,16 @@
 import { Resend } from "resend";
 
+// Escapes HTML-special characters so untrusted text can be safely interpolated
+// into email HTML bodies without injecting markup.
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 let resend: Resend | null = null;
 
 function getResend(): Resend | null {
@@ -15,16 +26,16 @@ function getResend(): Resend | null {
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
 // Builds the "De:" (From) header and optional Reply-To for outbound emails.
-// The display name reads "<Nombre del remitente> via Cobro Simple" so the
+// The display name reads "<Nombre del remitente> via NextCob" so the
 // recipient sees who sent it, while the address stays on the platform domain.
 // Reply-To is set to the sender's own email so replies reach them directly,
-// not Cobro Simple. Header values are sanitized against CRLF/quote injection.
+// not NextCob. Header values are sanitized against CRLF/quote injection.
 function buildRemitente(remitente?: {
   nombre?: string | null;
   email?: string | null;
 }): { from: string; replyTo?: string } {
   const nombre = remitente?.nombre?.replace(/[\r\n]/g, "").trim();
-  const displayName = nombre ? `${nombre} via Cobro Simple` : "Cobro Simple";
+  const displayName = nombre ? `${nombre} via NextCob` : "NextCob";
   const safeName = displayName.replace(/"/g, "").trim();
   const from = `"${safeName}" <${FROM_EMAIL}>`;
 
@@ -71,7 +82,7 @@ function buildEmailHtml(opts: {
               <table cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="background:#2563eb;border-radius:10px;padding:8px 10px;vertical-align:middle;">
-                    <span style="color:#fff;font-size:16px;font-weight:700;letter-spacing:-0.5px;">⚡ Cobro Simple</span>
+                    <span style="color:#fff;font-size:16px;font-weight:700;letter-spacing:-0.5px;">⚡ NextCob</span>
                   </td>
                 </tr>
               </table>
@@ -100,8 +111,8 @@ function buildEmailHtml(opts: {
           <tr>
             <td style="padding-top:24px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#a1a1aa;">
-                Cobro Simple · Santiago, Chile<br/>
-                Si tienes dudas, responde este correo o escríbenos a hola@cobrosimple.cl
+                NextCob · Santiago, Chile<br/>
+                Si tienes dudas, responde este correo o escríbenos a contacto@nextcob.com
               </p>
             </td>
           </tr>
@@ -209,7 +220,7 @@ export async function sendAvisoManualEmail(
         `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
       ],
       ctaText: `Responder al cobro`,
-      ctaUrl: `mailto:hola@cobrosimple.cl`,
+      ctaUrl: `mailto:contacto@nextcob.com`,
       footerNote: `Si no reconoces este cobro, ignora este correo.`,
     }),
   });
@@ -259,21 +270,21 @@ export async function sendRenovacionEmail(
   const fechaFormato = formatFecha(data.vencimiento);
 
   const heading = data.vencido
-    ? `${saludo}, tu acceso a Cobro Simple venció ⏰`
-    : `${saludo}, tu acceso a Cobro Simple está por vencer ⏰`;
+    ? `${saludo}, tu acceso a NextCob venció ⏰`
+    : `${saludo}, tu acceso a NextCob está por vencer ⏰`;
 
   const detalle = data.vencido
-    ? `Tu ${data.estado === "activa" ? "suscripción" : "período de prueba"} venció el <strong>${fechaFormato}</strong>. Renueva para seguir usando todas las funciones de Cobro Simple.`
+    ? `Tu ${data.estado === "activa" ? "suscripción" : "período de prueba"} venció el <strong>${fechaFormato}</strong>. Renueva para seguir usando todas las funciones de NextCob.`
     : `Tu ${data.estado === "activa" ? "suscripción" : "período de prueba"} vence el <strong>${fechaFormato}</strong>. Renueva ahora para no perder el acceso.`;
 
   const { error } = await client.emails.send({
     ...buildRemitente(),
     to: [data.email],
     subject: data.vencido
-      ? "Tu acceso a Cobro Simple venció — renueva tu suscripción"
-      : "Tu acceso a Cobro Simple está por vencer",
+      ? "Tu acceso a NextCob venció — renueva tu suscripción"
+      : "Tu acceso a NextCob está por vencer",
     html: buildEmailHtml({
-      title: "Renovación de Cobro Simple",
+      title: "Renovación de NextCob",
       previewText: data.vencido
         ? "Tu acceso venció. Renueva tu suscripción para continuar."
         : "Tu acceso está por vencer. Renueva tu suscripción.",
@@ -287,7 +298,7 @@ export async function sendRenovacionEmail(
       ],
       ctaText: "Renovar suscripción",
       ctaUrl: data.ctaUrl,
-      footerNote: "Si ya renovaste, ignora este mensaje. ¡Gracias por usar Cobro Simple!",
+      footerNote: "Si ya renovaste, ignora este mensaje. ¡Gracias por usar NextCob!",
     }),
   });
 
@@ -365,7 +376,7 @@ export async function sendSecuenciaRecordatorioEmail(
           : `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
       ],
       ctaText: tieneLink ? `Pagar ${montoFormato}` : `Responder al cobro`,
-      ctaUrl: tieneLink ? data.linkPago! : `mailto:hola@cobrosimple.cl`,
+      ctaUrl: tieneLink ? data.linkPago! : `mailto:contacto@nextcob.com`,
       footerNote: `Si ya realizaste el pago, ignora este mensaje.`,
     }),
   });
@@ -403,13 +414,13 @@ export async function sendInvitacionEmail(
   const { error } = await client.emails.send({
     ...buildRemitente({ nombre: data.invitadoPorNombre, email: data.invitadoPorEmail }),
     to: [data.email],
-    subject: `Te invitaron a unirte a ${data.organizacionNombre} en Cobro Simple`,
+    subject: `Te invitaron a unirte a ${data.organizacionNombre} en NextCob`,
     html: buildEmailHtml({
       title: `Invitación a ${data.organizacionNombre}`,
-      previewText: `${invitador} te invitó a unirte a ${data.organizacionNombre} en Cobro Simple.`,
+      previewText: `${invitador} te invitó a unirte a ${data.organizacionNombre} en NextCob.`,
       heading: `Te invitaron a ${data.organizacionNombre} 👋`,
       bodyLines: [
-        `<strong>${invitador}</strong> te invitó a unirte a <strong>${data.organizacionNombre}</strong> en Cobro Simple como <strong>${rolTexto}</strong>.`,
+        `<strong>${invitador}</strong> te invitó a unirte a <strong>${data.organizacionNombre}</strong> en NextCob como <strong>${rolTexto}</strong>.`,
         `Para aceptar la invitación, inicia sesión con este mismo correo (<strong>${data.email}</strong>) haciendo clic en el botón a continuación.`,
       ],
       ctaText: "Aceptar invitación",
@@ -462,6 +473,69 @@ export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn:
   if (error) {
     const msg = `Resend error: ${error.name} — ${error.message}`;
     log?.warn({ resendError: error }, "Error sending reminder email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
+export interface LeadNotificationData {
+  nombre: string;
+  telefono: string;
+  email: string;
+  mensaje?: string | null;
+}
+
+// Notifies the NextCob sales inbox when a new lead arrives from the public
+// landing-page form. Recipient is configurable via LEADS_NOTIFICATION_EMAIL,
+// defaulting to the public contact address.
+export async function sendLeadNotificationEmail(
+  data: LeadNotificationData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping lead notification email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const destino = process.env.LEADS_NOTIFICATION_EMAIL || "contacto@nextcob.com";
+  // Lead fields come from an unauthenticated public form, so escape them before
+  // interpolating into HTML to prevent content/HTML injection in the inbox.
+  const nombre = escapeHtml(data.nombre);
+  const telefono = escapeHtml(data.telefono);
+  const email = escapeHtml(data.email);
+  const mensajeHtml = data.mensaje
+    ? `<strong>Mensaje:</strong> ${escapeHtml(data.mensaje)}`
+    : `<strong>Mensaje:</strong> <em>(sin mensaje)</em>`;
+
+  const { error } = await client.emails.send({
+    ...buildRemitente(),
+    to: [destino],
+    replyTo: data.email,
+    subject: `Nuevo lead: ${data.nombre}`,
+    html: buildEmailHtml({
+      title: "Nuevo lead desde la landing",
+      previewText: `${nombre} solicitó que lo contacten (${email}).`,
+      heading: "Tienes un nuevo lead 🎯",
+      bodyLines: [
+        `Un visitante completó el formulario de contacto en la landing de NextCob:`,
+        `<span style="display:block;background:#f4f4f5;border-radius:8px;padding:12px 16px;font-size:14px;color:#09090b;border-left:3px solid #6C5CE7;">
+          <strong>Nombre:</strong> ${nombre}<br/>
+          <strong>Teléfono:</strong> ${telefono}<br/>
+          <strong>Correo:</strong> ${email}<br/>
+          ${mensajeHtml}
+        </span>`,
+        `Responde este correo para contactarlo directamente, o gestiónalo desde la sección <strong>Leads</strong> del panel.`,
+      ],
+      ctaText: "Escribir al lead",
+      ctaUrl: `mailto:${encodeURIComponent(data.email)}`,
+      footerNote: "Lead generado automáticamente desde el formulario público.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending lead notification email via Resend");
     return { ok: false, error: msg };
   }
   return { ok: true };

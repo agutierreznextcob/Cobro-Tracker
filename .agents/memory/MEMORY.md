@@ -7,5 +7,6 @@
 - [Cobro IVA (19%)](cobro-iva.md) — optional Chilean VAT: server computes from entered neto, monto=neto+iva; incluyeIva/montoNeto/montoIva columns; off = current behavior unchanged.
 - [WhatsApp reminder auto-send](whatsapp-reminders.md) — whatsapp canal auto-sends via Meta Cloud API when configured, else in-app fallback; estado enviado=sent, pendiente=manual-click fallback.
 - [Email From/Reply-To](email-remitente.md) — every email via buildRemitente(): From="<sender> via Cobro Simple" on platform addr, Reply-To=sender email; new emails must route through it.
+- [Leads capture](leads-capture.md) — landing form → lead; PLATFORM-admin-only (not per-org, avoids tenant leak); public route mounted before cobros blanket-auth; escape untrusted input in emails.
 - [Landing public AI chat](landing-public-chat.md) — unauth sales chatbot is its OWN router mounted before auth-gated aiRouter; public LLM endpoints MUST stay rate-limited (in-memory, single-instance only).
 - [Flow plan pricing & IVA](flow-plan-pricing.md) — platform prices are IVA-inclusive (neto+IVA=total); changing the charged amount REQUIRES bumping PLAN_ID or Flow keeps the old price.

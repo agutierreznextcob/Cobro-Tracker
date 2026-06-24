@@ -733,6 +733,70 @@ export interface Notificacion {
   creadoEn: string;
 }
 
+export type LeadEstado = typeof LeadEstado[keyof typeof LeadEstado];
+
+
+export const LeadEstado = {
+  nuevo: 'nuevo',
+  contactado: 'contactado',
+  en_proceso: 'en_proceso',
+  cerrado: 'cerrado',
+  descartado: 'descartado',
+} as const;
+
+export interface Lead {
+  id: number;
+  nombre: string;
+  telefono: string;
+  email: string;
+  /** @nullable */
+  mensaje?: string | null;
+  estado: LeadEstado;
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
+export interface LeadInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  nombre: string;
+  /**
+     * @minLength 1
+     * @maxLength 50
+     */
+  telefono: string;
+  /** @maxLength 200 */
+  email: string;
+  /** @maxLength 2000 */
+  mensaje?: string;
+}
+
+export type LeadEstadoInputEstado = typeof LeadEstadoInputEstado[keyof typeof LeadEstadoInputEstado];
+
+
+export const LeadEstadoInputEstado = {
+  nuevo: 'nuevo',
+  contactado: 'contactado',
+  en_proceso: 'en_proceso',
+  cerrado: 'cerrado',
+  descartado: 'descartado',
+} as const;
+
+export interface LeadEstadoInput {
+  estado: LeadEstadoInputEstado;
+}
+
+export interface LeadCreated {
+  ok: boolean;
+  id: number;
+}
+
+export interface LeadsCount {
+  count: number;
+}
+
 export interface RecordatoriosRunResult {
   ok: boolean;
   fecha: string;
@@ -1180,5 +1244,9 @@ export const ListWebhookEventosResultado = {
 
 export type ListNotificacionesParams = {
 soloNoLeidas?: boolean;
+};
+
+export type ListLeadsParams = {
+estado?: string;
 };
 

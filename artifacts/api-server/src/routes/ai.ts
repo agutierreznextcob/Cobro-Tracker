@@ -85,7 +85,7 @@ ${cobrosLines.join("\n") || "  (sin cobros)"}
 ${clientesLines.join("\n") || "  (sin clientes)"}`;
 }
 
-const SYSTEM_BASE = `Eres un asistente de gestión de cobros integrado en la plataforma "Cobros App".
+const SYSTEM_BASE = `Eres un asistente de gestión de cobros integrado en la plataforma "NextCob".
 Tu rol es ayudar al usuario a entender el estado de sus cobros, responder preguntas sobre montos recaudados, cobros pendientes, información de clientes y generar resúmenes.
 
 Reglas importantes:

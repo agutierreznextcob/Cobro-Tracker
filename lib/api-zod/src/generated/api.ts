@@ -1303,6 +1303,78 @@ export const MarcarNotificacionLeidaResponse = zod.object({
 
 
 /**
+ * @summary Submit a contact/demo request from the public landing page
+ */
+export const crearLeadPublicoBodyNombreMax = 200;
+
+export const crearLeadPublicoBodyTelefonoMax = 50;
+
+export const crearLeadPublicoBodyEmailMax = 200;
+
+export const crearLeadPublicoBodyMensajeMax = 2000;
+
+
+
+export const CrearLeadPublicoBody = zod.object({
+  "nombre": zod.string().min(1).max(crearLeadPublicoBodyNombreMax),
+  "telefono": zod.string().min(1).max(crearLeadPublicoBodyTelefonoMax),
+  "email": zod.string().email().max(crearLeadPublicoBodyEmailMax),
+  "mensaje": zod.string().max(crearLeadPublicoBodyMensajeMax).optional()
+})
+
+
+/**
+ * @summary List sales leads (platform admin only)
+ */
+export const ListLeadsQueryParams = zod.object({
+  "estado": zod.coerce.string().optional()
+})
+
+export const ListLeadsResponseItem = zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "telefono": zod.string(),
+  "email": zod.string(),
+  "mensaje": zod.string().nullish(),
+  "estado": zod.enum(['nuevo', 'contactado', 'en_proceso', 'cerrado', 'descartado']),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date()
+})
+export const ListLeadsResponse = zod.array(ListLeadsResponseItem)
+
+
+/**
+ * @summary Count leads in estado "nuevo" (platform admin only)
+ */
+export const ContarLeadsNuevosResponse = zod.object({
+  "count": zod.number()
+})
+
+
+/**
+ * @summary Update a lead's estado (platform admin only)
+ */
+export const ActualizarLeadEstadoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ActualizarLeadEstadoBody = zod.object({
+  "estado": zod.enum(['nuevo', 'contactado', 'en_proceso', 'cerrado', 'descartado'])
+})
+
+export const ActualizarLeadEstadoResponse = zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "telefono": zod.string(),
+  "email": zod.string(),
+  "mensaje": zod.string().nullish(),
+  "estado": zod.enum(['nuevo', 'contactado', 'en_proceso', 'cerrado', 'descartado']),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date()
+})
+
+
+/**
  * @summary Manually trigger the daily reminder engine (admin or cron secret)
  */
 export const RunRecordatoriosResponse = zod.object({

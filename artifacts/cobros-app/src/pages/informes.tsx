@@ -306,7 +306,7 @@ export default function Informes() {
     ];
 
     const resumenRows: (string | number)[][] = [
-      ["Informe de cobros — Cobro Simple"],
+      ["Informe de cobros — NextCob"],
       ["Período", `${format(range.desde, "dd-MM-yyyy")} a ${format(range.hasta, "dd-MM-yyyy")}`],
       [],
       ["Total recaudado (CLP)", Math.round(summary.totalRecaudado)],

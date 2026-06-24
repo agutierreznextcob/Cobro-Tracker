@@ -15,3 +15,4 @@ export * from "./recordatorios";
 export * from "./recordatorios-default";
 export * from "./recordatorios-enviados";
 export * from "./notificaciones";
+export * from "./leads";

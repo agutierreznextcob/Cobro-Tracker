@@ -57,10 +57,16 @@ import type {
   Invitacion,
   InvitacionPublica,
   InvitarUsuarioInput,
+  Lead,
+  LeadCreated,
+  LeadEstadoInput,
+  LeadInput,
+  LeadsCount,
   LiquidacionDetalle,
   LiquidacionListResponse,
   ListClientesParams,
   ListCobrosParams,
+  ListLeadsParams,
   ListLiquidacionesParams,
   ListNotificacionesParams,
   ListWebhookEventosParams,
@@ -5114,6 +5120,310 @@ export const useMarcarNotificacionLeida = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getMarcarNotificacionLeidaMutationOptions(options));
+    }
+
+export const getCrearLeadPublicoUrl = () => {
+
+
+
+
+  return `/api/public/leads`
+}
+
+/**
+ * @summary Submit a contact/demo request from the public landing page
+ */
+export const crearLeadPublico = async (leadInput: LeadInput, options?: RequestInit): Promise<LeadCreated> => {
+
+  return customFetch<LeadCreated>(getCrearLeadPublicoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      leadInput,)
+  }
+);}
+
+
+
+
+export const getCrearLeadPublicoMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof crearLeadPublico>>, TError,{data: BodyType<LeadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof crearLeadPublico>>, TError,{data: BodyType<LeadInput>}, TContext> => {
+
+const mutationKey = ['crearLeadPublico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof crearLeadPublico>>, {data: BodyType<LeadInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  crearLeadPublico(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CrearLeadPublicoMutationResult = NonNullable<Awaited<ReturnType<typeof crearLeadPublico>>>
+    export type CrearLeadPublicoMutationBody = BodyType<LeadInput>
+    export type CrearLeadPublicoMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Submit a contact/demo request from the public landing page
+ */
+export const useCrearLeadPublico = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof crearLeadPublico>>, TError,{data: BodyType<LeadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof crearLeadPublico>>,
+        TError,
+        {data: BodyType<LeadInput>},
+        TContext
+      > => {
+      return useMutation(getCrearLeadPublicoMutationOptions(options));
+    }
+
+export const getListLeadsUrl = (params?: ListLeadsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/leads?${stringifiedParams}` : `/api/leads`
+}
+
+/**
+ * @summary List sales leads (platform admin only)
+ */
+export const listLeads = async (params?: ListLeadsParams, options?: RequestInit): Promise<Lead[]> => {
+
+  return customFetch<Lead[]>(getListLeadsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLeadsQueryKey = (params?: ListLeadsParams,) => {
+    return [
+    `/api/leads`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListLeadsQueryOptions = <TData = Awaited<ReturnType<typeof listLeads>>, TError = ErrorType<unknown>>(params?: ListLeadsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLeadsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLeads>>> = ({ signal }) => listLeads(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLeads>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLeadsQueryResult = NonNullable<Awaited<ReturnType<typeof listLeads>>>
+export type ListLeadsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List sales leads (platform admin only)
+ */
+
+export function useListLeads<TData = Awaited<ReturnType<typeof listLeads>>, TError = ErrorType<unknown>>(
+ params?: ListLeadsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLeadsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getContarLeadsNuevosUrl = () => {
+
+
+
+
+  return `/api/leads/nuevos/count`
+}
+
+/**
+ * @summary Count leads in estado "nuevo" (platform admin only)
+ */
+export const contarLeadsNuevos = async ( options?: RequestInit): Promise<LeadsCount> => {
+
+  return customFetch<LeadsCount>(getContarLeadsNuevosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getContarLeadsNuevosQueryKey = () => {
+    return [
+    `/api/leads/nuevos/count`
+    ] as const;
+    }
+
+
+export const getContarLeadsNuevosQueryOptions = <TData = Awaited<ReturnType<typeof contarLeadsNuevos>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof contarLeadsNuevos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getContarLeadsNuevosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof contarLeadsNuevos>>> = ({ signal }) => contarLeadsNuevos({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof contarLeadsNuevos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ContarLeadsNuevosQueryResult = NonNullable<Awaited<ReturnType<typeof contarLeadsNuevos>>>
+export type ContarLeadsNuevosQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Count leads in estado "nuevo" (platform admin only)
+ */
+
+export function useContarLeadsNuevos<TData = Awaited<ReturnType<typeof contarLeadsNuevos>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof contarLeadsNuevos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getContarLeadsNuevosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getActualizarLeadEstadoUrl = (id: number,) => {
+
+
+
+
+  return `/api/leads/${id}`
+}
+
+/**
+ * @summary Update a lead's estado (platform admin only)
+ */
+export const actualizarLeadEstado = async (id: number,
+    leadEstadoInput: LeadEstadoInput, options?: RequestInit): Promise<Lead> => {
+
+  return customFetch<Lead>(getActualizarLeadEstadoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      leadEstadoInput,)
+  }
+);}
+
+
+
+
+export const getActualizarLeadEstadoMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof actualizarLeadEstado>>, TError,{id: number;data: BodyType<LeadEstadoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof actualizarLeadEstado>>, TError,{id: number;data: BodyType<LeadEstadoInput>}, TContext> => {
+
+const mutationKey = ['actualizarLeadEstado'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof actualizarLeadEstado>>, {id: number;data: BodyType<LeadEstadoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  actualizarLeadEstado(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ActualizarLeadEstadoMutationResult = NonNullable<Awaited<ReturnType<typeof actualizarLeadEstado>>>
+    export type ActualizarLeadEstadoMutationBody = BodyType<LeadEstadoInput>
+    export type ActualizarLeadEstadoMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update a lead's estado (platform admin only)
+ */
+export const useActualizarLeadEstado = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof actualizarLeadEstado>>, TError,{id: number;data: BodyType<LeadEstadoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof actualizarLeadEstado>>,
+        TError,
+        {id: number;data: BodyType<LeadEstadoInput>},
+        TContext
+      > => {
+      return useMutation(getActualizarLeadEstadoMutationOptions(options));
     }
 
 export const getRunRecordatoriosUrl = () => {

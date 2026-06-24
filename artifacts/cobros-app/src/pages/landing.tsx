@@ -1,6 +1,7 @@
 import { useAuth } from "@workspace/replit-auth-web";
 import { Redirect } from "wouter";
 import { LandingChat } from "@/components/landing-chat";
+import { DemoRequestModal } from "@/components/demo-request-modal";
 import {
   Activity,
   ArrowRight,
@@ -26,7 +27,7 @@ function LandingNav() {
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-sm">
             <Activity className="h-4 w-4" />
           </div>
-          <span className="font-bold text-lg tracking-tight">Cobro Simple</span>
+          <span className="font-bold text-lg tracking-tight">NextCob</span>
         </div>
         <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
           <a href="#como-funciona" className="hover:text-foreground transition-colors">Cómo funciona</a>
@@ -41,6 +42,13 @@ function LandingNav() {
           >
             Iniciar sesión
           </button>
+          <DemoRequestModal
+            trigger={
+              <button className="hidden sm:inline-flex text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-secondary/60">
+                Agenda una presentación
+              </button>
+            }
+          />
           <button
             onClick={login}
             className="text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow hover:bg-primary/90 transition-colors"
@@ -79,12 +87,13 @@ function HeroSection() {
             Comenzar gratis
             <ArrowRight className="h-4 w-4" />
           </button>
-          <a
-            href="#como-funciona"
-            className="inline-flex items-center gap-2 border border-border text-foreground px-6 py-3 rounded-lg text-base font-semibold hover:bg-secondary/60 transition-colors w-full sm:w-auto justify-center"
-          >
-            Ver cómo funciona
-          </a>
+          <DemoRequestModal
+            trigger={
+              <button className="inline-flex items-center gap-2 border border-border text-foreground px-6 py-3 rounded-lg text-base font-semibold hover:bg-secondary/60 transition-colors w-full sm:w-auto justify-center">
+                Agenda una presentación
+              </button>
+            }
+          />
         </div>
         <p className="text-sm text-muted-foreground mt-5">
           14 días de prueba gratis · Luego $18.990 + IVA ($22.598 total) CLP/mes
@@ -96,7 +105,7 @@ function HeroSection() {
             <div className="h-3 w-3 rounded-full bg-red-400" />
             <div className="h-3 w-3 rounded-full bg-yellow-400" />
             <div className="h-3 w-3 rounded-full bg-green-400" />
-            <div className="mx-auto text-xs text-muted-foreground font-mono">cobrosimple.app/dashboard</div>
+            <div className="mx-auto text-xs text-muted-foreground font-mono">nextcob.app/dashboard</div>
             <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Datos de ejemplo</span>
           </div>
           <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -236,7 +245,7 @@ function PreciosSection() {
               <span className="bg-white/20 border border-white/30 text-primary-foreground text-xs font-bold px-2.5 py-1 rounded-full">14 DÍAS GRATIS</span>
             </div>
             <div className="mb-6">
-              <p className="text-xs font-semibold text-primary-foreground/60 uppercase tracking-wider mb-2">Plan Cobro Simple</p>
+              <p className="text-xs font-semibold text-primary-foreground/60 uppercase tracking-wider mb-2">Plan NextCob</p>
               <div className="flex items-end gap-1">
                 <span className="text-4xl font-black">$18.990 + IVA</span>
                 <span className="text-primary-foreground/60 pb-1 text-sm">/mes</span>
@@ -287,7 +296,7 @@ function QuienesSomosSection() {
               Una plataforma construida por emprendedores, para emprendedores.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              Construimos Cobro Simple porque sabíamos exactamente lo que las pymes y profesionales independientes necesitaban: una forma simple y profesional de cobrar, sin depender de programadores ni contadores.
+              Construimos NextCob porque sabíamos exactamente lo que las pymes y profesionales independientes necesitaban: una forma simple y profesional de cobrar, sin depender de programadores ni contadores.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-4">
               Integramos Webpay, MercadoPago y un asistente IA para que tú te enfoques en tu negocio, no en perseguir pagos.
@@ -348,7 +357,7 @@ function Footer() {
               <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
                 <Activity className="h-3.5 w-3.5" />
               </div>
-              <span className="font-bold text-sm">Cobro Simple</span>
+              <span className="font-bold text-sm">NextCob</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">La forma más simple de cobrar en Chile.</p>
           </div>
@@ -371,14 +380,13 @@ function Footer() {
           <div>
             <p className="font-semibold text-sm mb-3">Contacto</p>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="mailto:hola@cobrosimple.cl" className="hover:text-foreground transition-colors">hola@cobrosimple.cl</a></li>
-              <li>+56 9 1234 5678</li>
+              <li><a href="mailto:contacto@nextcob.com" className="hover:text-foreground transition-colors">contacto@nextcob.com</a></li>
               <li>Santiago, Chile</li>
             </ul>
           </div>
         </div>
         <div className="border-t pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">© 2025 Cobro Simple. Todos los derechos reservados.</p>
+          <p className="text-sm text-muted-foreground">© 2025 NextCob. Todos los derechos reservados.</p>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">Términos y condiciones</a>
             <a href="#" className="hover:text-foreground transition-colors">Privacidad</a>

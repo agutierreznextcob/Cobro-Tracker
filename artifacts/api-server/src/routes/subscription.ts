@@ -138,7 +138,7 @@ subscriptionRouter.post("/subscription/subscribe", async (req, res) => {
       const nombre =
         [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
         user.email ||
-        "Cliente Cobro Simple";
+        "Cliente NextCob";
       const email = user.email ?? `${userId}@cobrosimple.app`;
       const customer = await createCustomer(creds, { name: nombre, email, externalId: userId });
       customerId = customer.customerId;

@@ -22,6 +22,8 @@ tags:
     description: Webhook endpoints
   - name: Auth
     description: Browser and mobile authentication endpoints.
+  - name: leads
+    description: Sales leads from the public landing page
 paths:
   /auth/user:
     get:
@@ -1687,6 +1689,96 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /public/leads:
+    post:
+      operationId: crearLeadPublico
+      tags: [leads]
+      summary: Submit a contact/demo request from the public landing page
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "201":
+          description: Lead created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadCreated"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /leads:
+    get:
+      operationId: listLeads
+      tags: [leads]
+      summary: List sales leads (platform admin only)
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Leads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Lead"
+
+  /leads/nuevos/count:
+    get:
+      operationId: contarLeadsNuevos
+      tags: [leads]
+      summary: Count leads in estado "nuevo" (platform admin only)
+      responses:
+        "200":
+          description: Count of new leads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadsCount"
+
+  /leads/{id}:
+    patch:
+      operationId: actualizarLeadEstado
+      tags: [leads]
+      summary: Update a lead's estado (platform admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadEstadoInput"
+      responses:
+        "200":
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /recordatorios/run:
     post:
       operationId: runRecordatorios
@@ -2457,6 +2549,74 @@ components:
         creadoEn:
           type: string
           format: date-time
+
+    Lead:
+      type: object
+      required: [id, nombre, telefono, email, estado, creadoEn, actualizadoEn]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        mensaje:
+          type: ["string", "null"]
+        estado:
+          type: string
+          enum: [nuevo, contactado, en_proceso, cerrado, descartado]
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+
+    LeadInput:
+      type: object
+      required: [nombre, telefono, email]
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 200
+        telefono:
+          type: string
+          minLength: 1
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          maxLength: 200
+        mensaje:
+          type: string
+          maxLength: 2000
+
+    LeadEstadoInput:
+      type: object
+      required: [estado]
+      properties:
+        estado:
+          type: string
+          enum: [nuevo, contactado, en_proceso, cerrado, descartado]
+
+    LeadCreated:
+      type: object
+      required: [ok, id]
+      properties:
+        ok:
+          type: boolean
+        id:
+          type: integer
+
+    LeadsCount:
+      type: object
+      required: [count]
+      properties:
+        count:
+          type: integer
 
     RecordatoriosRunResult:
       type: object
