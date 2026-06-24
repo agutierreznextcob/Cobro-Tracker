@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, Activity, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X } from "lucide-react";
+import { Home, Plus, Search, Users, Landmark, Webhook, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
@@ -124,10 +124,11 @@ export function Layout({ children }: { children: ReactNode }) {
       >
         {/* Brand */}
         <div className="h-16 flex items-center gap-3 px-5 border-b">
-          <div className="h-8 w-8 rounded bg-primary flex items-center justify-center text-primary-foreground shadow-sm shrink-0">
-            <Activity className="h-4 w-4" />
-          </div>
-          <span className="font-bold text-lg tracking-tight flex-1">NextCob</span>
+          <img
+            src={`${import.meta.env.BASE_URL}brand/nextcob-logo.png`}
+            alt="NextCob"
+            className="h-8 w-auto flex-1"
+          />
           <button
             onClick={closeMobile}
             className="md:hidden p-1.5 -mr-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
@@ -234,10 +235,11 @@ export function Layout({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded bg-primary flex items-center justify-center text-primary-foreground shadow-sm shrink-0">
-              <Activity className="h-3.5 w-3.5" />
-            </div>
-            <span className="font-bold tracking-tight">NextCob</span>
+            <img
+              src={`${import.meta.env.BASE_URL}brand/nextcob-logo.png`}
+              alt="NextCob"
+              className="h-7 w-auto"
+            />
           </div>
         </header>
 

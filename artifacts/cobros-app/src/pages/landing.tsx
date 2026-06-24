@@ -24,10 +24,11 @@ function LandingNav() {
     <header className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-sm">
-            <Activity className="h-4 w-4" />
-          </div>
-          <span className="font-bold text-lg tracking-tight">NextCob</span>
+          <img
+            src={`${import.meta.env.BASE_URL}brand/nextcob-logo.png`}
+            alt="NextCob"
+            className="h-8 w-auto"
+          />
         </div>
         <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
           <a href="#como-funciona" className="hover:text-foreground transition-colors">Cómo funciona</a>
