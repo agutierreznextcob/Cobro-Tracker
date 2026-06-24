@@ -127,11 +127,11 @@ export function Layout({ children }: { children: ReactNode }) {
           <img
             src={`${import.meta.env.BASE_URL}brand/nextcob-logo.png`}
             alt="NextCob"
-            className="h-8 w-auto flex-1"
+            className="h-8 w-auto object-contain shrink-0"
           />
           <button
             onClick={closeMobile}
-            className="md:hidden p-1.5 -mr-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+            className="md:hidden ml-auto p-1.5 -mr-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
             aria-label="Cerrar menú"
           >
             <X className="h-5 w-5" />

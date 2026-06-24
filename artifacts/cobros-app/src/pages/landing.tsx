@@ -3,7 +3,6 @@ import { Redirect } from "wouter";
 import { LandingChat } from "@/components/landing-chat";
 import { DemoRequestModal } from "@/components/demo-request-modal";
 import {
-  Activity,
   ArrowRight,
   Bell,
   Bot,
@@ -354,11 +353,12 @@ function Footer() {
       <div className="max-w-5xl mx-auto">
         <div className="grid sm:grid-cols-4 gap-8 mb-10">
           <div className="sm:col-span-1">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-                <Activity className="h-3.5 w-3.5" />
-              </div>
-              <span className="font-bold text-sm">NextCob</span>
+            <div className="flex items-center mb-3">
+              <img
+                src={`${import.meta.env.BASE_URL}brand/nextcob-logo.png`}
+                alt="NextCob"
+                className="h-8 w-auto object-contain"
+              />
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">La forma más simple de cobrar en Chile.</p>
           </div>
