@@ -1,39 +1,29 @@
-import * as client from "openid-client";
 import crypto from "crypto";
 import { type Request, type Response } from "express";
 import { db, sessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import type { AuthUser } from "@workspace/api-zod";
 
-export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
 export const SESSION_COOKIE = "sid";
+// Default session lifetime, and the longer "recordarme" (remember me) lifetime.
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
+export const SESSION_TTL_LARGO = 30 * 24 * 60 * 60 * 1000;
 
+// Session payload for the custom email+password auth. Only identity fields are
+// stored; the live role/profile is always re-read from the DB in /auth/user.
 export interface SessionData {
   user: AuthUser;
-  access_token: string;
-  refresh_token?: string;
-  expires_at?: number;
 }
 
-let oidcConfig: client.Configuration | null = null;
-
-export async function getOidcConfig(): Promise<client.Configuration> {
-  if (!oidcConfig) {
-    oidcConfig = await client.discovery(
-      new URL(ISSUER_URL),
-      process.env.REPL_ID!,
-    );
-  }
-  return oidcConfig;
-}
-
-export async function createSession(data: SessionData): Promise<string> {
+export async function createSession(
+  data: SessionData,
+  ttl: number = SESSION_TTL,
+): Promise<string> {
   const sid = crypto.randomBytes(32).toString("hex");
   await db.insert(sessionsTable).values({
     sid,
     sess: data as unknown as Record<string, unknown>,
-    expire: new Date(Date.now() + SESSION_TTL),
+    expire: new Date(Date.now() + ttl),
   });
   return sid;
 }
@@ -50,19 +40,6 @@ export async function getSession(sid: string): Promise<SessionData | null> {
   }
 
   return row.sess as unknown as SessionData;
-}
-
-export async function updateSession(
-  sid: string,
-  data: SessionData,
-): Promise<void> {
-  await db
-    .update(sessionsTable)
-    .set({
-      sess: data as unknown as Record<string, unknown>,
-      expire: new Date(Date.now() + SESSION_TTL),
-    })
-    .where(eq(sessionsTable.sid, sid));
 }
 
 export async function deleteSession(sid: string): Promise<void> {
@@ -83,4 +60,18 @@ export function getSessionId(req: Request): string | undefined {
     return authHeader.slice(7);
   }
   return req.cookies?.[SESSION_COOKIE];
+}
+
+export function setSessionCookie(
+  res: Response,
+  sid: string,
+  ttl: number = SESSION_TTL,
+) {
+  res.cookie(SESSION_COOKIE, sid, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: ttl,
+  });
 }

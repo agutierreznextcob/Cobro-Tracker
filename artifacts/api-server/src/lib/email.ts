@@ -310,6 +310,80 @@ export async function sendRenovacionEmail(
   return { ok: true };
 }
 
+export async function sendVerificacionEmail(
+  data: { email: string; nombre?: string | null; ctaUrl: string },
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping verification email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const saludo = data.nombre ? `Hola ${data.nombre}` : "Hola";
+  const { error } = await client.emails.send({
+    ...buildRemitente(),
+    to: [data.email],
+    subject: "Confirma tu correo — NextCob",
+    html: buildEmailHtml({
+      title: "Confirma tu correo",
+      previewText: "Confirma tu correo para activar tu cuenta en NextCob.",
+      heading: `${saludo}, confirma tu correo 👋`,
+      bodyLines: [
+        `Gracias por registrarte en <strong>NextCob</strong>. Para activar tu cuenta y comenzar tu prueba gratuita, confirma tu dirección de correo haciendo clic en el botón.`,
+        `Si no creaste esta cuenta, puedes ignorar este mensaje.`,
+      ],
+      ctaText: "Confirmar mi correo",
+      ctaUrl: data.ctaUrl,
+      footerNote: "Este enlace es válido por 24 horas.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending verification email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
+export async function sendResetPasswordEmail(
+  data: { email: string; nombre?: string | null; ctaUrl: string },
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping password reset email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const saludo = data.nombre ? `Hola ${data.nombre}` : "Hola";
+  const { error } = await client.emails.send({
+    ...buildRemitente(),
+    to: [data.email],
+    subject: "Recupera tu contraseña — NextCob",
+    html: buildEmailHtml({
+      title: "Recupera tu contraseña",
+      previewText: "Restablece tu contraseña de NextCob.",
+      heading: `${saludo}, recupera tu contraseña 🔑`,
+      bodyLines: [
+        `Recibimos una solicitud para restablecer la contraseña de tu cuenta de <strong>NextCob</strong>. Haz clic en el botón para crear una nueva contraseña.`,
+        `Si no solicitaste este cambio, puedes ignorar este mensaje; tu contraseña no se modificará.`,
+      ],
+      ctaText: "Restablecer contraseña",
+      ctaUrl: data.ctaUrl,
+      footerNote: "Este enlace es válido por 1 hora.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending password reset email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
 export interface SecuenciaRecordatorioData {
   emailPagador: string;
   clienteNombre: string | null;

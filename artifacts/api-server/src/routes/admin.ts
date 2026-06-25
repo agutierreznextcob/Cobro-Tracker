@@ -1,14 +1,16 @@
 import { Router } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, cobrosTable, organizacionesTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { computeSubscriptionState } from "../lib/subscription";
+import { computePricing } from "../lib/org";
 import { sendRenovacionEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
 
 const adminRouter = Router();
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const TRIAL_DAYS = 14;
 
 // All admin routes require an authenticated admin user.
 adminRouter.use("/admin", (req, res, next) => {
@@ -34,62 +36,261 @@ function vencimientoDe(state: {
   return state.status === "activa" ? state.periodEnd : state.trialEndsAt;
 }
 
-adminRouter.get("/admin/usuarios", async (req, res) => {
-  try {
-    const rows = await db.select().from(usersTable);
+// Builds per-organization aggregates in two grouped queries (active member
+// counts and total collected), so the user list doesn't issue per-row queries.
+async function buildOrgAggregates(): Promise<{
+  miembros: Map<number, number>;
+  recaudado: Map<number, number>;
+}> {
+  const memberRows = await db
+    .select({
+      organizationId: usersTable.organizationId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.activo, true))
+    .groupBy(usersTable.organizationId);
 
-    const usuarios = rows
-      .map((u) => {
-        const state = computeSubscriptionState({
-          subscriptionStatus: u.subscriptionStatus,
-          trialEndsAt: u.trialEndsAt,
-          subscriptionPeriodEnd: u.subscriptionPeriodEnd,
-          flowSubscriptionId: u.flowSubscriptionId,
-          role: u.role,
-          activo: u.activo,
-        });
+  const recaudadoRows = await db
+    .select({
+      organizationId: cobrosTable.organizationId,
+      total: sql<number>`coalesce(sum(${cobrosTable.monto}), 0)::float8`,
+    })
+    .from(cobrosTable)
+    .where(eq(cobrosTable.estado, "pagado"))
+    .groupBy(cobrosTable.organizationId);
 
-        const vencimiento = vencimientoDe(state);
-        let diasParaVencer: number | null = null;
-        if (vencimiento) {
-          const ms = new Date(vencimiento).getTime() - Date.now();
-          diasParaVencer = Math.ceil(ms / MS_PER_DAY);
-        }
+  const miembros = new Map<number, number>();
+  for (const r of memberRows) {
+    if (r.organizationId != null) miembros.set(r.organizationId, r.count);
+  }
+  const recaudado = new Map<number, number>();
+  for (const r of recaudadoRows) {
+    if (r.organizationId != null)
+      recaudado.set(r.organizationId, Math.round(r.total));
+  }
+  return { miembros, recaudado };
+}
 
-        // Reminders apply to non-admins whose access ended or ends within 3 days.
-        const requiereRecordatorio =
-          !state.isAdmin &&
-          (state.status === "vencida" ||
-            (diasParaVencer !== null && diasParaVencer <= 3));
+interface EnrichedUsuario {
+  id: string;
+  nombre: string | null;
+  email: string | null;
+  role: "user" | "admin";
+  subscriptionStatus: "prueba" | "activa" | "vencida";
+  hasAccess: boolean;
+  isAdmin: boolean;
+  tieneSuscripcion: boolean;
+  createdAt: string | null;
+  trialEndsAt: string | null;
+  subscriptionPeriodEnd: string | null;
+  vencimiento: string | null;
+  diasParaVencer: number | null;
+  requiereRecordatorio: boolean;
+  rut: string | null;
+  esDemo: boolean;
+  activo: boolean;
+  usuariosExtra: number;
+  montoMensual: number;
+  totalRecaudado: number;
+}
 
-        return {
-          id: u.id,
-          nombre: nombreDe(u),
-          email: u.email,
-          role: u.role,
-          subscriptionStatus: state.status,
-          hasAccess: state.hasAccess,
-          isAdmin: state.isAdmin,
-          tieneSuscripcion: state.tieneSuscripcion,
-          createdAt: u.createdAt ? u.createdAt.toISOString() : null,
-          trialEndsAt: state.trialEndsAt,
-          subscriptionPeriodEnd: state.periodEnd,
-          vencimiento,
-          diasParaVencer,
-          requiereRecordatorio,
-        };
-      })
-      .sort((a, b) => {
-        // Most recently registered first.
-        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return tb - ta;
+async function buildUsuarios(): Promise<EnrichedUsuario[]> {
+  const rows = await db.select().from(usersTable);
+  const { miembros, recaudado } = await buildOrgAggregates();
+
+  return rows
+    .map((u): EnrichedUsuario => {
+      const state = computeSubscriptionState({
+        subscriptionStatus: u.subscriptionStatus,
+        trialEndsAt: u.trialEndsAt,
+        subscriptionPeriodEnd: u.subscriptionPeriodEnd,
+        flowSubscriptionId: u.flowSubscriptionId,
+        role: u.role,
+        activo: u.activo,
+        esDemo: u.esDemo,
       });
 
+      const vencimiento = vencimientoDe(state);
+      let diasParaVencer: number | null = null;
+      if (vencimiento) {
+        const ms = new Date(vencimiento).getTime() - Date.now();
+        diasParaVencer = Math.ceil(ms / MS_PER_DAY);
+      }
+
+      const requiereRecordatorio =
+        !state.isAdmin &&
+        !u.esDemo &&
+        (state.status === "vencida" ||
+          (diasParaVencer !== null && diasParaVencer <= 3));
+
+      const miembrosActivos =
+        u.organizationId != null ? (miembros.get(u.organizationId) ?? 1) : 1;
+      const pricing = computePricing(miembrosActivos);
+      const totalRecaudado =
+        u.organizationId != null ? (recaudado.get(u.organizationId) ?? 0) : 0;
+
+      return {
+        id: u.id,
+        nombre: nombreDe(u),
+        email: u.email,
+        role: u.role,
+        subscriptionStatus: state.status,
+        hasAccess: state.hasAccess,
+        isAdmin: state.isAdmin,
+        tieneSuscripcion: state.tieneSuscripcion,
+        createdAt: u.createdAt ? u.createdAt.toISOString() : null,
+        trialEndsAt: state.trialEndsAt,
+        subscriptionPeriodEnd: state.periodEnd,
+        vencimiento,
+        diasParaVencer,
+        requiereRecordatorio,
+        rut: u.rut,
+        esDemo: u.esDemo,
+        activo: u.activo,
+        usuariosExtra: pricing.usuariosAdicionales,
+        montoMensual: pricing.totalMensual,
+        totalRecaudado,
+      };
+    })
+    .sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
+}
+
+adminRouter.get("/admin/usuarios", async (req, res) => {
+  try {
+    const usuarios = await buildUsuarios();
     res.json(usuarios);
   } catch (err) {
     req.log.error({ err }, "Error listing admin usuarios");
     res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+adminRouter.get("/admin/metricas", async (req, res) => {
+  try {
+    const usuarios = await buildUsuarios();
+
+    // Account status breakdown over real customer accounts (exclude platform
+    // admins).
+    let totalCuentas = 0;
+    let enPrueba = 0;
+    let activas = 0;
+    let vencidas = 0;
+    let demo = 0;
+
+    for (const u of usuarios) {
+      if (u.isAdmin) continue;
+      totalCuentas += 1;
+      if (u.esDemo) demo += 1;
+      if (u.subscriptionStatus === "activa") activas += 1;
+      else if (u.subscriptionStatus === "prueba" && u.hasAccess) enPrueba += 1;
+      else vencidas += 1;
+    }
+
+    // Org-level sums, counted once per organization. Revenue counts only orgs
+    // whose owner has an active subscription.
+    const { miembros, recaudado } = await buildOrgAggregates();
+    let totalRecaudado = 0;
+    for (const v of recaudado.values()) totalRecaudado += v;
+
+    const orgs = await db
+      .select({
+        id: organizacionesTable.id,
+        ownerStatus: usersTable.subscriptionStatus,
+      })
+      .from(organizacionesTable)
+      .leftJoin(usersTable, eq(usersTable.id, organizacionesTable.ownerId));
+
+    let revenueMensual = 0;
+    for (const org of orgs) {
+      if (org.ownerStatus !== "activa") continue;
+      const memberCount = miembros.get(org.id) ?? 1;
+      revenueMensual += computePricing(memberCount).totalMensual;
+    }
+
+    res.json({
+      totalCuentas,
+      enPrueba,
+      activas,
+      vencidas,
+      demo,
+      revenueMensual,
+      totalRecaudado,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error building admin metricas");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+adminRouter.post("/admin/usuarios/:id/extender-trial", async (req, res) => {
+  const { id } = req.params;
+  const dias =
+    typeof req.body?.dias === "number" && req.body.dias > 0
+      ? Math.floor(req.body.dias)
+      : TRIAL_DAYS;
+  try {
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!u) {
+      res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" });
+      return;
+    }
+    // Extend from the later of now or the current trial end.
+    const base = Math.max(
+      Date.now(),
+      u.trialEndsAt ? u.trialEndsAt.getTime() : Date.now(),
+    );
+    const nuevoFin = new Date(base + dias * MS_PER_DAY);
+    await db
+      .update(usersTable)
+      .set({ subscriptionStatus: "prueba", trialEndsAt: nuevoFin })
+      .where(eq(usersTable.id, id));
+    res.json({ ok: true, mensaje: `Prueba extendida ${dias} día(s).` });
+  } catch (err) {
+    req.log.error({ err }, "Error extending trial");
+    res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+});
+
+adminRouter.post("/admin/usuarios/:id/activar", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!u) {
+      res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" });
+      return;
+    }
+    await db
+      .update(usersTable)
+      .set({ activo: true })
+      .where(eq(usersTable.id, id));
+    res.json({ ok: true, mensaje: "Cuenta activada." });
+  } catch (err) {
+    req.log.error({ err }, "Error activating account");
+    res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+});
+
+adminRouter.post("/admin/usuarios/:id/desactivar", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!u) {
+      res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" });
+      return;
+    }
+    await db
+      .update(usersTable)
+      .set({ activo: false })
+      .where(eq(usersTable.id, id));
+    res.json({ ok: true, mensaje: "Cuenta desactivada." });
+  } catch (err) {
+    req.log.error({ err }, "Error deactivating account");
+    res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
   }
 });
 
@@ -116,6 +317,7 @@ adminRouter.post("/admin/usuarios/:id/recordatorio-email", async (req, res) => {
       flowSubscriptionId: u.flowSubscriptionId,
       role: u.role,
       activo: u.activo,
+      esDemo: u.esDemo,
     });
 
     const vencimiento = vencimientoDe(state);

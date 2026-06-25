@@ -43,18 +43,18 @@ export function useAuth(): AuthState {
 
   const login = useCallback(() => {
     const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "";
-    const url = `/api/login?returnTo=${encodeURIComponent(base + "/dashboard")}`;
-    // Try window.top to break out of any same-origin iframe.
-    // Falls back to window.location if top is cross-origin (e.g. Replit preview).
-    try {
-      (window.top ?? window).location.href = url;
-    } catch {
-      window.location.href = url;
-    }
+    window.location.href = `${base}/login`;
   }, []);
 
   const logout = useCallback(() => {
-    window.location.href = "/api/logout";
+    const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "";
+    fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+      .catch(() => {
+        // Ignore network errors; we still navigate away to clear local state.
+      })
+      .finally(() => {
+        window.location.href = `${base}/`;
+      });
   }, []);
 
   return {

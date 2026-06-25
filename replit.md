@@ -31,7 +31,13 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Chilean cobros/payments app. Auth is 100% custom email+password (no OIDC):
+  registro (nombre, RUT único+validado, email, contraseña), login (recordarme,
+  olvidé contraseña), recuperación por enlace 1h (Resend), verificación de email.
+- Seguridad: bcrypt, sesiones por cookie, bloqueo tras 5 intentos fallidos (15min).
+- Anti-abuso: 1 RUT = 1 trial de 14 días para siempre (`trialRutsTable`).
+- Cuenta demo permanente (`esDemo`) y panel superadmin (cuentas, revenue, total
+  recaudado, extender/activar/desactivar).
 
 ## User preferences
 
@@ -39,7 +45,11 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Auth token consume (`lib/tokens.ts`) and login lockout increment
+  (`routes/auth.ts`) MUST stay as single atomic SQL `UPDATE`s. Splitting either
+  into SELECT-then-UPDATE reintroduces a single-use-token bypass / lockout race.
+- Demo (anibal) and superadmin (agutierrez@nextcob.com) accounts are seeded with
+  `passwordHash=null` + `emailVerified=true`; they set passwords via forgot-password.
 
 ## Pointers
 

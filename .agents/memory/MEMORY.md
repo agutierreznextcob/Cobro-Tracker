@@ -13,4 +13,5 @@
 - [Comprobante auto-delivery](comprobante-delivery.md) — receipt email idempotent+retryable via emailEnviado(success-only)+emailIntentoEn(TTL claim); residual dup-send is an accepted tradeoff, stop re-hardening.
 - [Cobro saldo on list/detail](cobro-saldo.md) — GET /cobros & /cobros/:id expose `saldo` (montoACobrar minus confirmed abonos, 0 for terminal); use it (not montoACobrar) for parcial in aging/receivables.
 - [Profile edit, avatar & deactivation](profile-edit-and-deactivation.md) — avatar=base64 data URL in profileImageUrl (no object storage); RUT read-only server-side; deactivated user loses access via /auth/user→null + computeSubscriptionState !activo gate.
+- [Custom email+password auth](custom-auth.md) — replaced OIDC; token consume & lockout increment MUST be single atomic SQL UPDATEs (else single-use bypass / lockout race); 1 RUT=1 trial via trialRutsTable; demo+superadmin seeded passwordHash=null.
 - [Gestiones agenda contract](gestiones-agenda-contract.md) — /gestiones/agenda must filter to gestiones with BOTH proximaGestionEn AND proximaGestionTipo non-null; contract requires non-null tipo + dashboard indexes label map by it.

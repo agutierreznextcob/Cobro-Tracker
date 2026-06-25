@@ -30,4 +30,14 @@ export interface AdminUsuario {
   /** @nullable */
   diasParaVencer: number | null;
   requiereRecordatorio: boolean;
+  /** @nullable */
+  rut: string | null;
+  esDemo: boolean;
+  activo: boolean;
+  /** Active org members beyond the owner. */
+  usuariosExtra: number;
+  /** Monthly amount (base plan + extra seats), IVA included. */
+  montoMensual: number;
+  /** Total collected (paid cobros) for the user's organization. */
+  totalRecaudado: number;
 }

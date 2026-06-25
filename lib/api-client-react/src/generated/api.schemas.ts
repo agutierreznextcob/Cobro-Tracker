@@ -44,6 +44,42 @@ export interface AdminUsuario {
   /** @nullable */
   diasParaVencer: number | null;
   requiereRecordatorio: boolean;
+  /** @nullable */
+  rut: string | null;
+  esDemo: boolean;
+  activo: boolean;
+  /** Active org members beyond the owner. */
+  usuariosExtra: number;
+  /** Monthly amount (base plan + extra seats), IVA included. */
+  montoMensual: number;
+  /** Total collected (paid cobros) for the user's organization. */
+  totalRecaudado: number;
+}
+
+export interface AdminMetricas {
+  totalCuentas: number;
+  enPrueba: number;
+  activas: number;
+  vencidas: number;
+  demo: number;
+  /** Sum of monthly amounts across paying accounts. */
+  revenueMensual: number;
+  /** Total collected across all organizations. */
+  totalRecaudado: number;
+}
+
+export interface ExtenderTrialInput {
+  /**
+     * Days to extend (default 14).
+     * @minimum 1
+     */
+  dias?: number;
+}
+
+export interface AdminAccionResult {
+  ok: boolean;
+  /** @nullable */
+  mensaje?: string | null;
 }
 
 export interface AdminRecordatorioResult {
@@ -1126,6 +1162,8 @@ export interface AuthUser {
   lastName: string | null;
   /** @nullable */
   profileImageUrl: string | null;
+  emailVerified?: boolean;
+  esDemo?: boolean;
   role?: AuthUserRole;
   /**
      * Role within the user's organization
@@ -1169,21 +1207,63 @@ export interface AuthUserEnvelope {
   user: AuthUser | null;
 }
 
-export interface MobileTokenExchangeRequest {
-  /** @minLength 1 */
-  code: string;
-  /** @minLength 1 */
-  code_verifier: string;
-  /** @minLength 1 */
-  redirect_uri: string;
-  /** @minLength 1 */
-  state: string;
-  /** @minLength 1 */
-  nonce?: string;
+export interface RegisterInput {
+  /**
+     * Full name (split into first/last name server-side).
+     * @minLength 1
+     */
+  nombre: string;
+  /**
+     * Chilean RUT (validated and normalized server-side).
+     * @minLength 1
+     */
+  rut: string;
+  email: string;
+  /** @minLength 8 */
+  password: string;
+  /** @minLength 8 */
+  confirmPassword: string;
 }
 
-export interface MobileTokenExchangeSuccess {
+export interface LoginInput {
+  email: string;
+  /** @minLength 1 */
+  password: string;
+  /** Keep me logged in (longer session). */
+  recordarme?: boolean;
+}
+
+export interface EmailInput {
+  email: string;
+}
+
+export interface ResetPasswordInput {
+  /** @minLength 1 */
   token: string;
+  /** @minLength 8 */
+  password: string;
+  /** @minLength 8 */
+  confirmPassword: string;
+}
+
+export interface AuthResult {
+  ok: boolean;
+  /** @nullable */
+  mensaje?: string | null;
+  /**
+     * Machine-readable code (e.g. email_no_verificado, cuenta_bloqueada).
+     * @nullable
+     */
+  code?: string | null;
+}
+
+export interface RegisterResult {
+  ok: boolean;
+  /** @nullable */
+  mensaje?: string | null;
+  requiereVerificacion?: boolean;
+  /** True when the RUT had already used its lifetime free trial. */
+  trialUsado?: boolean;
 }
 
 export const LogoutSuccessValue = {
@@ -1350,14 +1430,8 @@ export interface RendimientoEjecutivo {
  */
 export type AuthorizationSessionHeaderParameter = string;
 
-export type BeginBrowserLoginParams = {
-returnTo?: string;
-};
-
-export type HandleBrowserLoginCallbackParams = {
-code?: string;
-state?: string;
-iss?: string;
+export type VerifyEmailParams = {
+token: string;
 };
 
 export type ListClientesParams = {

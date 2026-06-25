@@ -18,6 +18,8 @@ export interface AuthUser {
   lastName: string | null;
   /** @nullable */
   profileImageUrl: string | null;
+  emailVerified?: boolean;
+  esDemo?: boolean;
   role?: AuthUserRole;
   /**
      * Role within the user's organization

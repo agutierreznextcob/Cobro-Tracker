@@ -4,6 +4,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
+import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
+import ResendVerificationPage from "@/pages/resend-verification";
 import Dashboard from "@/pages/dashboard";
 import NewCobro from "@/pages/new-cobro";
 import CobrosList from "@/pages/cobros-list";
@@ -105,6 +110,11 @@ function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/resend-verification" component={ResendVerificationPage} />
       <Route path="/portal/:token" component={PortalPage} />
       <Route path="/dashboard">
         <AuthGate>

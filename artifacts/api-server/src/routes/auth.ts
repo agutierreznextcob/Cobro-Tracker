@@ -1,13 +1,25 @@
-import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   GetCurrentAuthUserResponse,
-  ExchangeMobileAuthorizationCodeBody,
-  ExchangeMobileAuthorizationCodeResponse,
-  LogoutMobileSessionResponse,
+  RegisterUserBody,
+  RegisterUserResponse,
+  LoginUserBody,
+  LoginUserResponse,
+  LogoutUserResponse,
+  ForgotPasswordBody,
+  ForgotPasswordResponse,
+  ResetPasswordBody,
+  ResetPasswordResponse,
+  ResendVerificationBody,
+  ResendVerificationResponse,
 } from "@workspace/api-zod";
-import { db, usersTable, invitacionesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import {
+  db,
+  usersTable,
+  invitacionesTable,
+  trialRutsTable,
+} from "@workspace/db";
+import { eq, and, sql } from "drizzle-orm";
 import {
   createSoloOrganization,
   backfillUserOrgRecords,
@@ -16,116 +28,43 @@ import {
 import { logger } from "../lib/logger";
 import {
   clearSession,
-  getOidcConfig,
   getSessionId,
   createSession,
   deleteSession,
+  setSessionCookie,
   SESSION_COOKIE,
   SESSION_TTL,
-  ISSUER_URL,
+  SESSION_TTL_LARGO,
   type SessionData,
 } from "../lib/auth";
-
-const OIDC_COOKIE_TTL = 10 * 60 * 1000;
+import { hashPassword, verifyPassword, isStrongPassword } from "../lib/password";
+import { createAuthToken, consumeAuthToken } from "../lib/tokens";
+import { sendVerificacionEmail, sendResetPasswordEmail } from "../lib/email";
+import { getPublicBaseUrl } from "../lib/flow-api";
+import { normalizeRut } from "../lib/rut";
 
 const router: IRouter = Router();
 
-function getOrigin(req: Request): string {
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const host =
-    req.headers["x-forwarded-host"] || req.headers["host"] || "localhost";
-  return `${proto}://${host}`;
-}
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_MS = 15 * 60 * 1000; // 15 minutes
+const TRIAL_DAYS = 14;
 
-function setSessionCookie(res: Response, sid: string) {
-  res.cookie(SESSION_COOKIE, sid, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_TTL,
-  });
-}
-
-function setOidcCookie(res: Response, name: string, value: string) {
-  res.cookie(name, value, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: OIDC_COOKIE_TTL,
-  });
-}
-
-function getSafeReturnTo(value: unknown): string {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
-    return "/";
-  }
-  return value;
-}
-
-async function upsertUser(claims: Record<string, unknown>) {
-  const userData = {
-    id: claims.sub as string,
-    email: (claims.email as string) || null,
-    firstName: (claims.first_name as string) || null,
-    lastName: (claims.last_name as string) || null,
-    profileImageUrl: (claims.profile_image_url || claims.picture) as
-      | string
-      | null,
+function splitNombre(nombre: string): { firstName: string; lastName: string | null } {
+  const parts = nombre.trim().split(/\s+/);
+  if (parts.length === 1) return { firstName: parts[0], lastName: null };
+  return {
+    firstName: parts.slice(0, -1).join(" "),
+    lastName: parts[parts.length - 1],
   };
-
-  const [user] = await db
-    .insert(usersTable)
-    .values(userData)
-    .onConflictDoUpdate({
-      target: usersTable.id,
-      set: {
-        // Intentionally omit profileImageUrl: once a user uploads a custom photo
-        // we must not clobber it with the OIDC picture on every re-login. The
-        // OIDC picture is still seeded on first insert (values above).
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-
-  // Multi-tenant onboarding: a user with no organization either joins one via a
-  // pending invitation matching their email, or gets their own solo org.
-  if (user.organizationId == null) {
-    await assignOrganization(user);
-  }
-
-  // Self-heal legacy data: link the user's pre-organizations cobros/clientes to
-  // their org. Idempotent (only touches null-org rows), so it costs nothing once
-  // healed but fixes environments where the one-time backfill never ran (prod).
-  // Restricted to org owners (admin_org): an invited member's pre-existing
-  // personal records must NOT be absorbed into the inviting org — they stay
-  // private to the member, who still sees them via responsableId scoping.
-  const ctx = await getOrgContext(user.id);
-  if (ctx.organizationId != null && ctx.isOrgAdmin) {
-    try {
-      const healed = await backfillUserOrgRecords(user.id, ctx.organizationId);
-      if (healed.cobros > 0 || healed.clientes > 0) {
-        logger.info(
-          { userId: user.id, organizationId: ctx.organizationId, ...healed },
-          "Backfilled organizationId on legacy records",
-        );
-      }
-    } catch (err) {
-      logger.warn({ err, userId: user.id }, "No se pudo backfillear organizationId");
-    }
-  }
-
-  return user;
 }
 
-// Resolves the organization a newly-seen user should belong to. If a pending
-// invitation matches their email, they join that org with the invited role and
-// the invitation is marked accepted. Otherwise they become admin_org of a new
-// solo organization. Best-effort: failures are swallowed so login still works.
+function nombreDe(u: { firstName: string | null; lastName: string | null }): string | null {
+  return [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || null;
+}
+
+// Resolves the organization a newly-registered user should belong to. If a
+// pending invitation matches their email they join that org with the invited
+// role; otherwise they become admin_org of a new solo organization.
 async function assignOrganization(user: {
   id: string;
   email: string | null;
@@ -168,15 +107,32 @@ async function assignOrganization(user: {
   }
 }
 
+// Self-heals legacy null-org cobros/clientes for org owners on login. Idempotent.
+async function healOrgRecords(userId: string): Promise<void> {
+  const ctx = await getOrgContext(userId);
+  if (ctx.organizationId != null && ctx.isOrgAdmin) {
+    try {
+      const healed = await backfillUserOrgRecords(userId, ctx.organizationId);
+      if (healed.cobros > 0 || healed.clientes > 0) {
+        logger.info(
+          { userId, organizationId: ctx.organizationId, ...healed },
+          "Backfilled organizationId on legacy records",
+        );
+      }
+    } catch (err) {
+      logger.warn({ err, userId }, "No se pudo backfillear organizationId");
+    }
+  }
+}
+
 router.get("/auth/user", async (req: Request, res: Response) => {
   if (!req.isAuthenticated() || !req.user) {
     res.json(GetCurrentAuthUserResponse.parse({ user: null }));
     return;
   }
 
-  // Enrich the session user with the current DB role and profile data so the
-  // frontend can gate admin-only UI and the mandatory profile-completion flow.
-  // The session only stores identity fields populated from the OIDC claims.
+  // Always re-read the live role/profile from the DB so the frontend can gate
+  // admin-only UI and the mandatory profile-completion flow.
   let role: "user" | "admin" = "user";
   let profileCompleted = false;
   let rut: string | null = null;
@@ -188,6 +144,8 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   let orgRole: "admin_org" | "ejecutivo" | null = null;
   let organizationId: number | null = null;
   let activo = true;
+  let emailVerified = false;
+  let esDemo = false;
   let profileImageUrl: string | null = req.user.profileImageUrl ?? null;
   try {
     const [row] = await db
@@ -203,6 +161,8 @@ router.get("/auth/user", async (req: Request, res: Response) => {
         orgRole: usersTable.orgRole,
         organizationId: usersTable.organizationId,
         activo: usersTable.activo,
+        emailVerified: usersTable.emailVerified,
+        esDemo: usersTable.esDemo,
         profileImageUrl: usersTable.profileImageUrl,
       })
       .from(usersTable)
@@ -219,14 +179,15 @@ router.get("/auth/user", async (req: Request, res: Response) => {
       orgRole = row.orgRole;
       organizationId = row.organizationId;
       activo = row.activo;
+      emailVerified = row.emailVerified;
+      esDemo = row.esDemo;
       profileImageUrl = row.profileImageUrl ?? profileImageUrl;
     }
   } catch (err) {
     req.log.error({ err }, "Error loading user profile");
   }
 
-  // A deactivated (removed) team member loses platform access immediately: report
-  // them as logged-out so the frontend AuthGate bounces them to the landing page.
+  // A deactivated (removed) team member loses platform access immediately.
   if (!activo) {
     res.json(GetCurrentAuthUserResponse.parse({ user: null }));
     return;
@@ -239,6 +200,8 @@ router.get("/auth/user", async (req: Request, res: Response) => {
         firstName,
         lastName,
         profileImageUrl,
+        emailVerified,
+        esDemo,
         role,
         profileCompleted,
         rut,
@@ -252,185 +215,454 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   );
 });
 
-router.get("/login", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
-
-  const returnTo = getSafeReturnTo(req.query.returnTo);
-
-  const state = oidc.randomState();
-  const nonce = oidc.randomNonce();
-  const codeVerifier = oidc.randomPKCECodeVerifier();
-  const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
-
-  const redirectTo = oidc.buildAuthorizationUrl(config, {
-    redirect_uri: callbackUrl,
-    scope: "openid email profile offline_access",
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
-    prompt: "login consent",
-    state,
-    nonce,
-  });
-
-  setOidcCookie(res, "code_verifier", codeVerifier);
-  setOidcCookie(res, "nonce", nonce);
-  setOidcCookie(res, "state", state);
-  setOidcCookie(res, "return_to", returnTo);
-
-  res.redirect(redirectTo.href);
-});
-
-// Query params are not validated because the OIDC provider may include
-// parameters not expressed in the schema.
-router.get("/callback", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
-
-  const codeVerifier = req.cookies?.code_verifier;
-  const nonce = req.cookies?.nonce;
-  const expectedState = req.cookies?.state;
-
-  if (!codeVerifier || !expectedState) {
-    // OIDC state cookies missing (expired or blocked).
-    // Restart login pointing to /dashboard so user doesn't land on landing page.
-    res.redirect(`/api/login?returnTo=${encodeURIComponent("/dashboard")}`);
+router.post("/auth/register", async (req: Request, res: Response) => {
+  const parsed = RegisterUserBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json(
+      RegisterUserResponse.parse({
+        ok: false,
+        mensaje: "Datos de registro inválidos.",
+      }),
+    );
     return;
   }
 
-  const currentUrl = new URL(
-    `${callbackUrl}?${new URL(req.url, `http://${req.headers.host}`).searchParams}`,
-  );
+  const { nombre, password, confirmPassword } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
 
-  let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
+  if (password !== confirmPassword) {
+    res.status(400).json(
+      RegisterUserResponse.parse({
+        ok: false,
+        mensaje: "Las contraseñas no coinciden.",
+      }),
+    );
+    return;
+  }
+  if (!isStrongPassword(password)) {
+    res.status(400).json(
+      RegisterUserResponse.parse({
+        ok: false,
+        mensaje:
+          "La contraseña debe tener al menos 8 caracteres, una mayúscula y un número.",
+      }),
+    );
+    return;
+  }
+
+  const rut = normalizeRut(parsed.data.rut);
+  if (!rut) {
+    res.status(400).json(
+      RegisterUserResponse.parse({ ok: false, mensaje: "El RUT no es válido." }),
+    );
+    return;
+  }
+
   try {
-    tokens = await oidc.authorizationCodeGrant(config, currentUrl, {
-      pkceCodeVerifier: codeVerifier,
-      expectedNonce: nonce,
-      expectedState,
-      idTokenExpected: true,
-    });
-  } catch {
-    res.redirect("/api/login");
-    return;
-  }
-
-  const returnTo = getSafeReturnTo(req.cookies?.return_to);
-
-  res.clearCookie("code_verifier", { path: "/" });
-  res.clearCookie("nonce", { path: "/" });
-  res.clearCookie("state", { path: "/" });
-  res.clearCookie("return_to", { path: "/" });
-
-  const claims = tokens.claims();
-  if (!claims) {
-    res.redirect("/api/login");
-    return;
-  }
-
-  const dbUser = await upsertUser(
-    claims as unknown as Record<string, unknown>,
-  );
-
-  const now = Math.floor(Date.now() / 1000);
-  const sessionData: SessionData = {
-    user: {
-      id: dbUser.id,
-      email: dbUser.email,
-      firstName: dbUser.firstName,
-      lastName: dbUser.lastName,
-      profileImageUrl: dbUser.profileImageUrl,
-    },
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-    expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
-  };
-
-  const sid = await createSession(sessionData);
-  setSessionCookie(res, sid);
-  res.redirect(returnTo);
-});
-
-router.get("/logout", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const origin = getOrigin(req);
-
-  const sid = getSessionId(req);
-  await clearSession(res, sid);
-
-  const endSessionUrl = oidc.buildEndSessionUrl(config, {
-    client_id: process.env.REPL_ID!,
-    post_logout_redirect_uri: origin,
-  });
-
-  res.redirect(endSessionUrl.href);
-});
-
-router.post(
-  "/mobile-auth/token-exchange",
-  async (req: Request, res: Response) => {
-    const parsed = ExchangeMobileAuthorizationCodeBody.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Missing or invalid required parameters" });
+    const [emailExists] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, email));
+    if (emailExists) {
+      res.status(409).json(
+        RegisterUserResponse.parse({
+          ok: false,
+          mensaje: "Ya existe una cuenta con este correo.",
+        }),
+      );
       return;
     }
 
-    const { code, code_verifier, redirect_uri, state, nonce } = parsed.data;
+    const [rutExists] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.rut, rut));
+    if (rutExists) {
+      res.status(409).json(
+        RegisterUserResponse.parse({
+          ok: false,
+          mensaje: "Ya existe una cuenta con este RUT.",
+        }),
+      );
+      return;
+    }
 
-    try {
-      const config = await getOidcConfig();
+    // Anti-abuse: a RUT can only ever receive one free trial. If this RUT
+    // already used its trial, the account is created already "vencida".
+    const [trialUsado] = await db
+      .select({ rut: trialRutsTable.rut })
+      .from(trialRutsTable)
+      .where(eq(trialRutsTable.rut, rut));
 
-      const callbackUrl = new URL(redirect_uri);
-      callbackUrl.searchParams.set("code", code);
-      callbackUrl.searchParams.set("state", state);
-      callbackUrl.searchParams.set("iss", ISSUER_URL);
+    const { firstName, lastName } = splitNombre(nombre);
+    const passwordHash = await hashPassword(password);
 
-      const tokens = await oidc.authorizationCodeGrant(config, callbackUrl, {
-        pkceCodeVerifier: code_verifier,
-        expectedNonce: nonce ?? undefined,
-        expectedState: state,
-        idTokenExpected: true,
-      });
+    const trialEndsAt = new Date(
+      Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000,
+    );
 
-      const claims = tokens.claims();
-      if (!claims) {
-        res.status(401).json({ error: "No claims in ID token" });
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email,
+        firstName,
+        lastName,
+        rut,
+        passwordHash,
+        emailVerified: false,
+        subscriptionStatus: trialUsado ? "vencida" : "prueba",
+        trialEndsAt: trialUsado ? new Date() : trialEndsAt,
+      })
+      .returning();
+
+    if (!trialUsado) {
+      await db
+        .insert(trialRutsTable)
+        .values({ rut })
+        .onConflictDoNothing();
+    }
+
+    await assignOrganization(user);
+
+    const rawToken = await createAuthToken(user.id, "verificacion");
+    const ctaUrl = `${getPublicBaseUrl()}/api/auth/verify-email?token=${rawToken}`;
+    await sendVerificacionEmail(
+      { email, nombre: nombreDe(user), ctaUrl },
+      req.log,
+    );
+
+    res.json(
+      RegisterUserResponse.parse({
+        ok: true,
+        requiereVerificacion: true,
+        trialUsado: Boolean(trialUsado),
+        mensaje:
+          "Cuenta creada. Revisa tu correo para confirmar tu cuenta.",
+      }),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Error registering user");
+    res.status(400).json(
+      RegisterUserResponse.parse({
+        ok: false,
+        mensaje: "No se pudo crear la cuenta.",
+      }),
+    );
+  }
+});
+
+router.post("/auth/login", async (req: Request, res: Response) => {
+  const parsed = LoginUserBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(401).json(
+      LoginUserResponse.parse({ ok: false, mensaje: "Credenciales inválidas." }),
+    );
+    return;
+  }
+
+  const email = parsed.data.email.trim().toLowerCase();
+  const { password, recordarme } = parsed.data;
+
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email));
+
+    // Generic message for unknown email to avoid account enumeration.
+    if (!user) {
+      res.status(401).json(
+        LoginUserResponse.parse({
+          ok: false,
+          mensaje: "Correo o contraseña incorrectos.",
+        }),
+      );
+      return;
+    }
+
+    // Account temporarily locked after too many failed attempts.
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      const mins = Math.ceil(
+        (user.lockedUntil.getTime() - Date.now()) / 60000,
+      );
+      res.status(423).json(
+        LoginUserResponse.parse({
+          ok: false,
+          code: "cuenta_bloqueada",
+          mensaje: `Demasiados intentos fallidos. Intenta nuevamente en ${mins} minuto(s).`,
+        }),
+      );
+      return;
+    }
+
+    const valid = await verifyPassword(password, user.passwordHash);
+    if (!valid) {
+      // Increment and decide the lock atomically in SQL so concurrent failed
+      // attempts can't race past the 5-attempt threshold. On lock we reset the
+      // counter and set lockedUntil; otherwise we just bump the counter.
+      const lockSeconds = Math.floor(LOCK_MS / 1000);
+      const [updated] = await db
+        .update(usersTable)
+        .set({
+          failedLoginAttempts: sql`CASE WHEN ${usersTable.failedLoginAttempts} + 1 >= ${MAX_FAILED_ATTEMPTS} THEN 0 ELSE ${usersTable.failedLoginAttempts} + 1 END`,
+          lockedUntil: sql`CASE WHEN ${usersTable.failedLoginAttempts} + 1 >= ${MAX_FAILED_ATTEMPTS} THEN now() + (${lockSeconds} * interval '1 second') ELSE NULL END`,
+        })
+        .where(eq(usersTable.id, user.id))
+        .returning({ lockedUntil: usersTable.lockedUntil });
+
+      const lock =
+        updated?.lockedUntil != null &&
+        updated.lockedUntil.getTime() > Date.now();
+
+      if (lock) {
+        res.status(423).json(
+          LoginUserResponse.parse({
+            ok: false,
+            code: "cuenta_bloqueada",
+            mensaje:
+              "Demasiados intentos fallidos. Tu cuenta quedó bloqueada por 15 minutos.",
+          }),
+        );
         return;
       }
-
-      const dbUser = await upsertUser(
-        claims as unknown as Record<string, unknown>,
+      res.status(401).json(
+        LoginUserResponse.parse({
+          ok: false,
+          mensaje: "Correo o contraseña incorrectos.",
+        }),
       );
-
-      const now = Math.floor(Date.now() / 1000);
-      const sessionData: SessionData = {
-        user: {
-          id: dbUser.id,
-          email: dbUser.email,
-          firstName: dbUser.firstName,
-          lastName: dbUser.lastName,
-          profileImageUrl: dbUser.profileImageUrl,
-        },
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
-      };
-
-      const sid = await createSession(sessionData);
-      res.json(ExchangeMobileAuthorizationCodeResponse.parse({ token: sid }));
-    } catch (err) {
-      req.log.error({ err }, "Mobile token exchange error");
-      res.status(500).json({ error: "Token exchange failed" });
+      return;
     }
-  },
-);
 
-router.post("/mobile-auth/logout", async (req: Request, res: Response) => {
+    // Block login until the email is verified.
+    if (!user.emailVerified) {
+      res.status(403).json(
+        LoginUserResponse.parse({
+          ok: false,
+          code: "email_no_verificado",
+          mensaje: "Debes confirmar tu correo antes de iniciar sesión.",
+        }),
+      );
+      return;
+    }
+
+    // Deactivated team members cannot log in.
+    if (!user.activo) {
+      res.status(403).json(
+        LoginUserResponse.parse({
+          ok: false,
+          code: "cuenta_desactivada",
+          mensaje: "Tu cuenta está desactivada. Contacta al administrador.",
+        }),
+      );
+      return;
+    }
+
+    // Reset brute-force counters on a successful login.
+    await db
+      .update(usersTable)
+      .set({ failedLoginAttempts: 0, lockedUntil: null })
+      .where(eq(usersTable.id, user.id));
+
+    await healOrgRecords(user.id);
+
+    const sessionData: SessionData = {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profileImageUrl: user.profileImageUrl,
+      },
+    };
+    const ttl = recordarme ? SESSION_TTL_LARGO : SESSION_TTL;
+    const sid = await createSession(sessionData, ttl);
+    setSessionCookie(res, sid, ttl);
+
+    res.json(LoginUserResponse.parse({ ok: true }));
+  } catch (err) {
+    req.log.error({ err }, "Error logging in");
+    res.status(401).json(
+      LoginUserResponse.parse({
+        ok: false,
+        mensaje: "No se pudo iniciar sesión.",
+      }),
+    );
+  }
+});
+
+router.post("/auth/logout", async (req: Request, res: Response) => {
   const sid = getSessionId(req);
   if (sid) {
     await deleteSession(sid);
   }
-  res.json(LogoutMobileSessionResponse.parse({ success: true }));
+  res.clearCookie(SESSION_COOKIE, { path: "/" });
+  res.json(LogoutUserResponse.parse({ success: true }));
+});
+
+router.post("/auth/forgot-password", async (req: Request, res: Response) => {
+  const parsed = ForgotPasswordBody.safeParse(req.body);
+  // Always respond ok to avoid account enumeration.
+  const okResponse = ForgotPasswordResponse.parse({
+    ok: true,
+    mensaje: "Si el correo existe, te enviamos un enlace para recuperarla.",
+  });
+  if (!parsed.success) {
+    res.json(okResponse);
+    return;
+  }
+
+  const email = parsed.data.email.trim().toLowerCase();
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email));
+    if (user) {
+      const rawToken = await createAuthToken(user.id, "reset");
+      const ctaUrl = `${getPublicBaseUrl()}/reset-password?token=${rawToken}`;
+      await sendResetPasswordEmail(
+        { email, nombre: nombreDe(user), ctaUrl },
+        req.log,
+      );
+    }
+  } catch (err) {
+    req.log.error({ err }, "Error in forgot-password");
+  }
+  res.json(okResponse);
+});
+
+router.post("/auth/reset-password", async (req: Request, res: Response) => {
+  const parsed = ResetPasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json(
+      ResetPasswordResponse.parse({
+        ok: false,
+        mensaje: "Datos inválidos.",
+      }),
+    );
+    return;
+  }
+
+  const { token, password, confirmPassword } = parsed.data;
+  if (password !== confirmPassword) {
+    res.status(400).json(
+      ResetPasswordResponse.parse({
+        ok: false,
+        mensaje: "Las contraseñas no coinciden.",
+      }),
+    );
+    return;
+  }
+  if (!isStrongPassword(password)) {
+    res.status(400).json(
+      ResetPasswordResponse.parse({
+        ok: false,
+        mensaje:
+          "La contraseña debe tener al menos 8 caracteres, una mayúscula y un número.",
+      }),
+    );
+    return;
+  }
+
+  try {
+    const userId = await consumeAuthToken(token, "reset");
+    if (!userId) {
+      res.status(400).json(
+        ResetPasswordResponse.parse({
+          ok: false,
+          mensaje: "El enlace es inválido o expiró.",
+        }),
+      );
+      return;
+    }
+
+    const passwordHash = await hashPassword(password);
+    // Resetting the password proves email ownership, so mark it verified and
+    // clear any brute-force lock.
+    await db
+      .update(usersTable)
+      .set({
+        passwordHash,
+        emailVerified: true,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      })
+      .where(eq(usersTable.id, userId));
+
+    res.json(
+      ResetPasswordResponse.parse({
+        ok: true,
+        mensaje: "Tu contraseña fue actualizada. Ya puedes iniciar sesión.",
+      }),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Error resetting password");
+    res.status(400).json(
+      ResetPasswordResponse.parse({
+        ok: false,
+        mensaje: "No se pudo actualizar la contraseña.",
+      }),
+    );
+  }
+});
+
+router.post(
+  "/auth/resend-verification",
+  async (req: Request, res: Response) => {
+    const parsed = ResendVerificationBody.safeParse(req.body);
+    const okResponse = ResendVerificationResponse.parse({
+      ok: true,
+      mensaje: "Si la cuenta existe y no está verificada, te enviamos un enlace.",
+    });
+    if (!parsed.success) {
+      res.json(okResponse);
+      return;
+    }
+
+    const email = parsed.data.email.trim().toLowerCase();
+    try {
+      const [user] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.email, email));
+      if (user && !user.emailVerified) {
+        const rawToken = await createAuthToken(user.id, "verificacion");
+        const ctaUrl = `${getPublicBaseUrl()}/api/auth/verify-email?token=${rawToken}`;
+        await sendVerificacionEmail(
+          { email, nombre: nombreDe(user), ctaUrl },
+          req.log,
+        );
+      }
+    } catch (err) {
+      req.log.error({ err }, "Error resending verification");
+    }
+    res.json(okResponse);
+  },
+);
+
+router.get("/auth/verify-email", async (req: Request, res: Response) => {
+  const token = typeof req.query.token === "string" ? req.query.token : "";
+  const base = getPublicBaseUrl();
+  if (!token) {
+    res.redirect(`${base}/login?verificado=0`);
+    return;
+  }
+  try {
+    const userId = await consumeAuthToken(token, "verificacion");
+    if (!userId) {
+      res.redirect(`${base}/login?verificado=0`);
+      return;
+    }
+    await db
+      .update(usersTable)
+      .set({ emailVerified: true })
+      .where(eq(usersTable.id, userId));
+    res.redirect(`${base}/login?verificado=1`);
+  } catch (err) {
+    req.log.error({ err }, "Error verifying email");
+    res.redirect(`${base}/login?verificado=0`);
+  }
 });
 
 export default router;

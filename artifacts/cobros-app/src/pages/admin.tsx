@@ -1,9 +1,16 @@
 import { useState } from "react";
 import {
   useListAdminUsuarios,
+  useGetAdminMetricas,
   useSendAdminRecordatorioEmail,
+  useExtenderTrial,
+  useActivarCuenta,
+  useDesactivarCuenta,
+  getListAdminUsuariosQueryKey,
+  getGetAdminMetricasQueryKey,
   type AdminUsuario,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,14 +22,41 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Mail, MessageCircle, Loader2, AlertTriangle, Users } from "lucide-react";
+import {
+  Shield,
+  Mail,
+  MessageCircle,
+  Loader2,
+  AlertTriangle,
+  Users,
+  MoreHorizontal,
+  CalendarPlus,
+  CheckCircle2,
+  Ban,
+  DollarSign,
+  Wallet,
+} from "lucide-react";
 
 function formatFecha(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatCLP(n: number): string {
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
 function EstadoBadge({ u }: { u: AdminUsuario }) {
@@ -34,6 +68,12 @@ function EstadoBadge({ u }: { u: AdminUsuario }) {
       </Badge>
     );
   }
+  if (!u.activo) {
+    return <Badge variant="outline">Desactivada</Badge>;
+  }
+  if (u.esDemo) {
+    return <Badge variant="secondary">Demo</Badge>;
+  }
   if (u.subscriptionStatus === "activa") {
     return <Badge variant="default">Activa</Badge>;
   }
@@ -44,7 +84,7 @@ function EstadoBadge({ u }: { u: AdminUsuario }) {
 }
 
 function VencimientoCell({ u }: { u: AdminUsuario }) {
-  if (u.isAdmin) {
+  if (u.isAdmin || u.esDemo) {
     return <span className="text-muted-foreground">Sin vencimiento</span>;
   }
   const fecha = formatFecha(u.vencimiento);
@@ -79,10 +119,53 @@ function buildWhatsappRenovacionUrl(u: AdminUsuario): string {
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 
-function RecordatorioActions({ u }: { u: AdminUsuario }) {
+function MetricCard({
+  icon,
+  value,
+  label,
+  tone = "primary",
+}: {
+  icon: React.ReactNode;
+  value: string | number;
+  label: string;
+  tone?: "primary" | "amber" | "green" | "red";
+}) {
+  const toneClass =
+    tone === "amber"
+      ? "bg-amber-500/10 text-amber-600 dark:text-amber-500"
+      : tone === "green"
+        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-500"
+        : tone === "red"
+          ? "bg-destructive/10 text-destructive"
+          : "bg-primary/10 text-primary";
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${toneClass}`}>
+          {icon}
+        </div>
+        <div>
+          <p className="text-2xl font-bold leading-none">{value}</p>
+          <p className="text-xs text-muted-foreground mt-1">{label}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CuentaActions({ u }: { u: AdminUsuario }) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const sendEmail = useSendAdminRecordatorioEmail();
-  const [sendingId, setSendingId] = useState(false);
+  const extender = useExtenderTrial();
+  const activar = useActivarCuenta();
+  const desactivar = useDesactivarCuenta();
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: getListAdminUsuariosQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetAdminMetricasQueryKey() });
+  };
 
   const handleEmail = () => {
     if (!u.email) {
@@ -93,7 +176,7 @@ function RecordatorioActions({ u }: { u: AdminUsuario }) {
       });
       return;
     }
-    setSendingId(true);
+    setSendingEmail(true);
     sendEmail.mutate(
       { id: u.id },
       {
@@ -113,14 +196,83 @@ function RecordatorioActions({ u }: { u: AdminUsuario }) {
             variant: "destructive",
           });
         },
-        onSettled: () => setSendingId(false),
+        onSettled: () => setSendingEmail(false),
       },
     );
   };
 
-  const handleWhatsapp = () => {
-    window.open(buildWhatsappRenovacionUrl(u), "_blank", "noopener,noreferrer");
+  const handleExtender = () => {
+    extender.mutate(
+      { id: u.id, data: { dias: 14 } },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: res.ok ? "Prueba extendida" : "No se pudo extender",
+            description: res.mensaje ?? undefined,
+            variant: res.ok ? undefined : "destructive",
+          });
+          refresh();
+        },
+        onError: () =>
+          toast({
+            title: "Error",
+            description: "No se pudo extender la prueba.",
+            variant: "destructive",
+          }),
+      },
+    );
   };
+
+  const handleActivar = () => {
+    activar.mutate(
+      { id: u.id },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: res.ok ? "Cuenta activada" : "No se pudo activar",
+            description: res.mensaje ?? undefined,
+            variant: res.ok ? undefined : "destructive",
+          });
+          refresh();
+        },
+        onError: () =>
+          toast({
+            title: "Error",
+            description: "No se pudo activar la cuenta.",
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
+  const handleDesactivar = () => {
+    desactivar.mutate(
+      { id: u.id },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: res.ok ? "Cuenta desactivada" : "No se pudo desactivar",
+            description: res.mensaje ?? undefined,
+            variant: res.ok ? undefined : "destructive",
+          });
+          refresh();
+        },
+        onError: () =>
+          toast({
+            title: "Error",
+            description: "No se pudo desactivar la cuenta.",
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
+  const busy =
+    extender.isPending || activar.isPending || desactivar.isPending;
+
+  if (u.isAdmin) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -129,28 +281,65 @@ function RecordatorioActions({ u }: { u: AdminUsuario }) {
         variant="outline"
         className="gap-1.5"
         onClick={handleEmail}
-        disabled={sendingId}
+        disabled={sendingEmail}
       >
-        {sendingId ? (
+        {sendingEmail ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
         ) : (
           <Mail className="h-3.5 w-3.5" />
         )}
-        Recordar por email
+        Email
       </Button>
-      <Button size="sm" variant="outline" className="gap-1.5" onClick={handleWhatsapp}>
+      <Button
+        size="sm"
+        variant="outline"
+        className="gap-1.5"
+        onClick={() =>
+          window.open(
+            buildWhatsappRenovacionUrl(u),
+            "_blank",
+            "noopener,noreferrer",
+          )
+        }
+      >
         <MessageCircle className="h-3.5 w-3.5" />
-        Recordar por WhatsApp
+        WhatsApp
       </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="outline" disabled={busy}>
+            {busy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={handleExtender}>
+            <CalendarPlus className="h-4 w-4 mr-2" />
+            Extender prueba 14 días
+          </DropdownMenuItem>
+          {u.activo ? (
+            <DropdownMenuItem onClick={handleDesactivar} className="text-destructive">
+              <Ban className="h-4 w-4 mr-2" />
+              Desactivar cuenta
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={handleActivar}>
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Activar cuenta
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
 
 export default function AdminPage() {
   const { data: usuarios, isLoading } = useListAdminUsuarios();
-
-  const total = usuarios?.length ?? 0;
-  const porVencer = usuarios?.filter((u) => u.requiereRecordatorio).length ?? 0;
+  const { data: metricas } = useGetAdminMetricas();
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -161,34 +350,51 @@ export default function AdminPage() {
             <h1 className="text-3xl font-bold tracking-tight">Administración</h1>
           </div>
           <p className="text-muted-foreground mt-1">
-            Todos los usuarios de la plataforma y el estado de su suscripción.
+            Cuentas de la plataforma, suscripciones y métricas de negocio.
           </p>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 max-w-lg">
-        <Card className="shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-              <Users className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold leading-none">{total}</p>
-              <p className="text-xs text-muted-foreground mt-1">Usuarios registrados</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-500">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold leading-none">{porVencer}</p>
-              <p className="text-xs text-muted-foreground mt-1">Por vencer o vencidos</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          icon={<Users className="h-5 w-5" />}
+          value={metricas?.totalCuentas ?? "—"}
+          label="Cuentas totales"
+        />
+        <MetricCard
+          icon={<CheckCircle2 className="h-5 w-5" />}
+          value={metricas?.activas ?? "—"}
+          label="Suscripciones activas"
+          tone="green"
+        />
+        <MetricCard
+          icon={<CalendarPlus className="h-5 w-5" />}
+          value={metricas?.enPrueba ?? "—"}
+          label="En prueba"
+          tone="amber"
+        />
+        <MetricCard
+          icon={<AlertTriangle className="h-5 w-5" />}
+          value={metricas?.vencidas ?? "—"}
+          label="Vencidas"
+          tone="red"
+        />
+        <MetricCard
+          icon={<DollarSign className="h-5 w-5" />}
+          value={metricas ? formatCLP(metricas.revenueMensual) : "—"}
+          label="Ingresos mensuales (MRR)"
+          tone="green"
+        />
+        <MetricCard
+          icon={<Wallet className="h-5 w-5" />}
+          value={metricas ? formatCLP(metricas.totalRecaudado) : "—"}
+          label="Total recaudado (clientes)"
+        />
+        <MetricCard
+          icon={<Users className="h-5 w-5" />}
+          value={metricas?.demo ?? "—"}
+          label="Cuentas demo"
+        />
       </div>
 
       <Card className="shadow-sm">
@@ -196,40 +402,52 @@ export default function AdminPage() {
           {isLoading ? (
             <div className="flex items-center justify-center py-24 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              Cargando usuarios...
+              Cargando cuentas...
             </div>
           ) : !usuarios || usuarios.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <Users className="h-8 w-8 text-muted-foreground mb-3" />
-              <p className="text-muted-foreground text-sm">No hay usuarios registrados.</p>
+              <p className="text-muted-foreground text-sm">No hay cuentas registradas.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Usuario</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Registro</TableHead>
+                    <TableHead>Cuenta</TableHead>
+                    <TableHead>RUT</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Vencimiento</TableHead>
-                    <TableHead className="text-right">Recordatorios</TableHead>
+                    <TableHead className="text-right">Usuarios</TableHead>
+                    <TableHead className="text-right">Plan mensual</TableHead>
+                    <TableHead className="text-right">Recaudado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {usuarios.map((u) => (
                     <TableRow
                       key={u.id}
-                      className={u.requiereRecordatorio ? "bg-amber-500/5" : undefined}
+                      className={
+                        !u.activo
+                          ? "opacity-60"
+                          : u.requiereRecordatorio
+                            ? "bg-amber-500/5"
+                            : undefined
+                      }
                     >
-                      <TableCell className="font-medium">
-                        {u.nombre || <span className="text-muted-foreground">Sin nombre</span>}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {u.email || "—"}
+                      <TableCell>
+                        <div className="font-medium">
+                          {u.nombre || (
+                            <span className="text-muted-foreground">Sin nombre</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {u.email || "—"}
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground whitespace-nowrap">
-                        {formatFecha(u.createdAt)}
+                        {u.rut || "—"}
                       </TableCell>
                       <TableCell>
                         <EstadoBadge u={u} />
@@ -237,12 +455,23 @@ export default function AdminPage() {
                       <TableCell className="whitespace-nowrap text-sm">
                         <VencimientoCell u={u} />
                       </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {u.isAdmin ? "—" : 1 + u.usuariosExtra}
+                        {u.usuariosExtra > 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            {" "}
+                            (+{u.usuariosExtra})
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {u.isAdmin || u.esDemo ? "—" : formatCLP(u.montoMensual)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {u.isAdmin ? "—" : formatCLP(u.totalRecaudado)}
+                      </TableCell>
                       <TableCell className="text-right">
-                        {u.requiereRecordatorio ? (
-                          <RecordatorioActions u={u} />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
+                        <CuentaActions u={u} />
                       </TableCell>
                     </TableRow>
                   ))}

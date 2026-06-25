@@ -22,6 +22,7 @@ export interface UserSubscriptionRow {
   flowSubscriptionId: string | null;
   role: "user" | "admin";
   activo: boolean;
+  esDemo?: boolean;
 }
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -37,8 +38,9 @@ export function computeSubscriptionState(row: UserSubscriptionRow): Subscription
   let hasAccess = false;
   let diasRestantes: number | null = null;
 
-  if (isAdmin) {
-    // Admins have permanent access — no trial/subscription gating.
+  if (isAdmin || row.esDemo) {
+    // Admins and the demo account have permanent access — no trial/subscription
+    // gating.
     hasAccess = true;
   } else if (row.subscriptionStatus === "activa") {
     // Active subscription: trust it. Webhook flips to "vencida" on failed charge.
@@ -82,6 +84,7 @@ export async function getSubscriptionState(userId: string): Promise<Subscription
       flowSubscriptionId: usersTable.flowSubscriptionId,
       role: usersTable.role,
       activo: usersTable.activo,
+      esDemo: usersTable.esDemo,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userId));

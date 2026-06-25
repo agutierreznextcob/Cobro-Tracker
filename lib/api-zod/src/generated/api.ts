@@ -22,6 +22,8 @@ export const GetCurrentAuthUserResponse = zod.object({
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
   "profileImageUrl": zod.string().nullable(),
+  "emailVerified": zod.boolean().optional(),
+  "esDemo": zod.boolean().optional(),
   "role": zod.enum(['user', 'admin']).optional(),
   "orgRole": zod.union([zod.literal('admin_org'),zod.literal('ejecutivo'),zod.literal(null)]).nullish().describe('Role within the user\'s organization'),
   "organizationId": zod.number().nullish(),
@@ -35,63 +37,119 @@ export const GetCurrentAuthUserResponse = zod.object({
 
 
 /**
- * @summary Start the browser OIDC login flow
+ * @summary Register a new account with email and password
  */
-export const BeginBrowserLoginQueryParams = zod.object({
-  "returnTo": zod.coerce.string().optional()
+
+
+export const registerUserBodyPasswordMin = 8;
+
+export const registerUserBodyConfirmPasswordMin = 8;
+
+
+
+export const RegisterUserBody = zod.object({
+  "nombre": zod.string().min(1).describe('Full name (split into first\/last name server-side).'),
+  "rut": zod.string().min(1).describe('Chilean RUT (validated and normalized server-side).'),
+  "email": zod.string().email(),
+  "password": zod.string().min(registerUserBodyPasswordMin),
+  "confirmPassword": zod.string().min(registerUserBodyConfirmPasswordMin)
+})
+
+export const RegisterUserResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish(),
+  "requiereVerificacion": zod.boolean().optional(),
+  "trialUsado": zod.boolean().optional().describe('True when the RUT had already used its lifetime free trial.')
 })
 
 
 /**
- * @summary Complete the browser OIDC login flow
+ * @summary Log in with email and password
  */
-export const HandleBrowserLoginCallbackQueryParams = zod.object({
-  "code": zod.coerce.string().optional(),
-  "state": zod.coerce.string().optional(),
-  "iss": zod.coerce.string().url().optional()
+
+
+
+export const LoginUserBody = zod.object({
+  "email": zod.string().email(),
+  "password": zod.string().min(1),
+  "recordarme": zod.boolean().optional().describe('Keep me logged in (longer session).')
+})
+
+export const LoginUserResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish(),
+  "code": zod.string().nullish().describe('Machine-readable code (e.g. email_no_verificado, cuenta_bloqueada).')
 })
 
 
 /**
- * @summary Clear the session and begin OIDC logout
+ * @summary Clear the current session
  */
-export const LogoutBrowserSessionHeader = zod.object({
+export const LogoutUserHeader = zod.object({
   "Authorization": zod.string().optional().describe('Opaque session token — Bearer <sid>.')
 })
 
-
-/**
- * @summary Exchange a mobile OIDC code for a session token
- */
-
-
-
-
-
-
-
-export const ExchangeMobileAuthorizationCodeBody = zod.object({
-  "code": zod.string().min(1),
-  "code_verifier": zod.string().min(1),
-  "redirect_uri": zod.string().url().min(1),
-  "state": zod.string().min(1),
-  "nonce": zod.string().min(1).optional()
-})
-
-export const ExchangeMobileAuthorizationCodeResponse = zod.object({
-  "token": zod.string()
-})
-
-
-/**
- * @summary Delete a mobile session token
- */
-export const LogoutMobileSessionHeader = zod.object({
-  "Authorization": zod.string().optional().describe('Opaque session token — Bearer <sid>.')
-})
-
-export const LogoutMobileSessionResponse = zod.object({
+export const LogoutUserResponse = zod.object({
   "success": zod.boolean()
+})
+
+
+/**
+ * @summary Request a password reset link
+ */
+export const ForgotPasswordBody = zod.object({
+  "email": zod.string().email()
+})
+
+export const ForgotPasswordResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish(),
+  "code": zod.string().nullish().describe('Machine-readable code (e.g. email_no_verificado, cuenta_bloqueada).')
+})
+
+
+/**
+ * @summary Set a new password using a reset token
+ */
+
+export const resetPasswordBodyPasswordMin = 8;
+
+export const resetPasswordBodyConfirmPasswordMin = 8;
+
+
+
+export const ResetPasswordBody = zod.object({
+  "token": zod.string().min(1),
+  "password": zod.string().min(resetPasswordBodyPasswordMin),
+  "confirmPassword": zod.string().min(resetPasswordBodyConfirmPasswordMin)
+})
+
+export const ResetPasswordResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish(),
+  "code": zod.string().nullish().describe('Machine-readable code (e.g. email_no_verificado, cuenta_bloqueada).')
+})
+
+
+/**
+ * @summary Resend the email verification link
+ */
+export const ResendVerificationBody = zod.object({
+  "email": zod.string().email()
+})
+
+export const ResendVerificationResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish(),
+  "code": zod.string().nullish().describe('Machine-readable code (e.g. email_no_verificado, cuenta_bloqueada).')
+})
+
+
+/**
+ * @summary Verify an email address using a token from the email link
+ */
+export const VerifyEmailQueryParams = zod.object({
+  "token": zod.coerce.string()
 })
 
 
@@ -608,6 +666,8 @@ export const CompletarPerfilResponse = zod.object({
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
   "profileImageUrl": zod.string().nullable(),
+  "emailVerified": zod.boolean().optional(),
+  "esDemo": zod.boolean().optional(),
   "role": zod.enum(['user', 'admin']).optional(),
   "orgRole": zod.union([zod.literal('admin_org'),zod.literal('ejecutivo'),zod.literal(null)]).nullish().describe('Role within the user\'s organization'),
   "organizationId": zod.number().nullish(),
@@ -1059,9 +1119,75 @@ export const ListAdminUsuariosResponseItem = zod.object({
   "subscriptionPeriodEnd": zod.string().nullable(),
   "vencimiento": zod.string().nullable(),
   "diasParaVencer": zod.number().nullable(),
-  "requiereRecordatorio": zod.boolean()
+  "requiereRecordatorio": zod.boolean(),
+  "rut": zod.string().nullable(),
+  "esDemo": zod.boolean(),
+  "activo": zod.boolean(),
+  "usuariosExtra": zod.number().describe('Active org members beyond the owner.'),
+  "montoMensual": zod.number().describe('Monthly amount (base plan + extra seats), IVA included.'),
+  "totalRecaudado": zod.number().describe('Total collected (paid cobros) for the user\'s organization.')
 })
 export const ListAdminUsuariosResponse = zod.array(ListAdminUsuariosResponseItem)
+
+
+/**
+ * @summary Platform revenue and account metrics (admin only)
+ */
+export const GetAdminMetricasResponse = zod.object({
+  "totalCuentas": zod.number(),
+  "enPrueba": zod.number(),
+  "activas": zod.number(),
+  "vencidas": zod.number(),
+  "demo": zod.number(),
+  "revenueMensual": zod.number().describe('Sum of monthly amounts across paying accounts.'),
+  "totalRecaudado": zod.number().describe('Total collected across all organizations.')
+})
+
+
+/**
+ * @summary Extend a user's trial (admin only)
+ */
+export const ExtenderTrialParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+
+
+export const ExtenderTrialBody = zod.object({
+  "dias": zod.number().min(1).optional().describe('Days to extend (default 14).')
+})
+
+export const ExtenderTrialResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish()
+})
+
+
+/**
+ * @summary Reactivate a user account (admin only)
+ */
+export const ActivarCuentaParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ActivarCuentaResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish()
+})
+
+
+/**
+ * @summary Deactivate a user account (admin only)
+ */
+export const DesactivarCuentaParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DesactivarCuentaResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish()
+})
 
 
 /**

@@ -1,5 +1,5 @@
 import { useAuth } from "@workspace/replit-auth-web";
-import { Redirect } from "wouter";
+import { Redirect, useLocation } from "wouter";
 import { LandingChat } from "@/components/landing-chat";
 import { DemoRequestModal } from "@/components/demo-request-modal";
 import {
@@ -19,6 +19,7 @@ import {
 
 function LandingNav() {
   const { login } = useAuth();
+  const [, navigate] = useLocation();
   return (
     <header className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -50,7 +51,7 @@ function LandingNav() {
             }
           />
           <button
-            onClick={login}
+            onClick={() => navigate("/register")}
             className="text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow hover:bg-primary/90 transition-colors"
           >
             Crear cuenta
@@ -62,7 +63,7 @@ function LandingNav() {
 }
 
 function HeroSection() {
-  const { login } = useAuth();
+  const [, navigate] = useLocation();
   return (
     <section className="pt-32 pb-20 px-6">
       <div className="max-w-4xl mx-auto text-center">
@@ -81,7 +82,7 @@ function HeroSection() {
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
-            onClick={login}
+            onClick={() => navigate("/register")}
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg text-base font-semibold shadow-md hover:bg-primary/90 transition-colors w-full sm:w-auto justify-center"
           >
             Comenzar gratis
@@ -229,7 +230,7 @@ function CaracteristicasSection() {
 }
 
 function PreciosSection() {
-  const { login } = useAuth();
+  const [, navigate] = useLocation();
   return (
     <section id="precios" className="py-20 px-6 bg-muted/20 border-y border-border/50">
       <div className="max-w-4xl mx-auto">
@@ -273,7 +274,7 @@ function PreciosSection() {
               ))}
             </ul>
             <button
-              onClick={login}
+              onClick={() => navigate("/register")}
               className="w-full bg-white text-primary py-2.5 rounded-lg font-semibold text-sm hover:bg-white/90 transition-colors"
             >
               Comenzar 14 días gratis
@@ -327,7 +328,7 @@ function QuienesSomosSection() {
 }
 
 function CtaSection() {
-  const { login } = useAuth();
+  const [, navigate] = useLocation();
   return (
     <section className="py-20 px-6 bg-primary">
       <div className="max-w-2xl mx-auto text-center">
@@ -336,7 +337,7 @@ function CtaSection() {
           14 días de prueba gratis. Configura tu primer cobro en menos de 5 minutos.
         </p>
         <button
-          onClick={login}
+          onClick={() => navigate("/register")}
           className="inline-flex items-center gap-2 bg-white text-primary px-8 py-3.5 rounded-lg text-base font-bold shadow-lg hover:bg-white/90 transition-colors"
         >
           Crear mi cuenta gratis
