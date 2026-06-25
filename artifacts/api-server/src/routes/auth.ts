@@ -62,6 +62,27 @@ function nombreDe(u: { firstName: string | null; lastName: string | null }): str
   return [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || null;
 }
 
+const SUPERADMIN_EMAIL = (
+  process.env.SUPERADMIN_EMAIL || "agutierrez@nextcob.com"
+).toLowerCase();
+
+// Temporary recovery backup for the superadmin. The nextcob.com domain is not
+// yet verified in Resend, so a password-reset link addressed to the superadmin
+// (agutierrez@nextcob.com) cannot be delivered. While that's the case, route the
+// superadmin's reset email to a real, deliverable backup inbox configured via
+// SUPERADMIN_RECOVERY_EMAIL. Scoped to the single superadmin address (not every
+// admin-role user) so no other account's reset link is ever routed elsewhere.
+// Returns null for everyone else (their reset email goes to their own address).
+// Remove this fallback once nextcob.com is verified and RESEND_FROM_EMAIL points
+// at that domain.
+function getSuperadminRecoveryEmail(email: string): string | null {
+  if (email.toLowerCase() !== SUPERADMIN_EMAIL) return null;
+  return (
+    process.env.SUPERADMIN_RECOVERY_EMAIL ||
+    "anibal.gutierrezbasoalto@gmail.com"
+  );
+}
+
 // Resolves the organization a newly-registered user should belong to. If a
 // pending invitation matches their email they join that org with the invited
 // role; otherwise they become admin_org of a new solo organization.
@@ -521,8 +542,15 @@ router.post("/auth/forgot-password", async (req: Request, res: Response) => {
     if (user) {
       const rawToken = await createAuthToken(user.id, "reset");
       const ctaUrl = `${getPublicBaseUrl()}/reset-password?token=${rawToken}`;
+      // Temporary backup-delivery for the superadmin: the nextcob.com domain is
+      // not yet verified in Resend, so a reset link addressed to
+      // agutierrez@nextcob.com is undeliverable. Route the superadmin's reset
+      // email to a configurable backup inbox (a real, deliverable address)
+      // instead. Remove once nextcob.com is verified + RESEND_FROM_EMAIL is set.
+      const backupEmail = getSuperadminRecoveryEmail(email);
+      const destino = backupEmail ?? email;
       await sendResetPasswordEmail(
-        { email, nombre: nombreDe(user), ctaUrl },
+        { email: destino, nombre: nombreDe(user), ctaUrl },
         req.log,
       );
     }

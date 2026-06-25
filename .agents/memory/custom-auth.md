@@ -37,6 +37,20 @@ already exists there does NOT get a fresh 14-day trial again.
 - Both seeded with `passwordHash=null` + `emailVerified=true`; they set their
   password through the forgot-password flow (no plaintext seeded).
 
+## Resend deliverability & superadmin backup
+`RESEND_FROM_EMAIL` is unset → sender falls back to Resend's SANDBOX domain,
+which only delivers to the Resend account-owner inbox and rejects arbitrary
+recipients. So a superadmin reset link addressed to the (unverified) nextcob.com
+domain was undeliverable.
+**Temporary fix:** `getSuperadminRecoveryEmail()` in `routes/auth.ts` routes the
+superadmin's password-reset email to a backup inbox (`SUPERADMIN_RECOVERY_EMAIL`
+env), scoped to the exact `SUPERADMIN_EMAIL` address (not all admin-role users,
+so no other account's reset link leaks elsewhere).
+**Permanent fix:** verify the app domain in Resend + set `RESEND_FROM_EMAIL` to
+an address on it, then remove the backup fallback.
+**Why:** until the domain is verified, ALL outbound mail to non-owner recipients
+(incl. customer cobro links) silently fails — this is a broader prod issue.
+
 ## Email gates
 Login blocks unverified email (code `email_no_verificado`) and deactivated
 accounts. forgot-password / resend-verification return a generic "si el correo
