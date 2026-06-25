@@ -669,6 +669,80 @@ export const ListSeguimientosResponse = zod.array(ListSeguimientosResponseItem)
 
 
 /**
+ * @summary List management notes (gestiones) for a cobro, newest first
+ */
+export const ListGestionesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListGestionesResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "usuarioId": zod.string(),
+  "usuarioNombre": zod.string().nullish(),
+  "tipo": zod.enum(['llamada', 'email', 'whatsapp', 'visita', 'otro']),
+  "resultado": zod.enum(['contactado_pagara', 'contactado_no_pagara', 'no_contesto', 'numero_no_disponible', 'acordo_pago_parcial', 'acordo_fecha_pago', 'disputa_reclamo']),
+  "nota": zod.string().nullish(),
+  "proximaGestionEn": zod.coerce.date().nullish(),
+  "proximaGestionTipo": zod.union([zod.enum(['llamada', 'email', 'whatsapp', 'visita', 'otro']),zod.null()]).optional(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListGestionesResponse = zod.array(ListGestionesResponseItem)
+
+
+/**
+ * @summary Register a management note (gestión) for a cobro
+ */
+export const CrearGestionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CrearGestionBody = zod.object({
+  "tipo": zod.enum(['llamada', 'email', 'whatsapp', 'visita', 'otro']),
+  "resultado": zod.enum(['contactado_pagara', 'contactado_no_pagara', 'no_contesto', 'numero_no_disponible', 'acordo_pago_parcial', 'acordo_fecha_pago', 'disputa_reclamo']),
+  "nota": zod.string().optional(),
+  "proximaGestionEn": zod.coerce.date().optional(),
+  "proximaGestionTipo": zod.enum(['llamada', 'email', 'whatsapp', 'visita', 'otro']).optional()
+})
+
+
+/**
+ * @summary Upcoming/planned next gestiones (próxima gestión) for the current user's scope
+ */
+export const GetGestionesAgendaResponseItem = zod.object({
+  "gestionId": zod.number(),
+  "cobroId": zod.number(),
+  "cobroDescripcion": zod.string().nullish(),
+  "clienteNombre": zod.string().nullish(),
+  "saldo": zod.number().optional(),
+  "estado": zod.string().optional(),
+  "responsableId": zod.string().nullish(),
+  "responsableNombre": zod.string().nullish(),
+  "proximaGestionEn": zod.coerce.date(),
+  "proximaGestionTipo": zod.enum(['llamada', 'email', 'whatsapp', 'visita', 'otro']),
+  "vencida": zod.boolean()
+})
+export const GetGestionesAgendaResponse = zod.array(GetGestionesAgendaResponseItem)
+
+
+/**
+ * @summary Per-ejecutivo management metrics
+ */
+export const GetGestionesMetricasResponseItem = zod.object({
+  "usuarioId": zod.string(),
+  "usuarioNombre": zod.string().nullish(),
+  "gestionesRealizadas": zod.number(),
+  "intentos": zod.number(),
+  "contactados": zod.number(),
+  "tasaContactoEfectivo": zod.number(),
+  "cobrosGestionados": zod.number(),
+  "cobrosRecuperados": zod.number(),
+  "tasaRecuperacion": zod.number()
+})
+export const GetGestionesMetricasResponse = zod.array(GetGestionesMetricasResponseItem)
+
+
+/**
  * @summary List pagos parciales for a cobro
  */
 export const ListAbonosParams = zod.object({

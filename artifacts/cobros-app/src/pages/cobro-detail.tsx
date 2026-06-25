@@ -38,6 +38,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate, formatDateOnly } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
+import { GestionesSection } from "@/components/gestiones-section";
 import {
   ArrowLeft,
   RefreshCw,
@@ -1906,6 +1907,9 @@ export default function CobroDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Historial de gestiones */}
+      <GestionesSection cobroId={Number(id)} />
     </div>
   );
 }

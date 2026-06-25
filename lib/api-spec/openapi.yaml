@@ -779,6 +779,103 @@ paths:
         "404":
           description: Cobro not found
 
+  /cobros/{id}/gestiones:
+    get:
+      operationId: listGestiones
+      tags: [cobros]
+      summary: List management notes (gestiones) for a cobro, newest first
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of gestiones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GestionCobranza"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Cobro not found
+
+    post:
+      operationId: crearGestion
+      tags: [cobros]
+      summary: Register a management note (gestión) for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GestionInput"
+      responses:
+        "201":
+          description: Gestión created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GestionCobranza"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Cobro not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /gestiones/agenda:
+    get:
+      operationId: getGestionesAgenda
+      tags: [gestiones]
+      summary: Upcoming/planned next gestiones (próxima gestión) for the current user's scope
+      responses:
+        "200":
+          description: Agenda of planned next gestiones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GestionAgendaItem"
+        "401":
+          description: Unauthorized
+
+  /gestiones/metricas:
+    get:
+      operationId: getGestionesMetricas
+      tags: [gestiones]
+      summary: Per-ejecutivo management metrics
+      responses:
+        "200":
+          description: Management metrics grouped by ejecutivo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GestionMetricaEjecutivo"
+        "401":
+          description: Unauthorized
+
   /cobros/{id}/abonos:
     get:
       operationId: listAbonos
@@ -2390,6 +2487,130 @@ components:
         emailPagador:
           type: string
           format: email
+
+    GestionTipo:
+      type: string
+      enum: [llamada, email, whatsapp, visita, otro]
+
+    GestionResultado:
+      type: string
+      enum:
+        - contactado_pagara
+        - contactado_no_pagara
+        - no_contesto
+        - numero_no_disponible
+        - acordo_pago_parcial
+        - acordo_fecha_pago
+        - disputa_reclamo
+
+    GestionCobranza:
+      type: object
+      required: [id, cobroId, usuarioId, tipo, resultado, creadoEn]
+      properties:
+        id:
+          type: integer
+        cobroId:
+          type: integer
+        usuarioId:
+          type: string
+        usuarioNombre:
+          type: ["string", "null"]
+        tipo:
+          $ref: "#/components/schemas/GestionTipo"
+        resultado:
+          $ref: "#/components/schemas/GestionResultado"
+        nota:
+          type: ["string", "null"]
+        proximaGestionEn:
+          type: ["string", "null"]
+          format: date-time
+        proximaGestionTipo:
+          oneOf:
+            - $ref: "#/components/schemas/GestionTipo"
+            - type: "null"
+        creadoEn:
+          type: string
+          format: date-time
+
+    GestionInput:
+      type: object
+      required: [tipo, resultado]
+      properties:
+        tipo:
+          $ref: "#/components/schemas/GestionTipo"
+        resultado:
+          $ref: "#/components/schemas/GestionResultado"
+        nota:
+          type: string
+        proximaGestionEn:
+          type: string
+          format: date-time
+        proximaGestionTipo:
+          $ref: "#/components/schemas/GestionTipo"
+
+    GestionAgendaItem:
+      type: object
+      required:
+        - gestionId
+        - cobroId
+        - proximaGestionEn
+        - proximaGestionTipo
+        - vencida
+      properties:
+        gestionId:
+          type: integer
+        cobroId:
+          type: integer
+        cobroDescripcion:
+          type: ["string", "null"]
+        clienteNombre:
+          type: ["string", "null"]
+        saldo:
+          type: number
+        estado:
+          type: string
+        responsableId:
+          type: ["string", "null"]
+        responsableNombre:
+          type: ["string", "null"]
+        proximaGestionEn:
+          type: string
+          format: date-time
+        proximaGestionTipo:
+          $ref: "#/components/schemas/GestionTipo"
+        vencida:
+          type: boolean
+
+    GestionMetricaEjecutivo:
+      type: object
+      required:
+        - usuarioId
+        - gestionesRealizadas
+        - intentos
+        - contactados
+        - tasaContactoEfectivo
+        - cobrosGestionados
+        - cobrosRecuperados
+        - tasaRecuperacion
+      properties:
+        usuarioId:
+          type: string
+        usuarioNombre:
+          type: ["string", "null"]
+        gestionesRealizadas:
+          type: integer
+        intentos:
+          type: integer
+        contactados:
+          type: integer
+        tasaContactoEfectivo:
+          type: number
+        cobrosGestionados:
+          type: integer
+        cobrosRecuperados:
+          type: integer
+        tasaRecuperacion:
+          type: number
 
     MpCredentialsStatus:
       type: object

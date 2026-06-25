@@ -54,6 +54,10 @@ import type {
   FlowCredentialsStatus,
   FlowLinkResponse,
   GenerarFlowLinkInput,
+  GestionAgendaItem,
+  GestionCobranza,
+  GestionInput,
+  GestionMetricaEjecutivo,
   GetDashboardMetricsParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
@@ -2449,6 +2453,309 @@ export function useListSeguimientos<TData = Awaited<ReturnType<typeof listSeguim
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListSeguimientosQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListGestionesUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/gestiones`
+}
+
+/**
+ * @summary List management notes (gestiones) for a cobro, newest first
+ */
+export const listGestiones = async (id: number, options?: RequestInit): Promise<GestionCobranza[]> => {
+
+  return customFetch<GestionCobranza[]>(getListGestionesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListGestionesQueryKey = (id: number,) => {
+    return [
+    `/api/cobros/${id}/gestiones`
+    ] as const;
+    }
+
+
+export const getListGestionesQueryOptions = <TData = Awaited<ReturnType<typeof listGestiones>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGestiones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListGestionesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGestiones>>> = ({ signal }) => listGestiones(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGestiones>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListGestionesQueryResult = NonNullable<Awaited<ReturnType<typeof listGestiones>>>
+export type ListGestionesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List management notes (gestiones) for a cobro, newest first
+ */
+
+export function useListGestiones<TData = Awaited<ReturnType<typeof listGestiones>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGestiones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListGestionesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCrearGestionUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/gestiones`
+}
+
+/**
+ * @summary Register a management note (gestión) for a cobro
+ */
+export const crearGestion = async (id: number,
+    gestionInput: GestionInput, options?: RequestInit): Promise<GestionCobranza> => {
+
+  return customFetch<GestionCobranza>(getCrearGestionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      gestionInput,)
+  }
+);}
+
+
+
+
+export const getCrearGestionMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof crearGestion>>, TError,{id: number;data: BodyType<GestionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof crearGestion>>, TError,{id: number;data: BodyType<GestionInput>}, TContext> => {
+
+const mutationKey = ['crearGestion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof crearGestion>>, {id: number;data: BodyType<GestionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  crearGestion(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CrearGestionMutationResult = NonNullable<Awaited<ReturnType<typeof crearGestion>>>
+    export type CrearGestionMutationBody = BodyType<GestionInput>
+    export type CrearGestionMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Register a management note (gestión) for a cobro
+ */
+export const useCrearGestion = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof crearGestion>>, TError,{id: number;data: BodyType<GestionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof crearGestion>>,
+        TError,
+        {id: number;data: BodyType<GestionInput>},
+        TContext
+      > => {
+      return useMutation(getCrearGestionMutationOptions(options));
+    }
+
+export const getGetGestionesAgendaUrl = () => {
+
+
+
+
+  return `/api/gestiones/agenda`
+}
+
+/**
+ * @summary Upcoming/planned next gestiones (próxima gestión) for the current user's scope
+ */
+export const getGestionesAgenda = async ( options?: RequestInit): Promise<GestionAgendaItem[]> => {
+
+  return customFetch<GestionAgendaItem[]>(getGetGestionesAgendaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGestionesAgendaQueryKey = () => {
+    return [
+    `/api/gestiones/agenda`
+    ] as const;
+    }
+
+
+export const getGetGestionesAgendaQueryOptions = <TData = Awaited<ReturnType<typeof getGestionesAgenda>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGestionesAgenda>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGestionesAgendaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGestionesAgenda>>> = ({ signal }) => getGestionesAgenda({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGestionesAgenda>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGestionesAgendaQueryResult = NonNullable<Awaited<ReturnType<typeof getGestionesAgenda>>>
+export type GetGestionesAgendaQueryError = ErrorType<void>
+
+
+/**
+ * @summary Upcoming/planned next gestiones (próxima gestión) for the current user's scope
+ */
+
+export function useGetGestionesAgenda<TData = Awaited<ReturnType<typeof getGestionesAgenda>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGestionesAgenda>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGestionesAgendaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetGestionesMetricasUrl = () => {
+
+
+
+
+  return `/api/gestiones/metricas`
+}
+
+/**
+ * @summary Per-ejecutivo management metrics
+ */
+export const getGestionesMetricas = async ( options?: RequestInit): Promise<GestionMetricaEjecutivo[]> => {
+
+  return customFetch<GestionMetricaEjecutivo[]>(getGetGestionesMetricasUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGestionesMetricasQueryKey = () => {
+    return [
+    `/api/gestiones/metricas`
+    ] as const;
+    }
+
+
+export const getGetGestionesMetricasQueryOptions = <TData = Awaited<ReturnType<typeof getGestionesMetricas>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGestionesMetricas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGestionesMetricasQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGestionesMetricas>>> = ({ signal }) => getGestionesMetricas({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGestionesMetricas>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGestionesMetricasQueryResult = NonNullable<Awaited<ReturnType<typeof getGestionesMetricas>>>
+export type GetGestionesMetricasQueryError = ErrorType<void>
+
+
+/**
+ * @summary Per-ejecutivo management metrics
+ */
+
+export function useGetGestionesMetricas<TData = Awaited<ReturnType<typeof getGestionesMetricas>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGestionesMetricas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGestionesMetricasQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

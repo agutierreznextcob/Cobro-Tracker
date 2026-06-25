@@ -10,6 +10,7 @@ export * from "./mp-credentials";
 export * from "./conversations";
 export * from "./messages";
 export * from "./seguimientos-cobranza";
+export * from "./gestiones-cobranza";
 export * from "./pagos-parciales";
 export * from "./recordatorios";
 export * from "./recordatorios-default";

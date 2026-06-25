@@ -1,13 +1,21 @@
 import { useState, useMemo } from "react";
-import { useListCobros, useGetDashboardMetrics, useListClientes } from "@workspace/api-client-react";
+import { useListCobros, useGetDashboardMetrics, useListClientes, useGetGestionesAgenda, GestionTipo } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatCurrency, formatShortDate, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { ScoreBadge } from "@/components/score-badge";
 import { Link } from "wouter";
-import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, BarChart3, Wallet, AlertCircle, Minus, ShieldAlert } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, BarChart3, Wallet, AlertCircle, Minus, ShieldAlert, CalendarClock } from "lucide-react";
+
+const GESTION_TIPO_LABEL: Record<GestionTipo, string> = {
+  llamada: "Llamada",
+  email: "Email",
+  whatsapp: "WhatsApp",
+  visita: "Visita",
+  otro: "Otro",
+};
 
 function PasarelaBadge({ flowLinkPago, mpPaymentLinkUrl }: { flowLinkPago?: string | null; mpPaymentLinkUrl?: string | null }) {
   if (flowLinkPago && mpPaymentLinkUrl) {
@@ -51,6 +59,7 @@ export default function Dashboard() {
   });
   const { data: cobros, isLoading: isLoadingCobros } = useListCobros();
   const { data: clientes } = useListClientes();
+  const { data: agenda } = useGetGestionesAgenda();
 
   const clientesPrioritarios = useMemo(() => {
     if (!clientes) return [];
@@ -206,6 +215,42 @@ export default function Dashboard() {
               </Link>
             ))}
           </div>
+        </div>
+      )}
+
+      {agenda && agenda.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <CalendarClock className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold tracking-tight">Próximas gestiones</h2>
+            <span className="text-sm text-muted-foreground">— agenda de cobranza programada</span>
+          </div>
+          <Card className="shadow-sm overflow-hidden">
+            <div className="divide-y divide-border/60">
+              {agenda.map((g) => (
+                <Link key={g.gestionId} href={`/cobros/${g.cobroId}`}>
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40 transition-colors cursor-pointer">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {g.clienteNombre || g.cobroDescripcion || `Cobro #${g.cobroId}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {GESTION_TIPO_LABEL[g.proximaGestionTipo]}
+                        {g.responsableNombre && ` · ${g.responsableNombre}`}
+                        {typeof g.saldo === "number" && g.saldo > 0 && ` · ${formatCurrency(g.saldo)} pendiente`}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-xs font-medium ${g.vencida ? "text-red-600" : "text-foreground"}`}>
+                        {formatDate(g.proximaGestionEn)}
+                      </p>
+                      {g.vencida && <p className="text-[10px] text-red-600 font-medium">Vencida</p>}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </Card>
         </div>
       )}
 

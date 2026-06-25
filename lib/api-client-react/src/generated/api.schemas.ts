@@ -472,6 +472,85 @@ export interface AbonoInput {
   emailPagador?: string;
 }
 
+export type GestionTipo = typeof GestionTipo[keyof typeof GestionTipo];
+
+
+export const GestionTipo = {
+  llamada: 'llamada',
+  email: 'email',
+  whatsapp: 'whatsapp',
+  visita: 'visita',
+  otro: 'otro',
+} as const;
+
+export type GestionResultado = typeof GestionResultado[keyof typeof GestionResultado];
+
+
+export const GestionResultado = {
+  contactado_pagara: 'contactado_pagara',
+  contactado_no_pagara: 'contactado_no_pagara',
+  no_contesto: 'no_contesto',
+  numero_no_disponible: 'numero_no_disponible',
+  acordo_pago_parcial: 'acordo_pago_parcial',
+  acordo_fecha_pago: 'acordo_fecha_pago',
+  disputa_reclamo: 'disputa_reclamo',
+} as const;
+
+export interface GestionCobranza {
+  id: number;
+  cobroId: number;
+  usuarioId: string;
+  /** @nullable */
+  usuarioNombre?: string | null;
+  tipo: GestionTipo;
+  resultado: GestionResultado;
+  /** @nullable */
+  nota?: string | null;
+  /** @nullable */
+  proximaGestionEn?: string | null;
+  proximaGestionTipo?: GestionTipo | null;
+  creadoEn: string;
+}
+
+export interface GestionInput {
+  tipo: GestionTipo;
+  resultado: GestionResultado;
+  nota?: string;
+  proximaGestionEn?: string;
+  proximaGestionTipo?: GestionTipo;
+}
+
+export interface GestionAgendaItem {
+  gestionId: number;
+  cobroId: number;
+  /** @nullable */
+  cobroDescripcion?: string | null;
+  /** @nullable */
+  clienteNombre?: string | null;
+  saldo?: number;
+  estado?: string;
+  /** @nullable */
+  responsableId?: string | null;
+  /** @nullable */
+  responsableNombre?: string | null;
+  proximaGestionEn: string;
+  proximaGestionTipo: GestionTipo;
+  vencida: boolean;
+}
+
+export interface GestionMetricaEjecutivo {
+  usuarioId: string;
+  /** @nullable */
+  usuarioNombre?: string | null;
+  gestionesRealizadas: number;
+  intentos: number;
+  contactados: number;
+  tasaContactoEfectivo: number;
+  cobrosGestionados: number;
+  cobrosRecuperados: number;
+  tasaRecuperacion: number;
+}
+
 export interface MpCredentialsStatus {
   configurado: boolean;
 }

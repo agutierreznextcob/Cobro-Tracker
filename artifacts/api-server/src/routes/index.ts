@@ -8,6 +8,7 @@ import aiRouter from "./ai";
 import publicChatRouter from "./public-chat";
 import webhooksRouter from "./webhooks";
 import recordatoriosRouter from "./recordatorios";
+import gestionesRouter from "./gestiones";
 import notificacionesRouter from "./notificaciones";
 import leadsRouter from "./leads";
 import portalRouter from "./portal";
@@ -28,6 +29,7 @@ router.use(publicChatRouter);
 // every request including public webhook paths like /webhooks/flow.
 router.use(webhooksRouter);
 router.use(recordatoriosRouter);
+router.use(gestionesRouter);
 router.use(notificacionesRouter);
 // leadsRouter has a public POST (/public/leads) plus admin-gated /leads routes;
 // mount before cobrosRouter, whose blanket auth middleware would otherwise
