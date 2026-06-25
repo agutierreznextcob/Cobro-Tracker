@@ -37,6 +37,7 @@ import type {
   BeginBrowserLoginParams,
   Cliente,
   ClienteConHistorial,
+  ClienteConScore,
   ClienteInput,
   Cobro,
   CobroInput,
@@ -670,9 +671,9 @@ export const getListClientesUrl = (params?: ListClientesParams,) => {
 /**
  * @summary List clientes for the current user
  */
-export const listClientes = async (params?: ListClientesParams, options?: RequestInit): Promise<Cliente[]> => {
+export const listClientes = async (params?: ListClientesParams, options?: RequestInit): Promise<ClienteConScore[]> => {
 
-  return customFetch<Cliente[]>(getListClientesUrl(params),
+  return customFetch<ClienteConScore[]>(getListClientesUrl(params),
   {
     ...options,
     method: 'GET'

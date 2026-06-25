@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Cobro } from './cobro';
+import type { ScoreDetalle } from './scoreDetalle';
 
 export interface ClienteConHistorial {
   id: number;
@@ -20,4 +21,5 @@ export interface ClienteConHistorial {
   creadoEn: Date;
   actualizadoEn: Date;
   cobros: Cobro[];
+  scoreDetalle: ScoreDetalle;
 }

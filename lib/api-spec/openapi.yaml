@@ -177,7 +177,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Cliente"
+                  $ref: "#/components/schemas/ClienteConScore"
         "401":
           description: Unauthorized
     post:
@@ -1987,6 +1987,104 @@ components:
           type: string
           format: date-time
 
+    ScoreCategoria:
+      type: string
+      enum: [excelente, bueno, regular, riesgoso, critico, sin_datos]
+
+    ScoreFactor:
+      type: object
+      required: [texto, tipo]
+      properties:
+        texto:
+          type: string
+        tipo:
+          type: string
+          enum: [positivo, neutral, negativo]
+
+    ClienteConScore:
+      type: object
+      required:
+        [
+          id,
+          nombre,
+          userId,
+          creadoEn,
+          actualizadoEn,
+          score,
+          categoria,
+          totalCobros,
+          totalCobrado,
+          totalPendiente,
+          promedioDiasAtraso,
+          cobrosVencidos,
+        ]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        rut:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        userId:
+          type: string
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+        score:
+          type: ["integer", "null"]
+        categoria:
+          $ref: "#/components/schemas/ScoreCategoria"
+        totalCobros:
+          type: integer
+        totalCobrado:
+          type: number
+        totalPendiente:
+          type: number
+        promedioDiasAtraso:
+          type: number
+        cobrosVencidos:
+          type: integer
+
+    ScoreDetalle:
+      type: object
+      required:
+        [
+          score,
+          categoria,
+          totalCobros,
+          totalCobrado,
+          totalPendiente,
+          promedioDiasAtraso,
+          cobrosVencidos,
+          factores,
+        ]
+      properties:
+        score:
+          type: ["integer", "null"]
+        categoria:
+          $ref: "#/components/schemas/ScoreCategoria"
+        totalCobros:
+          type: integer
+        totalCobrado:
+          type: number
+        totalPendiente:
+          type: number
+        promedioDiasAtraso:
+          type: number
+        cobrosVencidos:
+          type: integer
+        factores:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScoreFactor"
+
     ClienteInput:
       type: object
       required: [nombre]
@@ -2004,7 +2102,7 @@ components:
 
     ClienteConHistorial:
       type: object
-      required: [id, nombre, userId, creadoEn, actualizadoEn, cobros]
+      required: [id, nombre, userId, creadoEn, actualizadoEn, cobros, scoreDetalle]
       properties:
         id:
           type: integer
@@ -2028,6 +2126,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Cobro"
+        scoreDetalle:
+          $ref: "#/components/schemas/ScoreDetalle"
 
     DashboardMetricas:
       type: object

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useListCobros } from "@workspace/api-client-react";
+import { useListCobros, useListClientes } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,11 +9,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
+import { ScoreBadge, SCORE_META } from "@/components/score-badge";
 import { ArrowRight, Minus, Search, X } from "lucide-react";
-import type { ListCobrosParams } from "@workspace/api-client-react";
+import type { ListCobrosParams, ScoreCategoria } from "@workspace/api-client-react";
 
 type EstadoFilter = ListCobrosParams["estado"];
 type MetodoFilter = ListCobrosParams["metodo"];
+
+const CATEGORIAS_SCORE: { value: ScoreCategoria; label: string }[] = [
+  { value: "excelente", label: "Excelente" },
+  { value: "bueno", label: "Bueno" },
+  { value: "regular", label: "Regular" },
+  { value: "riesgoso", label: "Riesgoso" },
+  { value: "critico", label: "Crítico" },
+  { value: "sin_datos", label: "Sin historial" },
+];
 
 function MetodoBadge({ flowLinkPago, mpPaymentLinkUrl }: { flowLinkPago?: string | null; mpPaymentLinkUrl?: string | null }) {
   if (flowLinkPago && mpPaymentLinkUrl) {
@@ -56,9 +66,17 @@ const METODOS: { value: NonNullable<MetodoFilter>; label: string }[] = [
 export default function CobrosList() {
   const [filterEstado, setFilterEstado] = useState<EstadoFilter>(undefined);
   const [filterMetodo, setFilterMetodo] = useState<MetodoFilter>(undefined);
+  const [filterScore, setFilterScore] = useState<ScoreCategoria | undefined>(undefined);
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [debouncedBusqueda, setDebouncedBusqueda] = useState("");
   const [, navigate] = useLocation();
+
+  const { data: clientes } = useListClientes();
+  const categoriaPorCliente = useMemo(() => {
+    const map = new Map<number, ScoreCategoria>();
+    for (const c of clientes ?? []) map.set(c.id, c.categoria);
+    return map;
+  }, [clientes]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedBusqueda(busquedaCliente), 250);
@@ -76,11 +94,17 @@ export default function CobrosList() {
   const cobrosFiltrados = useMemo(() => {
     if (!cobros) return cobros;
     const q = debouncedBusqueda.trim().toLowerCase();
-    if (!q) return cobros;
-    return cobros.filter((c) => (c.clienteNombre ?? "").toLowerCase().includes(q));
-  }, [cobros, debouncedBusqueda]);
+    return cobros.filter((c) => {
+      if (q && !(c.clienteNombre ?? "").toLowerCase().includes(q)) return false;
+      if (filterScore) {
+        const cat = c.clienteId != null ? categoriaPorCliente.get(c.clienteId) : undefined;
+        if ((cat ?? "sin_datos") !== filterScore) return false;
+      }
+      return true;
+    });
+  }, [cobros, debouncedBusqueda, filterScore, categoriaPorCliente]);
 
-  const hayFiltros = !!filterEstado || !!filterMetodo || busquedaCliente.trim() !== "";
+  const hayFiltros = !!filterEstado || !!filterMetodo || !!filterScore || busquedaCliente.trim() !== "";
 
   return (
     <div className="space-y-6">
@@ -132,6 +156,22 @@ export default function CobrosList() {
           </SelectContent>
         </Select>
 
+        <Select
+          value={filterScore ?? ""}
+          onValueChange={(v) => setFilterScore(v ? (v as ScoreCategoria) : undefined)}
+        >
+          <SelectTrigger className="h-8 w-[170px] text-xs">
+            <SelectValue placeholder="Score: todos" />
+          </SelectTrigger>
+          <SelectContent>
+            {CATEGORIAS_SCORE.map((c) => (
+              <SelectItem key={c.value} value={c.value} className="text-xs">
+                {c.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <div className="relative w-[180px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <Input
@@ -147,7 +187,7 @@ export default function CobrosList() {
             size="sm"
             variant="ghost"
             className="h-8 gap-1.5 text-xs text-muted-foreground"
-            onClick={() => { setFilterEstado(undefined); setFilterMetodo(undefined); setBusquedaCliente(""); setDebouncedBusqueda(""); }}
+            onClick={() => { setFilterEstado(undefined); setFilterMetodo(undefined); setFilterScore(undefined); setBusquedaCliente(""); setDebouncedBusqueda(""); }}
           >
             <X className="h-3 w-3" />
             Limpiar
@@ -205,7 +245,19 @@ export default function CobrosList() {
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {cobro.clienteNombre ?? cobro.responsableNombre ?? <span className="opacity-40">—</span>}
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate">
+                        {cobro.clienteNombre ?? cobro.responsableNombre ?? <span className="opacity-40">—</span>}
+                      </span>
+                      {cobro.clienteId != null && categoriaPorCliente.has(cobro.clienteId) && (
+                        <ScoreBadge
+                          score={null}
+                          categoria={categoriaPorCliente.get(cobro.clienteId)!}
+                          size="xs"
+                          showLabel={false}
+                        />
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={cobro.estado} />

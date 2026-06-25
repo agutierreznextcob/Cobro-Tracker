@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import {
   useListCobros,
+  useListClientes,
   useGetRendimientoEquipo,
   getGetRendimientoEquipoQueryKey,
 } from "@workspace/api-client-react";
-import type { Cobro } from "@workspace/api-client-react";
+import type { Cobro, ClienteConScore } from "@workspace/api-client-react";
+import { ScoreBadge } from "@/components/score-badge";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -354,6 +356,7 @@ export default function Informes() {
         <TabsList>
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="cuentas">Cuentas por Cobrar</TabsTrigger>
+          <TabsTrigger value="ranking">Ranking de clientes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-6 mt-0">
@@ -677,6 +680,10 @@ export default function Informes() {
 
         <TabsContent value="cuentas" className="space-y-6 mt-0">
           <AgingReport cobros={cobros ?? []} isOrgAdmin={isOrgAdmin} loading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="ranking" className="space-y-6 mt-0">
+          <RankingClientes />
         </TabsContent>
       </Tabs>
     </div>
@@ -1046,5 +1053,127 @@ function EmptyChart() {
     <div className="h-[280px] flex items-center justify-center text-sm text-muted-foreground">
       Sin datos en el período seleccionado.
     </div>
+  );
+}
+
+const CATEGORIA_LABEL: Record<string, string> = {
+  excelente: "Excelente",
+  bueno: "Bueno",
+  regular: "Regular",
+  riesgoso: "Riesgoso",
+  critico: "Crítico",
+  sin_datos: "Sin historial",
+};
+
+function RankingClientes() {
+  const { data: clientes, isLoading } = useListClientes();
+
+  const ranking = useMemo(() => {
+    const list = (clientes ?? []).slice();
+    return list.sort((a, b) => {
+      const sa = a.score ?? -1;
+      const sb = b.score ?? -1;
+      if (sb !== sa) return sb - sa;
+      return b.totalCobrado - a.totalCobrado;
+    });
+  }, [clientes]);
+
+  const exportar = async () => {
+    const XLSX = await import("xlsx");
+    const rows = ranking.map((c: ClienteConScore) => ({
+      Cliente: c.nombre,
+      Score: c.score ?? "Sin historial",
+      Categoría: CATEGORIA_LABEL[c.categoria] ?? c.categoria,
+      "Total cobrado": c.totalCobrado,
+      "Total pendiente": c.totalPendiente,
+      "Cobros vencidos": c.cobrosVencidos,
+      "Prom. días de atraso": c.promedioDiasAtraso,
+      "Total cobros": c.totalCobros,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 28 }, { wch: 8 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 18 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ranking clientes");
+    XLSX.writeFile(wb, `ranking-clientes-${format(new Date(), "yyyyMMdd")}.xlsx`);
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <p className="text-sm text-muted-foreground">
+          {isLoading ? "Cargando..." : `${ranking.length} cliente${ranking.length !== 1 ? "s" : ""} ordenados por score de comportamiento de pago.`}
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={exportar}
+          disabled={ranking.length === 0}
+        >
+          <Download className="h-4 w-4" />
+          Exportar Excel
+        </Button>
+      </div>
+
+      <Card className="shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="text-xs w-10">#</TableHead>
+              <TableHead className="text-xs">Cliente</TableHead>
+              <TableHead className="text-xs">Score</TableHead>
+              <TableHead className="text-xs text-right">Total cobrado</TableHead>
+              <TableHead className="text-xs text-right">Total pendiente</TableHead>
+              <TableHead className="text-xs text-right">Prom. días atraso</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              [1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={i} className="animate-pulse">
+                  <TableCell><div className="h-4 w-4 bg-muted rounded" /></TableCell>
+                  <TableCell><div className="h-4 w-40 bg-muted rounded" /></TableCell>
+                  <TableCell><div className="h-5 w-24 bg-muted rounded-full" /></TableCell>
+                  <TableCell><div className="h-4 w-20 bg-muted rounded ml-auto" /></TableCell>
+                  <TableCell><div className="h-4 w-20 bg-muted rounded ml-auto" /></TableCell>
+                  <TableCell><div className="h-4 w-12 bg-muted rounded ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : ranking.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground text-sm">
+                  Sin clientes registrados.
+                </TableCell>
+              </TableRow>
+            ) : (
+              ranking.map((c, i) => (
+                <TableRow key={c.id} className="hover:bg-muted/40 transition-colors">
+                  <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                  <TableCell className="font-medium text-sm">{c.nombre}</TableCell>
+                  <TableCell>
+                    <ScoreBadge score={c.score} categoria={c.categoria} size="sm" />
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">{formatCurrency(c.totalCobrado)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {c.totalPendiente > 0 ? (
+                      <span className="text-amber-700 font-medium">{formatCurrency(c.totalPendiente)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">{formatCurrency(0)}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right text-sm tabular-nums">
+                    {c.score == null ? (
+                      <span className="text-muted-foreground/50">—</span>
+                    ) : (
+                      `${c.promedioDiasAtraso} d`
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+    </>
   );
 }

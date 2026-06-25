@@ -21,6 +21,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight, Shield } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
+import { ScoreBadge } from "@/components/score-badge";
+import { formatCurrency } from "@/lib/format";
 
 // Validates Chilean RUT checksum
 function validarRut(rut: string): boolean {
@@ -422,8 +424,22 @@ export default function ClientesPage() {
                         </div>
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1 group-hover:text-primary transition-colors" />
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <ScoreBadge score={cliente.score} categoria={cliente.categoria} size="xs" />
+                    </div>
                   </div>
+                  {cliente.totalPendiente > 0 && (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Pendiente:{" "}
+                      <span className="font-semibold text-foreground">{formatCurrency(cliente.totalPendiente)}</span>
+                      {cliente.cobrosVencidos > 0 && (
+                        <span className="ml-1.5 text-red-600">
+                          · {cliente.cobrosVencidos} vencido{cliente.cobrosVencidos !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </Link>

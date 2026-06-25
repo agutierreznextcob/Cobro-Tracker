@@ -119,7 +119,14 @@ export const ListClientesResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "userId": zod.string(),
   "creadoEn": zod.coerce.date(),
-  "actualizadoEn": zod.coerce.date()
+  "actualizadoEn": zod.coerce.date(),
+  "score": zod.number().nullable(),
+  "categoria": zod.enum(['excelente', 'bueno', 'regular', 'riesgoso', 'critico', 'sin_datos']),
+  "totalCobros": zod.number(),
+  "totalCobrado": zod.number(),
+  "totalPendiente": zod.number(),
+  "promedioDiasAtraso": zod.number(),
+  "cobrosVencidos": zod.number()
 })
 export const ListClientesResponse = zod.array(ListClientesResponseItem)
 
@@ -182,7 +189,20 @@ export const GetClienteResponse = zod.object({
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
+})),
+  "scoreDetalle": zod.object({
+  "score": zod.number().nullable(),
+  "categoria": zod.enum(['excelente', 'bueno', 'regular', 'riesgoso', 'critico', 'sin_datos']),
+  "totalCobros": zod.number(),
+  "totalCobrado": zod.number(),
+  "totalPendiente": zod.number(),
+  "promedioDiasAtraso": zod.number(),
+  "cobrosVencidos": zod.number(),
+  "factores": zod.array(zod.object({
+  "texto": zod.string(),
+  "tipo": zod.enum(['positivo', 'neutral', 'negativo'])
 }))
+})
 })
 
 

@@ -14,10 +14,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/status-badge";
+import { ScoreBadge, SCORE_META } from "@/components/score-badge";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, Send, Link2, Copy, Check } from "lucide-react";
+import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, Send, Link2, Copy, Check, Gauge, TrendingUp, Minus, TrendingDown } from "lucide-react";
 
 const editSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio").max(200),
@@ -325,6 +326,56 @@ export default function ClienteDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {data.scoreDetalle && (
+        <Card className="shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+              <div className="flex items-center gap-4 shrink-0">
+                <div
+                  className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center ${SCORE_META[data.scoreDetalle.categoria].bg} border ${SCORE_META[data.scoreDetalle.categoria].border}`}
+                >
+                  {data.scoreDetalle.score != null ? (
+                    <span className={`text-3xl font-bold tabular-nums ${SCORE_META[data.scoreDetalle.categoria].text}`}>
+                      {data.scoreDetalle.score}
+                    </span>
+                  ) : (
+                    <Gauge className={`h-8 w-8 ${SCORE_META[data.scoreDetalle.categoria].text}`} />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                    <Gauge className="h-4 w-4" />
+                    Comportamiento de pago
+                  </div>
+                  <ScoreBadge score={data.scoreDetalle.score} categoria={data.scoreDetalle.categoria} />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {data.scoreDetalle.totalCobros} cobro{data.scoreDetalle.totalCobros !== 1 ? "s" : ""} ·{" "}
+                    {formatCurrency(data.scoreDetalle.totalPendiente)} pendiente
+                  </p>
+                </div>
+              </div>
+              <div className="flex-1 space-y-1.5 sm:border-l sm:pl-5">
+                {data.scoreDetalle.factores.map((f, i) => {
+                  const Icon = f.tipo === "positivo" ? TrendingUp : f.tipo === "negativo" ? TrendingDown : Minus;
+                  const color =
+                    f.tipo === "positivo"
+                      ? "text-emerald-600"
+                      : f.tipo === "negativo"
+                        ? "text-red-600"
+                        : "text-muted-foreground";
+                  return (
+                    <div key={i} className="flex items-start gap-2 text-sm">
+                      <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color}`} />
+                      <span className="text-foreground/90">{f.texto}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 grid-cols-3">
         <Card className="shadow-sm">

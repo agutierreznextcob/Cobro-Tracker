@@ -24,6 +24,12 @@ create paths.
 them, wire in the org-scope guard/condition from `lib/org.ts`. Never fetch by bare id and
 proceed. Audit non-`:id` aggregate routes too — they leak just as easily.
 
+**Related-collection trap:** Guarding the parent record is NOT enough. Inside `GET /clientes/:id`
+the cliente is access-checked, but the cobros *historial* returned alongside it must ALSO apply
+`cobroScopeCondition` (combine via `and(eq(clienteId,id), scope)`), or an ejecutivo sees a
+co-tenant's cobros for the same cliente. Whenever an :id route returns a child collection, scope
+the child query independently — the parent guard does not cascade.
+
 **Backfill / prod gotcha:** Pre-org rows must have `organizationId` set or org-scoped lists
 return empty for admin_org. A one-time backfill script runs ONLY in the dev DB — production
 data is never migrated by it (and prod DB writes are read-only to the agent). So legacy-data

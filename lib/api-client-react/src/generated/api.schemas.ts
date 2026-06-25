@@ -99,6 +99,66 @@ export interface Cliente {
   actualizadoEn: string;
 }
 
+export type ScoreCategoria = typeof ScoreCategoria[keyof typeof ScoreCategoria];
+
+
+export const ScoreCategoria = {
+  excelente: 'excelente',
+  bueno: 'bueno',
+  regular: 'regular',
+  riesgoso: 'riesgoso',
+  critico: 'critico',
+  sin_datos: 'sin_datos',
+} as const;
+
+export type ScoreFactorTipo = typeof ScoreFactorTipo[keyof typeof ScoreFactorTipo];
+
+
+export const ScoreFactorTipo = {
+  positivo: 'positivo',
+  neutral: 'neutral',
+  negativo: 'negativo',
+} as const;
+
+export interface ScoreFactor {
+  texto: string;
+  tipo: ScoreFactorTipo;
+}
+
+export interface ClienteConScore {
+  id: number;
+  nombre: string;
+  /** @nullable */
+  rut?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  userId: string;
+  creadoEn: string;
+  actualizadoEn: string;
+  /** @nullable */
+  score: number | null;
+  categoria: ScoreCategoria;
+  totalCobros: number;
+  totalCobrado: number;
+  totalPendiente: number;
+  promedioDiasAtraso: number;
+  cobrosVencidos: number;
+}
+
+export interface ScoreDetalle {
+  /** @nullable */
+  score: number | null;
+  categoria: ScoreCategoria;
+  totalCobros: number;
+  totalCobrado: number;
+  totalPendiente: number;
+  promedioDiasAtraso: number;
+  cobrosVencidos: number;
+  factores: ScoreFactor[];
+}
+
 export interface ClienteInput {
   /** @minLength 1 */
   nombre: string;
@@ -223,6 +283,7 @@ export interface ClienteConHistorial {
   creadoEn: string;
   actualizadoEn: string;
   cobros: Cobro[];
+  scoreDetalle: ScoreDetalle;
 }
 
 export type DashboardMetricasPeriodo = typeof DashboardMetricasPeriodo[keyof typeof DashboardMetricasPeriodo];

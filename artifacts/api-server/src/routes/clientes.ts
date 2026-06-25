@@ -5,7 +5,8 @@ import { eq, and, or, ilike, desc, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { EnviarPortalClienteBody } from "@workspace/api-zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
-import { getOrgContext, userCanAccessCliente, getRemitenteContacto } from "../lib/org";
+import { getOrgContext, userCanAccessCliente, getRemitenteContacto, cobroScopeCondition } from "../lib/org";
+import { computeClienteScores } from "../lib/scoring";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import { sendPortalEmail } from "../lib/email";
 import { isWhatsAppConfigured, sendWhatsAppMensaje } from "../lib/whatsapp";
@@ -49,7 +50,27 @@ clientesRouter.get("/clientes", async (req, res) => {
       )
       .orderBy(desc(clientesTable.creadoEn));
 
-    res.json(rows);
+    const scopeCobros = cobroScopeCondition(ctx, userId);
+    const scores = await computeClienteScores(
+      rows.map((r) => r.id),
+      scopeCobros,
+    );
+
+    const conScore = rows.map((r) => {
+      const s = scores.get(r.id);
+      return {
+        ...r,
+        score: s?.score ?? null,
+        categoria: s?.categoria ?? "sin_datos",
+        totalCobros: s?.totalCobros ?? 0,
+        totalCobrado: s?.totalCobrado ?? 0,
+        totalPendiente: s?.totalPendiente ?? 0,
+        promedioDiasAtraso: s?.promedioDiasAtraso ?? 0,
+        cobrosVencidos: s?.cobrosVencidos ?? 0,
+      };
+    });
+
+    res.json(conScore);
   } catch (err) {
     req.log.error({ err }, "Error listing clientes");
     res.status(500).json({ error: "Error interno" });
@@ -107,13 +128,27 @@ clientesRouter.get("/clientes/:id", async (req, res) => {
       return;
     }
 
+    const scopeCobros = cobroScopeCondition(ctx, userId);
     const cobros = await db
       .select()
       .from(cobrosTable)
-      .where(eq(cobrosTable.clienteId, id))
+      .where(and(eq(cobrosTable.clienteId, id), scopeCobros))
       .orderBy(desc(cobrosTable.creadoEn));
 
-    res.json({ ...cliente, cobros });
+    const scores = await computeClienteScores([id], scopeCobros);
+    const s = scores.get(id);
+    const scoreDetalle = {
+      score: s?.score ?? null,
+      categoria: s?.categoria ?? ("sin_datos" as const),
+      totalCobros: s?.totalCobros ?? 0,
+      totalCobrado: s?.totalCobrado ?? 0,
+      totalPendiente: s?.totalPendiente ?? 0,
+      promedioDiasAtraso: s?.promedioDiasAtraso ?? 0,
+      cobrosVencidos: s?.cobrosVencidos ?? 0,
+      factores: s?.factores ?? [],
+    };
+
+    res.json({ ...cliente, cobros, scoreDetalle });
   } catch (err) {
     req.log.error({ err }, "Error getting cliente");
     res.status(500).json({ error: "Error interno" });

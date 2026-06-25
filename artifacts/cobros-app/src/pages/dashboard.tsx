@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
-import { useListCobros, useGetDashboardMetrics } from "@workspace/api-client-react";
+import { useListCobros, useGetDashboardMetrics, useListClientes } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
+import { ScoreBadge } from "@/components/score-badge";
 import { Link } from "wouter";
-import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, BarChart3, Wallet, AlertCircle, Minus } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, BarChart3, Wallet, AlertCircle, Minus, ShieldAlert } from "lucide-react";
 
 function PasarelaBadge({ flowLinkPago, mpPaymentLinkUrl }: { flowLinkPago?: string | null; mpPaymentLinkUrl?: string | null }) {
   if (flowLinkPago && mpPaymentLinkUrl) {
@@ -49,6 +50,15 @@ export default function Dashboard() {
     ...(responsableParam ? { responsable: responsableParam } : {}),
   });
   const { data: cobros, isLoading: isLoadingCobros } = useListCobros();
+  const { data: clientes } = useListClientes();
+
+  const clientesPrioritarios = useMemo(() => {
+    if (!clientes) return [];
+    return clientes
+      .filter((c) => c.score != null && c.totalPendiente > 0)
+      .sort((a, b) => (a.score ?? 100) - (b.score ?? 100) || b.totalPendiente - a.totalPendiente)
+      .slice(0, 5);
+  }, [clientes]);
 
   const responsablesUnicos = useMemo(() => {
     if (!cobros) return [];
@@ -160,6 +170,44 @@ export default function Dashboard() {
           </Card>
         </div>
       ) : null}
+
+      {clientesPrioritarios.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldAlert className="h-5 w-5 text-orange-500" />
+            <h2 className="text-xl font-semibold tracking-tight">Clientes prioritarios</h2>
+            <span className="text-sm text-muted-foreground">— con saldo pendiente y bajo score</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {clientesPrioritarios.map((c) => (
+              <Link key={c.id} href={`/clientes/${c.id}`}>
+                <Card className="shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group h-full">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                        {c.nombre}
+                      </p>
+                      <ScoreBadge score={c.score} categoria={c.categoria} size="xs" showLabel={false} />
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold font-mono text-foreground">{formatCurrency(c.totalPendiente)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        pendiente
+                        {c.cobrosVencidos > 0 && (
+                          <span className="text-red-600 font-medium">
+                            {" · "}
+                            {c.cobrosVencidos} vencido{c.cobrosVencidos !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
