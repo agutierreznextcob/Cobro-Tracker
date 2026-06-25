@@ -71,13 +71,13 @@ function HeroSection() {
           Con asistente IA incluido
         </div>
         <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1] mb-6">
-          Cobra a tus clientes{" "}
+          Gestiona la cobranza a tus clientes{" "}
           <span className="text-primary">sin complicaciones</span>
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          Crea cobros, comparte links de pago con Webpay y MercadoPago, y haz
-          seguimiento automático. Con dashboard en tiempo real y asistente IA
-          para analizar tu negocio.
+          Controla la cobranza de tus clientes, comparte links de pago con
+          Webpay y MercadoPago, y automatiza el seguimiento. Con dashboard en
+          tiempo real y asistente IA para analizar tu negocio.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
