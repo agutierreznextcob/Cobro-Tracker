@@ -51,7 +51,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Users, UserPlus, MailCheck, X, ShieldCheck } from "lucide-react";
+import { Loader2, Users, UserPlus, MailCheck, X, ShieldCheck, Trash2 } from "lucide-react";
 
 function formatCLP(value: number): string {
   return new Intl.NumberFormat("es-CL", {
@@ -145,12 +145,12 @@ export function TeamSection() {
       { id: deactivateTarget.id },
       {
         onSuccess: () => {
-          toast({ title: "Usuario desactivado" });
+          toast({ title: "Usuario eliminado correctamente" });
           invalidateTeam();
           setDeactivateTarget(null);
         },
         onError: (err: unknown) => {
-          const msg = err instanceof Error ? err.message : "No se pudo desactivar el usuario.";
+          const msg = err instanceof Error ? err.message : "No se pudo eliminar el usuario.";
           toast({ title: "Error", description: msg, variant: "destructive" });
           setDeactivateTarget(null);
         },
@@ -297,7 +297,7 @@ export function TeamSection() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-destructive hover:bg-destructive/10"
+                            className="text-destructive hover:bg-destructive/10 gap-1.5"
                             onClick={() =>
                               setDeactivateTarget({
                                 id: m.id,
@@ -305,7 +305,8 @@ export function TeamSection() {
                               })
                             }
                           >
-                            Desactivar
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Eliminar
                           </Button>
                         )}
                       </TableCell>
@@ -419,10 +420,18 @@ export function TeamSection() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Desactivar a {deactivateTarget?.nombre}?</AlertDialogTitle>
+            <AlertDialogTitle>Eliminar usuario</AlertDialogTitle>
             <AlertDialogDescription>
-              El usuario perderá acceso a la organización. Sus cobros asignados se mantendrán.
-              Puedes volver a activarlo más adelante.
+              ¿Estás seguro que deseas eliminar a {deactivateTarget?.nombre} de tu equipo? Esta
+              acción no se puede deshacer.
+              {org && (
+                <>
+                  {" "}
+                  Se liberará su licencia y se descontarán {formatCLP(org.costoUsuarioAdicional)} de
+                  tu próximo cobro.
+                </>
+              )}{" "}
+              El usuario perderá acceso a la plataforma de inmediato.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -431,7 +440,7 @@ export function TeamSection() {
               onClick={handleDeactivate}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Desactivar
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

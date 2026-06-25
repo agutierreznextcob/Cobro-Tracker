@@ -21,6 +21,7 @@ export interface UserSubscriptionRow {
   subscriptionPeriodEnd: Date | null;
   flowSubscriptionId: string | null;
   role: "user" | "admin";
+  activo: boolean;
 }
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -51,6 +52,13 @@ export function computeSubscriptionState(row: UserSubscriptionRow): Subscription
     hasAccess = false;
   }
 
+  // A deactivated member loses access immediately, regardless of subscription
+  // or platform-admin status. Org owners cannot be deactivated (guarded in the
+  // org routes), so this only ever applies to removed team members.
+  if (!row.activo) {
+    hasAccess = false;
+  }
+
   return {
     status: row.subscriptionStatus,
     hasAccess,
@@ -73,6 +81,7 @@ export async function getSubscriptionState(userId: string): Promise<Subscription
       subscriptionPeriodEnd: usersTable.subscriptionPeriodEnd,
       flowSubscriptionId: usersTable.flowSubscriptionId,
       role: usersTable.role,
+      activo: usersTable.activo,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userId));

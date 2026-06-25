@@ -578,7 +578,8 @@ export const CompletarPerfilBody = zod.object({
   "rut": zod.string().min(1),
   "phone": zod.string().min(1),
   "address": zod.string().min(1),
-  "companyName": zod.string().nullish()
+  "companyName": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish().describe('Optional profile photo, as an http(s) URL or a data:image\/ URL. Ignored when omitted (undefined leaves the current photo unchanged).')
 })
 
 export const CompletarPerfilResponse = zod.object({

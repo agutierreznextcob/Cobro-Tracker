@@ -1018,6 +1018,11 @@ export interface CompletarPerfilInput {
   address: string;
   /** @nullable */
   companyName?: string | null;
+  /**
+     * Optional profile photo, as an http(s) URL or a data:image/ URL. Ignored when omitted (undefined leaves the current photo unchanged).
+     * @nullable
+     */
+  profileImageUrl?: string | null;
 }
 
 export interface AuthUserEnvelope {

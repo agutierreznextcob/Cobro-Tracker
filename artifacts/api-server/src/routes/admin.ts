@@ -46,6 +46,7 @@ adminRouter.get("/admin/usuarios", async (req, res) => {
           subscriptionPeriodEnd: u.subscriptionPeriodEnd,
           flowSubscriptionId: u.flowSubscriptionId,
           role: u.role,
+          activo: u.activo,
         });
 
         const vencimiento = vencimientoDe(state);
@@ -114,6 +115,7 @@ adminRouter.post("/admin/usuarios/:id/recordatorio-email", async (req, res) => {
       subscriptionPeriodEnd: u.subscriptionPeriodEnd,
       flowSubscriptionId: u.flowSubscriptionId,
       role: u.role,
+      activo: u.activo,
     });
 
     const vencimiento = vencimientoDe(state);

@@ -81,7 +81,12 @@ async function upsertUser(claims: Record<string, unknown>) {
     .onConflictDoUpdate({
       target: usersTable.id,
       set: {
-        ...userData,
+        // Intentionally omit profileImageUrl: once a user uploads a custom photo
+        // we must not clobber it with the OIDC picture on every re-login. The
+        // OIDC picture is still seeded on first insert (values above).
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
         updatedAt: new Date(),
       },
     })
@@ -182,6 +187,8 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   let lastName = req.user.lastName;
   let orgRole: "admin_org" | "ejecutivo" | null = null;
   let organizationId: number | null = null;
+  let activo = true;
+  let profileImageUrl: string | null = req.user.profileImageUrl ?? null;
   try {
     const [row] = await db
       .select({
@@ -195,6 +202,8 @@ router.get("/auth/user", async (req: Request, res: Response) => {
         lastName: usersTable.lastName,
         orgRole: usersTable.orgRole,
         organizationId: usersTable.organizationId,
+        activo: usersTable.activo,
+        profileImageUrl: usersTable.profileImageUrl,
       })
       .from(usersTable)
       .where(eq(usersTable.id, req.user.id));
@@ -209,9 +218,18 @@ router.get("/auth/user", async (req: Request, res: Response) => {
       lastName = row.lastName ?? lastName;
       orgRole = row.orgRole;
       organizationId = row.organizationId;
+      activo = row.activo;
+      profileImageUrl = row.profileImageUrl ?? profileImageUrl;
     }
   } catch (err) {
     req.log.error({ err }, "Error loading user profile");
+  }
+
+  // A deactivated (removed) team member loses platform access immediately: report
+  // them as logged-out so the frontend AuthGate bounces them to the landing page.
+  if (!activo) {
+    res.json(GetCurrentAuthUserResponse.parse({ user: null }));
+    return;
   }
 
   res.json(
@@ -220,6 +238,7 @@ router.get("/auth/user", async (req: Request, res: Response) => {
         ...req.user,
         firstName,
         lastName,
+        profileImageUrl,
         role,
         profileCompleted,
         rut,

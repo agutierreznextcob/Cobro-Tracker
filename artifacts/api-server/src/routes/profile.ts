@@ -39,22 +39,56 @@ profileRouter.put("/profile/datos", async (req, res) => {
     return;
   }
 
-  const normalizedRut = normalizeRut(parsed.data.rut);
-  if (!normalizedRut) {
-    res.status(400).json({ error: "El RUT ingresado no es válido" });
-    return;
+  // Validate the optional profile photo. `undefined` means "leave unchanged";
+  // an empty string or null clears it. Accepts an http(s) URL (OIDC picture) or
+  // a data:image/ URL (client-resized upload), capped to keep payloads small.
+  const rawPhoto = parsed.data.profileImageUrl;
+  let nextPhoto: string | null | undefined = undefined;
+  if (rawPhoto !== undefined) {
+    if (rawPhoto === null || rawPhoto === "") {
+      nextPhoto = null;
+    } else {
+      const isData = rawPhoto.startsWith("data:image/");
+      const isHttp = /^https?:\/\//.test(rawPhoto);
+      if (!isData && !isHttp) {
+        res.status(400).json({ error: "La imagen de perfil no es válida" });
+        return;
+      }
+      if (isData && rawPhoto.length > 1_500_000) {
+        res.status(400).json({ error: "La imagen es demasiado grande" });
+        return;
+      }
+      nextPhoto = rawPhoto;
+    }
   }
 
   try {
+    // RUT is read-only once saved: keep the stored value and ignore any change
+    // sent in the body. Only the very first profile completion sets (and thus
+    // validates) the RUT — edits by users who already have one skip validation.
+    const [current] = await db
+      .select({ rut: usersTable.rut })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    let rutToSave = current?.rut ?? null;
+    if (!rutToSave) {
+      rutToSave = normalizeRut(parsed.data.rut);
+      if (!rutToSave) {
+        res.status(400).json({ error: "El RUT ingresado no es válido" });
+        return;
+      }
+    }
+
     const [updated] = await db
       .update(usersTable)
       .set({
         firstName,
         lastName,
-        rut: normalizedRut,
+        rut: rutToSave,
         phone,
         address,
         companyName,
+        ...(nextPhoto !== undefined ? { profileImageUrl: nextPhoto } : {}),
         profileCompleted: true,
         updatedAt: new Date(),
       })

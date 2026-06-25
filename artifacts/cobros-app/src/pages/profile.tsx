@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useGetFlowCredentials,
   useSaveFlowCredentials,
@@ -13,15 +13,52 @@ import {
   useCompletarPerfil,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth, type AuthUser } from "@workspace/replit-auth-web";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { isValidRut, formatRut } from "@/lib/rut";
 import { TeamSection } from "@/components/team-section";
-import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail } from "lucide-react";
+import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera } from "lucide-react";
+
+// Resize a chosen image client-side and return a JPEG data URL. Keeping avatars
+// small (max 256px) lets us store them directly in users.profileImageUrl without
+// any object-storage infrastructure, and keeps the /auth/user payload light.
+async function resizeImageToDataUrl(file: File, max = 256): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Imagen inválida"));
+    image.src = dataUrl;
+  });
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("No se pudo procesar la imagen");
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
 
 function formatCLP(value: number): string {
   return new Intl.NumberFormat("es-CL", {
@@ -194,6 +231,231 @@ export default function ProfilePage() {
   return <ProfileSettings />;
 }
 
+function EditProfileDialog({ user }: { user: AuthUser }) {
+  const { toast } = useToast();
+  const completarPerfil = useCompletarPerfil();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [open, setOpen] = useState(false);
+  const [firstName, setFirstName] = useState(user.firstName ?? "");
+  const [lastName, setLastName] = useState(user.lastName ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [address, setAddress] = useState(user.address ?? "");
+  const [companyName, setCompanyName] = useState(user.companyName ?? "");
+  const [photo, setPhoto] = useState<string | null>(user.profileImageUrl ?? null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  // Reset fields from the current user each time the dialog opens.
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setFirstName(user.firstName ?? "");
+      setLastName(user.lastName ?? "");
+      setPhone(user.phone ?? "");
+      setAddress(user.address ?? "");
+      setCompanyName(user.companyName ?? "");
+      setPhoto(user.profileImageUrl ?? null);
+      setPhotoError(null);
+    }
+    setOpen(next);
+  };
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Selecciona un archivo de imagen.");
+      return;
+    }
+    try {
+      const resized = await resizeImageToDataUrl(file);
+      setPhoto(resized);
+      setPhotoError(null);
+    } catch {
+      setPhotoError("No se pudo procesar la imagen.");
+    }
+  };
+
+  const displayName = [firstName, lastName].filter(Boolean).join(" ") || user.email || "Usuario";
+  const initials =
+    [firstName, lastName]
+      .filter(Boolean)
+      .map((n) => n[0]?.toUpperCase())
+      .join("") || "U";
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firstName.trim() || !lastName.trim() || !phone.trim() || !address.trim()) {
+      toast({
+        title: "Campos requeridos",
+        description: "Completa todos los campos obligatorios.",
+        variant: "destructive",
+      });
+      return;
+    }
+    completarPerfil.mutate(
+      {
+        data: {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          // RUT is read-only; the server preserves the stored value regardless.
+          rut: user.rut ?? "",
+          phone: phone.trim(),
+          address: address.trim(),
+          companyName: companyName.trim() || null,
+          profileImageUrl: photo,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Perfil actualizado correctamente" });
+          // useAuth only fetches /auth/user on mount, so reload to reflect changes.
+          window.location.reload();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo actualizar tu perfil.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Pencil className="h-3.5 w-3.5" />
+          Editar perfil
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Editar perfil</DialogTitle>
+          <DialogDescription>Actualiza tu información personal.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div className="flex items-center gap-4">
+            {photo ? (
+              <img
+                src={photo}
+                alt={displayName}
+                className="h-16 w-16 rounded-full object-cover ring-2 ring-border"
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xl font-bold ring-2 ring-border">
+                {initials}
+              </div>
+            )}
+            <div className="space-y-1">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  Subir foto
+                </Button>
+                {photo && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive/10"
+                    onClick={() => setPhoto(null)}
+                  >
+                    Quitar
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Opcional. JPG o PNG.</p>
+            </div>
+          </div>
+          {photoError && <p className="text-xs text-destructive">{photoError}</p>}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="editFirstName">Nombre *</Label>
+              <Input
+                id="editFirstName"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editLastName">Apellido *</Label>
+              <Input
+                id="editLastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editRut">RUT</Label>
+            <Input id="editRut" value={user.rut ?? ""} disabled readOnly className="bg-muted/40" />
+            <p className="text-xs text-muted-foreground">El RUT no se puede modificar.</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editPhone">Teléfono *</Label>
+            <Input
+              id="editPhone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              inputMode="tel"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editAddress">Dirección *</Label>
+            <Input
+              id="editAddress"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="editCompany">Nombre de la empresa (opcional)</Label>
+            <Input
+              id="editCompany"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={completarPerfil.isPending}>
+              {completarPerfil.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Guardando...
+                </>
+              ) : (
+                "Guardar cambios"
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ProfileSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -339,10 +601,13 @@ function ProfileSettings() {
 
       <Card className="shadow-sm border-border/50">
         <CardHeader className="bg-muted/20 border-b border-border/50">
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-4 w-4 text-primary" />
-            Información de cuenta
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              Información de cuenta
+            </CardTitle>
+            {user && <EditProfileDialog user={user} />}
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
