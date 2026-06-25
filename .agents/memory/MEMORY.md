@@ -10,3 +10,5 @@
 - [Leads capture](leads-capture.md) — landing form → lead; PLATFORM-admin-only (not per-org, avoids tenant leak); public route mounted before cobros blanket-auth; escape untrusted input in emails.
 - [Landing public AI chat](landing-public-chat.md) — unauth sales chatbot is its OWN router mounted before auth-gated aiRouter; public LLM endpoints MUST stay rate-limited (in-memory, single-instance only).
 - [Flow plan pricing & IVA](flow-plan-pricing.md) — platform prices are IVA-inclusive (neto+IVA=total); changing the charged amount REQUIRES bumping PLAN_ID or Flow keeps the old price.
+- [Comprobante auto-delivery](comprobante-delivery.md) — receipt email idempotent+retryable via emailEnviado(success-only)+emailIntentoEn(TTL claim); residual dup-send is an accepted tradeoff, stop re-hardening.
+- [Cobro saldo on list/detail](cobro-saldo.md) — GET /cobros & /cobros/:id expose `saldo` (montoACobrar minus confirmed abonos, 0 for terminal); use it (not montoACobrar) for parcial in aging/receivables.

@@ -11,7 +11,7 @@ import {
   usersTable,
 } from "@workspace/db";
 import type { Cobro, CobroDescuento } from "@workspace/db";
-import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt } from "drizzle-orm";
+import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
 import {
   CreateCobroBody,
   UpdateCobroBody,
@@ -28,6 +28,7 @@ import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro } from "../lib/recordatorios";
+import { emitirComprobante } from "../lib/comprobante-service";
 import { getOrgContext, cobroScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto } from "../lib/org";
 
 const cobrosRouter = Router();
@@ -38,19 +39,43 @@ function montoACobrar(cobro: Pick<Cobro, "monto" | "montoDescuento">): number {
 }
 
 // Standard JSON serialization for a cobro response (numeric + date conversions
-// plus the derived montoACobrar field).
-function serializeCobro(cobro: Cobro) {
+// plus the derived montoACobrar field). When `abonado` (sum of confirmed partial
+// payments) is provided, the outstanding `saldo` is included; for terminal states
+// the saldo is always 0. When omitted, `saldo` is left undefined (dropped from JSON).
+function serializeCobro(cobro: Cobro, abonado?: number) {
+  const aCobrar = montoACobrar(cobro);
+  const terminal =
+    cobro.estado === "pagado" || cobro.estado === "cancelado" || cobro.estado === "fallido";
+  const saldo =
+    abonado === undefined ? undefined : terminal ? 0 : Math.max(aCobrar - abonado, 0);
   return {
     ...cobro,
     monto: Number(cobro.monto),
     montoDescuento: cobro.montoDescuento != null ? Number(cobro.montoDescuento) : null,
-    montoACobrar: montoACobrar(cobro),
+    montoACobrar: aCobrar,
+    saldo,
     incluyeIva: cobro.incluyeIva,
     montoNeto: cobro.montoNeto != null ? Number(cobro.montoNeto) : null,
     montoIva: cobro.montoIva != null ? Number(cobro.montoIva) : null,
     creadoEn: cobro.creadoEn.toISOString(),
     actualizadoEn: cobro.actualizadoEn.toISOString(),
   };
+}
+
+// Sums confirmed partial payments (abonos) per cobro id, returning a map.
+async function abonadoPorCobro(cobroIds: number[]): Promise<Map<number, number>> {
+  const map = new Map<number, number>();
+  if (cobroIds.length === 0) return map;
+  const sums = await db
+    .select({
+      cobroId: pagosParciales.cobroId,
+      total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)`,
+    })
+    .from(pagosParciales)
+    .where(and(eq(pagosParciales.estado, "confirmado"), inArray(pagosParciales.cobroId, cobroIds)))
+    .groupBy(pagosParciales.cobroId);
+  for (const s of sums) map.set(s.cobroId, s.total);
+  return map;
 }
 
 function serializeDescuento(d: CobroDescuento) {
@@ -69,7 +94,9 @@ function serializeDescuento(d: CobroDescuento) {
   };
 }
 
-async function recalcularEstadoCobro(cobroId: number): Promise<void> {
+async function recalcularEstadoCobro(
+  cobroId: number,
+): Promise<"pagado" | "parcial" | "pendiente" | null> {
   const [result] = await db
     .select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
     .from(pagosParciales)
@@ -78,12 +105,13 @@ async function recalcularEstadoCobro(cobroId: number): Promise<void> {
     .select({ monto: cobrosTable.monto, montoDescuento: cobrosTable.montoDescuento })
     .from(cobrosTable)
     .where(eq(cobrosTable.id, cobroId));
-  if (!cobro) return;
+  if (!cobro) return null;
   const totalPagado = result?.total ?? 0;
   const montoTotal = montoACobrar(cobro);
   const nuevoEstado: "pagado" | "parcial" | "pendiente" =
     totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
   await db.update(cobrosTable).set({ estado: nuevoEstado, actualizadoEn: new Date() }).where(eq(cobrosTable.id, cobroId));
+  return nuevoEstado;
 }
 
 // Authorization guard for any /cobros/:id/* route. Loads the org context and the
@@ -137,7 +165,8 @@ cobrosRouter.get("/cobros", async (req, res) => {
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(cobrosTable.creadoEn));
 
-    res.json(cobros.map(serializeCobro));
+    const abonado = await abonadoPorCobro(cobros.map((c) => c.id));
+    res.json(cobros.map((c) => serializeCobro(c, abonado.get(c.id) ?? 0)));
   } catch (err) {
     req.log.error({ err }, "Error listing cobros");
     res.status(500).json({ error: "Error interno del servidor" });
@@ -312,7 +341,8 @@ cobrosRouter.get("/cobros/:id", async (req, res) => {
       return;
     }
 
-    res.json(serializeCobro(cobro));
+    const abonado = await abonadoPorCobro([cobro.id]);
+    res.json(serializeCobro(cobro, abonado.get(cobro.id) ?? 0));
   } catch (err) {
     req.log.error({ err }, "Error getting cobro");
     res.status(500).json({ error: "Error interno del servidor" });
@@ -428,7 +458,10 @@ cobrosRouter.post("/cobros/:id/descuentos", async (req, res) => {
       .returning();
 
     // Re-evaluate estado in case confirmed abonos already cover the new lower amount.
-    await recalcularEstadoCobro(cobro.id);
+    const estadoTrasDescuento = await recalcularEstadoCobro(cobro.id);
+    if (estadoTrasDescuento === "pagado") {
+      void emitirComprobante(cobro.id, { metodo: "manual" }, req.log);
+    }
     const [refreshed] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, cobro.id));
 
     req.log.info(
@@ -833,6 +866,11 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
       }
     }
 
+    // A manual transition to `pagado` should also emit the receipt (idempotent).
+    if (bodyParsed.data.estado === "pagado") {
+      void emitirComprobante(cobro.id, { metodo: "manual", referencia: cobro.referencia ?? null }, req.log);
+    }
+
     res.json(serializeCobro(cobro));
   } catch (err) {
     req.log.error({ err }, "Error updating cobro");
@@ -955,7 +993,10 @@ cobrosRouter.post("/cobros/:id/abonos", async (req, res) => {
         cobroId: cobro.id, monto: String(monto), metodo: "manual",
         estado: "confirmado", notas: notas ?? null, confirmadoEn: new Date(), creadoEn: new Date(),
       }).returning();
-      await recalcularEstadoCobro(cobro.id);
+      const estadoTrasAbono = await recalcularEstadoCobro(cobro.id);
+      if (estadoTrasAbono === "pagado") {
+        void emitirComprobante(cobro.id, { metodo: "manual" }, req.log);
+      }
       req.log.info({ cobroId: cobro.id, abonoId: abono.id, monto }, "Manual abono confirmed");
       res.status(201).json({ ...abono, monto: Number(abono.monto), creadoEn: abono.creadoEn.toISOString(), confirmadoEn: abono.confirmadoEn?.toISOString() ?? null });
       return;
@@ -1048,7 +1089,10 @@ cobrosRouter.post("/cobros/:id/abonos/:abonoId/confirmar", async (req, res) => {
       .set({ estado: "confirmado", confirmadoEn: new Date() })
       .where(eq(pagosParciales.id, abonoId))
       .returning();
-    await recalcularEstadoCobro(paramsParsed.data.id);
+    const estadoTrasConfirmar = await recalcularEstadoCobro(paramsParsed.data.id);
+    if (estadoTrasConfirmar === "pagado") {
+      void emitirComprobante(paramsParsed.data.id, { metodo: "manual" }, req.log);
+    }
     req.log.info({ abonoId, cobroId: paramsParsed.data.id }, "Abono confirmed manually");
     res.json({ ...updated, monto: Number(updated.monto), creadoEn: updated.creadoEn.toISOString(), confirmadoEn: updated.confirmadoEn?.toISOString() ?? null });
   } catch (err) {

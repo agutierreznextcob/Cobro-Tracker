@@ -540,3 +540,116 @@ export async function sendLeadNotificationEmail(
   }
   return { ok: true };
 }
+
+export interface ComprobanteEmailData {
+  emailDestino: string;
+  clienteNombre: string;
+  empresa: string;
+  numero: string;
+  montoTotal: number;
+  descripcion: string;
+  metodoPago: string;
+  pdf: Buffer;
+  remitenteNombre?: string | null;
+  remitenteEmail?: string | null;
+}
+
+// Sends the auto-generated payment receipt (comprobante) PDF to the payer.
+export async function sendComprobanteEmail(
+  data: ComprobanteEmailData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping comprobante email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const montoFormato = formatCLP(data.montoTotal);
+  const nombre = data.clienteNombre || "cliente";
+
+  const { error } = await client.emails.send({
+    ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
+    to: [data.emailDestino],
+    subject: `Comprobante de pago ${data.numero} — ${montoFormato}`,
+    html: buildEmailHtml({
+      title: `Comprobante de pago — ${montoFormato}`,
+      previewText: `Tu pago de ${montoFormato} a ${data.empresa} fue registrado. Comprobante ${data.numero}.`,
+      heading: `Gracias ${escapeHtml(nombre)}, recibimos tu pago ✅`,
+      bodyLines: [
+        `<strong>${escapeHtml(data.empresa)}</strong> ha registrado tu pago correctamente. Adjuntamos el comprobante en PDF.`,
+        `<span style="display:block;background:#f4f4f5;border-radius:8px;padding:12px 16px;font-size:14px;color:#09090b;border-left:3px solid #6C5CE7;">
+          <strong>Comprobante:</strong> ${escapeHtml(data.numero)}<br/>
+          <strong>Concepto:</strong> ${escapeHtml(data.descripcion)}<br/>
+          <strong>Monto pagado:</strong> <span style="font-family:monospace;font-weight:700;color:#6C5CE7;">${montoFormato}</span><br/>
+          <strong>Método:</strong> ${escapeHtml(data.metodoPago)}
+        </span>`,
+        `Conserva este comprobante como respaldo de tu pago.`,
+      ],
+      ctaText: "Ver NextCob",
+      ctaUrl: "https://nextcob.com",
+      footerNote: "Comprobante generado automáticamente al confirmarse el pago.",
+    }),
+    attachments: [
+      {
+        filename: `comprobante-${data.numero}.pdf`,
+        content: data.pdf.toString("base64"),
+      },
+    ],
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending comprobante email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
+export interface PortalEmailData {
+  emailDestino: string;
+  clienteNombre: string;
+  empresa: string;
+  url: string;
+  remitenteNombre?: string | null;
+  remitenteEmail?: string | null;
+}
+
+// Sends the debtor portal magic link to a cliente.
+export async function sendPortalEmail(
+  data: PortalEmailData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping portal email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const nombre = data.clienteNombre || "cliente";
+
+  const { error } = await client.emails.send({
+    ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
+    to: [data.emailDestino],
+    subject: `Tu portal de pagos con ${data.empresa}`,
+    html: buildEmailHtml({
+      title: `Portal de pagos — ${data.empresa}`,
+      previewText: `Revisa y paga tus cobros pendientes con ${data.empresa}.`,
+      heading: `Hola ${escapeHtml(nombre)} 👋`,
+      bodyLines: [
+        `<strong>${escapeHtml(data.empresa)}</strong> habilitó un portal privado donde puedes ver tus cobros pendientes, revisar tu historial y pagar en línea de forma segura.`,
+        `Ingresa con el botón de abajo. Este enlace es personal — no lo compartas.`,
+      ],
+      ctaText: "Ver mi portal de pagos",
+      ctaUrl: data.url,
+      footerNote: "Si no esperabas este correo, puedes ignorarlo.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending portal email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}

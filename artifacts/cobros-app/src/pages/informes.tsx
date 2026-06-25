@@ -36,14 +36,16 @@ import {
   eachWeekOfInterval,
   eachMonthOfInterval,
   differenceInCalendarDays,
+  addMonths,
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/format";
-import { Download, TrendingUp, Receipt, Percent, ListChecks, TicketPercent, RefreshCcw } from "lucide-react";
+import { Download, TrendingUp, Receipt, Percent, ListChecks, TicketPercent, RefreshCcw, Wallet, AlertTriangle, CalendarClock } from "lucide-react";
 
 type Estado = "pendiente" | "pagado" | "parcial" | "fallido" | "cancelado";
 type Gran = "dia" | "semana" | "mes";
@@ -341,20 +343,32 @@ export default function Informes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Informes</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading
-              ? "Cargando..."
-              : `${filtered.length} cobro${filtered.length !== 1 ? "s" : ""} en el período`}
-          </p>
-        </div>
-        <Button onClick={exportExcel} disabled={isLoading || filtered.length === 0} className="gap-2">
-          <Download className="h-4 w-4" />
-          Descargar Excel
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Informes</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Analiza tu recaudación y tus cuentas por cobrar.
+        </p>
       </div>
+
+      <Tabs defaultValue="resumen" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="cuentas">Cuentas por Cobrar</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="resumen" className="space-y-6 mt-0">
+          {/* Resumen toolbar */}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              {isLoading
+                ? "Cargando..."
+                : `${filtered.length} cobro${filtered.length !== 1 ? "s" : ""} en el período`}
+            </p>
+            <Button onClick={exportExcel} disabled={isLoading || filtered.length === 0} className="gap-2">
+              <Download className="h-4 w-4" />
+              Descargar Excel
+            </Button>
+          </div>
 
       {/* Period selector */}
       <Card className="p-4 shadow-sm space-y-4">
@@ -659,7 +673,346 @@ export default function Informes() {
           </div>
         </Card>
       )}
+        </TabsContent>
+
+        <TabsContent value="cuentas" className="space-y-6 mt-0">
+          <AgingReport cobros={cobros ?? []} isOrgAdmin={isOrgAdmin} loading={isLoading} />
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+const AGING_BUCKETS = [
+  { key: "por_vencer", label: "Por vencer", color: "#16a34a" },
+  { key: "b1", label: "1–30 días", color: "#f59e0b" },
+  { key: "b2", label: "31–60 días", color: "#fb923c" },
+  { key: "b3", label: "61–90 días", color: "#f97316" },
+  { key: "b4", label: "+90 días", color: "#ef4444" },
+] as const;
+
+type BucketKey = (typeof AGING_BUCKETS)[number]["key"];
+
+function bucketForDays(days: number | null): BucketKey {
+  if (days == null || days <= 0) return "por_vencer";
+  if (days <= 30) return "b1";
+  if (days <= 60) return "b2";
+  if (days <= 90) return "b3";
+  return "b4";
+}
+
+function AgingReport({
+  cobros,
+  isOrgAdmin,
+  loading,
+}: {
+  cobros: Cobro[];
+  isOrgAdmin: boolean;
+  loading: boolean;
+}) {
+  const today = useMemo(() => startOfDay(new Date()), []);
+  // Outstanding balance: prefer backend `saldo` (montoACobrar minus confirmed
+  // abonos) so `parcial` cobros are not overstated; fall back when absent.
+  const saldoCobrar = (c: Cobro) => c.saldo ?? c.montoACobrar ?? c.monto - (c.montoDescuento ?? 0);
+
+  // Outstanding receivables = pending or partially paid cobros.
+  const pendientes = useMemo(
+    () => cobros.filter((c) => c.estado === "pendiente" || c.estado === "parcial"),
+    [cobros],
+  );
+
+  const rows = useMemo(
+    () =>
+      pendientes.map((c) => {
+        const due = c.fechaVencimiento ? startOfDay(parseISO(c.fechaVencimiento)) : null;
+        const days = due ? differenceInCalendarDays(today, due) : null;
+        return { cobro: c, due, days, bucket: bucketForDays(days), saldo: saldoCobrar(c) };
+      }),
+    [pendientes, today],
+  );
+
+  const totalPorCobrar = rows.reduce((a, r) => a + r.saldo, 0);
+  const totalVencido = rows.filter((r) => r.bucket !== "por_vencer").reduce((a, r) => a + r.saldo, 0);
+  const totalPorVencer = totalPorCobrar - totalVencido;
+
+  const bucketData = useMemo(
+    () =>
+      AGING_BUCKETS.map((b) => {
+        const rs = rows.filter((r) => r.bucket === b.key);
+        return {
+          key: b.key,
+          label: b.label,
+          color: b.color,
+          cantidad: rs.length,
+          monto: rs.reduce((a, r) => a + r.saldo, 0),
+        };
+      }),
+    [rows],
+  );
+
+  // Cash-flow projection: outstanding amounts grouped by due month for the next 6 months.
+  const proyeccion = useMemo(() => {
+    const months: { key: number; label: string; monto: number }[] = [];
+    for (let i = 0; i < 6; i++) {
+      const m = startOfMonth(addMonths(today, i));
+      months.push({ key: m.getTime(), label: format(m, "MMM yy", { locale: es }), monto: 0 });
+    }
+    const lastMonth = months[months.length - 1].key;
+    let vencido = 0;
+    for (const r of rows) {
+      if (!r.due || (r.days ?? 0) > 0) {
+        // overdue or no due date → expected to collect now
+        vencido += r.saldo;
+        continue;
+      }
+      const mKey = startOfMonth(r.due).getTime();
+      const target = months.find((m) => m.key === mKey);
+      if (target) target.monto += r.saldo;
+      else if (mKey > lastMonth) {
+        // beyond projection window — fold into last bucket
+        months[months.length - 1].monto += r.saldo;
+      }
+    }
+    return [{ key: 0, label: "Vencido", monto: vencido }, ...months];
+  }, [rows, today]);
+
+  // Top debtors by outstanding balance.
+  const porCliente = useMemo(() => {
+    const map = new Map<string, { nombre: string; total: number; vencido: number; cantidad: number }>();
+    for (const r of rows) {
+      const nombre = r.cobro.clienteNombre ?? "Sin cliente";
+      const key = `${r.cobro.clienteId ?? "x"}-${nombre}`;
+      const cur = map.get(key) ?? { nombre, total: 0, vencido: 0, cantidad: 0 };
+      cur.total += r.saldo;
+      cur.cantidad += 1;
+      if (r.bucket !== "por_vencer") cur.vencido += r.saldo;
+      map.set(key, cur);
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }, [rows]);
+
+  async function exportAging() {
+    const XLSX = await import("xlsx");
+    const detalle = rows
+      .slice()
+      .sort((a, b) => (b.days ?? -9999) - (a.days ?? -9999))
+      .map((r) => ({
+        Cliente: r.cobro.clienteNombre ?? "Sin cliente",
+        Descripción: r.cobro.descripcion,
+        "Fecha vencimiento": r.due ? format(r.due, "dd-MM-yyyy") : "Sin fecha",
+        "Días vencido": r.days != null && r.days > 0 ? r.days : 0,
+        Antigüedad: AGING_BUCKETS.find((b) => b.key === r.bucket)?.label ?? "",
+        Estado: ESTADO_META[r.cobro.estado as Estado]?.label ?? r.cobro.estado,
+        "Saldo (CLP)": Math.round(r.saldo),
+        ...(isOrgAdmin ? { "Ejecutivo responsable": r.cobro.responsableNombre ?? "Sin asignar" } : {}),
+      }));
+    const wsDetalle = XLSX.utils.json_to_sheet(detalle);
+    wsDetalle["!cols"] = [
+      { wch: 26 },
+      { wch: 40 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 14 },
+      ...(isOrgAdmin ? [{ wch: 24 }] : []),
+    ];
+
+    const resumenRows: (string | number)[][] = [
+      ["Cuentas por cobrar — NextCob"],
+      ["Generado", format(new Date(), "dd-MM-yyyy")],
+      [],
+      ["Total por cobrar (CLP)", Math.round(totalPorCobrar)],
+      ["Total vencido (CLP)", Math.round(totalVencido)],
+      ["Total por vencer (CLP)", Math.round(totalPorVencer)],
+      [],
+      ["Antigüedad", "Cantidad", "Saldo (CLP)"],
+      ...bucketData.map((b) => [b.label, b.cantidad, Math.round(b.monto)]),
+      [],
+      ["Proyección de flujo", "Monto esperado (CLP)"],
+      ...proyeccion.map((p) => [p.label, Math.round(p.monto)]),
+    ];
+    const wsResumen = XLSX.utils.aoa_to_sheet(resumenRows);
+    wsResumen["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+    XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle");
+    XLSX.writeFile(wb, `cuentas-por-cobrar-${format(new Date(), "yyyyMMdd")}.xlsx`);
+  }
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+  }
+
+  if (rows.length === 0) {
+    return (
+      <Card className="p-10 shadow-sm text-center">
+        <div className="mx-auto h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
+          <Wallet className="h-6 w-6 text-emerald-600" />
+        </div>
+        <p className="font-medium">No tienes cuentas por cobrar</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Todos tus cobros están pagados o no hay cobros pendientes.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-end">
+        <Button onClick={exportAging} className="gap-2">
+          <Download className="h-4 w-4" />
+          Descargar Excel
+        </Button>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <SummaryCard
+          icon={<Wallet className="h-4 w-4" />}
+          label="Total por cobrar"
+          value={formatCurrency(totalPorCobrar)}
+          sub={`${rows.length} cobro${rows.length !== 1 ? "s" : ""} pendiente${rows.length !== 1 ? "s" : ""}`}
+        />
+        <SummaryCard
+          icon={<AlertTriangle className="h-4 w-4" />}
+          label="Vencido"
+          value={formatCurrency(totalVencido)}
+          sub={`${((totalVencido / (totalPorCobrar || 1)) * 100).toFixed(0)}% del total`}
+          accent="text-red-600"
+        />
+        <SummaryCard
+          icon={<CalendarClock className="h-4 w-4" />}
+          label="Por vencer"
+          value={formatCurrency(totalPorVencer)}
+          accent="text-emerald-600"
+        />
+      </div>
+
+      {/* Aging table + bar chart */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Card className="p-5 shadow-sm">
+          <h2 className="text-sm font-semibold mb-4">Antigüedad de saldos</h2>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tramo</TableHead>
+                <TableHead className="text-right">Cobros</TableHead>
+                <TableHead className="text-right">Saldo</TableHead>
+                <TableHead className="text-right">%</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {bucketData.map((b) => (
+                <TableRow key={b.key}>
+                  <TableCell>
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: b.color }} />
+                      {b.label}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">{b.cantidad}</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(b.monto)}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {((b.monto / (totalPorCobrar || 1)) * 100).toFixed(0)}%
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="font-semibold border-t-2">
+                <TableCell>Total</TableCell>
+                <TableCell className="text-right">{rows.length}</TableCell>
+                <TableCell className="text-right font-mono">{formatCurrency(totalPorCobrar)}</TableCell>
+                <TableCell className="text-right">100%</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </Card>
+
+        <Card className="p-5 shadow-sm">
+          <h2 className="text-sm font-semibold mb-4">Saldo por antigüedad</h2>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={bucketData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={compactCLP} width={48} />
+              <Tooltip
+                formatter={(v: number, _n, item) => [
+                  `${formatCurrency(v)} · ${item?.payload?.cantidad ?? 0} cobro${(item?.payload?.cantidad ?? 0) !== 1 ? "s" : ""}`,
+                  "Saldo",
+                ]}
+                contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                cursor={{ fill: "hsl(var(--muted))" }}
+              />
+              <Bar dataKey="monto" radius={[3, 3, 0, 0]}>
+                {bucketData.map((d) => (
+                  <Cell key={d.key} fill={d.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      </div>
+
+      {/* Cash-flow projection */}
+      <Card className="p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold">Proyección de flujo de caja</h2>
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+            Cobranza esperada
+          </span>
+        </div>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={proyeccion} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={compactCLP} width={48} />
+            <Tooltip
+              formatter={(v: number) => [formatCurrency(v), "Esperado"]}
+              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              cursor={{ fill: "hsl(var(--muted))" }}
+            />
+            <Bar dataKey="monto" radius={[3, 3, 0, 0]}>
+              {proyeccion.map((p) => (
+                <Cell key={p.key} fill={p.label === "Vencido" ? "#ef4444" : "#6C5CE7"} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* By-cliente table */}
+      <Card className="p-5 shadow-sm">
+        <h2 className="text-sm font-semibold mb-4">Deudores</h2>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente</TableHead>
+                <TableHead className="text-right">Cobros</TableHead>
+                <TableHead className="text-right">Vencido</TableHead>
+                <TableHead className="text-right">Total adeudado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {porCliente.map((c) => (
+                <TableRow key={c.nombre}>
+                  <TableCell className="font-medium">{c.nombre}</TableCell>
+                  <TableCell className="text-right">{c.cantidad}</TableCell>
+                  <TableCell className="text-right text-red-600">
+                    {c.vencido > 0 ? formatCurrency(c.vencido) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono font-medium">
+                    {formatCurrency(c.total)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+    </>
   );
 }
 

@@ -43,7 +43,7 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
 }
 
 // Looks up the display name and email of a user, used as the "remitente" (sender)
-// of outbound emails so the "De:" header reads "<Nombre> via Cobro Simple" and
+// of outbound emails so the "De:" header reads "<Nombre> via NextCob" and
 // replies route back to the user via Reply-To. Returns nulls when unavailable.
 export async function getRemitenteContacto(
   userId: string | null | undefined,

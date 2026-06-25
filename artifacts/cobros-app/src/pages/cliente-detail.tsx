@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetCliente, useUpdateCliente, getGetClienteQueryKey } from "@workspace/api-client-react";
+import { useGetCliente, useUpdateCliente, useEnviarPortalCliente, getGetClienteQueryKey } from "@workspace/api-client-react";
+import type { EnviarPortalInputCanal } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,7 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency, formatShortDate } from "@/lib/format";
-import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, TrendingUp, Clock, CheckCircle2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, Send, Link2, Copy, Check } from "lucide-react";
 
 const editSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio").max(200),
@@ -111,6 +114,138 @@ function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nomb
   );
 }
 
+function EnviarPortalDialog({
+  cliente,
+}: {
+  cliente: { id: number; nombre: string; email?: string | null; telefono?: string | null };
+}) {
+  const [open, setOpen] = useState(false);
+  const [canal, setCanal] = useState<EnviarPortalInputCanal>("email");
+  const [url, setUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+  const enviarPortal = useEnviarPortalCliente();
+
+  const tieneEmail = !!cliente.email;
+  const tieneTelefono = !!cliente.telefono;
+
+  const onSubmit = () => {
+    enviarPortal.mutate(
+      { id: cliente.id, data: { canal } },
+      {
+        onSuccess: (res) => {
+          setUrl(res.url);
+          const partes: string[] = [];
+          if (res.emailEnviado) partes.push("email");
+          if (res.whatsappEnviado) partes.push("WhatsApp");
+          toast({
+            title: "Portal enviado",
+            description:
+              partes.length > 0
+                ? `Enlace enviado por ${partes.join(" y ")}.`
+                : res.mensaje || "Enlace generado. Cópialo y compártelo manualmente.",
+          });
+        },
+        onError: () => {
+          toast({ title: "Error", description: "No se pudo enviar el portal.", variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  const copyUrl = async () => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "No se pudo copiar", variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) {
+          setUrl(null);
+          setCopied(false);
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-1.5">
+          <Send className="h-3.5 w-3.5" /> Enviar portal
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Enviar portal de pago</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Genera un enlace privado para que {cliente.nombre} vea y pague sus cobros pendientes
+            sin necesidad de iniciar sesión.
+          </p>
+
+          <div className="space-y-2">
+            <Label>Enviar por</Label>
+            <Select value={canal} onValueChange={(v) => setCanal(v as EnviarPortalInputCanal)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="email" disabled={!tieneEmail}>
+                  Email {tieneEmail ? `(${cliente.email})` : "(sin email)"}
+                </SelectItem>
+                <SelectItem value="whatsapp" disabled={!tieneTelefono}>
+                  WhatsApp {tieneTelefono ? `(${cliente.telefono})` : "(sin teléfono)"}
+                </SelectItem>
+                <SelectItem value="ambos" disabled={!tieneEmail || !tieneTelefono}>
+                  Email y WhatsApp
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {url && (
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Link2 className="h-3.5 w-3.5" /> Enlace del portal
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={url} className="font-mono text-xs" />
+                <Button type="button" size="icon" variant="outline" onClick={copyUrl}>
+                  {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cerrar
+            </Button>
+            <Button type="button" onClick={onSubmit} disabled={enviarPortal.isPending} className="gap-1.5">
+              {enviarPortal.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Enviando...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" /> {url ? "Reenviar" : "Enviar"}
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ClienteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const clienteId = Number(id);
@@ -157,7 +292,10 @@ export default function ClienteDetailPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Clientes
         </Link>
-        <EditClienteDialog cliente={data} onUpdated={handleUpdated} />
+        <div className="flex items-center gap-2">
+          <EnviarPortalDialog cliente={data} />
+          <EditClienteDialog cliente={data} onUpdated={handleUpdated} />
+        </div>
       </div>
 
       <Card className="shadow-sm">

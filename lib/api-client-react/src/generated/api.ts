@@ -45,6 +45,8 @@ import type {
   CompletarPerfilInput,
   DashboardMetricas,
   Descuento,
+  EnviarPortalInput,
+  EnviarPortalResult,
   ErrorEnvelope,
   ErrorResponse,
   FlowCredentialsInput,
@@ -80,6 +82,7 @@ import type {
   Notificacion,
   OkResponse,
   OrganizacionInfo,
+  PortalData,
   Recordatorio,
   RecordatorioDefault,
   RecordatorioEnviado,
@@ -5424,6 +5427,155 @@ export const useActualizarLeadEstado = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getActualizarLeadEstadoMutationOptions(options));
+    }
+
+export const getGetPortalDeudorUrl = (token: string,) => {
+
+
+
+
+  return `/api/public/portal/${token}`
+}
+
+/**
+ * @summary Public debtor portal data for a magic-link token (no auth)
+ */
+export const getPortalDeudor = async (token: string, options?: RequestInit): Promise<PortalData> => {
+
+  return customFetch<PortalData>(getGetPortalDeudorUrl(token),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPortalDeudorQueryKey = (token: string,) => {
+    return [
+    `/api/public/portal/${token}`
+    ] as const;
+    }
+
+
+export const getGetPortalDeudorQueryOptions = <TData = Awaited<ReturnType<typeof getPortalDeudor>>, TError = ErrorType<ErrorResponse>>(token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPortalDeudor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPortalDeudorQueryKey(token);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPortalDeudor>>> = ({ signal }) => getPortalDeudor(token, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(token), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPortalDeudor>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPortalDeudorQueryResult = NonNullable<Awaited<ReturnType<typeof getPortalDeudor>>>
+export type GetPortalDeudorQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Public debtor portal data for a magic-link token (no auth)
+ */
+
+export function useGetPortalDeudor<TData = Awaited<ReturnType<typeof getPortalDeudor>>, TError = ErrorType<ErrorResponse>>(
+ token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPortalDeudor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPortalDeudorQueryOptions(token,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getEnviarPortalClienteUrl = (id: number,) => {
+
+
+
+
+  return `/api/clientes/${id}/portal`
+}
+
+/**
+ * @summary Generate the debtor portal link for a cliente and send it
+ */
+export const enviarPortalCliente = async (id: number,
+    enviarPortalInput: EnviarPortalInput, options?: RequestInit): Promise<EnviarPortalResult> => {
+
+  return customFetch<EnviarPortalResult>(getEnviarPortalClienteUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      enviarPortalInput,)
+  }
+);}
+
+
+
+
+export const getEnviarPortalClienteMutationOptions = <TError = ErrorType<void | ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enviarPortalCliente>>, TError,{id: number;data: BodyType<EnviarPortalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof enviarPortalCliente>>, TError,{id: number;data: BodyType<EnviarPortalInput>}, TContext> => {
+
+const mutationKey = ['enviarPortalCliente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof enviarPortalCliente>>, {id: number;data: BodyType<EnviarPortalInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  enviarPortalCliente(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EnviarPortalClienteMutationResult = NonNullable<Awaited<ReturnType<typeof enviarPortalCliente>>>
+    export type EnviarPortalClienteMutationBody = BodyType<EnviarPortalInput>
+    export type EnviarPortalClienteMutationError = ErrorType<void | ErrorResponse>
+
+    /**
+ * @summary Generate the debtor portal link for a cliente and send it
+ */
+export const useEnviarPortalCliente = <TError = ErrorType<void | ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enviarPortalCliente>>, TError,{id: number;data: BodyType<EnviarPortalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof enviarPortalCliente>>,
+        TError,
+        {id: number;data: BodyType<EnviarPortalInput>},
+        TContext
+      > => {
+      return useMutation(getEnviarPortalClienteMutationOptions(options));
     }
 
 export const getRunRecordatoriosUrl = () => {

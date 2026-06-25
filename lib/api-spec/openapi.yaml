@@ -24,6 +24,8 @@ tags:
     description: Browser and mobile authentication endpoints.
   - name: leads
     description: Sales leads from the public landing page
+  - name: portal
+    description: Public debtor portal (magic link)
 paths:
   /auth/user:
     get:
@@ -1779,6 +1781,64 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /public/portal/{token}:
+    get:
+      operationId: getPortalDeudor
+      tags: [portal]
+      summary: Public debtor portal data for a magic-link token (no auth)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Portal data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalData"
+        "404":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /clientes/{id}/portal:
+    post:
+      operationId: enviarPortalCliente
+      tags: [clientes]
+      summary: Generate the debtor portal link for a cliente and send it
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnviarPortalInput"
+      responses:
+        "200":
+          description: Portal link sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnviarPortalResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+
   /recordatorios/run:
     post:
       operationId: runRecordatorios
@@ -2002,6 +2062,9 @@ components:
         montoACobrar:
           type: number
           description: Net amount to charge after the current discount (monto - montoDescuento)
+        saldo:
+          type: number
+          description: Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses.
         incluyeIva:
           type: boolean
           description: Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).
@@ -2617,6 +2680,71 @@ components:
       properties:
         count:
           type: integer
+
+    PortalCobro:
+      type: object
+      required: [id, descripcion, montoACobrar, saldo, estado]
+      properties:
+        id:
+          type: integer
+        descripcion:
+          type: string
+        montoACobrar:
+          type: number
+          description: Net amount to charge after discount
+        saldo:
+          type: number
+          description: Outstanding balance (montoACobrar minus confirmed abonos)
+        estado:
+          type: string
+          enum: [pendiente, vencido, parcial, pagado]
+        fechaVencimiento:
+          type: ["string", "null"]
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        linkPago:
+          type: ["string", "null"]
+          description: Existing Flow or MercadoPago payment URL, if any
+
+    PortalData:
+      type: object
+      required: [empresa, clienteNombre, pendientes, pagados]
+      properties:
+        empresa:
+          type: string
+          description: Name of the business collecting the debt
+        clienteNombre:
+          type: string
+        pendientes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortalCobro"
+        pagados:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortalCobro"
+
+    EnviarPortalInput:
+      type: object
+      required: [canal]
+      properties:
+        canal:
+          type: string
+          enum: [email, whatsapp, ambos]
+
+    EnviarPortalResult:
+      type: object
+      required: [ok, url]
+      properties:
+        ok:
+          type: boolean
+        url:
+          type: string
+        emailEnviado:
+          type: boolean
+        whatsappEnviado:
+          type: boolean
+        mensaje:
+          type: ["string", "null"]
 
     RecordatoriosRunResult:
       type: object

@@ -10,6 +10,7 @@ import webhooksRouter from "./webhooks";
 import recordatoriosRouter from "./recordatorios";
 import notificacionesRouter from "./notificaciones";
 import leadsRouter from "./leads";
+import portalRouter from "./portal";
 import { profileRouter } from "./profile";
 import { subscriptionRouter } from "./subscription";
 import { adminRouter } from "./admin";
@@ -32,6 +33,10 @@ router.use(notificacionesRouter);
 // mount before cobrosRouter, whose blanket auth middleware would otherwise
 // intercept the public lead-submission path.
 router.use(leadsRouter);
+// portalRouter exposes the unauthenticated debtor portal (/public/portal/:token);
+// mount before cobrosRouter, whose blanket auth middleware would otherwise
+// intercept the public path.
+router.use(portalRouter);
 router.use(cobrosRouter);
 router.use(clientesRouter);
 router.use(liquidacionesRouter);

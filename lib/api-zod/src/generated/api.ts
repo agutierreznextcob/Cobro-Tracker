@@ -162,6 +162,7 @@ export const GetClienteResponse = zod.object({
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
   "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
+  "saldo": zod.number().optional().describe('Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses.'),
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
@@ -360,6 +361,7 @@ export const ListCobrosResponseItem = zod.object({
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
   "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
+  "saldo": zod.number().optional().describe('Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses.'),
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
@@ -419,6 +421,7 @@ export const GetCobroResponse = zod.object({
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
   "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
+  "saldo": zod.number().optional().describe('Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses.'),
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
@@ -467,6 +470,7 @@ export const UpdateCobroResponse = zod.object({
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
   "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
+  "saldo": zod.number().optional().describe('Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses.'),
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
@@ -761,6 +765,7 @@ export const AplicarDescuentoResponse = zod.object({
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
   "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
+  "saldo": zod.number().optional().describe('Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses.'),
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
@@ -1371,6 +1376,61 @@ export const ActualizarLeadEstadoResponse = zod.object({
   "estado": zod.enum(['nuevo', 'contactado', 'en_proceso', 'cerrado', 'descartado']),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date()
+})
+
+
+/**
+ * @summary Public debtor portal data for a magic-link token (no auth)
+ */
+export const GetPortalDeudorParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const getPortalDeudorResponsePendientesItemFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getPortalDeudorResponsePagadosItemFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const GetPortalDeudorResponse = zod.object({
+  "empresa": zod.string().describe('Name of the business collecting the debt'),
+  "clienteNombre": zod.string(),
+  "pendientes": zod.array(zod.object({
+  "id": zod.number(),
+  "descripcion": zod.string(),
+  "montoACobrar": zod.number().describe('Net amount to charge after discount'),
+  "saldo": zod.number().describe('Outstanding balance (montoACobrar minus confirmed abonos)'),
+  "estado": zod.enum(['pendiente', 'vencido', 'parcial', 'pagado']),
+  "fechaVencimiento": zod.string().regex(getPortalDeudorResponsePendientesItemFechaVencimientoRegExp).nullish(),
+  "linkPago": zod.string().nullish().describe('Existing Flow or MercadoPago payment URL, if any')
+})),
+  "pagados": zod.array(zod.object({
+  "id": zod.number(),
+  "descripcion": zod.string(),
+  "montoACobrar": zod.number().describe('Net amount to charge after discount'),
+  "saldo": zod.number().describe('Outstanding balance (montoACobrar minus confirmed abonos)'),
+  "estado": zod.enum(['pendiente', 'vencido', 'parcial', 'pagado']),
+  "fechaVencimiento": zod.string().regex(getPortalDeudorResponsePagadosItemFechaVencimientoRegExp).nullish(),
+  "linkPago": zod.string().nullish().describe('Existing Flow or MercadoPago payment URL, if any')
+}))
+})
+
+
+/**
+ * @summary Generate the debtor portal link for a cliente and send it
+ */
+export const EnviarPortalClienteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EnviarPortalClienteBody = zod.object({
+  "canal": zod.enum(['email', 'whatsapp', 'ambos'])
+})
+
+export const EnviarPortalClienteResponse = zod.object({
+  "ok": zod.boolean(),
+  "url": zod.string(),
+  "emailEnviado": zod.boolean().optional(),
+  "whatsappEnviado": zod.boolean().optional(),
+  "mensaje": zod.string().nullish()
 })
 
 

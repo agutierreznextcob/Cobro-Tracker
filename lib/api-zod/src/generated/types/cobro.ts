@@ -18,6 +18,8 @@ export interface Cobro {
   montoDescuento?: number | null;
   /** Net amount to charge after the current discount (monto - montoDescuento) */
   montoACobrar?: number;
+  /** Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses. */
+  saldo?: number;
   /** Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva). */
   incluyeIva?: boolean;
   /**

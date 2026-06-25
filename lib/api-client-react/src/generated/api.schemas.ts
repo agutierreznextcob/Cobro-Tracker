@@ -129,6 +129,8 @@ export interface Cobro {
   montoDescuento?: number | null;
   /** Net amount to charge after the current discount (monto - montoDescuento) */
   montoACobrar?: number;
+  /** Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses. */
+  saldo?: number;
   /** Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva). */
   incluyeIva?: boolean;
   /**
@@ -795,6 +797,66 @@ export interface LeadCreated {
 
 export interface LeadsCount {
   count: number;
+}
+
+export type PortalCobroEstado = typeof PortalCobroEstado[keyof typeof PortalCobroEstado];
+
+
+export const PortalCobroEstado = {
+  pendiente: 'pendiente',
+  vencido: 'vencido',
+  parcial: 'parcial',
+  pagado: 'pagado',
+} as const;
+
+export interface PortalCobro {
+  id: number;
+  descripcion: string;
+  /** Net amount to charge after discount */
+  montoACobrar: number;
+  /** Outstanding balance (montoACobrar minus confirmed abonos) */
+  saldo: number;
+  estado: PortalCobroEstado;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  fechaVencimiento?: string | null;
+  /**
+     * Existing Flow or MercadoPago payment URL, if any
+     * @nullable
+     */
+  linkPago?: string | null;
+}
+
+export interface PortalData {
+  /** Name of the business collecting the debt */
+  empresa: string;
+  clienteNombre: string;
+  pendientes: PortalCobro[];
+  pagados: PortalCobro[];
+}
+
+export type EnviarPortalInputCanal = typeof EnviarPortalInputCanal[keyof typeof EnviarPortalInputCanal];
+
+
+export const EnviarPortalInputCanal = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+  ambos: 'ambos',
+} as const;
+
+export interface EnviarPortalInput {
+  canal: EnviarPortalInputCanal;
+}
+
+export interface EnviarPortalResult {
+  ok: boolean;
+  url: string;
+  emailEnviado?: boolean;
+  whatsappEnviado?: boolean;
+  /** @nullable */
+  mensaje?: string | null;
 }
 
 export interface RecordatoriosRunResult {

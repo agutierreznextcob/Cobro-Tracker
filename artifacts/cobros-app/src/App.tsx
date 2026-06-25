@@ -16,6 +16,7 @@ import ClientesPage from "@/pages/clientes";
 import ClienteDetailPage from "@/pages/cliente-detail";
 import AdminPage from "@/pages/admin";
 import LeadsPage from "@/pages/leads";
+import PortalPage from "@/pages/portal";
 import LiquidacionesPage from "@/pages/liquidaciones";
 import LiquidacionDetailPage from "@/pages/liquidacion-detail";
 import Notificaciones from "@/pages/notificaciones";
@@ -104,6 +105,7 @@ function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
+      <Route path="/portal/:token" component={PortalPage} />
       <Route path="/dashboard">
         <AuthGate>
           <Layout>

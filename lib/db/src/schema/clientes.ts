@@ -11,6 +11,8 @@ export const clientesTable = pgTable("clientes", {
   userId: text("user_id").notNull(),
   // Organization the cliente belongs to (denormalized for org-wide queries).
   organizationId: integer("organization_id"),
+  // Unique token for the public debtor portal magic link (generated on demand).
+  portalToken: text("portal_token").unique(),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),
 });

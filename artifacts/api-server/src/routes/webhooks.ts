@@ -13,8 +13,23 @@ import {
   mapSubscription,
 } from "../lib/flow-subscriptions";
 import { requireSubscription } from "../middlewares/requireSubscription";
+import { emitirComprobante } from "../lib/comprobante-service";
 
 const webhooksRouter = Router();
+
+// Dispara la emisión del comprobante (PDF + email) cuando un cobro llega a
+// `pagado`. Es fire-and-forget e idempotente (gate por comprobantes.cobro_id),
+// así que llamarlo varias veces para el mismo cobro produce un solo comprobante.
+function emitirComprobanteSiPagado(
+  estado: string,
+  cobroId: number,
+  metodo: string,
+  referencia: string | null,
+  log: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void; error: (o: object, m: string) => void },
+): void {
+  if (estado !== "pagado") return;
+  void emitirComprobante(cobroId, { metodo, referencia }, log);
+}
 
 const EVENTO_A_ESTADO: Record<string, "pagado" | "fallido" | "cancelado" | "pendiente"> = {
   "pago.completado": "pagado",
@@ -153,6 +168,7 @@ webhooksRouter.post("/webhooks/flow", async (req, res) => {
         const nuevoEstadoCobro: "pagado" | "parcial" | "pendiente" = totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
         await db.update(cobrosTable).set({ estado: nuevoEstadoCobro, actualizadoEn: new Date() }).where(eq(cobrosTable.id, abono.cobroId));
         await logEvento({ evento: "flow.abono.confirmado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id} confirmado, cobro ahora ${nuevoEstadoCobro}` });
+        emitirComprobanteSiPagado(nuevoEstadoCobro, abono.cobroId, "flow", token.trim(), req.log);
       } else if (pagoStatus.status === 3 || pagoStatus.status === 4) {
         await db.update(pagosParciales).set({ estado: "fallido" }).where(eq(pagosParciales.id, abono.id));
         await logEvento({ evento: "flow.abono.fallido", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id} fallido (status ${pagoStatus.status})` });
@@ -246,6 +262,7 @@ webhooksRouter.post("/webhooks/flow", async (req, res) => {
     });
 
     req.log.info({ cobroId: cobro.id, nuevoEstado }, "Cobro updated via Flow webhook (verified)");
+    emitirComprobanteSiPagado(nuevoEstado, cobro.id, "flow", pagoStatus.flowOrder != null ? String(pagoStatus.flowOrder) : token.trim(), req.log);
     res.status(200).json({ ok: true });
   } catch (err) {
     req.log.error({ err, token }, "Error processing Flow webhook");
@@ -329,6 +346,7 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
         const nuevoEstadoCobro: "pagado" | "parcial" | "pendiente" = totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
         await db.update(cobrosTable).set({ estado: nuevoEstadoCobro, actualizadoEn: new Date() }).where(eq(cobrosTable.id, abono.cobroId));
         await logEvento({ evento: "mp.abono.confirmado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId} confirmado, cobro ahora ${nuevoEstadoCobro}` });
+        emitirComprobanteSiPagado(nuevoEstadoCobro, abono.cobroId, "mp", String(paymentId), req.log);
       } else if (["rejected", "cancelled", "refunded"].includes(payment.status)) {
         await db.update(pagosParciales).set({ estado: "fallido", mpPaymentId: String(paymentId) }).where(eq(pagosParciales.id, abonoId));
         await logEvento({ evento: "mp.abono.fallido", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId} fallido (${payment.status})` });
@@ -390,6 +408,7 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
     });
 
     req.log.info({ cobroId: cobro.id, nuevoEstado, paymentId }, "Cobro updated via MercadoPago webhook");
+    emitirComprobanteSiPagado(nuevoEstado, cobro.id, "mp", String(paymentId), req.log);
     res.status(200).json({ ok: true });
   } catch (err) {
     req.log.error({ err, paymentId }, "Error processing MercadoPago webhook");
@@ -469,6 +488,7 @@ webhooksRouter.post("/webhooks/cobro", async (req, res) => {
 
     await logEvento({ evento, cobroId, ipOrigen: ip, exitoso: true, detalle: `Estado actualizado a: ${nuevoEstado}` });
     req.log.info({ cobroId, nuevoEstado }, "Cobro updated via webhook");
+    emitirComprobanteSiPagado(nuevoEstado, cobroId, "manual", referencia ?? null, req.log);
     res.json({ recibido: true, cobroActualizado: true });
   } catch (err) {
     await logEvento({ evento, cobroId, ipOrigen: ip, exitoso: false, detalle: `Error interno: ${String(err)}` });
