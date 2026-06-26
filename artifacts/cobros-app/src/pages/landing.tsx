@@ -2,6 +2,7 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { Redirect, useLocation, Link } from "wouter";
 import { LandingChat } from "@/components/landing-chat";
 import { DemoRequestModal } from "@/components/demo-request-modal";
+import { HeroParticles } from "@/components/hero-particles";
 import {
   ArrowRight,
   Bell,
@@ -65,17 +66,27 @@ function LandingNav() {
 function HeroSection() {
   const [, navigate] = useLocation();
   return (
-    <section className="pt-32 pb-20 px-6">
-      <div className="max-w-4xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-medium mb-8 border border-primary/20">
-          <Sparkles className="h-3.5 w-3.5" />
+    <section className="relative overflow-hidden pt-32 pb-20 px-6 hero-animated-bg">
+      {/* Animated fintech particle network */}
+      <HeroParticles />
+      {/* Dark overlay so the white text always stays legible */}
+      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
+      {/* Fade-to-white transition into the next section */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-background"
+        aria-hidden="true"
+      />
+
+      <div className="relative z-10 max-w-4xl mx-auto text-center">
+        <div className="inline-flex items-center gap-2 bg-white/90 text-gray-900 px-3 py-1.5 rounded-full text-sm font-medium mb-8 border border-white/30 shadow-sm backdrop-blur-sm">
+          <Sparkles className="h-3.5 w-3.5 text-[#F4A800]" />
           Con asistente IA incluido
         </div>
-        <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1] mb-6">
+        <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white leading-[1.1] mb-6">
           Gestiona la cobranza a tus clientes{" "}
-          <span className="text-primary">sin complicaciones</span>
+          <span className="text-[#F4A800]">sin complicaciones</span>
         </h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+        <p className="text-xl text-white/80 max-w-2xl mx-auto mb-10 leading-relaxed">
           Controla la cobranza de tus clientes, comparte links de pago con
           Webpay y MercadoPago, y automatiza el seguimiento. Con dashboard en
           tiempo real y asistente IA para analizar tu negocio.
@@ -83,25 +94,25 @@ function HeroSection() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
             onClick={() => navigate("/register")}
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg text-base font-semibold shadow-md hover:bg-primary/90 transition-colors w-full sm:w-auto justify-center"
+            className="inline-flex items-center gap-2 bg-[#F4A800] text-black px-6 py-3 rounded-lg text-base font-semibold shadow-lg shadow-[#F4A800]/20 hover:bg-[#ffba1f] transition-colors w-full sm:w-auto justify-center"
           >
             Comenzar gratis
             <ArrowRight className="h-4 w-4" />
           </button>
           <DemoRequestModal
             trigger={
-              <button className="inline-flex items-center gap-2 border border-border text-foreground px-6 py-3 rounded-lg text-base font-semibold hover:bg-secondary/60 transition-colors w-full sm:w-auto justify-center">
+              <button className="inline-flex items-center gap-2 border border-white/70 text-white px-6 py-3 rounded-lg text-base font-semibold hover:bg-white/10 transition-colors w-full sm:w-auto justify-center">
                 Agenda una presentación
               </button>
             }
           />
         </div>
-        <p className="text-sm text-muted-foreground mt-5">
+        <p className="text-sm text-white/60 mt-5">
           14 días de prueba gratis · Luego $18.990 + IVA ($22.598 total) CLP/mes
         </p>
 
         {/* App preview mockup */}
-        <div className="mt-16 rounded-2xl border border-border/60 bg-card shadow-2xl overflow-hidden text-left">
+        <div className="mt-16 rounded-2xl border border-white/10 bg-card shadow-2xl overflow-hidden text-left">
           <div className="bg-muted/40 border-b px-4 py-3 flex items-center gap-2">
             <div className="h-3 w-3 rounded-full bg-red-400" />
             <div className="h-3 w-3 rounded-full bg-yellow-400" />

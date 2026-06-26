@@ -287,3 +287,34 @@
     inset: -1px;
   }
 }
+
+/* Landing hero — animated dark fintech gradient */
+@keyframes heroGradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.hero-animated-bg {
+  background: linear-gradient(
+    125deg,
+    #0a0a0a 0%,
+    #0d1b2a 35%,
+    #1a1206 65%,
+    #0a0a0a 100%
+  );
+  background-size: 300% 300%;
+  animation: heroGradientShift 24s ease infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-animated-bg {
+    animation: none;
+  }
+}
