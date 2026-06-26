@@ -11,6 +11,8 @@ import {
   useStartSubscription,
   getGetSubscriptionStatusQueryKey,
   useCompletarPerfil,
+  exportarDatos,
+  useEliminarCuenta,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth, type AuthUser } from "@workspace/replit-auth-web";
@@ -30,7 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { isValidRut, formatRut } from "@/lib/rut";
 import { TeamSection } from "@/components/team-section";
-import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera } from "lucide-react";
+import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera, ShieldCheck, Download } from "lucide-react";
 
 // Resize a chosen image client-side and return a JPEG data URL. Keeping avatars
 // small (max 256px) lets us store them directly in users.profileImageUrl without
@@ -952,6 +954,183 @@ function ProfileSettings() {
           )}
         </CardContent>
       </Card>
+
+      <PrivacySection />
     </div>
+  );
+}
+
+function PrivacySection() {
+  const { toast } = useToast();
+  const [downloading, setDownloading] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const eliminarCuenta = useEliminarCuenta();
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const data = await exportarDatos();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fecha = new Date().toISOString().slice(0, 10);
+      a.download = `nextcob-mis-datos-${fecha}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Datos descargados",
+        description: "Tu archivo con tus datos se descargó correctamente.",
+      });
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "No se pudieron descargar tus datos.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleDelete = () => {
+    eliminarCuenta.mutate(
+      { data: { confirmacion: "ELIMINAR" } },
+      {
+        onSuccess: () => {
+          // The account and session are gone; send the user to the landing page.
+          window.location.href = "/";
+        },
+        onError: (err: unknown) => {
+          const msg =
+            err instanceof Error
+              ? err.message
+              : "No se pudo eliminar la cuenta.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  return (
+    <Card className="shadow-sm border-border/50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          Mis datos y privacidad
+        </CardTitle>
+        <CardDescription>
+          Descarga una copia de tus datos o elimina tu cuenta de forma
+          permanente, según la Ley N° 21.719.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Descargar mis datos
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Obtén un archivo JSON con tu perfil, cobros y clientes.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleDownload}
+            disabled={downloading}
+            className="shrink-0"
+          >
+            {downloading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Preparando...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Descargar JSON
+              </>
+            )}
+          </Button>
+        </div>
+
+        <div className="border-t border-border/60 pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-destructive">
+              Eliminar mi cuenta
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Esta acción es permanente y elimina todos tus datos, cobros y
+              clientes. No se puede deshacer.
+            </p>
+          </div>
+          <Dialog
+            open={deleteOpen}
+            onOpenChange={(open) => {
+              setDeleteOpen(open);
+              if (!open) setConfirmText("");
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="destructive" className="shrink-0">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar cuenta
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>¿Eliminar tu cuenta?</DialogTitle>
+                <DialogDescription>
+                  Esta acción es permanente e irreversible. Se eliminarán tu
+                  cuenta y todos tus datos, cobros y clientes asociados. Para
+                  confirmar, escribe <strong>ELIMINAR</strong> en el campo de
+                  abajo.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="confirmDelete">Escribe ELIMINAR</Label>
+                <Input
+                  id="confirmDelete"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  placeholder="ELIMINAR"
+                  autoComplete="off"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteOpen(false)}
+                  disabled={eliminarCuenta.isPending}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={
+                    confirmText !== "ELIMINAR" || eliminarCuenta.isPending
+                  }
+                >
+                  {eliminarCuenta.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Eliminando...
+                    </>
+                  ) : (
+                    "Eliminar definitivamente"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

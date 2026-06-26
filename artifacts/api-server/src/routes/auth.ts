@@ -248,8 +248,21 @@ router.post("/auth/register", async (req: Request, res: Response) => {
     return;
   }
 
-  const { nombre, password, confirmPassword } = parsed.data;
+  const { nombre, password, confirmPassword, aceptaPolitica } = parsed.data;
   const email = parsed.data.email.trim().toLowerCase();
+
+  // Ley 21.719: consent to the Privacy Policy + Terms is mandatory. Enforce it
+  // server-side too, not only via the frontend checkbox.
+  if (aceptaPolitica !== true) {
+    res.status(400).json(
+      RegisterUserResponse.parse({
+        ok: false,
+        mensaje:
+          "Debes aceptar la Política de Privacidad y los Términos de Uso.",
+      }),
+    );
+    return;
+  }
 
   if (password !== confirmPassword) {
     res.status(400).json(
@@ -331,6 +344,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         rut,
         passwordHash,
         emailVerified: false,
+        politicaAceptadaEn: new Date(),
         subscriptionStatus: trialUsado ? "vencida" : "prueba",
         trialEndsAt: trialUsado ? new Date() : trialEndsAt,
       })

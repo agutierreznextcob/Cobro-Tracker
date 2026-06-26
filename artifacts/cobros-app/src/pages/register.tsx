@@ -5,6 +5,7 @@ import { AuthLayout } from "@/components/auth-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { isValidRut, formatRut } from "@/lib/rut";
 
 function isStrongPassword(pw: string): boolean {
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [aceptaPolitica, setAceptaPolitica] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const register = useRegisterUser();
@@ -47,6 +49,12 @@ export default function RegisterPage() {
       setErrorMsg("Las contraseñas no coinciden.");
       return;
     }
+    if (!aceptaPolitica) {
+      setErrorMsg(
+        "Debes aceptar la Política de Privacidad y los Términos de Uso.",
+      );
+      return;
+    }
 
     try {
       const res = await register.mutateAsync({
@@ -56,6 +64,7 @@ export default function RegisterPage() {
           email: email.trim(),
           password,
           confirmPassword,
+          aceptaPolitica,
         },
       });
       if (res.ok) {
@@ -155,6 +164,35 @@ export default function RegisterPage() {
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="••••••••"
           />
+        </div>
+
+        <div className="flex items-start gap-2.5 pt-1">
+          <Checkbox
+            id="aceptaPolitica"
+            checked={aceptaPolitica}
+            onCheckedChange={(checked) => setAceptaPolitica(checked === true)}
+            className="mt-0.5"
+          />
+          <Label
+            htmlFor="aceptaPolitica"
+            className="text-sm font-normal leading-snug text-muted-foreground cursor-pointer"
+          >
+            Acepto la{" "}
+            <Link
+              href="/privacidad"
+              className="text-primary font-medium hover:underline"
+            >
+              Política de Privacidad
+            </Link>{" "}
+            y los{" "}
+            <Link
+              href="/terminos"
+              className="text-primary font-medium hover:underline"
+            >
+              Términos de Uso
+            </Link>
+            .
+          </Label>
         </div>
 
         {errorMsg ? (

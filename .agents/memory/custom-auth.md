@@ -31,11 +31,12 @@ Lockout = 15min, MAX_FAILED_ATTEMPTS = 5.
 already exists there does NOT get a fresh 14-day trial again.
 
 ## Demo & superadmin seed accounts
-- anibal.gutierrezbasoalto@gmail.com (id=60793159): `esDemo=true` (permanent
-  access like admin, via computeSubscriptionState), owns all migrated data.
-- agutierrez@nextcob.com: `role=admin` superadmin.
+- A demo account is seeded with `esDemo=true` (permanent access like admin, via
+  computeSubscriptionState) and owns all migrated data.
+- A superadmin account is seeded with `role=admin`.
 - Both seeded with `passwordHash=null` + `emailVerified=true`; they set their
-  password through the forgot-password flow (no plaintext seeded).
+  password through the forgot-password flow (no plaintext seeded). The exact
+  seeded addresses live in the seed script, not here.
 
 ## Resend deliverability & superadmin backup
 `RESEND_FROM_EMAIL` is unset → sender falls back to Resend's SANDBOX domain,

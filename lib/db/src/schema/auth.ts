@@ -77,6 +77,10 @@ export const usersTable = pgTable("users", {
   flowSubscriptionId: varchar("flow_subscription_id"),
   flowRegisterToken: varchar("flow_register_token"),
   subscriptionPeriodEnd: timestamp("subscription_period_end", { withTimezone: true }),
+  // Ley 21.719: timestamp the user accepted the Privacy Policy + Terms of Use at
+  // registration (consent record). Null for accounts created before this field
+  // or seeded by migration (demo/superadmin).
+  politicaAceptadaEn: timestamp("politica_aceptada_en", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

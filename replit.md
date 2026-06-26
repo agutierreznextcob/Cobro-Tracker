@@ -43,6 +43,19 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
 
+## Ley 21.719 (data protection)
+
+- Consent: register requires `aceptaPolitica===true` (non-prechecked checkbox);
+  stored as `usersTable.politicaAceptadaEn`. Public legal pages at `/privacidad`
+  and `/terminos` (third parties disclosed: Resend, Groq, Flow, MercadoPago).
+- ARCO in Profile "Mis datos y privacidad": `GET /profile/exportar-datos` (JSON
+  export of perfil+cobros+clientes, scoped by org role, never leaks
+  passwordHash/credenciales) + `DELETE /profile/cuenta` (permanent, confirm
+  "ELIMINAR"). Delete runs in a transaction; comprobantes deleted manually
+  (no cascade), cobros children cascade by cobroId; `trial_ruts` preserved
+  (anti-abuse); demo/admin blocked; org owner with other members → 409
+  (re-checked inside the txn to close the race).
+
 ## Gotchas
 
 - Auth token consume (`lib/tokens.ts`) and login lockout increment

@@ -737,6 +737,60 @@ paths:
         "401":
           description: Unauthorized
 
+  /profile/exportar-datos:
+    get:
+      operationId: exportarDatos
+      tags: [profile]
+      summary: Export all of the user's personal data (Ley 21.719 portability)
+      responses:
+        "200":
+          description: Full data export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportarDatosResult"
+        "401":
+          description: Unauthorized
+
+  /profile/cuenta:
+    delete:
+      operationId: eliminarCuenta
+      tags: [profile]
+      summary: Permanently delete the user's account and all their data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EliminarCuentaInput"
+      responses:
+        "200":
+          description: Account deleted; session cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Confirmation missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Account type cannot be self-deleted (demo/admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Organization has other members; cannot delete owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /cobros/{id}/recordatorio-email:
     post:
       operationId: enviarRecordatorioEmail
@@ -3514,7 +3568,7 @@ components:
             - type: 'null'
     RegisterInput:
       type: object
-      required: [nombre, rut, email, password, confirmPassword]
+      required: [nombre, rut, email, password, confirmPassword, aceptaPolitica]
       properties:
         nombre:
           type: string
@@ -3533,6 +3587,43 @@ components:
         confirmPassword:
           type: string
           minLength: 8
+        aceptaPolitica:
+          type: boolean
+          description: >-
+            Ley 21.719 consent. Must be true: the user accepted the Privacy
+            Policy and Terms of Use. Recorded with a timestamp server-side.
+    EliminarCuentaInput:
+      type: object
+      required: [confirmacion]
+      properties:
+        confirmacion:
+          type: string
+          description: >-
+            Must equal "ELIMINAR" to confirm permanent, irreversible deletion of
+            the account and all associated data.
+    ExportarDatosResult:
+      type: object
+      required: [exportadoEn, perfil, cobros, clientes]
+      properties:
+        exportadoEn:
+          type: string
+          description: ISO timestamp the export was generated.
+        perfil:
+          type: object
+          additionalProperties: true
+          description: The user's profile fields (no password hash or secrets).
+        cobros:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Cobros the user can access (their own / their organization).
+        clientes:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Clientes the user can access (their own / their organization).
     LoginInput:
       type: object
       required: [email, password]

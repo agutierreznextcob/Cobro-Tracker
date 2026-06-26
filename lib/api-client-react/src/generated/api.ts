@@ -48,10 +48,12 @@ import type {
   CompletarPerfilInput,
   DashboardMetricas,
   Descuento,
+  EliminarCuentaInput,
   EmailInput,
   EnviarPortalInput,
   EnviarPortalResult,
   ErrorResponse,
+  ExportarDatosResult,
   ExtenderTrialInput,
   FlowCredentialsInput,
   FlowCredentialsStatus,
@@ -2372,6 +2374,154 @@ export const useCompletarPerfil = <TError = ErrorType<ErrorResponse | void>,
         TContext
       > => {
       return useMutation(getCompletarPerfilMutationOptions(options));
+    }
+
+export const getExportarDatosUrl = () => {
+
+
+
+
+  return `/api/profile/exportar-datos`
+}
+
+/**
+ * @summary Export all of the user's personal data (Ley 21.719 portability)
+ */
+export const exportarDatos = async ( options?: RequestInit): Promise<ExportarDatosResult> => {
+
+  return customFetch<ExportarDatosResult>(getExportarDatosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportarDatosQueryKey = () => {
+    return [
+    `/api/profile/exportar-datos`
+    ] as const;
+    }
+
+
+export const getExportarDatosQueryOptions = <TData = Awaited<ReturnType<typeof exportarDatos>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportarDatos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportarDatosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportarDatos>>> = ({ signal }) => exportarDatos({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportarDatos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportarDatosQueryResult = NonNullable<Awaited<ReturnType<typeof exportarDatos>>>
+export type ExportarDatosQueryError = ErrorType<void>
+
+
+/**
+ * @summary Export all of the user's personal data (Ley 21.719 portability)
+ */
+
+export function useExportarDatos<TData = Awaited<ReturnType<typeof exportarDatos>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportarDatos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportarDatosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getEliminarCuentaUrl = () => {
+
+
+
+
+  return `/api/profile/cuenta`
+}
+
+/**
+ * @summary Permanently delete the user's account and all their data
+ */
+export const eliminarCuenta = async (eliminarCuentaInput: EliminarCuentaInput, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getEliminarCuentaUrl(),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      eliminarCuentaInput,)
+  }
+);}
+
+
+
+
+export const getEliminarCuentaMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof eliminarCuenta>>, TError,{data: BodyType<EliminarCuentaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof eliminarCuenta>>, TError,{data: BodyType<EliminarCuentaInput>}, TContext> => {
+
+const mutationKey = ['eliminarCuenta'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof eliminarCuenta>>, {data: BodyType<EliminarCuentaInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  eliminarCuenta(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EliminarCuentaMutationResult = NonNullable<Awaited<ReturnType<typeof eliminarCuenta>>>
+    export type EliminarCuentaMutationBody = BodyType<EliminarCuentaInput>
+    export type EliminarCuentaMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Permanently delete the user's account and all their data
+ */
+export const useEliminarCuenta = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof eliminarCuenta>>, TError,{data: BodyType<EliminarCuentaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof eliminarCuenta>>,
+        TError,
+        {data: BodyType<EliminarCuentaInput>},
+        TContext
+      > => {
+      return useMutation(getEliminarCuentaMutationOptions(options));
     }
 
 export const getEnviarRecordatorioEmailUrl = (id: number,) => {

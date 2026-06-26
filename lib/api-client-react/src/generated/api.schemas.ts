@@ -1223,6 +1223,33 @@ export interface RegisterInput {
   password: string;
   /** @minLength 8 */
   confirmPassword: string;
+  /** Ley 21.719 consent. Must be true: the user accepted the Privacy Policy and Terms of Use. Recorded with a timestamp server-side. */
+  aceptaPolitica: boolean;
+}
+
+export interface EliminarCuentaInput {
+  /** Must equal "ELIMINAR" to confirm permanent, irreversible deletion of the account and all associated data. */
+  confirmacion: string;
+}
+
+/**
+ * The user's profile fields (no password hash or secrets).
+ */
+export type ExportarDatosResultPerfil = { [key: string]: unknown };
+
+export type ExportarDatosResultCobrosItem = { [key: string]: unknown };
+
+export type ExportarDatosResultClientesItem = { [key: string]: unknown };
+
+export interface ExportarDatosResult {
+  /** ISO timestamp the export was generated. */
+  exportadoEn: string;
+  /** The user's profile fields (no password hash or secrets). */
+  perfil: ExportarDatosResultPerfil;
+  /** Cobros the user can access (their own / their organization). */
+  cobros: ExportarDatosResultCobrosItem[];
+  /** Clientes the user can access (their own / their organization). */
+  clientes: ExportarDatosResultClientesItem[];
 }
 
 export interface LoginInput {

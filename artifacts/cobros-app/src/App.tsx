@@ -9,6 +9,8 @@ import RegisterPage from "@/pages/register";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 import ResendVerificationPage from "@/pages/resend-verification";
+import PrivacidadPage from "@/pages/privacidad";
+import TerminosPage from "@/pages/terminos";
 import Dashboard from "@/pages/dashboard";
 import NewCobro from "@/pages/new-cobro";
 import CobrosList from "@/pages/cobros-list";
@@ -115,6 +117,8 @@ function AppRouter() {
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/resend-verification" component={ResendVerificationPage} />
+      <Route path="/privacidad" component={PrivacidadPage} />
+      <Route path="/terminos" component={TerminosPage} />
       <Route path="/portal/:token" component={PortalPage} />
       <Route path="/dashboard">
         <AuthGate>

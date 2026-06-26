@@ -52,7 +52,8 @@ export const RegisterUserBody = zod.object({
   "rut": zod.string().min(1).describe('Chilean RUT (validated and normalized server-side).'),
   "email": zod.string().email(),
   "password": zod.string().min(registerUserBodyPasswordMin),
-  "confirmPassword": zod.string().min(registerUserBodyConfirmPasswordMin)
+  "confirmPassword": zod.string().min(registerUserBodyConfirmPasswordMin),
+  "aceptaPolitica": zod.boolean().describe('Ley 21.719 consent. Must be true: the user accepted the Privacy Policy and Terms of Use. Recorded with a timestamp server-side.')
 })
 
 export const RegisterUserResponse = zod.object({
@@ -676,6 +677,29 @@ export const CompletarPerfilResponse = zod.object({
   "phone": zod.string().nullish(),
   "address": zod.string().nullish(),
   "companyName": zod.string().nullish()
+})
+
+
+/**
+ * @summary Export all of the user's personal data (Ley 21.719 portability)
+ */
+export const ExportarDatosResponse = zod.object({
+  "exportadoEn": zod.string().describe('ISO timestamp the export was generated.'),
+  "perfil": zod.record(zod.string(), zod.unknown()).describe('The user\'s profile fields (no password hash or secrets).'),
+  "cobros": zod.array(zod.record(zod.string(), zod.unknown())).describe('Cobros the user can access (their own \/ their organization).'),
+  "clientes": zod.array(zod.record(zod.string(), zod.unknown())).describe('Clientes the user can access (their own \/ their organization).')
+})
+
+
+/**
+ * @summary Permanently delete the user's account and all their data
+ */
+export const EliminarCuentaBody = zod.object({
+  "confirmacion": zod.string().describe('Must equal \"ELIMINAR\" to confirm permanent, irreversible deletion of the account and all associated data.')
+})
+
+export const EliminarCuentaResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 

@@ -1,5 +1,5 @@
 import { useAuth } from "@workspace/replit-auth-web";
-import { Redirect, useLocation } from "wouter";
+import { Redirect, useLocation, Link } from "wouter";
 import { LandingChat } from "@/components/landing-chat";
 import { DemoRequestModal } from "@/components/demo-request-modal";
 import {
@@ -390,8 +390,8 @@ function Footer() {
         <div className="border-t pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">© 2025 NextCob. Todos los derechos reservados.</p>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <a href="#" className="hover:text-foreground transition-colors">Términos y condiciones</a>
-            <a href="#" className="hover:text-foreground transition-colors">Privacidad</a>
+            <Link href="/terminos" className="hover:text-foreground transition-colors">Términos y condiciones</Link>
+            <Link href="/privacidad" className="hover:text-foreground transition-colors">Privacidad</Link>
           </div>
         </div>
       </div>

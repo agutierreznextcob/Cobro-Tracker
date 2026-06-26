@@ -22,4 +22,6 @@ export interface RegisterInput {
   password: string;
   /** @minLength 8 */
   confirmPassword: string;
+  /** Ley 21.719 consent. Must be true: the user accepted the Privacy Policy and Terms of Use. Recorded with a timestamp server-side. */
+  aceptaPolitica: boolean;
 }
