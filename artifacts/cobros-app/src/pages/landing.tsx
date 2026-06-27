@@ -1,59 +1,99 @@
 import { useAuth } from "@workspace/replit-auth-web";
 import { Redirect, useLocation, Link } from "wouter";
+import { useEffect, useState } from "react";
 import { LandingChat } from "@/components/landing-chat";
 import { DemoRequestModal } from "@/components/demo-request-modal";
 import { HeroParticles } from "@/components/hero-particles";
 import {
   ArrowRight,
+  BarChart3,
   Bell,
   Bot,
   CheckCircle2,
   ChevronRight,
+  ClipboardList,
   Coins,
   CreditCard,
+  Gauge,
+  Globe,
   Link2,
+  Percent,
   Share2,
   Sparkles,
   Users,
+  UsersRound,
   Wallet,
 } from "lucide-react";
 
 function LandingNav() {
   const { login } = useAuth();
   const [, navigate] = useLocation();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const hero = document.getElementById("hero");
+      const threshold = hero ? hero.offsetHeight - 80 : 400;
+      setScrolled(window.scrollY > threshold);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
+  const linkClass = scrolled
+    ? "text-muted-foreground hover:text-foreground transition-colors"
+    : "text-white/80 hover:text-white transition-colors";
+  const ghostBtnClass = scrolled
+    ? "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-secondary/60"
+    : "text-sm font-medium text-white/80 hover:text-white transition-colors px-3 py-2 rounded-md hover:bg-white/10";
+
   return (
-    <header className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+    <header
+      className={`fixed top-0 inset-x-0 z-50 transition-colors duration-300 ${
+        scrolled
+          ? "bg-background/80 backdrop-blur-md border-b border-border/50"
+          : "bg-transparent border-b border-transparent"
+      }`}
+    >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <img
             src={`${import.meta.env.BASE_URL}brand/nextcob-logo.png`}
             alt="NextCob"
-            className="h-8 w-auto"
+            className={`h-8 w-auto transition-[filter] duration-300 ${
+              scrolled ? "" : "brightness-0 invert"
+            }`}
           />
         </div>
-        <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
-          <a href="#como-funciona" className="hover:text-foreground transition-colors">Cómo funciona</a>
-          <a href="#caracteristicas" className="hover:text-foreground transition-colors">Características</a>
-          <a href="#precios" className="hover:text-foreground transition-colors">Precios</a>
-          <a href="#nosotros" className="hover:text-foreground transition-colors">Nosotros</a>
+        <nav className="hidden md:flex items-center gap-6 text-sm">
+          <a href="#como-funciona" className={linkClass}>Cómo funciona</a>
+          <a href="#caracteristicas" className={linkClass}>Características</a>
+          <a href="#precios" className={linkClass}>Precios</a>
+          <a href="#nosotros" className={linkClass}>Nosotros</a>
         </nav>
         <div className="flex items-center gap-3">
-          <button
-            onClick={login}
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-secondary/60"
-          >
+          <button onClick={login} className={ghostBtnClass}>
             Iniciar sesión
           </button>
           <DemoRequestModal
             trigger={
-              <button className="hidden sm:inline-flex text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-secondary/60">
+              <button className={`hidden sm:inline-flex ${ghostBtnClass}`}>
                 Agenda una presentación
               </button>
             }
           />
           <button
             onClick={() => navigate("/register")}
-            className="text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow hover:bg-primary/90 transition-colors"
+            className={`text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
+              scrolled
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-[#F4A800] text-black hover:bg-[#ffba1f]"
+            }`}
           >
             Crear cuenta
           </button>
@@ -66,7 +106,7 @@ function LandingNav() {
 function HeroSection() {
   const [, navigate] = useLocation();
   return (
-    <section className="relative overflow-hidden pt-32 pb-20 px-6 hero-animated-bg">
+    <section id="hero" className="relative overflow-hidden pt-32 pb-20 px-6 hero-animated-bg">
       {/* Animated fintech particle network */}
       <HeroParticles />
       {/* Dark overlay so the white text always stays legible */}
@@ -184,7 +224,8 @@ function ComoFuncionaSection() {
         <div className="text-center mb-14">
           <h2 className="text-3xl font-bold tracking-tight mb-3">Cómo funciona</h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Tres pasos simples para cobrar a cualquier cliente en Chile.
+            Tres pasos simples para gestionar la cobranza de tus clientes en
+            Chile.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
@@ -212,22 +253,39 @@ function CaracteristicasSection() {
     { icon: Wallet, title: "Cobranza manual", desc: "Registra pagos en efectivo, transferencia o cualquier medio. Mantén todos tus cobros en un solo lugar." },
     { icon: Coins, title: "Pagos parciales y abonos", desc: "Acepta abonos y haz seguimiento automático del saldo hasta completar el monto total del cobro." },
     { icon: Bell, title: "Recordatorios por email y WhatsApp", desc: "Envía recordatorios a tus clientes para que no se olviden de pagar y reduce la morosidad." },
-    { icon: Bot, title: "Asistente IA incluido", desc: "Pregúntale sobre tu negocio: '¿Cuánto recaudé este mes?' o '¿Qué clientes tienen cobros pendientes?'" },
+    { icon: Bot, title: "Asistente IA incluido", desc: "Pregúntale sobre tu negocio: '¿Cuánto recaudé este mes?' o '¿Qué clientes tienen cobros pendientes?'", premium: true },
     { icon: Users, title: "Gestión de clientes", desc: "Organiza tus clientes con RUT, email y teléfono, con el historial completo de cobros de cada uno." },
+    { icon: Gauge, title: "Scoring de clientes", desc: "Identifica automáticamente tus clientes más morosos y prioriza tu gestión de cobranza.", premium: true },
+    { icon: Globe, title: "Portal del deudor", desc: "Tus clientes acceden a un link único donde ven todas sus deudas pendientes y pueden pagar con un clic.", premium: true },
+    { icon: BarChart3, title: "Informes y aging", desc: "Reportes de cuentas por cobrar por antigüedad, proyección de flujo de caja y exportación a Excel." },
+    { icon: Percent, title: "Descuentos por mora", desc: "Aplica descuentos negociados a cobros vencidos para recuperar algo antes que perderlo todo." },
+    { icon: UsersRound, title: "Gestión de equipos", desc: "Agrega ejecutivos de cobranza, asigna cobros y mide el rendimiento de cada uno." },
+    { icon: ClipboardList, title: "Notas de gestión", desc: "Registra cada llamada, email o visita con resultado y programa la próxima gestión automáticamente." },
   ];
   return (
     <section id="caracteristicas" className="py-20 px-6">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold tracking-tight mb-3">Todo lo que necesitas para cobrar</h2>
+          <h2 className="text-3xl font-bold tracking-tight mb-3">Todo lo que necesitas para gestionar tu cobranza</h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
             Una plataforma completa para gestionar tus cobros en Chile, sin complicaciones.
           </p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f, i) => (
-            <div key={i} className="bg-card border rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-primary/30 transition-all group">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <div
+              key={i}
+              className={`bg-card border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group ${
+                f.premium ? "hover:border-[#F4A800]/40" : "hover:border-primary/30"
+              }`}
+            >
+              <div
+                className={`h-10 w-10 rounded-lg flex items-center justify-center mb-4 transition-colors ${
+                  f.premium
+                    ? "bg-[#F4A800]/10 text-[#F4A800] group-hover:bg-[#F4A800] group-hover:text-black"
+                    : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+                }`}
+              >
                 <f.icon className="h-5 w-5" />
               </div>
               <h3 className="font-semibold mb-2">{f.title}</h3>
@@ -252,20 +310,20 @@ function PreciosSection() {
           </p>
         </div>
         <div className="max-w-md mx-auto">
-          <div className="bg-primary text-primary-foreground rounded-2xl p-8 shadow-xl flex flex-col relative overflow-hidden">
+          <div className="bg-[#0A0A0A] text-white rounded-2xl p-8 shadow-xl flex flex-col relative overflow-hidden border-2 border-[#F4A800]">
             <div className="absolute top-5 right-5">
-              <span className="bg-white/20 border border-white/30 text-primary-foreground text-xs font-bold px-2.5 py-1 rounded-full">14 DÍAS GRATIS</span>
+              <span className="bg-[#F4A800] text-black text-xs font-bold px-2.5 py-1 rounded-full">14 DÍAS GRATIS</span>
             </div>
             <div className="mb-6">
-              <p className="text-xs font-semibold text-primary-foreground/60 uppercase tracking-wider mb-2">Plan NextCob</p>
+              <p className="text-xs font-semibold text-[#F4A800] uppercase tracking-wider mb-2">Plan NextCob</p>
               <div className="flex items-end gap-1">
                 <span className="text-4xl font-black">$18.990 + IVA</span>
-                <span className="text-primary-foreground/60 pb-1 text-sm">/mes</span>
+                <span className="text-white/60 pb-1 text-sm">/mes</span>
               </div>
-              <p className="text-sm text-primary-foreground/80 mt-2 font-medium">
+              <p className="text-sm text-white/80 mt-2 font-medium">
                 Neto $18.990 + IVA $3.608 = Total $22.598/mes
               </p>
-              <p className="text-sm text-primary-foreground/70 mt-1">CLP · IVA incluido · Después de tu prueba de 14 días. Cancela cuando quieras.</p>
+              <p className="text-sm text-white/60 mt-1">CLP · IVA incluido · Después de tu prueba de 14 días. Cancela cuando quieras.</p>
             </div>
             <ul className="space-y-3 flex-1 mb-8">
               {[
@@ -279,14 +337,14 @@ function PreciosSection() {
                 "Dashboard en tiempo real",
               ].map((item) => (
                 <li key={item} className="flex items-center gap-2.5 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary-foreground/70 shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 text-[#F4A800] shrink-0" />
                   {item}
                 </li>
               ))}
             </ul>
             <button
               onClick={() => navigate("/register")}
-              className="w-full bg-white text-primary py-2.5 rounded-lg font-semibold text-sm hover:bg-white/90 transition-colors"
+              className="w-full bg-[#F4A800] text-black py-2.5 rounded-lg font-semibold text-sm hover:bg-[#ffba1f] transition-colors"
             >
               Comenzar 14 días gratis
             </button>
@@ -308,7 +366,7 @@ function QuienesSomosSection() {
               Una plataforma construida por emprendedores, para emprendedores.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              Construimos NextCob porque sabíamos exactamente lo que las pymes y profesionales independientes necesitaban: una forma simple y profesional de cobrar, sin depender de programadores ni contadores.
+              Construimos NextCob porque sabíamos exactamente lo que las pymes y profesionales independientes necesitaban: una forma simple y profesional de gestionar la cobranza, sin depender de programadores ni contadores.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-4">
               Integramos Webpay, MercadoPago y un asistente IA para que tú te enfoques en tu negocio, no en perseguir pagos.
@@ -341,15 +399,20 @@ function QuienesSomosSection() {
 function CtaSection() {
   const [, navigate] = useLocation();
   return (
-    <section className="py-20 px-6 bg-primary">
-      <div className="max-w-2xl mx-auto text-center">
-        <h2 className="text-3xl font-bold text-primary-foreground mb-4">Empieza a cobrar hoy mismo</h2>
-        <p className="text-primary-foreground/75 text-lg mb-8 leading-relaxed">
+    <section className="relative overflow-hidden py-20 px-6 bg-[#0A0A0A]">
+      {/* Subtle gold glow */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(244,168,0,0.18),transparent_70%)]"
+        aria-hidden="true"
+      />
+      <div className="relative max-w-2xl mx-auto text-center">
+        <h2 className="text-3xl font-bold text-white mb-4">Empieza a gestionar tu cobranza hoy mismo</h2>
+        <p className="text-white/75 text-lg mb-8 leading-relaxed">
           14 días de prueba gratis. Configura tu primer cobro en menos de 5 minutos.
         </p>
         <button
           onClick={() => navigate("/register")}
-          className="inline-flex items-center gap-2 bg-white text-primary px-8 py-3.5 rounded-lg text-base font-bold shadow-lg hover:bg-white/90 transition-colors"
+          className="inline-flex items-center gap-2 bg-[#F4A800] text-black px-8 py-3.5 rounded-lg text-base font-bold shadow-lg shadow-[#F4A800]/20 hover:bg-[#ffba1f] transition-colors"
         >
           Crear mi cuenta gratis
           <ChevronRight className="h-5 w-5" />
@@ -372,7 +435,7 @@ function Footer() {
                 className="h-8 w-auto object-contain"
               />
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">La forma más simple de cobrar en Chile.</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">La forma más simple de gestionar tu cobranza en Chile.</p>
           </div>
           <div>
             <p className="font-semibold text-sm mb-3">Producto</p>
