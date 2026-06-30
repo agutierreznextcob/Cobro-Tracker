@@ -46,6 +46,21 @@ function buildRemitente(remitente?: {
   return replyTo ? { from, replyTo } : { from };
 }
 
+// Builds the "Responder al cobro" CTA as a mailto: link that opens the debtor's
+// mail client addressed directly to the ejecutivo/usuario who issued the cobro,
+// with a prefilled subject "Re: Cobro pendiente - <concepto>" and an empty body.
+// Returns null when the sender's email is missing/invalid so the caller can omit
+// the button entirely — the reply must never be routed to NextCob.
+function buildResponderCobroMailto(
+  remitenteEmail: string | null | undefined,
+  concepto: string,
+): string | null {
+  const email = remitenteEmail?.replace(/[\r\n]/g, "").trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  const asunto = encodeURIComponent(`Re: Cobro pendiente - ${concepto}`);
+  return `mailto:${encodeURIComponent(email)}?subject=${asunto}`;
+}
+
 function formatCLP(amount: number): string {
   return new Intl.NumberFormat("es-CL", {
     style: "currency",
@@ -59,8 +74,8 @@ function buildEmailHtml(opts: {
   previewText: string;
   heading: string;
   bodyLines: string[];
-  ctaText: string;
-  ctaUrl: string;
+  ctaText?: string;
+  ctaUrl?: string;
   footerNote?: string;
 }): string {
   return `<!DOCTYPE html>
@@ -94,7 +109,9 @@ function buildEmailHtml(opts: {
               <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#09090b;letter-spacing:-0.3px;">${opts.heading}</h1>
               ${opts.bodyLines.map((line) => `<p style="margin:0 0 14px;font-size:15px;color:#52525b;line-height:1.6;">${line}</p>`).join("")}
               <!-- CTA Button -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;">
+              ${
+                opts.ctaUrl && opts.ctaText
+                  ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;">
                 <tr>
                   <td align="center">
                     <a href="${opts.ctaUrl}" target="_blank"
@@ -103,7 +120,9 @@ function buildEmailHtml(opts: {
                     </a>
                   </td>
                 </tr>
-              </table>
+              </table>`
+                  : ""
+              }
               ${opts.footerNote ? `<p style="margin:24px 0 0;font-size:13px;color:#a1a1aa;text-align:center;">${opts.footerNote}</p>` : ""}
             </td>
           </tr>
@@ -203,6 +222,8 @@ export async function sendAvisoManualEmail(
   const montoFormato = formatCLP(data.monto);
   const nombre = data.clienteNombre || "cliente";
 
+  const responderUrl = buildResponderCobroMailto(data.remitenteEmail, data.descripcion);
+
   const { error } = await client.emails.send({
     ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
     to: [data.emailPagador],
@@ -219,8 +240,8 @@ export async function sendAvisoManualEmail(
         </span>`,
         `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
       ],
-      ctaText: `Responder al cobro`,
-      ctaUrl: `mailto:contacto@nextcob.com`,
+      ctaText: responderUrl ? `Responder al cobro` : undefined,
+      ctaUrl: responderUrl ?? undefined,
       footerNote: `Si no reconoces este cobro, ignora este correo.`,
     }),
   });
@@ -430,6 +451,9 @@ export async function sendSecuenciaRecordatorioEmail(
   }
 
   const tieneLink = !!data.linkPago;
+  const responderUrl = tieneLink
+    ? null
+    : buildResponderCobroMailto(data.remitenteEmail, data.descripcion);
 
   const { error } = await client.emails.send({
     ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
@@ -449,8 +473,12 @@ export async function sendSecuenciaRecordatorioEmail(
           ? `Puedes pagar de forma rápida y segura haciendo clic en el botón a continuación.`
           : `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
       ],
-      ctaText: tieneLink ? `Pagar ${montoFormato}` : `Responder al cobro`,
-      ctaUrl: tieneLink ? data.linkPago! : `mailto:contacto@nextcob.com`,
+      ctaText: tieneLink
+        ? `Pagar ${montoFormato}`
+        : responderUrl
+          ? `Responder al cobro`
+          : undefined,
+      ctaUrl: tieneLink ? data.linkPago! : (responderUrl ?? undefined),
       footerNote: `Si ya realizaste el pago, ignora este mensaje.`,
     }),
   });

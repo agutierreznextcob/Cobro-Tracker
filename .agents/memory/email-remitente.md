@@ -24,3 +24,20 @@ stay on a verified platform domain (DKIM/SPF) so it doesn't land in spam.
 **How to apply:** when adding ANY new email, route it through `buildRemitente()` and pass the
 sender's name+email. Never hardcode a bare `from`. The helper strips CR/LF + quotes and
 validates the Reply-To address (header-injection safety) — keep that.
+
+## "Responder al cobro" CTA
+
+The debtor-facing "Responder al cobro" button (manual aviso + reminder-sequence no-pay-link
+branch) is a `mailto:` link addressed to the **sending executive's own email**, built by
+`buildResponderCobroMailto(remitenteEmail, concepto)` (subject `Re: Cobro pendiente -
+<concepto>`, empty body, both encodeURIComponent'd).
+
+**Why:** product requirement — replies/clicks must reach the human who issued the cobro,
+never the platform inbox. Earlier code hardcoded `mailto:contacto@nextcob.com`, which routed
+debtor replies to the platform.
+
+**How to apply:** the helper returns `null` when the sender email is missing/invalid; callers
+must then OMIT the button (pass `ctaText`/`ctaUrl` as `undefined`). `buildEmailHtml` renders
+the CTA only when both are present. Do NOT reintroduce a NextCob/platform-address fallback for
+this button. Comprobante/portal/payment-link emails keep their own purposeful CTAs and already
+satisfy the reply requirement via Reply-To.
