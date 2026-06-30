@@ -6,12 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CobroUpdateEstado } from './cobroUpdateEstado';
+import type { CobroUpdateTipoDocumento } from './cobroUpdateTipoDocumento';
 
 export interface CobroUpdate {
   estado?: CobroUpdateEstado;
   /** @minLength 1 */
   descripcion?: string;
   referencia?: string;
+  /** Chilean electronic tax document type (DTE). */
+  tipoDocumento?: CobroUpdateTipoDocumento;
   /**
      * Due date (YYYY-MM-DD); null clears it
      * @nullable

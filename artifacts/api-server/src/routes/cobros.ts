@@ -33,6 +33,14 @@ import { getOrgContext, cobroScopeCondition, userCanAccessCobro, userCanAccessCl
 
 const cobrosRouter = Router();
 
+type TipoDocumento = Cobro["tipoDocumento"];
+
+// Only "afecta" Chilean electronic documents may carry IVA. Exenta documents
+// and informal charges (sin_documento) never do.
+function tipoDocumentoPermiteIva(tipo: TipoDocumento): boolean {
+  return tipo === "factura_afecta" || tipo === "boleta_afecta";
+}
+
 // Net amount to charge after the current effective discount.
 function montoACobrar(cobro: Pick<Cobro, "monto" | "montoDescuento">): number {
   return Number(cobro.monto) - Number(cobro.montoDescuento ?? 0);
@@ -181,7 +189,14 @@ cobrosRouter.post("/cobros", async (req, res) => {
   }
 
   const { monto, descripcion, referencia } = parsed.data;
-  const incluyeIva = (parsed.data as Record<string, unknown>).incluyeIva === true;
+  const tipoDocumento =
+    ((parsed.data as Record<string, unknown>).tipoDocumento as TipoDocumento | undefined) ??
+    "sin_documento";
+  // Only "afecta" electronic documents may carry IVA. Exenta / sin_documento
+  // charges never do, regardless of what the client sent.
+  const incluyeIva =
+    tipoDocumentoPermiteIva(tipoDocumento) &&
+    (parsed.data as Record<string, unknown>).incluyeIva === true;
   const emailPagador = (parsed.data as Record<string, unknown>).emailPagador as string | undefined;
   const clienteId = (parsed.data as Record<string, unknown>).clienteId as number | undefined;
   const fechaVencimiento = (parsed.data as Record<string, unknown>).fechaVencimiento as string | undefined;
@@ -254,6 +269,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
         incluyeIva,
         montoNeto: montoNeto != null ? String(montoNeto) : null,
         montoIva: montoIva != null ? String(montoIva) : null,
+        tipoDocumento,
         descripcion,
         referencia: referencia ?? null,
         estado: "pendiente",
@@ -843,6 +859,44 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
   if (bodyParsed.data.descripcion !== undefined) updates.descripcion = bodyParsed.data.descripcion;
   if (bodyParsed.data.referencia !== undefined) updates.referencia = bodyParsed.data.referencia;
   if (fechaVencimiento !== undefined) updates.fechaVencimiento = fechaVencimiento;
+
+  const tipoDocumentoInput = (bodyParsed.data as Record<string, unknown>).tipoDocumento as
+    | TipoDocumento
+    | undefined;
+  if (tipoDocumentoInput !== undefined) {
+    updates.tipoDocumento = tipoDocumentoInput;
+    // Switching to a type that can't carry IVA must strip any existing IVA so the
+    // charged amount reverts to the net and the breakdown is always cleared. We
+    // normalize unconditionally (not only when incluyeIva is currently true) so
+    // legacy/inconsistent rows with stale breakdown columns get cleaned up too.
+    if (!tipoDocumentoPermiteIva(tipoDocumentoInput)) {
+      const [current] = await db
+        .select({
+          incluyeIva: cobrosTable.incluyeIva,
+          monto: cobrosTable.monto,
+          montoNeto: cobrosTable.montoNeto,
+          montoIva: cobrosTable.montoIva,
+        })
+        .from(cobrosTable)
+        .where(eq(cobrosTable.id, paramsParsed.data.id));
+      if (current) {
+        updates.incluyeIva = false;
+        updates.montoNeto = null;
+        updates.montoIva = null;
+        // Revert the charged amount to the net. Prefer the stored net; fall back
+        // to deriving it from monto - iva, and finally to monto itself, so a row
+        // with incluyeIva=true but a missing montoNeto never keeps an IVA-included
+        // total after the switch.
+        if (current.incluyeIva) {
+          if (current.montoNeto != null) {
+            updates.monto = current.montoNeto;
+          } else if (current.montoIva != null && current.monto != null) {
+            updates.monto = String(Math.round(Number(current.monto) - Number(current.montoIva)));
+          }
+        }
+      }
+    }
+  }
 
   try {
     const [cobro] = await db

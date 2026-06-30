@@ -11,6 +11,16 @@ export const estadoCobroEnum = pgEnum("estado_cobro", [
   "cancelado",
 ]);
 
+// Chilean electronic tax document type (DTE). "afecta" documents allow IVA;
+// "exenta" documents never carry IVA; "sin_documento" is an informal charge.
+export const tipoDocumentoEnum = pgEnum("tipo_documento", [
+  "factura_afecta",
+  "factura_exenta",
+  "boleta_afecta",
+  "boleta_exenta",
+  "sin_documento",
+]);
+
 export const cobrosTable = pgTable("cobros", {
   id: serial("id").primaryKey(),
   monto: numeric("monto", { precision: 12, scale: 2 }).notNull(),
@@ -21,6 +31,9 @@ export const cobrosTable = pgTable("cobros", {
   incluyeIva: boolean("incluye_iva").notNull().default(false),
   montoNeto: numeric("monto_neto", { precision: 12, scale: 2 }),
   montoIva: numeric("monto_iva", { precision: 12, scale: 2 }),
+  // Chilean DTE document type for this charge. Defaults to informal so legacy
+  // rows backfill cleanly. "exenta"/"sin_documento" never carry IVA.
+  tipoDocumento: tipoDocumentoEnum("tipo_documento").notNull().default("sin_documento"),
   descripcion: text("descripcion").notNull(),
   estado: estadoCobroEnum("estado").notNull().default("pendiente"),
   referencia: text("referencia"),

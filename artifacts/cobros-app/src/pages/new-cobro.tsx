@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/format";
+import { TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
 import { Loader2, ArrowLeft, Users } from "lucide-react";
 import { Link } from "wouter";
 
@@ -22,6 +23,7 @@ const IVA_RATE = 0.19;
 
 const formSchema = z.object({
   monto: z.coerce.number().int("El monto debe ser un número entero").min(1, "El monto debe ser mayor a $0"),
+  tipoDocumento: z.enum(TIPO_DOCUMENTO_VALUES),
   incluyeIva: z.boolean().default(false),
   descripcion: z.string().min(1, "La descripción es obligatoria").max(255),
   referencia: z.string().optional(),
@@ -51,6 +53,7 @@ export default function NewCobro() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       monto: 0,
+      tipoDocumento: "sin_documento",
       incluyeIva: false,
       descripcion: "",
       referencia: "",
@@ -65,6 +68,8 @@ export default function NewCobro() {
   const selectedCliente = clientes?.find((c) => c.id === selectedClienteId);
 
   const montoWatch = form.watch("monto");
+  const tipoDocumentoWatch = form.watch("tipoDocumento");
+  const permiteIva = tipoDocumentoPermiteIva(tipoDocumentoWatch);
   const incluyeIvaWatch = form.watch("incluyeIva");
   const netoNum = Number(montoWatch) || 0;
   const ivaNum = incluyeIvaWatch ? Math.round(netoNum * IVA_RATE) : 0;
@@ -77,10 +82,19 @@ export default function NewCobro() {
     }
   }, [selectedCliente?.id]);
 
+  // Exenta / sin_documento charges can never carry IVA — force the toggle off
+  // whenever the selected document type does not allow it.
+  useEffect(() => {
+    if (!permiteIva && form.getValues("incluyeIva")) {
+      form.setValue("incluyeIva", false);
+    }
+  }, [permiteIva]);
+
   const onSubmit = (values: FormValues) => {
     const payload: CobroInput = {
       monto: values.monto,
-      incluyeIva: values.incluyeIva,
+      tipoDocumento: values.tipoDocumento,
+      incluyeIva: permiteIva ? values.incluyeIva : false,
       descripcion: values.descripcion,
       referencia: values.referencia || undefined,
       emailPagador: values.emailPagador || selectedCliente?.email || undefined,
@@ -152,14 +166,27 @@ export default function NewCobro() {
 
                 <FormField
                   control={form.control}
-                  name="referencia"
+                  name="tipoDocumento"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Referencia (opcional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Factura #, N° de orden..." className="font-mono text-sm" {...field} />
-                      </FormControl>
-                      <FormDescription>Identificador externo para conciliación.</FormDescription>
+                      <FormLabel>Tipo de documento</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona el tipo..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {TIPO_DOCUMENTO_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Documento tributario electrónico (DTE) asociado al cobro.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -168,20 +195,36 @@ export default function NewCobro() {
 
               <FormField
                 control={form.control}
-                name="incluyeIva"
+                name="referencia"
                 render={({ field }) => (
-                  <FormItem className="rounded-lg border border-border/60 p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-sm">Incluir IVA (19%)</FormLabel>
-                        <FormDescription>
-                          Si lo activas, el monto ingresado es el neto y se agrega el IVA al total a cobrar.
-                        </FormDescription>
+                  <FormItem>
+                    <FormLabel>Referencia (opcional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Factura #, N° de orden..." className="font-mono text-sm" {...field} />
+                    </FormControl>
+                    <FormDescription>Identificador externo para conciliación.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {permiteIva && (
+                <FormField
+                  control={form.control}
+                  name="incluyeIva"
+                  render={({ field }) => (
+                    <FormItem className="rounded-lg border border-border/60 p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Incluir IVA (19%)</FormLabel>
+                          <FormDescription>
+                            Si lo activas, el monto ingresado es el neto y se agrega el IVA al total a cobrar.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
                       </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </div>
 
                     {incluyeIvaWatch && (
                       <div className="rounded-md bg-muted/50 p-3 space-y-1.5 text-sm">
@@ -199,9 +242,10 @@ export default function NewCobro() {
                         </div>
                       </div>
                     )}
-                  </FormItem>
-                )}
-              />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

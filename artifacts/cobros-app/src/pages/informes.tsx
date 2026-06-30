@@ -48,10 +48,31 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/format";
+import {
+  TIPO_DOCUMENTO_VALUES,
+  TIPO_DOCUMENTO_LABELS,
+  tipoDocumentoLabel,
+  type TipoDocumento,
+} from "@/lib/tipo-documento";
 import { Download, TrendingUp, Receipt, Percent, ListChecks, TicketPercent, RefreshCcw, Wallet, AlertTriangle, CalendarClock } from "lucide-react";
 
 type Estado = "pendiente" | "pagado" | "parcial" | "fallido" | "cancelado";
 type Gran = "dia" | "semana" | "mes";
+
+const TIPO_DOC_COLOR: Record<TipoDocumento, string> = {
+  factura_afecta: "#6C5CE7",
+  factura_exenta: "#a78bfa",
+  boleta_afecta: "#0ea5e9",
+  boleta_exenta: "#38bdf8",
+  sin_documento: "#94a3b8",
+};
+
+function tipoDocumentoOf(c: Cobro): TipoDocumento {
+  const t = c.tipoDocumento;
+  return t && TIPO_DOCUMENTO_VALUES.includes(t as TipoDocumento)
+    ? (t as TipoDocumento)
+    : "sin_documento";
+}
 
 const ESTADO_META: Record<Estado, { label: string; color: string }> = {
   pagado: { label: "Pagado", color: "#16a34a" },
@@ -103,6 +124,7 @@ export default function Informes() {
   const [customDesde, setCustomDesde] = useState("");
   const [customHasta, setCustomHasta] = useState("");
   const [granSel, setGranSel] = useState<Gran | "auto">("auto");
+  const [filterTipoDoc, setFilterTipoDoc] = useState<TipoDocumento | "todos">("todos");
 
   const { user } = useAuth();
   const isOrgAdmin = user?.orgRole === "admin_org";
@@ -157,9 +179,11 @@ export default function Informes() {
     if (!cobros) return [] as Cobro[];
     return cobros.filter((c) => {
       const d = parseISO(c.creadoEn);
-      return d >= range.desde && d <= range.hasta;
+      if (d < range.desde || d > range.hasta) return false;
+      if (filterTipoDoc !== "todos" && tipoDocumentoOf(c) !== filterTipoDoc) return false;
+      return true;
     });
-  }, [cobros, range]);
+  }, [cobros, range, filterTipoDoc]);
 
   const gran: Gran = useMemo(() => {
     if (granSel !== "auto") return granSel;
@@ -223,6 +247,20 @@ export default function Informes() {
       cantidad: counts[e],
       color: ESTADO_META[e].color,
     }));
+  }, [filtered]);
+
+  const tipoDocData = useMemo(() => {
+    const counts = new Map<TipoDocumento, number>();
+    for (const c of filtered) {
+      const t = tipoDocumentoOf(c);
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    return TIPO_DOCUMENTO_VALUES.map((t) => ({
+      tipo: t,
+      name: TIPO_DOCUMENTO_LABELS[t],
+      value: counts.get(t) ?? 0,
+      color: TIPO_DOC_COLOR[t],
+    })).filter((d) => d.value > 0);
   }, [filtered]);
 
   const montoCobrar = (c: Cobro) => c.montoACobrar ?? c.monto - (c.montoDescuento ?? 0);
@@ -289,6 +327,7 @@ export default function Informes() {
       "IVA (19%)": c.incluyeIva ? c.montoIva ?? 0 : "",
       "Descuento aplicado": c.montoDescuento ?? 0,
       "Monto a cobrar": montoCobrar(c),
+      "Tipo de documento": tipoDocumentoLabel(c.tipoDocumento),
       Estado: ESTADO_META[c.estado as Estado]?.label ?? c.estado,
       Método: metodoLabel(c),
       ...(isOrgAdmin ? { "Ejecutivo responsable": c.responsableNombre ?? "Sin asignar" } : {}),
@@ -304,6 +343,7 @@ export default function Informes() {
       { wch: 12 },
       { wch: 16 },
       { wch: 14 },
+      { wch: 26 },
       { wch: 12 },
       { wch: 18 },
       ...(isOrgAdmin ? [{ wch: 24 }] : []),
@@ -328,6 +368,9 @@ export default function Informes() {
       [],
       ["Cobros por método", "Cantidad"],
       ...metodoData.map((m) => [m.name, m.value]),
+      [],
+      ["Cobros por tipo de documento", "Cantidad"],
+      ...tipoDocData.map((t) => [t.name, t.value]),
     ];
     const wsResumen = XLSX.utils.aoa_to_sheet(resumenRows);
     wsResumen["!cols"] = [{ wch: 30 }, { wch: 22 }];
@@ -429,6 +472,25 @@ export default function Informes() {
                 <SelectItem value="dia" className="text-xs">Día</SelectItem>
                 <SelectItem value="semana" className="text-xs">Semana</SelectItem>
                 <SelectItem value="mes" className="text-xs">Mes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">Tipo de documento</label>
+            <Select
+              value={filterTipoDoc}
+              onValueChange={(v) => setFilterTipoDoc(v as TipoDocumento | "todos")}
+            >
+              <SelectTrigger className="h-8 w-[220px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos" className="text-xs">Todos</SelectItem>
+                {TIPO_DOCUMENTO_VALUES.map((t) => (
+                  <SelectItem key={t} value={t} className="text-xs">
+                    {TIPO_DOCUMENTO_LABELS[t]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -601,6 +663,41 @@ export default function Informes() {
         </Card>
       </div>
 
+      {/* Distribución por tipo de documento */}
+      <Card className="p-5 shadow-sm">
+        <h2 className="text-sm font-semibold mb-4">Distribución por tipo de documento</h2>
+        {sinDatos || tipoDocData.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={tipoDocData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                innerRadius={55}
+                paddingAngle={2}
+                label={(entry) => `${entry.value}`}
+                labelLine={false}
+                style={{ fontSize: 11 }}
+              >
+                {tipoDocData.map((d) => (
+                  <Cell key={d.tipo} fill={d.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(v: number, n) => [`${v} cobro${v !== 1 ? "s" : ""}`, n]}
+                contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </Card>
+
       {/* Recuperación: pago completo vs. con descuento */}
       <Card className="p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
@@ -763,6 +860,22 @@ function AgingReport({
     [rows],
   );
 
+  // Outstanding balance broken down by document type.
+  const tipoData = useMemo(
+    () =>
+      TIPO_DOCUMENTO_VALUES.map((t) => {
+        const rs = rows.filter((r) => tipoDocumentoOf(r.cobro) === t);
+        return {
+          tipo: t,
+          label: TIPO_DOCUMENTO_LABELS[t],
+          color: TIPO_DOC_COLOR[t],
+          cantidad: rs.length,
+          monto: rs.reduce((a, r) => a + r.saldo, 0),
+        };
+      }).filter((d) => d.cantidad > 0),
+    [rows],
+  );
+
   // Cash-flow projection: outstanding amounts grouped by due month for the next 6 months.
   const proyeccion = useMemo(() => {
     const months: { key: number; label: string; monto: number }[] = [];
@@ -841,6 +954,9 @@ function AgingReport({
       [],
       ["Antigüedad", "Cantidad", "Saldo (CLP)"],
       ...bucketData.map((b) => [b.label, b.cantidad, Math.round(b.monto)]),
+      [],
+      ["Tipo de documento", "Cantidad", "Saldo (CLP)"],
+      ...tipoData.map((t) => [t.label, t.cantidad, Math.round(t.monto)]),
       [],
       ["Proyección de flujo", "Monto esperado (CLP)"],
       ...proyeccion.map((p) => [p.label, Math.round(p.monto)]),
@@ -967,6 +1083,69 @@ function AgingReport({
           </ResponsiveContainer>
         </Card>
       </div>
+
+      {/* Outstanding by document type */}
+      <Card className="p-5 shadow-sm">
+        <h2 className="text-sm font-semibold mb-4">Saldo por tipo de documento</h2>
+        {tipoData.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <div className="grid lg:grid-cols-2 gap-4 items-center">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tipo de documento</TableHead>
+                  <TableHead className="text-right">Cobros</TableHead>
+                  <TableHead className="text-right">Saldo</TableHead>
+                  <TableHead className="text-right">%</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tipoData.map((t) => (
+                  <TableRow key={t.tipo}>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: t.color }} />
+                        {t.label}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">{t.cantidad}</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(t.monto)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {((t.monto / (totalPorCobrar || 1)) * 100).toFixed(0)}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={tipoData}
+                  dataKey="monto"
+                  nameKey="label"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  innerRadius={50}
+                  paddingAngle={2}
+                  labelLine={false}
+                  style={{ fontSize: 11 }}
+                >
+                  {tipoData.map((d) => (
+                    <Cell key={d.tipo} fill={d.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(v: number, n) => [formatCurrency(v), n]}
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </Card>
 
       {/* Cash-flow projection */}
       <Card className="p-5 shadow-sm">

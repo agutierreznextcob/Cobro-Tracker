@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency, formatShortDate } from "@/lib/format";
+import { tipoDocumentoLabelCorto } from "@/lib/tipo-documento";
 import { StatusBadge } from "@/components/status-badge";
 import { ScoreBadge, SCORE_META } from "@/components/score-badge";
 import { ArrowRight, Minus, Search, X } from "lucide-react";
@@ -204,6 +205,7 @@ export default function CobrosList() {
               <TableHead className="text-xs">Descripción</TableHead>
               <TableHead className="text-xs">Cliente</TableHead>
               <TableHead className="text-xs">Estado</TableHead>
+              <TableHead className="text-xs">Tipo doc.</TableHead>
               <TableHead className="text-xs">Método</TableHead>
               <TableHead className="text-xs text-right">Monto</TableHead>
               <TableHead className="w-8" />
@@ -217,6 +219,7 @@ export default function CobrosList() {
                   <TableCell><div className="h-4 w-48 bg-muted rounded" /></TableCell>
                   <TableCell><div className="h-4 w-28 bg-muted rounded" /></TableCell>
                   <TableCell><div className="h-5 w-20 bg-muted rounded-full" /></TableCell>
+                  <TableCell><div className="h-4 w-20 bg-muted rounded" /></TableCell>
                   <TableCell><div className="h-5 w-16 bg-muted rounded-full" /></TableCell>
                   <TableCell><div className="h-4 w-16 bg-muted rounded ml-auto" /></TableCell>
                   <TableCell />
@@ -224,7 +227,7 @@ export default function CobrosList() {
               ))
             ) : !cobrosFiltrados || cobrosFiltrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground text-sm">
+                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground text-sm">
                   {hayFiltros ? "Ningún cobro coincide con los filtros." : "Sin cobros registrados."}
                 </TableCell>
               </TableRow>
@@ -261,6 +264,9 @@ export default function CobrosList() {
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={cobro.estado} />
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                    {tipoDocumentoLabelCorto(cobro.tipoDocumento)}
                   </TableCell>
                   <TableCell>
                     <MetodoBadge flowLinkPago={cobro.flowLinkPago} mpPaymentLinkUrl={cobro.mpPaymentLinkUrl} />

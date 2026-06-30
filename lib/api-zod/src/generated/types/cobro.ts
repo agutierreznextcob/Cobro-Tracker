@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CobroEstado } from './cobroEstado';
+import type { CobroTipoDocumento } from './cobroTipoDocumento';
 
 export interface Cobro {
   id: number;
@@ -32,6 +33,8 @@ export interface Cobro {
      * @nullable
      */
   montoIva?: number | null;
+  /** Chilean electronic tax document type (DTE). Only "afecta" types carry IVA. */
+  tipoDocumento?: CobroTipoDocumento;
   descripcion: string;
   estado: CobroEstado;
   /**

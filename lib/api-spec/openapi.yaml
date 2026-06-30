@@ -2530,6 +2530,10 @@ components:
         montoIva:
           type: ["number", "null"]
           description: IVA amount (19% of montoNeto, only set when incluyeIva is true)
+        tipoDocumento:
+          type: string
+          enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento]
+          description: Chilean electronic tax document type (DTE). Only "afecta" types carry IVA.
         descripcion:
           type: string
         estado:
@@ -2589,7 +2593,11 @@ components:
           description: Amount entered by the user. When incluyeIva is true this is the NETO (pre-IVA); the server computes iva and total. When false, this is the final charge.
         incluyeIva:
           type: boolean
-          description: Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total.
+          description: Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. Ignored (forced false) unless tipoDocumento is an "afecta" type.
+        tipoDocumento:
+          type: string
+          enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento]
+          description: Chilean electronic tax document type (DTE). Only "afecta" types may carry IVA. Defaults to sin_documento.
         descripcion:
           type: string
           minLength: 1
@@ -2948,6 +2956,10 @@ components:
           minLength: 1
         referencia:
           type: string
+        tipoDocumento:
+          type: string
+          enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento]
+          description: Chilean electronic tax document type (DTE).
         fechaVencimiento:
           type: ["string", "null"]
           pattern: '^\d{4}-\d{2}-\d{2}$'

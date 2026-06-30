@@ -232,6 +232,7 @@ export const GetClienteResponse = zod.object({
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types carry IVA.'),
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
@@ -444,6 +445,7 @@ export const ListCobrosResponseItem = zod.object({
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types carry IVA.'),
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
@@ -475,7 +477,8 @@ export const createCobroBodyFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-
 
 export const CreateCobroBody = zod.object({
   "monto": zod.number().min(createCobroBodyMontoMin).describe('Amount entered by the user. When incluyeIva is true this is the NETO (pre-IVA); the server computes iva and total. When false, this is the final charge.'),
-  "incluyeIva": zod.boolean().optional().describe('Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total.'),
+  "incluyeIva": zod.boolean().optional().describe('Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. Ignored (forced false) unless tipoDocumento is an \"afecta\" type.'),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types may carry IVA. Defaults to sin_documento.'),
   "descripcion": zod.string().min(1),
   "referencia": zod.string().optional(),
   "clienteId": zod.number().optional().describe('Associate an existing cliente'),
@@ -504,6 +507,7 @@ export const GetCobroResponse = zod.object({
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types carry IVA.'),
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
@@ -538,6 +542,7 @@ export const UpdateCobroBody = zod.object({
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).optional(),
   "descripcion": zod.string().min(1).optional(),
   "referencia": zod.string().optional(),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE).'),
   "fechaVencimiento": zod.string().regex(updateCobroBodyFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD); null clears it')
 })
 
@@ -553,6 +558,7 @@ export const UpdateCobroResponse = zod.object({
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types carry IVA.'),
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
@@ -948,6 +954,7 @@ export const AplicarDescuentoResponse = zod.object({
   "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
   "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
   "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types carry IVA.'),
   "descripcion": zod.string(),
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
   "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),

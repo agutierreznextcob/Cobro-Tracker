@@ -5,6 +5,7 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+import type { CobroInputTipoDocumento } from './cobroInputTipoDocumento';
 
 export interface CobroInput {
   /**
@@ -12,8 +13,10 @@ export interface CobroInput {
      * @minimum 0.01
      */
   monto: number;
-  /** Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. */
+  /** Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. Ignored (forced false) unless tipoDocumento is an "afecta" type. */
   incluyeIva?: boolean;
+  /** Chilean electronic tax document type (DTE). Only "afecta" types may carry IVA. Defaults to sin_documento. */
+  tipoDocumento?: CobroInputTipoDocumento;
   /** @minLength 1 */
   descripcion: string;
   referencia?: string;

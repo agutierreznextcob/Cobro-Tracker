@@ -203,6 +203,20 @@ export interface ClienteInput {
   telefono?: string;
 }
 
+/**
+ * Chilean electronic tax document type (DTE). Only "afecta" types carry IVA.
+ */
+export type CobroTipoDocumento = typeof CobroTipoDocumento[keyof typeof CobroTipoDocumento];
+
+
+export const CobroTipoDocumento = {
+  factura_afecta: 'factura_afecta',
+  factura_exenta: 'factura_exenta',
+  boleta_afecta: 'boleta_afecta',
+  boleta_exenta: 'boleta_exenta',
+  sin_documento: 'sin_documento',
+} as const;
+
 export type CobroEstado = typeof CobroEstado[keyof typeof CobroEstado];
 
 
@@ -239,6 +253,8 @@ export interface Cobro {
      * @nullable
      */
   montoIva?: number | null;
+  /** Chilean electronic tax document type (DTE). Only "afecta" types carry IVA. */
+  tipoDocumento?: CobroTipoDocumento;
   descripcion: string;
   estado: CobroEstado;
   /**
@@ -341,14 +357,30 @@ export interface DashboardMetricas {
   periodo: DashboardMetricasPeriodo;
 }
 
+/**
+ * Chilean electronic tax document type (DTE). Only "afecta" types may carry IVA. Defaults to sin_documento.
+ */
+export type CobroInputTipoDocumento = typeof CobroInputTipoDocumento[keyof typeof CobroInputTipoDocumento];
+
+
+export const CobroInputTipoDocumento = {
+  factura_afecta: 'factura_afecta',
+  factura_exenta: 'factura_exenta',
+  boleta_afecta: 'boleta_afecta',
+  boleta_exenta: 'boleta_exenta',
+  sin_documento: 'sin_documento',
+} as const;
+
 export interface CobroInput {
   /**
      * Amount entered by the user. When incluyeIva is true this is the NETO (pre-IVA); the server computes iva and total. When false, this is the final charge.
      * @minimum 0.01
      */
   monto: number;
-  /** Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. */
+  /** Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. Ignored (forced false) unless tipoDocumento is an "afecta" type. */
   incluyeIva?: boolean;
+  /** Chilean electronic tax document type (DTE). Only "afecta" types may carry IVA. Defaults to sin_documento. */
+  tipoDocumento?: CobroInputTipoDocumento;
   /** @minLength 1 */
   descripcion: string;
   referencia?: string;
@@ -636,11 +668,27 @@ export const CobroUpdateEstado = {
   cancelado: 'cancelado',
 } as const;
 
+/**
+ * Chilean electronic tax document type (DTE).
+ */
+export type CobroUpdateTipoDocumento = typeof CobroUpdateTipoDocumento[keyof typeof CobroUpdateTipoDocumento];
+
+
+export const CobroUpdateTipoDocumento = {
+  factura_afecta: 'factura_afecta',
+  factura_exenta: 'factura_exenta',
+  boleta_afecta: 'boleta_afecta',
+  boleta_exenta: 'boleta_exenta',
+  sin_documento: 'sin_documento',
+} as const;
+
 export interface CobroUpdate {
   estado?: CobroUpdateEstado;
   /** @minLength 1 */
   descripcion?: string;
   referencia?: string;
+  /** Chilean electronic tax document type (DTE). */
+  tipoDocumento?: CobroUpdateTipoDocumento;
   /**
      * Due date (YYYY-MM-DD); null clears it
      * @nullable
