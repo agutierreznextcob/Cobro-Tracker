@@ -63,12 +63,14 @@ _Populate as you build — explicit user instructions worth remembering across s
   into SELECT-then-UPDATE reintroduces a single-use-token bypass / lockout race.
 - Demo (anibal) and superadmin (agutierrez@nextcob.com) accounts are seeded with
   `passwordHash=null` + `emailVerified=true`; they set passwords via forgot-password.
-- Email deliverability: `RESEND_FROM_EMAIL` is unset → emails send from Resend's
-  sandbox sender, which only reaches the Resend account-owner inbox. Until
-  nextcob.com is verified in Resend and `RESEND_FROM_EMAIL` is set, mail to other
-  recipients (customer cobro links, @nextcob.com inboxes) silently fails. The
-  superadmin password-reset is temporarily routed to a backup inbox
-  (`SUPERADMIN_RECOVERY_EMAIL`) — see `lib`/`routes/auth.ts` `getSuperadminRecoveryEmail`.
+- Email deliverability: `RESEND_FROM_EMAIL` is set to `cobros@nextcob.com` (shared
+  env, dev + prod) and nextcob.com is verified in Resend, so mail now sends from the
+  verified domain as `"<sender> via NextCob" <cobros@nextcob.com>` (Reply-To = sender).
+  IMPORTANT: production picks up env-var changes only on the next publish/redeploy —
+  setting the var does not update an already-running deployment.
+  Note: the superadmin password-reset backup inbox (`SUPERADMIN_RECOVERY_EMAIL`,
+  `getSuperadminRecoveryEmail` in `routes/auth.ts`) is now redundant and can be
+  removed if desired.
 
 ## Pointers
 
