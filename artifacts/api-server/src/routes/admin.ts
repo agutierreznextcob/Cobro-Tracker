@@ -184,8 +184,14 @@ adminRouter.get("/admin/metricas", async (req, res) => {
 
     for (const u of usuarios) {
       if (u.isAdmin) continue;
+      // Internal demo/showcase accounts are tracked in their own bucket only and
+      // must never contaminate trial-conversion metrics (total customer accounts,
+      // trial, active, expired) — they are not real prospects/customers.
+      if (u.esDemo) {
+        demo += 1;
+        continue;
+      }
       totalCuentas += 1;
-      if (u.esDemo) demo += 1;
       if (u.subscriptionStatus === "activa") activas += 1;
       else if (u.subscriptionStatus === "prueba" && u.hasAccess) enPrueba += 1;
       else vencidas += 1;
