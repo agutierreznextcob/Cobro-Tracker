@@ -1548,6 +1548,26 @@ paths:
                 $ref: "#/components/schemas/AdminAccionResult"
         "404":
           description: User not found
+  /admin/usuarios/{id}/reclamar-cobros:
+    post:
+      operationId: reclamarCobrosHuerfanos
+      tags: [admin]
+      summary: Reassign cobros with no responsable to a user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Orphaned cobros reassigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccionResult"
+        "404":
+          description: User not found
   /admin/usuarios/{id}/recordatorio-email:
     post:
       operationId: sendAdminRecordatorioEmail

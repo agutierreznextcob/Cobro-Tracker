@@ -34,11 +34,22 @@ import TareasPage from "@/pages/tareas";
 import EncuestasPage from "@/pages/encuestas";
 import EncuestaPublicaPage from "@/pages/encuesta-publica";
 import { Layout } from "@/components/layout";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
 import { SubscriptionRequired } from "@/components/subscription-required";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Cached data stays fresh across navigation so moving between pages does
+      // not re-hit the API/DB on every mount. Mutations still invalidate the
+      // specific queries they affect, so this only removes redundant refetches.
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function FullScreenLoader() {
   return (
@@ -65,9 +76,11 @@ function SubscriptionGate({ children }: { children: React.ReactNode }) {
 function AuthGate({
   children,
   skipProfile = false,
+  skipSubscription = false,
 }: {
   children: React.ReactNode;
   skipProfile?: boolean;
+  skipSubscription?: boolean;
 }) {
   // Single source of resolved auth state for this chain. We deliberately read
   // user/isLoading/isAuthenticated from ONE useAuth() call so the profile gate
@@ -85,6 +98,13 @@ function AuthGate({
   // Force first-login users through the mandatory profile-completion form.
   if (!skipProfile && user && !user.profileCompleted) {
     return <Redirect to="/perfil" />;
+  }
+
+  // The profile page must stay reachable even without an active subscription so
+  // users whose trial ended can still manage, subscribe to, or delete their
+  // account. Everything else stays behind the subscription gate.
+  if (skipSubscription) {
+    return <>{children}</>;
   }
 
   return <SubscriptionGate>{children}</SubscriptionGate>;
@@ -261,7 +281,7 @@ function AppRouter() {
         </AuthGate>
       </Route>
       <Route path="/perfil">
-        <AuthGate skipProfile>
+        <AuthGate skipProfile skipSubscription>
           <Layout>
             <ProfilePage />
           </Layout>
@@ -289,12 +309,14 @@ function AppRouter() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AppRouter />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AppRouter />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

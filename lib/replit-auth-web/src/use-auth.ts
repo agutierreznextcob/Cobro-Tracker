@@ -1,4 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import type { AuthUser } from "@workspace/api-client-react";
 
 export type { AuthUser };
@@ -9,11 +17,19 @@ interface AuthState {
   isAuthenticated: boolean;
   login: () => void;
   logout: () => void;
+  refresh: () => void;
 }
 
-export function useAuth(): AuthState {
+const AuthContext = createContext<AuthState | null>(null);
+
+// Shared auth provider. The current user is fetched from /api/auth/user exactly
+// once when the app mounts and then kept in memory, so navigating between pages
+// never re-hits the network/DB or flashes a loader. Call refresh() (or do a full
+// page reload) to re-read the user after mutating identity/role state.
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +55,7 @@ export function useAuth(): AuthState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [nonce]);
 
   const login = useCallback(() => {
     const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "";
@@ -57,11 +73,29 @@ export function useAuth(): AuthState {
       });
   }, []);
 
-  return {
+  const refresh = useCallback(() => {
+    setIsLoading(true);
+    setNonce((n) => n + 1);
+  }, []);
+
+  const value: AuthState = {
     user,
     isLoading,
     isAuthenticated: !!user,
     login,
     logout,
+    refresh,
   };
+
+  return createElement(AuthContext.Provider, { value }, children);
+}
+
+// Reads the shared auth state. Must be used within an <AuthProvider>. All
+// consumers share a single fetch, so this is cheap to call from any component.
+export function useAuth(): AuthState {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used within an <AuthProvider>");
+  }
+  return ctx;
 }

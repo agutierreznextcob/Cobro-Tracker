@@ -1244,6 +1244,19 @@ export const MarcarDemoResponse = zod.object({
 
 
 /**
+ * @summary Reassign cobros with no responsable to a user (admin only)
+ */
+export const ReclamarCobrosHuerfanosParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ReclamarCobrosHuerfanosResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish()
+})
+
+
+/**
  * @summary Send a subscription renewal reminder email to a user (admin only)
  */
 export const SendAdminRecordatorioEmailParams = zod.object({

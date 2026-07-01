@@ -7,6 +7,7 @@ import {
   useActivarCuenta,
   useDesactivarCuenta,
   useMarcarDemo,
+  useReclamarCobrosHuerfanos,
   getListAdminUsuariosQueryKey,
   getGetAdminMetricasQueryKey,
   type AdminUsuario,
@@ -163,6 +164,7 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
   const activar = useActivarCuenta();
   const desactivar = useDesactivarCuenta();
   const marcarDemo = useMarcarDemo();
+  const reclamarCobros = useReclamarCobrosHuerfanos();
   const [sendingEmail, setSendingEmail] = useState(false);
 
   const refresh = () => {
@@ -296,11 +298,34 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
     );
   };
 
+  const handleReclamarCobros = () => {
+    reclamarCobros.mutate(
+      { id: u.id },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: res.ok ? "Cobros reasignados" : "No se pudo reasignar",
+            description: res.mensaje ?? undefined,
+            variant: res.ok ? undefined : "destructive",
+          });
+          refresh();
+        },
+        onError: () =>
+          toast({
+            title: "Error",
+            description: "No se pudieron reasignar los cobros.",
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
   const busy =
     extender.isPending ||
     activar.isPending ||
     desactivar.isPending ||
-    marcarDemo.isPending;
+    marcarDemo.isPending ||
+    reclamarCobros.isPending;
 
   if (u.isAdmin) {
     return <span className="text-xs text-muted-foreground">—</span>;
@@ -363,6 +388,10 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
               Marcar como demo
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem onClick={handleReclamarCobros}>
+            <Users className="h-4 w-4 mr-2" />
+            Reasignar cobros sin dueño
+          </DropdownMenuItem>
           {u.activo ? (
             <DropdownMenuItem onClick={handleDesactivar} className="text-destructive">
               <Ban className="h-4 w-4 mr-2" />

@@ -4677,6 +4677,76 @@ export const useMarcarDemo = <TError = ErrorType<void>,
       return useMutation(getMarcarDemoMutationOptions(options));
     }
 
+export const getReclamarCobrosHuerfanosUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/usuarios/${id}/reclamar-cobros`
+}
+
+/**
+ * @summary Reassign cobros with no responsable to a user (admin only)
+ */
+export const reclamarCobrosHuerfanos = async (id: string, options?: RequestInit): Promise<AdminAccionResult> => {
+
+  return customFetch<AdminAccionResult>(getReclamarCobrosHuerfanosUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReclamarCobrosHuerfanosMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reclamarCobrosHuerfanos>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reclamarCobrosHuerfanos>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['reclamarCobrosHuerfanos'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reclamarCobrosHuerfanos>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  reclamarCobrosHuerfanos(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReclamarCobrosHuerfanosMutationResult = NonNullable<Awaited<ReturnType<typeof reclamarCobrosHuerfanos>>>
+
+    export type ReclamarCobrosHuerfanosMutationError = ErrorType<void>
+
+    /**
+ * @summary Reassign cobros with no responsable to a user (admin only)
+ */
+export const useReclamarCobrosHuerfanos = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reclamarCobrosHuerfanos>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reclamarCobrosHuerfanos>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getReclamarCobrosHuerfanosMutationOptions(options));
+    }
+
 export const getSendAdminRecordatorioEmailUrl = (id: string,) => {
 
 

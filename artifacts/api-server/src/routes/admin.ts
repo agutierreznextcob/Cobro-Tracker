@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, usersTable, cobrosTable, organizacionesTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, isNull } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { computeSubscriptionState } from "../lib/subscription";
 import { computePricing } from "../lib/org";
@@ -328,6 +328,40 @@ adminRouter.post("/admin/usuarios/:id/demo", async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Error toggling demo flag");
+    res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+});
+
+// Reassigns "orphaned" cobros (rows with no responsable_id, e.g. left dangling
+// by the Replit-Auth → email+password migration) to the given user, adopting
+// that user's organization. Scoped to responsable_id IS NULL so it can never
+// touch cobros that already belong to another user. Idempotent.
+adminRouter.post("/admin/usuarios/:id/reclamar-cobros", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!u) {
+      res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" });
+      return;
+    }
+    const reasignados = await db
+      .update(cobrosTable)
+      .set({
+        responsableId: id,
+        responsableNombre: nombreDe(u),
+        organizationId: u.organizationId,
+      })
+      .where(isNull(cobrosTable.responsableId))
+      .returning({ id: cobrosTable.id });
+    res.json({
+      ok: true,
+      mensaje:
+        reasignados.length === 0
+          ? "No había cobros sin responsable por reasignar."
+          : `${reasignados.length} cobro(s) sin responsable reasignado(s) a esta cuenta.`,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error reclaiming orphaned cobros");
     res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
   }
 });
