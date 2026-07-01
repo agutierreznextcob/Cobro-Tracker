@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 
 function LandingNav() {
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [scrolled, setScrolled] = useState(false);
 
@@ -77,26 +77,42 @@ function LandingNav() {
           <a href="#nosotros" className={linkClass}>Nosotros</a>
         </nav>
         <div className="flex items-center gap-3">
-          <button onClick={login} className={ghostBtnClass}>
-            Iniciar sesión
-          </button>
-          <DemoRequestModal
-            trigger={
-              <button className={`hidden sm:inline-flex ${ghostBtnClass}`}>
-                Agenda una presentación
+          {isAuthenticated ? (
+            <button
+              onClick={() => navigate("/dashboard")}
+              className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
+                scrolled
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-[#F4A800] text-black hover:bg-[#ffba1f]"
+              }`}
+            >
+              Ir al dashboard
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          ) : (
+            <>
+              <button onClick={login} className={ghostBtnClass}>
+                Iniciar sesión
               </button>
-            }
-          />
-          <button
-            onClick={() => navigate("/register")}
-            className={`text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
-              scrolled
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "bg-[#F4A800] text-black hover:bg-[#ffba1f]"
-            }`}
-          >
-            Crear cuenta
-          </button>
+              <DemoRequestModal
+                trigger={
+                  <button className={`hidden sm:inline-flex ${ghostBtnClass}`}>
+                    Agenda una presentación
+                  </button>
+                }
+              />
+              <button
+                onClick={() => navigate("/register")}
+                className={`text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
+                  scrolled
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-[#F4A800] text-black hover:bg-[#ffba1f]"
+                }`}
+              >
+                Crear cuenta
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>
