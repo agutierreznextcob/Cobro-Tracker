@@ -4,6 +4,8 @@ import { db, conversationsTable, messagesTable, cobrosTable, clientesTable } fro
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
+import { computeClienteScores, type ScoreCategoria } from "../lib/scoring";
+import { plantillaKeyForScore, getPlantilla } from "../lib/workflow-templates";
 
 const aiRouter = Router();
 
@@ -69,6 +71,65 @@ async function buildUserContext(userId: string): Promise<string> {
     (cl) => `  - ID:${cl.id} | ${cl.nombre}${cl.rut ? ` (RUT: ${cl.rut})` : ""}${cl.email ? ` | ${cl.email}` : ""}`
   );
 
+  // ---- Prescriptive analysis: client scores, top debtors, risk, recovery ----
+  const nombrePorCliente = new Map(clientes.map((cl) => [cl.id, cl.nombre]));
+  const scoresMap = await computeClienteScores(
+    clientes.map((cl) => cl.id),
+    eq(cobrosTable.responsableId, userId),
+  );
+  const scores = Array.from(scoresMap.values());
+
+  const plantillaLabelPorCategoria = (categoria: ScoreCategoria) => {
+    const key = plantillaKeyForScore(categoria);
+    return getPlantilla(key)?.nombre ?? key;
+  };
+
+  const topDeudores = scores
+    .filter((s) => s.totalPendiente > 0)
+    .sort((a, b) => b.totalPendiente - a.totalPendiente)
+    .slice(0, 10)
+    .map(
+      (s) =>
+        `  - ${nombrePorCliente.get(s.clienteId) ?? `Cliente ${s.clienteId}`} | Pendiente: ${formatCLP(
+          s.totalPendiente,
+        )} | Score: ${s.categoria}${
+          s.cobrosVencidos > 0 ? ` | ${s.cobrosVencidos} cobro(s) vencido(s)` : ""
+        } | Atraso prom.: ${Math.round(s.promedioDiasAtraso)}d | Plantilla sugerida: ${plantillaLabelPorCategoria(
+          s.categoria,
+        )}`,
+    );
+
+  const enRiesgo = scores
+    .filter((s) => s.categoria === "riesgoso" || s.categoria === "critico")
+    .sort((a, b) => b.totalPendiente - a.totalPendiente)
+    .map(
+      (s) =>
+        `  - ${nombrePorCliente.get(s.clienteId) ?? `Cliente ${s.clienteId}`} | ${s.categoria.toUpperCase()} | Pendiente: ${formatCLP(
+          s.totalPendiente,
+        )} | Vencidos: ${s.cobrosVencidos}`,
+    );
+
+  const recuperacionPorCategoria = scores.reduce<Record<string, number>>((acc, s) => {
+    if (s.totalPendiente > 0) acc[s.categoria] = (acc[s.categoria] ?? 0) + s.totalPendiente;
+    return acc;
+  }, {});
+  // Weighted expected recovery: higher-score clients are likelier to pay.
+  const pesoPorCategoria: Record<string, number> = {
+    excelente: 0.95,
+    bueno: 0.8,
+    regular: 0.6,
+    riesgoso: 0.35,
+    critico: 0.15,
+    sin_datos: 0.5,
+  };
+  const recuperacionEsperada = scores.reduce(
+    (sum, s) => sum + s.totalPendiente * (pesoPorCategoria[s.categoria] ?? 0.5),
+    0,
+  );
+  const recuperacionLines = Object.entries(recuperacionPorCategoria)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, monto]) => `  - ${cat}: ${formatCLP(monto)}`);
+
   return `## Contexto del usuario
 
 ### Resumen de cobros
@@ -82,7 +143,22 @@ async function buildUserContext(userId: string): Promise<string> {
 ${cobrosLines.join("\n") || "  (sin cobros)"}
 
 ### Clientes registrados (${clientes.length})
-${clientesLines.join("\n") || "  (sin clientes)"}`;
+${clientesLines.join("\n") || "  (sin clientes)"}
+
+### Análisis prescriptivo (score por cliente)
+El score refleja el comportamiento de pago: excelente > bueno > regular > riesgoso > critico.
+
+#### A quién contactar hoy para maximizar recuperación (top deudores por monto pendiente)
+${topDeudores.join("\n") || "  (sin deudores con saldo pendiente)"}
+
+#### Clientes que deterioran el flujo de caja (riesgo alto)
+${enRiesgo.join("\n") || "  (ningún cliente en riesgo alto)"}
+
+#### Proyección de recuperación
+- Monto pendiente total: ${formatCLP(montoPendiente)}
+- Recuperación esperada (ponderada por score): ${formatCLP(Math.round(recuperacionEsperada))}
+- Pendiente por categoría de score:
+${recuperacionLines.join("\n") || "  (sin datos)"}`;
 }
 
 const SYSTEM_BASE = `Eres un asistente de gestión de cobros integrado en la plataforma "NextCob".
@@ -96,7 +172,12 @@ Reglas importantes:
 - Formato: usa markdown simple cuando sea útil (listas, negritas). Evita tablas largas.
 - Los montos son en pesos chilenos (CLP).
 - Las fechas están en formato YYYY-MM-DD.
-- El estado de cobros puede ser: pendiente, pagado, fallido, cancelado.`;
+- El estado de cobros puede ser: pendiente, pagado, fallido, cancelado.
+
+Asesoría prescriptiva de cobranza (usa la sección "Análisis prescriptivo" del contexto):
+- Puedes responder: a quién contactar hoy para maximizar la recuperación (prioriza top deudores por monto pendiente y cobros vencidos), qué clientes están deteriorando el flujo de caja (los de score riesgoso/critico), y la proyección de recuperación (usa la recuperación esperada ponderada por score).
+- Entrega listas priorizadas concretas con nombre de cliente y monto a recuperar cuando te pregunten a quién contactar o cuánto se puede recuperar.
+- Al recomendar un workflow de cobranza según el score del cliente, usa este mapeo: Excelente → "Cliente VIP"; Bueno → "Cobranza estándar"; Regular → "Cobranza intensiva"; Riesgoso o Crítico → "Alto riesgo".`;
 
 // GET /ai/conversations
 aiRouter.get("/ai/conversations", async (req, res) => {

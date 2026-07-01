@@ -188,7 +188,9 @@ export async function listProximasAcciones(
     for (const step of entry.steps) {
       if (executed.has(`${cobro.id}:${step.id}`)) continue;
       const due = addDaysYMD(anchor, step.delayDias);
-      if (diffDays(due, hoy) < 0) continue; // overdue but unrun — omit from "próximas"
+      const dias = diffDays(due, hoy);
+      if (dias < 0) continue; // overdue but unrun — omit from "próximas"
+      if (dias > 2) continue; // only the next 48h (today + 2 days)
       result.push({
         cobroId: cobro.id,
         accionTipo: step.accionTipo,

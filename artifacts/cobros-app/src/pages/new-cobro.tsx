@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateCobro, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, useListWorkflows, getListWorkflowsQueryKey, useAsignarWorkflow, type CobroInput } from "@workspace/api-client-react";
+import { useCreateCobro, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, useListWorkflows, getListWorkflowsQueryKey, useListWorkflowPlantillas, useCreateWorkflowFromPlantilla, useAsignarWorkflow, type CobroInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLocation } from "wouter";
@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/format";
 import { TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
@@ -52,8 +52,11 @@ export default function NewCobro() {
   const { data: workflowsList } = useListWorkflows({
     query: { queryKey: getListWorkflowsQueryKey() },
   });
+  const { data: plantillasList } = useListWorkflowPlantillas();
   const asignarWorkflow = useAsignarWorkflow();
+  const crearDesdePlantilla = useCreateWorkflowFromPlantilla();
   const [automatizacion, setAutomatizacion] = useState<"ninguna" | "simple" | "workflow">("ninguna");
+  // "wf:<id>" for a saved workflow, "tpl:<key>" for a template to instantiate.
   const [workflowSeleccionado, setWorkflowSeleccionado] = useState<string>("");
 
   const form = useForm<FormValues>({
@@ -110,10 +113,10 @@ export default function NewCobro() {
       responsableId: isOrgAdmin ? values.responsableId || undefined : undefined,
     };
 
-    if (automatizacion === "workflow" && !Number(workflowSeleccionado)) {
+    if (automatizacion === "workflow" && !workflowSeleccionado) {
       toast({
         title: "Selecciona un workflow",
-        description: "Elige un workflow inteligente o cambia la opción de automatización.",
+        description: "Elige una plantilla o un workflow guardado, o cambia la opción de automatización.",
         variant: "destructive",
       });
       return;
@@ -125,10 +128,21 @@ export default function NewCobro() {
         queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardMetricsQueryKey() });
 
-        const wfId = Number(workflowSeleccionado);
-        if (automatizacion === "workflow" && wfId) {
+        if (automatizacion === "workflow" && workflowSeleccionado) {
           try {
-            await asignarWorkflow.mutateAsync({ id: data.id, data: { workflowId: wfId } });
+            let workflowId: number;
+            if (workflowSeleccionado.startsWith("tpl:")) {
+              const plantillaKey = workflowSeleccionado.slice(4);
+              const nuevo = await crearDesdePlantilla.mutateAsync({ data: { plantillaKey } });
+              queryClient.invalidateQueries({ queryKey: getListWorkflowsQueryKey() });
+              workflowId = nuevo.id;
+            } else {
+              workflowId = Number(workflowSeleccionado.replace(/^wf:/, ""));
+            }
+            if (!Number.isInteger(workflowId) || workflowId <= 0) {
+              throw new Error("workflow inválido");
+            }
+            await asignarWorkflow.mutateAsync({ id: data.id, data: { workflowId } });
             toast({
               title: "Cobro creado con automatización",
               description: "El workflow fue asignado al cobro.",
@@ -437,8 +451,8 @@ export default function NewCobro() {
                   {(
                     [
                       { key: "ninguna", label: "Sin automatización", desc: "Seguimiento manual." },
-                      { key: "simple", label: "Recordatorio simple", desc: "Configúralo en el detalle." },
-                      { key: "workflow", label: "Workflow inteligente", desc: "Secuencia automatizada." },
+                      { key: "simple", label: "Recordatorio simple", desc: "Secuencia por fecha de vencimiento." },
+                      { key: "workflow", label: "Workflow inteligente", desc: "Plantilla o workflow guardado." },
                     ] as const
                   ).map((opt) => (
                     <button
@@ -456,30 +470,60 @@ export default function NewCobro() {
                     </button>
                   ))}
                 </div>
+                {automatizacion === "simple" && (
+                  <div className="space-y-1.5 rounded-md border border-border/50 bg-background p-3">
+                    <p className="text-xs text-muted-foreground">
+                      Se aplicará tu secuencia de recordatorios simples usando la fecha de vencimiento
+                      indicada abajo. Puedes personalizar la secuencia (días y canales) en la
+                      configuración de recordatorios.
+                    </p>
+                    <Link
+                      href="/recordatorios/config"
+                      className="inline-block text-xs font-medium text-primary hover:underline"
+                    >
+                      Configurar secuencia de recordatorios →
+                    </Link>
+                  </div>
+                )}
                 {automatizacion === "workflow" && (
                   <div className="space-y-1.5">
                     <Select value={workflowSeleccionado} onValueChange={setWorkflowSeleccionado}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un workflow" />
+                        <SelectValue placeholder="Selecciona una plantilla o workflow" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(workflowsList ?? []).length === 0 ? (
-                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                            No hay workflows. Créalos en Automatización.
-                          </div>
-                        ) : (
-                          workflowsList!.map((w) => (
-                            <SelectItem key={w.id} value={String(w.id)}>
-                              {w.nombre}
-                              {!w.activo ? " (pausado)" : ""}
-                            </SelectItem>
-                          ))
+                        {(plantillasList ?? []).length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel>Plantillas</SelectLabel>
+                            {plantillasList!.map((p) => (
+                              <SelectItem key={`tpl:${p.key}`} value={`tpl:${p.key}`}>
+                                {p.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         )}
+                        {(workflowsList ?? []).length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel>Mis workflows</SelectLabel>
+                            {workflowsList!.map((w) => (
+                              <SelectItem key={`wf:${w.id}`} value={`wf:${w.id}`}>
+                                {w.nombre}
+                                {!w.activo ? " (pausado)" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                        {(plantillasList ?? []).length === 0 &&
+                          (workflowsList ?? []).length === 0 && (
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                              No hay workflows disponibles.
+                            </div>
+                          )}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Al asignar un workflow, los recordatorios simples quedan desactivados para este
-                      cobro.
+                      Al elegir una plantilla se creará un workflow a partir de ella. Al asignar un
+                      workflow, los recordatorios simples quedan desactivados para este cobro.
                     </p>
                   </div>
                 )}

@@ -8,6 +8,7 @@ import {
   type WorkflowStepInput,
   type WorkflowStepConfig,
   type WorkflowStepConfigNuevoEstado,
+  type WorkflowCondiciones,
   type WorkflowTriggerTipo,
   type WorkflowStepAccionTipo,
 } from "@workspace/api-client-react";
@@ -43,6 +44,14 @@ type StepDraft = {
   descuentoValor: number;
   nuevoEstado: string;
 };
+
+const SCORE_OPCIONES: { value: string; label: string }[] = [
+  { value: "excelente", label: "Excelente" },
+  { value: "bueno", label: "Bueno" },
+  { value: "regular", label: "Regular" },
+  { value: "riesgoso", label: "Riesgoso" },
+  { value: "critico", label: "Crítico" },
+];
 
 function emptyStep(): StepDraft {
   return {
@@ -94,6 +103,9 @@ export default function WorkflowDetail() {
   const [activo, setActivo] = useState(true);
   const [triggerTipo, setTriggerTipo] = useState<WorkflowTriggerTipo>("cobro_creado");
   const [triggerDias, setTriggerDias] = useState(0);
+  const [condMontoMin, setCondMontoMin] = useState("");
+  const [condMontoMax, setCondMontoMax] = useState("");
+  const [condScores, setCondScores] = useState<string[]>([]);
   const [steps, setSteps] = useState<StepDraft[]>([emptyStep()]);
 
   useEffect(() => {
@@ -103,6 +115,13 @@ export default function WorkflowDetail() {
       setActivo(workflow.activo);
       setTriggerTipo(workflow.triggerTipo);
       setTriggerDias(workflow.triggerDias);
+      setCondMontoMin(
+        workflow.condiciones?.montoMin != null ? String(workflow.condiciones.montoMin) : "",
+      );
+      setCondMontoMax(
+        workflow.condiciones?.montoMax != null ? String(workflow.condiciones.montoMax) : "",
+      );
+      setCondScores(workflow.condiciones?.scores ?? []);
       setSteps(
         (workflow.steps ?? []).map((s) => ({
           delayDias: s.delayDias,
@@ -128,6 +147,13 @@ export default function WorkflowDetail() {
       return;
     }
     const stepInputs = steps.map((s, i) => toStepInput(s, i));
+    const montoMin = condMontoMin.trim() === "" ? null : Number(condMontoMin);
+    const montoMax = condMontoMax.trim() === "" ? null : Number(condMontoMax);
+    const condiciones: WorkflowCondiciones = {
+      montoMin: Number.isFinite(montoMin as number) ? montoMin : null,
+      montoMax: Number.isFinite(montoMax as number) ? montoMax : null,
+      scores: condScores.length > 0 ? condScores : null,
+    };
     try {
       if (isNew) {
         const created = await createWorkflow.mutateAsync({
@@ -137,6 +163,7 @@ export default function WorkflowDetail() {
             activo,
             triggerTipo,
             triggerDias,
+            condiciones,
             steps: stepInputs,
           },
         });
@@ -151,6 +178,7 @@ export default function WorkflowDetail() {
             activo,
             triggerTipo,
             triggerDias,
+            condiciones,
             steps: stepInputs,
           },
         });
@@ -236,6 +264,73 @@ export default function WorkflowDetail() {
             <Label htmlFor="activo" className="cursor-pointer">
               Workflow activo
             </Label>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Condiciones (opcional)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Aplica este workflow solo a los cobros que cumplan estas condiciones. Déjalas vacías
+            para aplicarlo a todos.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="condMontoMin">Monto mínimo (CLP)</Label>
+              <Input
+                id="condMontoMin"
+                type="number"
+                min={0}
+                value={condMontoMin}
+                onChange={(e) => setCondMontoMin(e.target.value)}
+                placeholder="Sin mínimo"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="condMontoMax">Monto máximo (CLP)</Label>
+              <Input
+                id="condMontoMax"
+                type="number"
+                min={0}
+                value={condMontoMax}
+                onChange={(e) => setCondMontoMax(e.target.value)}
+                placeholder="Sin máximo"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Score del cliente</Label>
+            <div className="flex flex-wrap gap-2">
+              {SCORE_OPCIONES.map((s) => {
+                const activeSel = condScores.includes(s.value);
+                return (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() =>
+                      setCondScores((prev) =>
+                        prev.includes(s.value)
+                          ? prev.filter((x) => x !== s.value)
+                          : [...prev, s.value],
+                      )
+                    }
+                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      activeSel
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/50 text-muted-foreground hover:bg-secondary/50"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Si no eliges ninguno, aplica a cualquier score.
+            </p>
           </div>
         </CardContent>
       </Card>
