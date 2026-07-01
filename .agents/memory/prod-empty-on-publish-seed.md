@@ -7,9 +7,9 @@ description: Why demo/superadmin accounts vanish in production and how they are 
 
 Replit's Publish flow copies the database **schema** to production, never the
 **data**. So any account/data that exists only because it was created manually in
-the dev DB (e.g. the demo `anibal.gutierrezbasoalto@gmail.com` and superadmin
-`agutierrez@nextcob.com`) is simply **absent in production** after publishing —
-the prod `users` table is empty (0 rows).
+the dev DB (e.g. the shared demo account and the superadmin account — see the
+email constants in `lib/seed.ts`) is simply **absent in production** after
+publishing — the prod `users` table is empty (0 rows).
 
 **Symptom this explains:** "password recovery email never arrives" in production.
 `forgot-password` only sends `if (user)` exists and always returns 200 (anti-
