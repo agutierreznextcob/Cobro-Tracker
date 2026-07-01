@@ -443,11 +443,20 @@ async function ejecutarAccion(
       }
 
       case "enviar_comprobante": {
+        // Defense-in-depth: comprobante is an "al pagar" action. Never emit for an
+        // unpaid cobro (emitirComprobante also guards on estado internally).
+        if (cobro.estado !== "pagado") {
+          return { ok: false, detalle: "Comprobante es una acción al-pagar; el cobro no está pagado." };
+        }
         void emitirComprobante(cobro.id, { metodo: "manual" }, log);
         return { ok: true, detalle: "Emisión de comprobante solicitada." };
       }
 
       case "enviar_encuesta": {
+        // Defense-in-depth: the survey is an "al pagar" action tied to a paid cobro.
+        if (cobro.estado !== "pagado") {
+          return { ok: false, detalle: "Encuesta es una acción al-pagar; el cobro no está pagado." };
+        }
         void crearYEnviarEncuesta(cobro.id, log);
         return { ok: true, detalle: "Encuesta de satisfacción solicitada." };
       }
@@ -533,6 +542,14 @@ export async function procesarWorkflows(log: RunLogger): Promise<WorkflowsRunRes
     if (!cumpleCondiciones(cobro, workflow.condiciones, scoreCategoria)) continue;
 
     for (const step of steps) {
+      // "Al pagar" actions (comprobante + encuesta) are NOT delay-scheduled: they
+      // are fired automatically on the paid transition by the universal payment
+      // path (emitirComprobante, which also triggers the survey), for every paid
+      // cobro. Running them here — where the loop only ever sees pendiente/parcial
+      // cobros — would emit a receipt/survey for still-unpaid debt. Skip them.
+      if (step.accionTipo === "enviar_comprobante" || step.accionTipo === "enviar_encuesta") {
+        continue;
+      }
       const due = addDaysYMD(anchor, step.delayDias);
       if (diffDays(hoy, due) < 0) continue; // not due yet
 

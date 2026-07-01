@@ -1,11 +1,12 @@
 import { Router } from "express";
 import Groq from "groq-sdk";
-import { db, conversationsTable, messagesTable, cobrosTable, clientesTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { db, conversationsTable, messagesTable, cobrosTable, clientesTable, usersTable } from "@workspace/db";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { computeClienteScores, type ScoreCategoria } from "../lib/scoring";
 import { plantillaKeyForScore, getPlantilla } from "../lib/workflow-templates";
+import { getOrgContext } from "../lib/org";
 
 const aiRouter = Router();
 
@@ -130,6 +131,63 @@ async function buildUserContext(userId: string): Promise<string> {
     .sort((a, b) => b[1] - a[1])
     .map(([cat, monto]) => `  - ${cat}: ${formatCLP(monto)}`);
 
+  // ---- Per-ejecutivo recovery ranking (org admins only) ----
+  // Answers "¿qué ejecutivo recupera mejor?" by ranking the whole team on money
+  // recovery rate (monto pagado / monto asignado). Only computed for org admins,
+  // scoped to the org, so ejecutivos never see cross-member data.
+  let rankingEjecutivosSection = "";
+  const orgCtx = await getOrgContext(userId);
+  if (orgCtx.isOrgAdmin && orgCtx.organizationId != null) {
+    const [miembros, statsPorEjecutivo] = await Promise.all([
+      db
+        .select({
+          id: usersTable.id,
+          firstName: usersTable.firstName,
+          lastName: usersTable.lastName,
+          email: usersTable.email,
+        })
+        .from(usersTable)
+        .where(eq(usersTable.organizationId, orgCtx.organizationId)),
+      db
+        .select({
+          responsableId: cobrosTable.responsableId,
+          estado: cobrosTable.estado,
+          cantidad: sql<number>`count(*)::int`,
+          monto: sql<number>`coalesce(sum(${cobrosTable.monto})::float, 0)`,
+        })
+        .from(cobrosTable)
+        .where(eq(cobrosTable.organizationId, orgCtx.organizationId))
+        .groupBy(cobrosTable.responsableId, cobrosTable.estado),
+    ]);
+
+    const ranking = miembros
+      .map((m) => {
+        const mine = statsPorEjecutivo.filter((s) => s.responsableId === m.id);
+        const pagados = mine.filter((s) => s.estado === "pagado");
+        const cobrosPagados = pagados.reduce((a, s) => a + s.cantidad, 0);
+        const montoRecaudado = pagados.reduce((a, s) => a + (s.monto ?? 0), 0);
+        const asignados = mine.reduce((a, s) => a + s.cantidad, 0);
+        const montoTotal = mine.reduce((a, s) => a + (s.monto ?? 0), 0);
+        const tasa = montoTotal > 0 ? montoRecaudado / montoTotal : 0;
+        const nombre = [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email;
+        return { nombre, cobrosPagados, asignados, montoRecaudado, tasa };
+      })
+      .filter((r) => r.asignados > 0)
+      .sort((a, b) => b.tasa - a.tasa || b.montoRecaudado - a.montoRecaudado);
+
+    const rankingLines = ranking.map(
+      (r, i) =>
+        `  ${i + 1}. ${r.nombre} | Tasa de recuperación: ${(r.tasa * 100).toFixed(0)}% | Recaudado: ${formatCLP(
+          r.montoRecaudado,
+        )} | ${r.cobrosPagados}/${r.asignados} cobros pagados`,
+    );
+
+    rankingEjecutivosSection = `
+
+#### Qué ejecutivo recupera mejor (ranking del equipo por tasa de recuperación de monto)
+${rankingLines.join("\n") || "  (sin datos del equipo)"}`;
+  }
+
   return `## Contexto del usuario
 
 ### Resumen de cobros
@@ -158,7 +216,7 @@ ${enRiesgo.join("\n") || "  (ningún cliente en riesgo alto)"}
 - Monto pendiente total: ${formatCLP(montoPendiente)}
 - Recuperación esperada (ponderada por score): ${formatCLP(Math.round(recuperacionEsperada))}
 - Pendiente por categoría de score:
-${recuperacionLines.join("\n") || "  (sin datos)"}`;
+${recuperacionLines.join("\n") || "  (sin datos)"}${rankingEjecutivosSection}`;
 }
 
 const SYSTEM_BASE = `Eres un asistente de gestión de cobros integrado en la plataforma "NextCob".
@@ -177,6 +235,7 @@ Reglas importantes:
 Asesoría prescriptiva de cobranza (usa la sección "Análisis prescriptivo" del contexto):
 - Puedes responder: a quién contactar hoy para maximizar la recuperación (prioriza top deudores por monto pendiente y cobros vencidos), qué clientes están deteriorando el flujo de caja (los de score riesgoso/critico), y la proyección de recuperación (usa la recuperación esperada ponderada por score).
 - Entrega listas priorizadas concretas con nombre de cliente y monto a recuperar cuando te pregunten a quién contactar o cuánto se puede recuperar.
+- Si el contexto incluye la sección "Qué ejecutivo recupera mejor" (solo disponible para administradores de organización), úsala para responder qué ejecutivo del equipo recupera mejor: nómbralos por orden de tasa de recuperación de monto e incluye la tasa y el monto recaudado. Si la sección no está presente, indica que ese ranking solo está disponible para administradores de la organización.
 - Al recomendar un workflow de cobranza según el score del cliente, usa este mapeo: Excelente → "Cliente VIP"; Bueno → "Cobranza estándar"; Regular → "Cobranza intensiva"; Riesgoso o Crítico → "Alto riesgo".`;
 
 // GET /ai/conversations

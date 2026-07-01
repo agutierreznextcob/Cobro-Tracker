@@ -52,6 +52,16 @@ export async function emitirComprobante(
       return;
     }
 
+    // Hard guard: the comprobante (and its companion satisfaction survey) are
+    // strictly "al pagar" actions. Never emit a receipt or survey for a cobro that
+    // is not fully paid — doing so for a pendiente/parcial cobro is a financial
+    // correctness bug. This also makes the fire-and-forget callers (webhooks,
+    // manual mark-paid, workflow cambiar_estado→pagado) safe by construction.
+    if (cobro.estado !== "pagado") {
+      log?.warn({ cobroId, estado: cobro.estado }, "emitirComprobante: cobro no está pagado, se omite");
+      return;
+    }
+
     // A paid cobro also triggers the post-payment satisfaction survey. Fire-and-
     // forget and idempotent (unique on encuestas.cobroId), so it runs at most once
     // per cobro across every paid path (manual, abono, webhook, workflow).
