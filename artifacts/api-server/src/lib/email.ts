@@ -332,7 +332,12 @@ export async function sendRenovacionEmail(
 }
 
 export async function sendVerificacionEmail(
-  data: { email: string; nombre?: string | null; ctaUrl: string },
+  data: {
+    email: string;
+    nombre?: string | null;
+    ctaUrl: string;
+    accountId?: string | null;
+  },
   log?: { warn: (obj: object, msg: string) => void },
 ): Promise<EmailResult> {
   const client = getResend();
@@ -352,6 +357,11 @@ export async function sendVerificacionEmail(
       heading: `${saludo}, confirma tu correo 👋`,
       bodyLines: [
         `Gracias por registrarte en <strong>NextCob</strong>. Para activar tu cuenta y comenzar tu prueba gratuita, confirma tu dirección de correo haciendo clic en el botón.`,
+        ...(data.accountId
+          ? [
+              `Tu ID de cuenta es <strong>${data.accountId}</strong>. Guárdalo para cualquier consulta de soporte.`,
+            ]
+          : []),
         `Si no creaste esta cuenta, puedes ignorar este mensaje.`,
       ],
       ctaText: "Confirmar mi correo",

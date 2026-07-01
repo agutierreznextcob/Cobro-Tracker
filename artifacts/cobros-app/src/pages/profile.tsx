@@ -632,6 +632,10 @@ function ProfileSettings() {
           </div>
 
           <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-t border-border/50 pt-6">
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">ID de cuenta</dt>
+              <dd className="text-base font-bold text-primary font-mono mt-0.5">{user?.accountId || "—"}</dd>
+            </div>
             <div>
               <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Correo electrónico</dt>
               <dd className="text-sm mt-0.5">{user?.email || "—"}</dd>

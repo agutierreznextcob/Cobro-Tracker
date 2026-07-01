@@ -10,6 +10,11 @@ import type { AdminUsuarioSubscriptionStatus } from './adminUsuarioSubscriptionS
 
 export interface AdminUsuario {
   id: string;
+  /**
+     * Permanent human-friendly account identifier (NCB-XXXXXXX).
+     * @nullable
+     */
+  accountId: string | null;
   /** @nullable */
   nombre: string | null;
   /** @nullable */

@@ -167,10 +167,12 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   let activo = true;
   let emailVerified = false;
   let esDemo = false;
+  let accountId: string | null = null;
   let profileImageUrl: string | null = req.user.profileImageUrl ?? null;
   try {
     const [row] = await db
       .select({
+        accountId: usersTable.accountId,
         role: usersTable.role,
         profileCompleted: usersTable.profileCompleted,
         rut: usersTable.rut,
@@ -189,6 +191,7 @@ router.get("/auth/user", async (req: Request, res: Response) => {
       .from(usersTable)
       .where(eq(usersTable.id, req.user.id));
     if (row) {
+      accountId = row.accountId;
       role = row.role;
       profileCompleted = row.profileCompleted;
       rut = row.rut;
@@ -218,6 +221,7 @@ router.get("/auth/user", async (req: Request, res: Response) => {
     GetCurrentAuthUserResponse.parse({
       user: {
         ...req.user,
+        accountId,
         firstName,
         lastName,
         profileImageUrl,
@@ -362,7 +366,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
     const rawToken = await createAuthToken(user.id, "verificacion");
     const ctaUrl = `${getPublicBaseUrl()}/api/auth/verify-email?token=${rawToken}`;
     await sendVerificacionEmail(
-      { email, nombre: nombreDe(user), ctaUrl },
+      { email, nombre: nombreDe(user), ctaUrl, accountId: user.accountId },
       req.log,
     );
 

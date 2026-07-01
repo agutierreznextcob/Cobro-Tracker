@@ -16,6 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableHeader,
@@ -412,6 +413,17 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
 export default function AdminPage() {
   const { data: usuarios, isLoading } = useListAdminUsuarios();
   const { data: metricas } = useGetAdminMetricas();
+  const [busqueda, setBusqueda] = useState("");
+
+  const q = busqueda.trim().toLowerCase();
+  const usuariosFiltrados = (usuarios ?? []).filter(
+    (u) =>
+      q === "" ||
+      (u.accountId ?? "").toLowerCase().includes(q) ||
+      (u.nombre ?? "").toLowerCase().includes(q) ||
+      (u.email ?? "").toLowerCase().includes(q) ||
+      (u.rut ?? "").toLowerCase().includes(q),
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -424,6 +436,13 @@ export default function AdminPage() {
           <p className="text-muted-foreground mt-1">
             Cuentas de la plataforma, suscripciones y métricas de negocio.
           </p>
+        </div>
+        <div className="w-full sm:w-80">
+          <Input
+            placeholder="Buscar por ID (NCB-…), nombre, email o RUT"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
         </div>
       </div>
 
@@ -476,16 +495,21 @@ export default function AdminPage() {
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
               Cargando cuentas...
             </div>
-          ) : !usuarios || usuarios.length === 0 ? (
+          ) : usuariosFiltrados.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <Users className="h-8 w-8 text-muted-foreground mb-3" />
-              <p className="text-muted-foreground text-sm">No hay cuentas registradas.</p>
+              <p className="text-muted-foreground text-sm">
+                {q
+                  ? "No hay cuentas que coincidan con la búsqueda."
+                  : "No hay cuentas registradas."}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>ID</TableHead>
                     <TableHead>Cuenta</TableHead>
                     <TableHead>RUT</TableHead>
                     <TableHead>Estado</TableHead>
@@ -497,7 +521,7 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {usuarios.map((u) => (
+                  {usuariosFiltrados.map((u) => (
                     <TableRow
                       key={u.id}
                       className={
@@ -508,6 +532,9 @@ export default function AdminPage() {
                             : undefined
                       }
                     >
+                      <TableCell className="font-mono text-xs whitespace-nowrap font-semibold text-primary">
+                        {u.accountId || "—"}
+                      </TableCell>
                       <TableCell>
                         <div className="font-medium">
                           {u.nombre || (

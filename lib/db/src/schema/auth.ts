@@ -34,6 +34,24 @@ export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 // stays for backwards compatibility.
 export const usersTable = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Permanent, human-friendly, sequential public account identifier shown to
+  // users and support (format NCB-XXXXXXX, zero-padded to 7 digits, and grows
+  // naturally past 7 digits — e.g. NCB-10000000 — so there is never a cap).
+  // accountSeq is the sequential source (an identity column, assigned by the DB
+  // and never reused); accountId is the formatted string as a STORED generated
+  // column, so it is always consistent and directly queryable. Neither is ever
+  // set by the application; the database generates both automatically, so the
+  // identifier is immutable across email/profile changes.
+  // Uniqueness is structural, not enforced by a UNIQUE constraint: account_seq
+  // is an identity (values never repeat or get reused) and account_id is a pure
+  // deterministic function of it, so two rows can never collide. We deliberately
+  // avoid a UNIQUE constraint because adding one to a populated table makes
+  // `drizzle-kit push` require an interactive truncate confirmation, which
+  // breaks non-interactive schema sync (dev push and production deploys).
+  accountSeq: integer("account_seq").generatedByDefaultAsIdentity(),
+  accountId: varchar("account_id").generatedAlwaysAs(
+    sql`'NCB-' || lpad(account_seq::text, 7, '0')`,
+  ),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),

@@ -10,6 +10,11 @@ import type { AuthUserRole } from './authUserRole';
 
 export interface AuthUser {
   id: string;
+  /**
+     * Permanent human-friendly account identifier (NCB-XXXXXXX).
+     * @nullable
+     */
+  accountId?: string | null;
   /** @nullable */
   email: string | null;
   /** @nullable */

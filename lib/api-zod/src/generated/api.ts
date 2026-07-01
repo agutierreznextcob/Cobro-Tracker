@@ -18,6 +18,7 @@ export const GetCurrentAuthUserHeader = zod.object({
 export const GetCurrentAuthUserResponse = zod.object({
   "user": zod.union([zod.object({
   "id": zod.string(),
+  "accountId": zod.string().nullish().describe('Permanent human-friendly account identifier (NCB-XXXXXXX).'),
   "email": zod.string().email().nullable(),
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
@@ -673,6 +674,7 @@ export const CompletarPerfilBody = zod.object({
 
 export const CompletarPerfilResponse = zod.object({
   "id": zod.string(),
+  "accountId": zod.string().nullish().describe('Permanent human-friendly account identifier (NCB-XXXXXXX).'),
   "email": zod.string().email().nullable(),
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
@@ -1143,6 +1145,7 @@ export const StartSubscriptionResponse = zod.object({
  */
 export const ListAdminUsuariosResponseItem = zod.object({
   "id": zod.string(),
+  "accountId": zod.string().nullable().describe('Permanent human-friendly account identifier (NCB-XXXXXXX).'),
   "nombre": zod.string().nullable(),
   "email": zod.string().email().nullable(),
   "role": zod.enum(['user', 'admin']),

@@ -377,6 +377,11 @@ export const AdminUsuarioSubscriptionStatus = {
 
 export interface AdminUsuario {
   id: string;
+  /**
+     * Permanent human-friendly account identifier (NCB-XXXXXXX).
+     * @nullable
+     */
+  accountId: string | null;
   /** @nullable */
   nombre: string | null;
   /** @nullable */
@@ -1565,6 +1570,11 @@ export const AuthUserOrgRole = {
 
 export interface AuthUser {
   id: string;
+  /**
+     * Permanent human-friendly account identifier (NCB-XXXXXXX).
+     * @nullable
+     */
+  accountId?: string | null;
   /** @nullable */
   email: string | null;
   /** @nullable */

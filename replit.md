@@ -37,7 +37,10 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 - Seguridad: bcrypt, sesiones por cookie, bloqueo tras 5 intentos fallidos (15min).
 - Anti-abuso: 1 RUT = 1 trial de 14 días para siempre (`trialRutsTable`).
 - Cuenta demo permanente (`esDemo`) y panel superadmin (cuentas, revenue, total
-  recaudado, extender/activar/desactivar).
+  recaudado, extender/activar/desactivar, buscar por ID/nombre/email/RUT).
+- ID de cuenta público permanente `NCB-XXXXXXX` (`usersTable.accountId`,
+  generado por la DB, inmutable): visible en Perfil, en el email de
+  verificación de registro y como columna "ID" + buscador en el panel superadmin.
 
 ## User preferences
 
@@ -58,6 +61,13 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
+- Account ID (`account_id` / `account_seq` in `usersTable`) is 100% DB-generated:
+  `account_seq` is an identity column, `account_id` is a STORED generated column
+  (`'NCB-' || lpad(account_seq::text,7,'0')`). The app NEVER writes either — it
+  only reads them. Uniqueness is structural (identity + deterministic formula),
+  intentionally WITHOUT a UNIQUE constraint: adding UNIQUE to the populated
+  `users` table makes `drizzle-kit push` demand an interactive truncate
+  confirmation, which breaks non-interactive push (dev + prod deploys).
 - Auth token consume (`lib/tokens.ts`) and login lockout increment
   (`routes/auth.ts`) MUST stay as single atomic SQL `UPDATE`s. Splitting either
   into SELECT-then-UPDATE reintroduces a single-use-token bypass / lockout race.

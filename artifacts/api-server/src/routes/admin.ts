@@ -74,6 +74,7 @@ async function buildOrgAggregates(): Promise<{
 
 interface EnrichedUsuario {
   id: string;
+  accountId: string | null;
   nombre: string | null;
   email: string | null;
   role: "user" | "admin";
@@ -132,6 +133,7 @@ async function buildUsuarios(): Promise<EnrichedUsuario[]> {
 
       return {
         id: u.id,
+        accountId: u.accountId,
         nombre: nombreDe(u),
         email: u.email,
         role: u.role,

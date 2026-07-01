@@ -2979,6 +2979,7 @@ components:
       required:
         [
           id,
+          accountId,
           nombre,
           email,
           role,
@@ -3002,6 +3003,9 @@ components:
       properties:
         id:
           type: string
+        accountId:
+          type: [string, 'null']
+          description: Permanent human-friendly account identifier (NCB-XXXXXXX).
         nombre:
           type: [string, 'null']
         email:
@@ -4353,6 +4357,9 @@ components:
       properties:
         id:
           type: string
+        accountId:
+          type: [string, 'null']
+          description: Permanent human-friendly account identifier (NCB-XXXXXXX).
         email:
           type: [string, 'null']
           format: email
