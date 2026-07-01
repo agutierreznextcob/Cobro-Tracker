@@ -17,6 +17,7 @@ import {
   Gauge,
   Globe,
   Link2,
+  LogOut,
   Percent,
   Share2,
   Sparkles,
@@ -26,9 +27,10 @@ import {
 } from "lucide-react";
 
 function LandingNav() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, logout, isAuthenticated, user } = useAuth();
   const [, navigate] = useLocation();
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => {
@@ -44,6 +46,23 @@ function LandingNav() {
       window.removeEventListener("resize", onScroll);
     };
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest("[data-account-menu]")) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [menuOpen]);
+
+  const accountName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() ||
+    user?.email ||
+    "Mi cuenta";
+  const accountInitial = (accountName[0] || "?").toUpperCase();
 
   const linkClass = scrolled
     ? "text-muted-foreground hover:text-foreground transition-colors"
@@ -78,17 +97,60 @@ function LandingNav() {
         </nav>
         <div className="flex items-center gap-3">
           {isAuthenticated ? (
-            <button
-              onClick={() => navigate("/dashboard")}
-              className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
-                scrolled
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "bg-[#F4A800] text-black hover:bg-[#ffba1f]"
-              }`}
-            >
-              Ir al dashboard
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            <>
+              <button
+                onClick={() => navigate("/dashboard")}
+                className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
+                  scrolled
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-[#F4A800] text-black hover:bg-[#ffba1f]"
+                }`}
+              >
+                Ir al dashboard
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              <div className="relative" data-account-menu>
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  aria-label="Menú de cuenta"
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+                    scrolled
+                      ? "bg-secondary text-foreground hover:bg-secondary/70 border border-border/60"
+                      : "bg-white/15 text-white hover:bg-white/25 border border-white/20"
+                  }`}
+                >
+                  {accountInitial}
+                </button>
+                {menuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg overflow-hidden z-50"
+                  >
+                    <div className="px-4 py-3 border-b border-border">
+                      <p className="text-sm font-medium truncate">{accountName}</p>
+                      {user?.email && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {user.email}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        logout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-secondary/70 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Cerrar sesión
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
             <>
               <button onClick={login} className={ghostBtnClass}>
