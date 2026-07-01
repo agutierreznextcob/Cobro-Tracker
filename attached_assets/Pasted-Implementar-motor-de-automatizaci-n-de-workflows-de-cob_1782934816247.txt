@@ -1,0 +1,131 @@
+Implementar motor de automatización de workflows de 
+cobranza inteligente, manteniendo los recordatorios 
+simples existentes como opción separada:
+
+1. AL CREAR UN COBRO — SECCIÓN "AUTOMATIZACIÓN":
+Agregar sección con tres opciones claramente descritas:
+
+○ Sin automatización
+  "Gestionaré este cobro manualmente"
+
+○ Recordatorio simple
+  "Configuro fechas fijas de aviso por email y/o 
+  WhatsApp. Se envían automáticamente según el 
+  calendario que defina."
+  → Abre la configuración de recordatorios existente
+
+○ Workflow inteligente
+  "Automatización condicional que actúa según el 
+  comportamiento del cliente. Se detiene si paga, 
+  escala si no responde y adapta las acciones según 
+  el score del cliente."
+  → Permite seleccionar plantilla o crear workflow
+
+IMPORTANTE: Los recordatorios simples existentes 
+NO deben modificarse ni eliminarse. Ambos sistemas 
+coexisten. Si el cobro tiene workflow asignado, 
+el workflow tiene prioridad.
+
+2. CONSTRUCTOR DE WORKFLOWS:
+En el menú lateral agregar nueva sección "Workflows".
+El usuario puede crear workflows con esta estructura:
+
+DISPARADOR (cuándo se activa):
+- Cobro creado
+- Cobro próximo a vencer (X días antes)
+- Cobro vencido (día 0)
+- Cobro con X días de mora
+- Cobro no pagado después de X días
+- Cliente no abrió el email anterior
+- Cobro marcado como parcial
+
+CONDICIÓN (filtro opcional):
+- Monto mayor/menor a $X
+- Score del cliente (Excelente/Bueno/Regular/Riesgoso/Crítico)
+- Tipo de documento
+- Cliente específico o grupo de clientes
+- Ejecutivo responsable
+
+ACCIÓN (qué hacer):
+- Enviar email automático (con plantilla seleccionable)
+- Enviar WhatsApp (mensaje pre-redactado con link de pago)
+- Crear tarea para ejecutivo ("Llamar al cliente")
+- Notificar al admin de la organización
+- Aplicar descuento automático (% o monto fijo)
+- Cambiar estado del cobro
+- Enviar comprobante de pago (cuando se paga)
+- Enviar encuesta de satisfacción (cuando se paga)
+
+3. ENCADENAMIENTO DE PASOS:
+Cada workflow puede tener múltiples pasos encadenados 
+con tiempos entre cada uno. Ejemplo de flujo completo:
+- Día -3 (antes vencimiento) → email recordatorio amable
+- Día 0 (vencimiento) → email aviso vencimiento
+- Día 3 sin pago → WhatsApp automático con link de pago
+- Día 7 sin pago → tarea para ejecutivo "Llamar cliente"
+- Día 15 sin pago → notificar al admin
+- Día 30 sin pago → alerta "Considerar derivación legal"
+- Al pagar (cualquier momento) → detener todo + 
+  comprobante PDF + encuesta de satisfacción
+
+4. PLANTILLAS PREDEFINIDAS LISTAS PARA USAR:
+- "Cobranza estándar" → email + WhatsApp + tarea ejecutivo
+- "Cobranza intensiva" → contacto cada 3 días, 
+  múltiples canales
+- "Cobranza suave" → solo emails, tono amable, 
+  sin WhatsApp
+- "Cliente VIP" → para score Excelente/Bueno, 
+  un solo recordatorio amable
+- "Alto riesgo" → para score Riesgoso/Crítico, 
+  escalada rápida desde día 1
+
+El usuario puede usar las plantillas tal como están 
+o personalizarlas completamente.
+
+5. ASIGNACIÓN DE WORKFLOW A COBROS:
+- Al crear cobro: seleccionar workflow desde la 
+  sección Automatización
+- En cobros existentes: botón "Asignar workflow" 
+  en el detalle del cobro
+- Si no selecciona ninguno: sin automatización 
+  por defecto (no forzar)
+
+6. DASHBOARD DE WORKFLOWS:
+En la sección Workflows mostrar:
+- Lista de workflows creados (activos/inactivos)
+- Cuántos cobros tiene cada workflow asignado
+- Acciones ejecutadas hoy y esta semana
+- Próximas acciones programadas (próximas 48 horas)
+- Historial completo de acciones ejecutadas con 
+  resultado (email enviado/abierto, WhatsApp enviado, 
+  tarea creada, etc.)
+
+7. IA PRESCRIPTIVA:
+El asistente IA debe:
+
+a) Al asignar workflow a un cobro, sugerir 
+   automáticamente la plantilla más adecuada 
+   basándose en el score del cliente:
+   - Score Excelente → sugerir "Cliente VIP"
+   - Score Bueno → sugerir "Cobranza estándar"
+   - Score Regular → sugerir "Cobranza intensiva"
+   - Score Riesgoso/Crítico → sugerir "Alto riesgo"
+
+b) Responder preguntas prescriptivas como:
+   - "¿Qué clientes debo contactar hoy para 
+     maximizar la recuperación esta semana?"
+     → Lista priorizada con monto potencial a recuperar
+   - "¿Qué clientes están deteriorando mi flujo 
+     de caja este mes?"
+   - "¿Qué ejecutivo tiene mejor tasa de recuperación?"
+   - "Si contacto hoy a mis 5 principales deudores, 
+     ¿cuánto podría recuperar?"
+
+8. ENCUESTA DE SATISFACCIÓN POST-PAGO:
+Cuando un cobro se marca como pagado, enviar 
+automáticamente al cliente una encuesta simple 
+de 1 pregunta vía email:
+"¿Cómo fue tu experiencia de pago con [nombre 
+del usuario]?" con opciones: Excelente / Buena / 
+Regular / Mala
+Los resultados se guardan y se muestran en Informes.
