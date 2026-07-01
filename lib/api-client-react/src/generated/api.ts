@@ -90,6 +90,7 @@ import type {
   ListWebhookEventosParams,
   LoginInput,
   LogoutSuccess,
+  MarcarDemoInput,
   MiembroEquipo,
   MpCredentialsInput,
   MpCredentialsStatus,
@@ -4602,6 +4603,78 @@ export const useDesactivarCuenta = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDesactivarCuentaMutationOptions(options));
+    }
+
+export const getMarcarDemoUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/usuarios/${id}/demo`
+}
+
+/**
+ * @summary Mark or unmark a user as an internal demo account (admin only)
+ */
+export const marcarDemo = async (id: string,
+    marcarDemoInput: MarcarDemoInput, options?: RequestInit): Promise<AdminAccionResult> => {
+
+  return customFetch<AdminAccionResult>(getMarcarDemoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      marcarDemoInput,)
+  }
+);}
+
+
+
+
+export const getMarcarDemoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof marcarDemo>>, TError,{id: string;data: BodyType<MarcarDemoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof marcarDemo>>, TError,{id: string;data: BodyType<MarcarDemoInput>}, TContext> => {
+
+const mutationKey = ['marcarDemo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof marcarDemo>>, {id: string;data: BodyType<MarcarDemoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  marcarDemo(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarcarDemoMutationResult = NonNullable<Awaited<ReturnType<typeof marcarDemo>>>
+    export type MarcarDemoMutationBody = BodyType<MarcarDemoInput>
+    export type MarcarDemoMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark or unmark a user as an internal demo account (admin only)
+ */
+export const useMarcarDemo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof marcarDemo>>, TError,{id: string;data: BodyType<MarcarDemoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof marcarDemo>>,
+        TError,
+        {id: string;data: BodyType<MarcarDemoInput>},
+        TContext
+      > => {
+      return useMutation(getMarcarDemoMutationOptions(options));
     }
 
 export const getSendAdminRecordatorioEmailUrl = (id: string,) => {

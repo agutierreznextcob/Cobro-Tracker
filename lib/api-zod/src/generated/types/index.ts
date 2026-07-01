@@ -118,6 +118,7 @@ export * from './listWebhookEventosParams';
 export * from './listWebhookEventosResultado';
 export * from './loginInput';
 export * from './logoutSuccess';
+export * from './marcarDemoInput';
 export * from './miembroEquipo';
 export * from './miembroEquipoOrgRole';
 export * from './mpCredentialsInput';

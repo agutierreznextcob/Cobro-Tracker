@@ -1227,6 +1227,23 @@ export const DesactivarCuentaResponse = zod.object({
 
 
 /**
+ * @summary Mark or unmark a user as an internal demo account (admin only)
+ */
+export const MarcarDemoParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const MarcarDemoBody = zod.object({
+  "esDemo": zod.boolean().describe('True to mark the account as an internal demo account, false to unmark.')
+})
+
+export const MarcarDemoResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish()
+})
+
+
+/**
  * @summary Send a subscription renewal reminder email to a user (admin only)
  */
 export const SendAdminRecordatorioEmailParams = zod.object({

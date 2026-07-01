@@ -429,6 +429,11 @@ export interface ExtenderTrialInput {
   dias?: number;
 }
 
+export interface MarcarDemoInput {
+  /** True to mark the account as an internal demo account, false to unmark. */
+  esDemo: boolean;
+}
+
 export interface AdminAccionResult {
   ok: boolean;
   /** @nullable */

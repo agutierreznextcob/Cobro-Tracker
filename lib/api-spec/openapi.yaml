@@ -1522,6 +1522,32 @@ paths:
                 $ref: "#/components/schemas/AdminAccionResult"
         "404":
           description: User not found
+  /admin/usuarios/{id}/demo:
+    post:
+      operationId: marcarDemo
+      tags: [admin]
+      summary: Mark or unmark a user as an internal demo account (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarcarDemoInput"
+      responses:
+        "200":
+          description: Demo flag updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccionResult"
+        "404":
+          description: User not found
   /admin/usuarios/{id}/recordatorio-email:
     post:
       operationId: sendAdminRecordatorioEmail
@@ -3038,6 +3064,14 @@ components:
           type: integer
           minimum: 1
           description: Days to extend (default 14).
+
+    MarcarDemoInput:
+      type: object
+      required: [esDemo]
+      properties:
+        esDemo:
+          type: boolean
+          description: True to mark the account as an internal demo account, false to unmark.
 
     AdminAccionResult:
       type: object

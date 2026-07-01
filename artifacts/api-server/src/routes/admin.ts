@@ -300,6 +300,38 @@ adminRouter.post("/admin/usuarios/:id/desactivar", async (req, res) => {
   }
 });
 
+adminRouter.post("/admin/usuarios/:id/demo", async (req, res) => {
+  const { id } = req.params;
+  const esDemo = req.body?.esDemo === true;
+  try {
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!u) {
+      res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" });
+      return;
+    }
+    // Marking demo grants permanent access via esDemo (source of truth). Also push
+    // trialEndsAt far into the future so the account never reads as expired; the
+    // column is NOT NULL so we set a far-future date rather than clearing it.
+    await db
+      .update(usersTable)
+      .set(
+        esDemo
+          ? { esDemo: true, trialEndsAt: new Date("2099-12-31T00:00:00.000Z") }
+          : { esDemo: false },
+      )
+      .where(eq(usersTable.id, id));
+    res.json({
+      ok: true,
+      mensaje: esDemo
+        ? "Cuenta marcada como demo interna."
+        : "Cuenta desmarcada como demo.",
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error toggling demo flag");
+    res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+});
+
 adminRouter.post("/admin/usuarios/:id/recordatorio-email", async (req, res) => {
   const { id } = req.params;
   try {

@@ -6,6 +6,7 @@ import {
   useExtenderTrial,
   useActivarCuenta,
   useDesactivarCuenta,
+  useMarcarDemo,
   getListAdminUsuariosQueryKey,
   getGetAdminMetricasQueryKey,
   type AdminUsuario,
@@ -160,6 +161,7 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
   const extender = useExtenderTrial();
   const activar = useActivarCuenta();
   const desactivar = useDesactivarCuenta();
+  const marcarDemo = useMarcarDemo();
   const [sendingEmail, setSendingEmail] = useState(false);
 
   const refresh = () => {
@@ -267,8 +269,37 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
     );
   };
 
+  const handleDemo = (esDemo: boolean) => {
+    marcarDemo.mutate(
+      { id: u.id, data: { esDemo } },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: res.ok
+              ? esDemo
+                ? "Marcada como demo"
+                : "Demo desmarcada"
+              : "No se pudo actualizar",
+            description: res.mensaje ?? undefined,
+            variant: res.ok ? undefined : "destructive",
+          });
+          refresh();
+        },
+        onError: () =>
+          toast({
+            title: "Error",
+            description: "No se pudo actualizar la cuenta demo.",
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
   const busy =
-    extender.isPending || activar.isPending || desactivar.isPending;
+    extender.isPending ||
+    activar.isPending ||
+    desactivar.isPending ||
+    marcarDemo.isPending;
 
   if (u.isAdmin) {
     return <span className="text-xs text-muted-foreground">—</span>;
@@ -320,6 +351,17 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
             <CalendarPlus className="h-4 w-4 mr-2" />
             Extender prueba 14 días
           </DropdownMenuItem>
+          {u.esDemo ? (
+            <DropdownMenuItem onClick={() => handleDemo(false)}>
+              <Star className="h-4 w-4 mr-2" />
+              Quitar cuenta demo
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={() => handleDemo(true)}>
+              <Star className="h-4 w-4 mr-2" />
+              Marcar como demo
+            </DropdownMenuItem>
+          )}
           {u.activo ? (
             <DropdownMenuItem onClick={handleDesactivar} className="text-destructive">
               <Ban className="h-4 w-4 mr-2" />
