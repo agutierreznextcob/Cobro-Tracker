@@ -21,6 +21,7 @@ import {
   Percent,
   Share2,
   Sparkles,
+  UserCircle,
   Users,
   UsersRound,
   Wallet,
@@ -140,9 +141,20 @@ function LandingNav() {
                       role="menuitem"
                       onClick={() => {
                         setMenuOpen(false);
-                        logout();
+                        navigate("/perfil");
                       }}
                       className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-secondary/70 transition-colors"
+                    >
+                      <UserCircle className="h-4 w-4" />
+                      Mi perfil
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        logout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-secondary/70 transition-colors border-t border-border"
                     >
                       <LogOut className="h-4 w-4" />
                       Cerrar sesión
