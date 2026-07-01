@@ -2,6 +2,7 @@ import { pool } from "@workspace/db";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startRecordatoriosScheduler } from "./lib/recordatorios-scheduler";
+import { seedEssentialAccounts } from "./lib/seed";
 
 // node-postgres emits an 'error' event on idle clients when the backend drops a
 // pooled connection (routine in cloud Postgres: idle timeouts, failovers). With
@@ -33,5 +34,10 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  // Ensure essential accounts (demo + superadmin) exist. Fire-and-forget with a
+  // catch so a seed failure logs but never crashes the process / healthcheck.
+  seedEssentialAccounts().catch((err) => {
+    logger.error({ err }, "Seed of essential accounts failed");
+  });
   startRecordatoriosScheduler();
 });
