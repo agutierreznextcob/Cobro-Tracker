@@ -28,3 +28,10 @@ grants access.
 
 **Why:** these accounts are internal, not prospects/customers; counting them as
 trials or letting them expire breaks demos and skews conversion reporting.
+
+**Setting demo in PRODUCTION:** the agent's SQL tooling against production is
+READ-ONLY, so you cannot flip `es_demo` on the prod row directly. The supported
+path is the superadmin panel action ("Marcar como demo") which hits an admin-only
+toggle endpoint; the operator runs it in the deployed app after publishing. Do not
+attempt prod data writes from the agent or via publish (publish migrates schema,
+not data).

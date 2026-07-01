@@ -41,6 +41,7 @@ import {
   CalendarPlus,
   CheckCircle2,
   Ban,
+  Star,
   DollarSign,
   Wallet,
 } from "lucide-react";

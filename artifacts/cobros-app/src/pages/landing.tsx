@@ -1,5 +1,5 @@
 import { useAuth } from "@workspace/replit-auth-web";
-import { Redirect, useLocation, Link } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useEffect, useState } from "react";
 import { LandingChat } from "@/components/landing-chat";
 import { DemoRequestModal } from "@/components/demo-request-modal";
@@ -474,12 +474,6 @@ function Footer() {
 }
 
 export default function LandingPage() {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (!isLoading && isAuthenticated) {
-    return <Redirect to="/dashboard" />;
-  }
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       <LandingNav />
