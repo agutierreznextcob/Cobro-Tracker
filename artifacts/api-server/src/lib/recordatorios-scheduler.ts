@@ -35,8 +35,16 @@ async function tick(): Promise<void> {
  */
 export function startRecordatoriosScheduler(): void {
   if (timer) return;
-  void tick();
-  timer = setInterval(() => void tick(), CHECK_INTERVAL_MS);
+  // Best-effort background work: tick() already try/catches its own body, but we
+  // also guard the fire-and-forget call itself so a rejection can never escape as
+  // an unhandled rejection and crash the process (which would fail the deploy).
+  const runTick = () => {
+    tick().catch((err) =>
+      logger.error({ err }, "Error no controlado en el scheduler de recordatorios"),
+    );
+  };
+  runTick();
+  timer = setInterval(runTick, CHECK_INTERVAL_MS);
   if (typeof timer.unref === "function") timer.unref();
   logger.info({}, "Scheduler de recordatorios iniciado");
 }

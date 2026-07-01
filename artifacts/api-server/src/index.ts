@@ -1,6 +1,16 @@
+import { pool } from "@workspace/db";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startRecordatoriosScheduler } from "./lib/recordatorios-scheduler";
+
+// node-postgres emits an 'error' event on idle clients when the backend drops a
+// pooled connection (routine in cloud Postgres: idle timeouts, failovers). With
+// no listener attached this becomes an uncaught exception that exits the whole
+// process — which in a deployment turns into a healthcheck crash loop. Handle it
+// so a dead idle connection is logged and discarded instead of killing the API.
+pool.on("error", (err) => {
+  logger.error({ err }, "Idle Postgres client error (connection discarded)");
+});
 
 const rawPort = process.env["PORT"];
 
