@@ -25,6 +25,14 @@ import {
   useListDescuentos,
   getListDescuentosQueryKey,
   AplicarDescuentoInputTipo,
+  useListWorkflows,
+  getListWorkflowsQueryKey,
+  useAsignarWorkflow,
+  useDesasignarWorkflow,
+  useListCobroEjecuciones,
+  getListCobroEjecucionesQueryKey,
+  useGetSugerenciaWorkflow,
+  getGetSugerenciaWorkflowQueryKey,
   type RecordatorioInputCanal,
   type RecordatorioInputMomento,
 } from "@workspace/api-client-react";
@@ -40,6 +48,7 @@ import { formatCurrency, formatDate, formatDateOnly } from "@/lib/format";
 import { tipoDocumentoLabel } from "@/lib/tipo-documento";
 import { StatusBadge } from "@/components/status-badge";
 import { GestionesSection } from "@/components/gestiones-section";
+import { accionLabel } from "@/lib/workflow-labels";
 import {
   ArrowLeft,
   RefreshCw,
@@ -68,6 +77,9 @@ import {
   Pencil,
   TicketPercent,
   History,
+  Workflow,
+  Zap,
+  XCircle,
 } from "lucide-react";
 import { CobroUpdateEstado } from "@workspace/api-client-react";
 
@@ -488,6 +500,79 @@ export default function CobroDetail() {
   const crearRecordatorio = useCreateRecordatorio();
   const actualizarRecordatorio = useUpdateRecordatorio();
   const eliminarRecordatorio = useDeleteRecordatorio();
+
+  // --- Automatización (workflows) ---
+  const { data: workflowsList } = useListWorkflows({
+    query: { queryKey: getListWorkflowsQueryKey() },
+  });
+  const { data: ejecuciones } = useListCobroEjecuciones(id, {
+    query: { enabled: !!id, queryKey: getListCobroEjecucionesQueryKey(id) },
+  });
+  const asignarWorkflow = useAsignarWorkflow();
+  const desasignarWorkflow = useDesasignarWorkflow();
+  const [workflowSeleccionado, setWorkflowSeleccionado] = useState<string>("");
+
+  const workflowAsignado =
+    cobro?.workflowId != null
+      ? workflowsList?.find((w) => w.id === cobro.workflowId)
+      : undefined;
+
+  const sinWorkflow = !!cobro && cobro.workflowId == null;
+  const { data: sugerencia } = useGetSugerenciaWorkflow(
+    { cobroId: id },
+    {
+      query: {
+        enabled: sinWorkflow,
+        queryKey: getGetSugerenciaWorkflowQueryKey({ cobroId: id }),
+      },
+    },
+  );
+  const workflowSugerido = sugerencia
+    ? workflowsList?.find((w) => w.plantillaKey === sugerencia.plantillaKey)
+    : undefined;
+
+  const invalidarWorkflow = () => {
+    queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+    queryClient.invalidateQueries({ queryKey: getListCobroEjecucionesQueryKey(id) });
+  };
+
+  const handleAsignarWorkflow = () => {
+    const wfId = Number(workflowSeleccionado);
+    if (!wfId) return;
+    asignarWorkflow.mutate(
+      { id, data: { workflowId: wfId } },
+      {
+        onSuccess: () => {
+          toast({ title: "Workflow asignado", description: "El cobro ahora usa automatización." });
+          setWorkflowSeleccionado("");
+          invalidarWorkflow();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo asignar el workflow.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  const handleDesasignarWorkflow = () => {
+    desasignarWorkflow.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Workflow removido",
+            description: "El cobro volvió a los recordatorios simples.",
+          });
+          invalidarWorkflow();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo remover el workflow.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  };
 
   const [nuevoCanal, setNuevoCanal] = useState<RecordatorioInputCanal>("email");
   const [nuevoMomento, setNuevoMomento] = useState<RecordatorioInputMomento>("despues");
@@ -1400,6 +1485,139 @@ export default function CobroDetail() {
           )}
         </div>
       </div>
+
+      {/* Automatización (workflows) */}
+      <Card className="shadow-sm border-border/50">
+        <CardHeader className="bg-muted/20 border-b border-border/50 pb-4">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Workflow className="h-4 w-4 text-primary" />
+            Automatización de cobranza
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-5">
+          {workflowAsignado ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary" />
+                <div>
+                  <div className="text-sm font-medium">{workflowAsignado.nombre}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {workflowAsignado.activo ? "Workflow activo" : "Workflow pausado"} · los
+                    recordatorios simples están desactivados para este cobro
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDesasignarWorkflow}
+                disabled={desasignarWorkflow.isPending}
+              >
+                {desasignarWorkflow.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Quitar workflow"
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Asigna un workflow para automatizar la cobranza de este cobro. Al asignarlo, los
+                recordatorios simples se desactivan.
+              </p>
+              {sugerencia && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 p-3">
+                  <div className="flex items-start gap-2">
+                    <Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div className="text-sm">
+                      <span className="font-medium">Sugerencia:</span> {sugerencia.razon}
+                    </div>
+                  </div>
+                  {workflowSugerido && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setWorkflowSeleccionado(String(workflowSugerido.id))}
+                    >
+                      Usar {workflowSugerido.nombre}
+                    </Button>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Select value={workflowSeleccionado} onValueChange={setWorkflowSeleccionado}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Selecciona un workflow" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(workflowsList ?? []).length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        No hay workflows. Crea uno en Automatización.
+                      </div>
+                    ) : (
+                      workflowsList!.map((w) => (
+                        <SelectItem key={w.id} value={String(w.id)}>
+                          {w.nombre}
+                          {!w.activo ? " (pausado)" : ""}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAsignarWorkflow}
+                  disabled={!workflowSeleccionado || asignarWorkflow.isPending}
+                >
+                  {asignarWorkflow.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Zap className="mr-2 h-4 w-4" />
+                  )}
+                  Asignar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {ejecuciones && ejecuciones.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Historial de automatización
+              </div>
+              <div className="space-y-1.5">
+                {ejecuciones.map((e) => (
+                  <div
+                    key={e.id}
+                    className="flex items-center justify-between gap-3 rounded-md border border-border/50 p-2.5"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      {e.estado === "enviado" ? (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                      ) : e.estado === "fallido" ? (
+                        <XCircle className="h-4 w-4 shrink-0 text-red-500" />
+                      ) : e.estado === "omitido" ? (
+                        <XCircle className="h-4 w-4 shrink-0 text-gray-400" />
+                      ) : (
+                        <Clock className="h-4 w-4 shrink-0 text-amber-500" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="truncate text-sm">{accionLabel(e.accionTipo)}</div>
+                        {e.detalle && (
+                          <div className="truncate text-xs text-muted-foreground">{e.detalle}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-xs text-muted-foreground">
+                      {formatDate(e.creadoEn)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recordatorios automáticos */}
       <Card className="shadow-sm border-border/50">

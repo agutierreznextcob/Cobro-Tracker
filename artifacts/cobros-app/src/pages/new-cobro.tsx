@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateCobro, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, type CobroInput } from "@workspace/api-client-react";
+import { useCreateCobro, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, useListWorkflows, getListWorkflowsQueryKey, useAsignarWorkflow, type CobroInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLocation } from "wouter";
@@ -48,6 +48,13 @@ export default function NewCobro() {
     query: { enabled: isOrgAdmin, queryKey: getListMiembrosQueryKey() },
   });
   const miembrosActivos = miembros?.filter((m) => m.activo) ?? [];
+
+  const { data: workflowsList } = useListWorkflows({
+    query: { queryKey: getListWorkflowsQueryKey() },
+  });
+  const asignarWorkflow = useAsignarWorkflow();
+  const [automatizacion, setAutomatizacion] = useState<"ninguna" | "simple" | "workflow">("ninguna");
+  const [workflowSeleccionado, setWorkflowSeleccionado] = useState<string>("");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -103,15 +110,42 @@ export default function NewCobro() {
       responsableId: isOrgAdmin ? values.responsableId || undefined : undefined,
     };
 
+    if (automatizacion === "workflow" && !Number(workflowSeleccionado)) {
+      toast({
+        title: "Selecciona un workflow",
+        description: "Elige un workflow inteligente o cambia la opción de automatización.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     createCobro.mutate({ data: payload }, {
-      onSuccess: (data) => {
-        toast({
-          title: "Cobro creado",
-          description: "El cobro fue creado exitosamente.",
-        });
+      onSuccess: async (data) => {
         queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardMetricsQueryKey() });
+
+        const wfId = Number(workflowSeleccionado);
+        if (automatizacion === "workflow" && wfId) {
+          try {
+            await asignarWorkflow.mutateAsync({ id: data.id, data: { workflowId: wfId } });
+            toast({
+              title: "Cobro creado con automatización",
+              description: "El workflow fue asignado al cobro.",
+            });
+          } catch {
+            toast({
+              title: "Cobro creado",
+              description: "No se pudo asignar el workflow; puedes asignarlo desde el detalle.",
+              variant: "destructive",
+            });
+          }
+        } else {
+          toast({
+            title: "Cobro creado",
+            description: "El cobro fue creado exitosamente.",
+          });
+        }
         setLocation(`/cobros/${data.id}`);
       },
       onError: () => {
@@ -392,9 +426,72 @@ export default function NewCobro() {
                 )}
               />
 
+              <div className="space-y-3 rounded-lg border border-border/50 bg-muted/20 p-4">
+                <div>
+                  <p className="text-sm font-medium">Automatización de cobranza</p>
+                  <p className="text-xs text-muted-foreground">
+                    Elige cómo dar seguimiento a este cobro. Puedes cambiarlo después.
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {(
+                    [
+                      { key: "ninguna", label: "Sin automatización", desc: "Seguimiento manual." },
+                      { key: "simple", label: "Recordatorio simple", desc: "Configúralo en el detalle." },
+                      { key: "workflow", label: "Workflow inteligente", desc: "Secuencia automatizada." },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setAutomatizacion(opt.key)}
+                      className={`rounded-lg border p-3 text-left transition-colors ${
+                        automatizacion === opt.key
+                          ? "border-primary bg-primary/5"
+                          : "border-border/50 hover:bg-secondary/50"
+                      }`}
+                    >
+                      <div className="text-sm font-medium">{opt.label}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                {automatizacion === "workflow" && (
+                  <div className="space-y-1.5">
+                    <Select value={workflowSeleccionado} onValueChange={setWorkflowSeleccionado}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un workflow" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(workflowsList ?? []).length === 0 ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            No hay workflows. Créalos en Automatización.
+                          </div>
+                        ) : (
+                          workflowsList!.map((w) => (
+                            <SelectItem key={w.id} value={String(w.id)}>
+                              {w.nombre}
+                              {!w.activo ? " (pausado)" : ""}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Al asignar un workflow, los recordatorios simples quedan desactivados para este
+                      cobro.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end pt-4 border-t border-border/50">
-                <Button type="submit" disabled={createCobro.isPending} className="min-w-32">
-                  {createCobro.isPending ? (
+                <Button
+                  type="submit"
+                  disabled={createCobro.isPending || asignarWorkflow.isPending}
+                  className="min-w-32"
+                >
+                  {createCobro.isPending || asignarWorkflow.isPending ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creando...</>
                   ) : (
                     "Crear cobro"

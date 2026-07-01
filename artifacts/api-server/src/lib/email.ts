@@ -755,3 +755,116 @@ export async function sendPortalEmail(
   }
   return { ok: true };
 }
+
+export interface WorkflowEmailData {
+  emailPagador: string;
+  clienteNombre: string | null;
+  asunto: string;
+  mensaje: string;
+  monto: number;
+  descripcion: string;
+  comercioNombre: string;
+  linkPago?: string | null;
+  remitenteNombre?: string | null;
+  remitenteEmail?: string | null;
+}
+
+// Sends a workflow-step email with an org-authored subject/body. The message is
+// HTML-escaped (newlines → <br/>) so untrusted client data can't inject markup.
+// A payment CTA is shown when a link exists, otherwise a "responder al cobro"
+// mailto is offered (never routed to NextCob).
+export async function sendWorkflowEmail(
+  data: WorkflowEmailData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping workflow email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const montoFormato = formatCLP(data.monto);
+  const nombre = data.clienteNombre || "cliente";
+  const tieneLink = !!data.linkPago;
+  const responderUrl = tieneLink
+    ? null
+    : buildResponderCobroMailto(data.remitenteEmail, data.descripcion);
+  const cuerpo = escapeHtml(data.mensaje).replace(/\r?\n/g, "<br/>");
+  const asunto = data.asunto?.replace(/[\r\n]/g, " ").trim() || `Cobro pendiente — ${data.comercioNombre}`;
+
+  const { error } = await client.emails.send({
+    ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
+    to: [data.emailPagador],
+    subject: asunto,
+    html: buildEmailHtml({
+      title: asunto,
+      previewText: data.mensaje.replace(/\s+/g, " ").slice(0, 140),
+      heading: `Hola ${escapeHtml(nombre)} 👋`,
+      bodyLines: [
+        cuerpo,
+        `<span style="display:block;background:#f4f4f5;border-radius:8px;padding:12px 16px;font-size:14px;color:#09090b;">
+          <strong>Concepto:</strong> ${escapeHtml(data.descripcion)}<br/>
+          <strong>Monto:</strong> <span style="font-family:monospace;font-weight:700;color:#2563eb;">${montoFormato}</span>
+        </span>`,
+      ],
+      ctaText: tieneLink ? `Pagar ${montoFormato}` : responderUrl ? "Responder al cobro" : undefined,
+      ctaUrl: tieneLink ? data.linkPago! : (responderUrl ?? undefined),
+      footerNote: "Si ya realizaste el pago, ignora este mensaje.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending workflow email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
+export interface EncuestaEmailData {
+  emailDestino: string;
+  clienteNombre: string | null;
+  empresa: string;
+  descripcion: string;
+  ctaUrl: string;
+  remitenteNombre?: string | null;
+  remitenteEmail?: string | null;
+}
+
+// Invites the client to rate their payment experience via a public 1-question survey.
+export async function sendEncuestaEmail(
+  data: EncuestaEmailData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping survey email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const nombre = data.clienteNombre || "cliente";
+  const { error } = await client.emails.send({
+    ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
+    to: [data.emailDestino],
+    subject: `¿Cómo fue tu experiencia con ${data.empresa}?`,
+    html: buildEmailHtml({
+      title: `Tu opinión — ${data.empresa}`,
+      previewText: `Cuéntanos cómo fue tu experiencia de pago con ${data.empresa}.`,
+      heading: `Gracias por tu pago, ${escapeHtml(nombre)} 🙏`,
+      bodyLines: [
+        `<strong>${escapeHtml(data.empresa)}</strong> agradece tu pago del cobro por <strong>${escapeHtml(data.descripcion)}</strong>.`,
+        `Nos ayudaría mucho conocer tu opinión. Solo te tomará unos segundos calificar tu experiencia.`,
+      ],
+      ctaText: "Calificar mi experiencia",
+      ctaUrl: data.ctaUrl,
+      footerNote: "Tu opinión es anónima para el equipo de cobranza y nos ayuda a mejorar.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending survey email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}

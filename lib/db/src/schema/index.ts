@@ -18,3 +18,8 @@ export * from "./recordatorios-enviados";
 export * from "./notificaciones";
 export * from "./leads";
 export * from "./comprobantes";
+export * from "./workflows";
+export * from "./workflow-steps";
+export * from "./workflow-ejecuciones";
+export * from "./tareas";
+export * from "./encuestas";

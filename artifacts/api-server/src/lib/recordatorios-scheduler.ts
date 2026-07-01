@@ -1,5 +1,6 @@
 import { logger } from "./logger";
 import { fechaHoySantiago, procesarRecordatorios } from "./recordatorios";
+import { procesarWorkflows } from "./workflows-engine";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 
@@ -17,6 +18,10 @@ async function tick(): Promise<void> {
   if (lastProcessedDate === hoy) return;
   try {
     await procesarRecordatorios(runLogger, hoy);
+    // Workflows de cobranza corren DESPUÉS de los recordatorios simples. Ambos
+    // engines coexisten: procesarRecordatorios ignora cobros con workflowId y
+    // procesarWorkflows sólo actúa sobre cobros con workflowId asignado.
+    await procesarWorkflows(runLogger);
     lastProcessedDate = hoy;
   } catch (err) {
     logger.error({ err }, "Error en el scheduler de recordatorios");

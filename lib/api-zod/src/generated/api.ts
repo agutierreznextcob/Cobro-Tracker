@@ -247,6 +247,7 @@ export const GetClienteResponse = zod.object({
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })),
@@ -460,6 +461,7 @@ export const ListCobrosResponseItem = zod.object({
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -522,6 +524,7 @@ export const GetCobroResponse = zod.object({
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -573,6 +576,7 @@ export const UpdateCobroResponse = zod.object({
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -969,6 +973,7 @@ export const AplicarDescuentoResponse = zod.object({
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -1696,6 +1701,514 @@ export const RunRecordatoriosResponse = zod.object({
   "whatsappsEnviados": zod.number(),
   "notificacionesCreadas": zod.number(),
   "errores": zod.number()
+})
+
+
+/**
+ * @summary List workflows for the current user/org
+ */
+export const ListWorkflowsResponseItem = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "userId": zod.string(),
+  "nombre": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "activo": zod.boolean(),
+  "plantillaKey": zod.string().nullish(),
+  "triggerTipo": zod.enum(['cobro_creado', 'proximo_vencer', 'vencido', 'dias_mora', 'no_pagado_despues', 'marcado_parcial', 'email_no_abierto']),
+  "triggerDias": zod.number(),
+  "condiciones": zod.union([zod.object({
+  "montoMin": zod.number().nullish(),
+  "montoMax": zod.number().nullish(),
+  "scores": zod.array(zod.string()).nullish(),
+  "tiposDocumento": zod.array(zod.string()).nullish(),
+  "clienteIds": zod.array(zod.number()).nullish(),
+  "responsableIds": zod.array(zod.string()).nullish()
+}),zod.null()]).optional(),
+  "cobrosUsando": zod.number().optional().describe('Number of cobros currently assigned to this workflow'),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date().optional()
+})
+export const ListWorkflowsResponse = zod.array(ListWorkflowsResponseItem)
+
+
+/**
+ * @summary Create a workflow
+ */
+export const CreateWorkflowBody = zod.object({
+  "nombre": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "activo": zod.boolean().optional(),
+  "triggerTipo": zod.enum(['cobro_creado', 'proximo_vencer', 'vencido', 'dias_mora', 'no_pagado_despues', 'marcado_parcial', 'email_no_abierto']),
+  "triggerDias": zod.number().optional(),
+  "condiciones": zod.object({
+  "montoMin": zod.number().nullish(),
+  "montoMax": zod.number().nullish(),
+  "scores": zod.array(zod.string()).nullish(),
+  "tiposDocumento": zod.array(zod.string()).nullish(),
+  "clienteIds": zod.array(zod.number()).nullish(),
+  "responsableIds": zod.array(zod.string()).nullish()
+}).optional(),
+  "steps": zod.array(zod.object({
+  "orden": zod.number().optional(),
+  "delayDias": zod.number().optional(),
+  "accionTipo": zod.enum(['enviar_email', 'enviar_whatsapp', 'crear_tarea', 'notificar_admin', 'aplicar_descuento', 'cambiar_estado', 'enviar_comprobante', 'enviar_encuesta']),
+  "config": zod.object({
+  "asunto": zod.string().nullish(),
+  "mensaje": zod.string().nullish(),
+  "tareaTitulo": zod.string().nullish(),
+  "descuentoTipo": zod.enum(['porcentaje', 'monto']).nullish(),
+  "descuentoValor": zod.number().nullish(),
+  "nuevoEstado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).nullish()
+}).optional()
+})).optional()
+})
+
+
+/**
+ * @summary List predefined workflow templates
+ */
+export const ListWorkflowPlantillasResponseItem = zod.object({
+  "key": zod.string(),
+  "nombre": zod.string(),
+  "descripcion": zod.string(),
+  "categoria": zod.string(),
+  "triggerTipo": zod.string(),
+  "triggerDias": zod.number(),
+  "condiciones": zod.union([zod.object({
+  "montoMin": zod.number().nullish(),
+  "montoMax": zod.number().nullish(),
+  "scores": zod.array(zod.string()).nullish(),
+  "tiposDocumento": zod.array(zod.string()).nullish(),
+  "clienteIds": zod.array(zod.number()).nullish(),
+  "responsableIds": zod.array(zod.string()).nullish()
+}),zod.null()]).optional(),
+  "steps": zod.array(zod.object({
+  "orden": zod.number().optional(),
+  "delayDias": zod.number().optional(),
+  "accionTipo": zod.enum(['enviar_email', 'enviar_whatsapp', 'crear_tarea', 'notificar_admin', 'aplicar_descuento', 'cambiar_estado', 'enviar_comprobante', 'enviar_encuesta']),
+  "config": zod.object({
+  "asunto": zod.string().nullish(),
+  "mensaje": zod.string().nullish(),
+  "tareaTitulo": zod.string().nullish(),
+  "descuentoTipo": zod.enum(['porcentaje', 'monto']).nullish(),
+  "descuentoValor": zod.number().nullish(),
+  "nuevoEstado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).nullish()
+}).optional()
+}))
+})
+export const ListWorkflowPlantillasResponse = zod.array(ListWorkflowPlantillasResponseItem)
+
+
+/**
+ * @summary Workflow dashboard aggregates
+ */
+export const GetWorkflowDashboardResponse = zod.object({
+  "workflows": zod.array(zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "activo": zod.boolean(),
+  "cobrosUsando": zod.number(),
+  "accionesHoy": zod.number(),
+  "accionesSemana": zod.number()
+})),
+  "accionesHoy": zod.number(),
+  "accionesSemana": zod.number(),
+  "proximas": zod.array(zod.object({
+  "cobroId": zod.number(),
+  "accionTipo": zod.string(),
+  "fecha": zod.string(),
+  "workflowNombre": zod.string().nullish(),
+  "clienteNombre": zod.string().nullish(),
+  "descripcion": zod.string().nullish()
+})),
+  "historial": zod.array(zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "workflowId": zod.number(),
+  "stepId": zod.number().nullish(),
+  "accionTipo": zod.string(),
+  "estado": zod.enum(['enviado', 'fallido', 'pendiente', 'omitido']),
+  "detalle": zod.string().nullish(),
+  "fecha": zod.string(),
+  "clienteNombre": zod.string().nullish(),
+  "descripcion": zod.string().nullish(),
+  "workflowNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Suggest a template by client score for a cobro
+ */
+export const GetSugerenciaWorkflowQueryParams = zod.object({
+  "cobroId": zod.coerce.number()
+})
+
+export const GetSugerenciaWorkflowResponse = zod.object({
+  "plantillaKey": zod.string(),
+  "categoria": zod.string(),
+  "score": zod.number().nullish(),
+  "razon": zod.string()
+})
+
+
+/**
+ * @summary Instantiate a workflow from a template
+ */
+export const CreateWorkflowFromPlantillaBody = zod.object({
+  "plantillaKey": zod.string(),
+  "nombre": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get a workflow with its steps
+ */
+export const GetWorkflowParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetWorkflowResponse = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "userId": zod.string(),
+  "nombre": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "activo": zod.boolean(),
+  "plantillaKey": zod.string().nullish(),
+  "triggerTipo": zod.enum(['cobro_creado', 'proximo_vencer', 'vencido', 'dias_mora', 'no_pagado_despues', 'marcado_parcial', 'email_no_abierto']),
+  "triggerDias": zod.number(),
+  "condiciones": zod.union([zod.object({
+  "montoMin": zod.number().nullish(),
+  "montoMax": zod.number().nullish(),
+  "scores": zod.array(zod.string()).nullish(),
+  "tiposDocumento": zod.array(zod.string()).nullish(),
+  "clienteIds": zod.array(zod.number()).nullish(),
+  "responsableIds": zod.array(zod.string()).nullish()
+}),zod.null()]).optional(),
+  "cobrosUsando": zod.number().optional().describe('Number of cobros currently assigned to this workflow'),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date().optional()
+}).and(zod.object({
+  "steps": zod.array(zod.object({
+  "id": zod.number(),
+  "workflowId": zod.number(),
+  "orden": zod.number(),
+  "delayDias": zod.number(),
+  "accionTipo": zod.enum(['enviar_email', 'enviar_whatsapp', 'crear_tarea', 'notificar_admin', 'aplicar_descuento', 'cambiar_estado', 'enviar_comprobante', 'enviar_encuesta']),
+  "config": zod.union([zod.object({
+  "asunto": zod.string().nullish(),
+  "mensaje": zod.string().nullish(),
+  "tareaTitulo": zod.string().nullish(),
+  "descuentoTipo": zod.enum(['porcentaje', 'monto']).nullish(),
+  "descuentoValor": zod.number().nullish(),
+  "nuevoEstado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).nullish()
+}),zod.null()]).optional()
+})).optional()
+}))
+
+
+/**
+ * @summary Update a workflow (and optionally its steps)
+ */
+export const UpdateWorkflowParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateWorkflowBody = zod.object({
+  "nombre": zod.string().optional(),
+  "descripcion": zod.string().nullish(),
+  "activo": zod.boolean().optional(),
+  "triggerTipo": zod.enum(['cobro_creado', 'proximo_vencer', 'vencido', 'dias_mora', 'no_pagado_despues', 'marcado_parcial', 'email_no_abierto']).optional(),
+  "triggerDias": zod.number().optional(),
+  "condiciones": zod.object({
+  "montoMin": zod.number().nullish(),
+  "montoMax": zod.number().nullish(),
+  "scores": zod.array(zod.string()).nullish(),
+  "tiposDocumento": zod.array(zod.string()).nullish(),
+  "clienteIds": zod.array(zod.number()).nullish(),
+  "responsableIds": zod.array(zod.string()).nullish()
+}).optional(),
+  "steps": zod.array(zod.object({
+  "orden": zod.number().optional(),
+  "delayDias": zod.number().optional(),
+  "accionTipo": zod.enum(['enviar_email', 'enviar_whatsapp', 'crear_tarea', 'notificar_admin', 'aplicar_descuento', 'cambiar_estado', 'enviar_comprobante', 'enviar_encuesta']),
+  "config": zod.object({
+  "asunto": zod.string().nullish(),
+  "mensaje": zod.string().nullish(),
+  "tareaTitulo": zod.string().nullish(),
+  "descuentoTipo": zod.enum(['porcentaje', 'monto']).nullish(),
+  "descuentoValor": zod.number().nullish(),
+  "nuevoEstado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).nullish()
+}).optional()
+})).optional()
+})
+
+export const UpdateWorkflowResponse = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "userId": zod.string(),
+  "nombre": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "activo": zod.boolean(),
+  "plantillaKey": zod.string().nullish(),
+  "triggerTipo": zod.enum(['cobro_creado', 'proximo_vencer', 'vencido', 'dias_mora', 'no_pagado_despues', 'marcado_parcial', 'email_no_abierto']),
+  "triggerDias": zod.number(),
+  "condiciones": zod.union([zod.object({
+  "montoMin": zod.number().nullish(),
+  "montoMax": zod.number().nullish(),
+  "scores": zod.array(zod.string()).nullish(),
+  "tiposDocumento": zod.array(zod.string()).nullish(),
+  "clienteIds": zod.array(zod.number()).nullish(),
+  "responsableIds": zod.array(zod.string()).nullish()
+}),zod.null()]).optional(),
+  "cobrosUsando": zod.number().optional().describe('Number of cobros currently assigned to this workflow'),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date().optional()
+}).and(zod.object({
+  "steps": zod.array(zod.object({
+  "id": zod.number(),
+  "workflowId": zod.number(),
+  "orden": zod.number(),
+  "delayDias": zod.number(),
+  "accionTipo": zod.enum(['enviar_email', 'enviar_whatsapp', 'crear_tarea', 'notificar_admin', 'aplicar_descuento', 'cambiar_estado', 'enviar_comprobante', 'enviar_encuesta']),
+  "config": zod.union([zod.object({
+  "asunto": zod.string().nullish(),
+  "mensaje": zod.string().nullish(),
+  "tareaTitulo": zod.string().nullish(),
+  "descuentoTipo": zod.enum(['porcentaje', 'monto']).nullish(),
+  "descuentoValor": zod.number().nullish(),
+  "nuevoEstado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).nullish()
+}),zod.null()]).optional()
+})).optional()
+}))
+
+
+/**
+ * @summary Delete a workflow
+ */
+export const DeleteWorkflowParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Assign a workflow to a cobro
+ */
+export const AsignarWorkflowParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AsignarWorkflowBody = zod.object({
+  "workflowId": zod.number()
+})
+
+export const asignarWorkflowResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const AsignarWorkflowResponse = zod.object({
+  "id": zod.number(),
+  "monto": zod.number().describe('Original amount in currency units'),
+  "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
+  "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
+  "saldo": zod.number().optional().describe('Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses.'),
+  "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
+  "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
+  "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types carry IVA.'),
+  "descripcion": zod.string(),
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
+  "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
+  "organizationId": zod.number().nullish().describe('Organization this cobro belongs to'),
+  "responsableId": zod.string().nullish().describe('User ID of the ejecutivo\/admin this cobro is assigned to'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the assigned ejecutivo\/admin'),
+  "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
+  "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
+  "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "fechaVencimiento": zod.string().regex(asignarWorkflowResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
+  "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
+  "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
+  "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Remove the workflow from a cobro
+ */
+export const DesasignarWorkflowParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const desasignarWorkflowResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const DesasignarWorkflowResponse = zod.object({
+  "id": zod.number(),
+  "monto": zod.number().describe('Original amount in currency units'),
+  "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
+  "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
+  "saldo": zod.number().optional().describe('Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses.'),
+  "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
+  "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
+  "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types carry IVA.'),
+  "descripcion": zod.string(),
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
+  "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
+  "organizationId": zod.number().nullish().describe('Organization this cobro belongs to'),
+  "responsableId": zod.string().nullish().describe('User ID of the ejecutivo\/admin this cobro is assigned to'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the assigned ejecutivo\/admin'),
+  "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
+  "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
+  "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "fechaVencimiento": zod.string().regex(desasignarWorkflowResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
+  "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
+  "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
+  "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Execution history for a cobro
+ */
+export const ListCobroEjecucionesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListCobroEjecucionesResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "workflowId": zod.number(),
+  "stepId": zod.number().nullish(),
+  "accionTipo": zod.string(),
+  "estado": zod.enum(['enviado', 'fallido', 'pendiente', 'omitido']),
+  "detalle": zod.string().nullish(),
+  "fecha": zod.string(),
+  "clienteNombre": zod.string().nullish(),
+  "descripcion": zod.string().nullish(),
+  "workflowNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListCobroEjecucionesResponse = zod.array(ListCobroEjecucionesResponseItem)
+
+
+/**
+ * @summary List tasks for the current user
+ */
+export const ListTareasQueryParams = zod.object({
+  "estado": zod.enum(['pendiente', 'completada']).optional()
+})
+
+export const ListTareasResponseItem = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "userId": zod.string(),
+  "cobroId": zod.number().nullish(),
+  "titulo": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "estado": zod.enum(['pendiente', 'completada']),
+  "origen": zod.enum(['workflow', 'manual']),
+  "clienteNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date(),
+  "completadoEn": zod.coerce.date().nullish()
+})
+export const ListTareasResponse = zod.array(ListTareasResponseItem)
+
+
+/**
+ * @summary Mark a task as completed
+ */
+export const CompletarTareaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CompletarTareaResponse = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "userId": zod.string(),
+  "cobroId": zod.number().nullish(),
+  "titulo": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "estado": zod.enum(['pendiente', 'completada']),
+  "origen": zod.enum(['workflow', 'manual']),
+  "clienteNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date(),
+  "completadoEn": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary Satisfaction survey results summary
+ */
+export const GetEncuestasResumenResponse = zod.object({
+  "total": zod.number(),
+  "respondidas": zod.number(),
+  "promedio": zod.number(),
+  "distribucion": zod.array(zod.object({
+  "calificacion": zod.number(),
+  "cantidad": zod.number()
+})),
+  "recientes": zod.array(zod.object({
+  "clienteNombre": zod.string().nullish(),
+  "calificacion": zod.number(),
+  "comentario": zod.string().nullish(),
+  "respondidoEn": zod.coerce.date().nullish()
+}))
+})
+
+
+/**
+ * @summary Get a public survey by token
+ */
+export const GetEncuestaParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const GetEncuestaResponse = zod.object({
+  "empresa": zod.string(),
+  "descripcion": zod.string(),
+  "monto": zod.number(),
+  "calificacion": zod.number().nullish(),
+  "comentario": zod.string().nullish(),
+  "respondidoEn": zod.coerce.date().nullish(),
+  "yaRespondida": zod.boolean()
+})
+
+
+/**
+ * @summary Submit a survey response
+ */
+export const ResponderEncuestaParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const responderEncuestaBodyCalificacionMax = 5;
+
+
+
+export const ResponderEncuestaBody = zod.object({
+  "calificacion": zod.number().min(1).max(responderEncuestaBodyCalificacionMax),
+  "comentario": zod.string().nullish()
+})
+
+export const ResponderEncuestaResponse = zod.object({
+  "empresa": zod.string(),
+  "descripcion": zod.string(),
+  "monto": zod.number(),
+  "calificacion": zod.number().nullish(),
+  "comentario": zod.string().nullish(),
+  "respondidoEn": zod.coerce.date().nullish(),
+  "yaRespondida": zod.boolean()
 })
 
 

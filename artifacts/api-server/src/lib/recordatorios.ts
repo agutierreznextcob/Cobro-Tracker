@@ -8,7 +8,7 @@ import {
   notificacionesTable,
   type RecordatorioDefault,
 } from "@workspace/db";
-import { and, eq, isNotNull, inArray } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, inArray } from "drizzle-orm";
 import { sendSecuenciaRecordatorioEmail } from "./email";
 import { getRemitenteContacto } from "./org";
 import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "./whatsapp";
@@ -210,6 +210,9 @@ export async function procesarRecordatorios(
         isNotNull(cobrosTable.fechaVencimiento),
         // Solo cobros vigentes por cobrar: excluye pagado, cancelado y fallido.
         inArray(cobrosTable.estado, ["pendiente", "parcial"]),
+        // Coexistencia: los cobros con un workflow de cobranza asignado los maneja
+        // el motor de workflows, no los recordatorios simples.
+        isNull(cobrosTable.workflowId),
       ),
     );
 

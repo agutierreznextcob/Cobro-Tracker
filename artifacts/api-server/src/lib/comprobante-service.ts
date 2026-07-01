@@ -9,6 +9,7 @@ import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { generarComprobantePdf } from "./comprobante";
 import { sendComprobanteEmail } from "./email";
 import { getRemitenteContacto } from "./org";
+import { crearYEnviarEncuesta } from "./encuestas-service";
 
 interface Logger {
   info: (obj: object, msg: string) => void;
@@ -50,6 +51,11 @@ export async function emitirComprobante(
       log?.warn({ cobroId }, "emitirComprobante: cobro not found");
       return;
     }
+
+    // A paid cobro also triggers the post-payment satisfaction survey. Fire-and-
+    // forget and idempotent (unique on encuestas.cobroId), so it runs at most once
+    // per cobro across every paid path (manual, abono, webhook, workflow).
+    void crearYEnviarEncuesta(cobro.id, log);
 
     const montoDescuento = Number(cobro.montoDescuento ?? 0);
     const montoTotal = Number(cobro.monto) - montoDescuento;

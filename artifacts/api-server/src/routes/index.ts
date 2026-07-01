@@ -12,6 +12,9 @@ import gestionesRouter from "./gestiones";
 import notificacionesRouter from "./notificaciones";
 import leadsRouter from "./leads";
 import portalRouter from "./portal";
+import workflowsRouter from "./workflows";
+import tareasRouter from "./tareas";
+import encuestasRouter from "./encuestas";
 import { profileRouter } from "./profile";
 import { subscriptionRouter } from "./subscription";
 import { adminRouter } from "./admin";
@@ -39,7 +42,14 @@ router.use(leadsRouter);
 // mount before cobrosRouter, whose blanket auth middleware would otherwise
 // intercept the public path.
 router.use(portalRouter);
+// encuestasRouter exposes the unauthenticated public survey (/encuestas/:token);
+// mount before cobrosRouter, whose blanket auth middleware would otherwise
+// intercept the public path. Its /encuestas/stats/resumen route self-guards.
+router.use(encuestasRouter);
 router.use(cobrosRouter);
+// workflowsRouter and tareasRouter self-guard with their own auth middleware.
+router.use(workflowsRouter);
+router.use(tareasRouter);
 router.use(clientesRouter);
 router.use(liquidacionesRouter);
 router.use(aiRouter);

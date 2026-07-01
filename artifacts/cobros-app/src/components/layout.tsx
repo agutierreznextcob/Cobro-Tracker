@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Webhook, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X } from "lucide-react";
+import { Home, Plus, Search, Users, Webhook, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
@@ -71,6 +71,9 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/notificaciones", label: "Notificaciones", icon: Bell },
     { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock },
+    { href: "/workflows", label: "Automatización", icon: Workflow },
+    { href: "/tareas", label: "Tareas", icon: CheckSquare },
+    { href: "/encuestas", label: "Satisfacción", icon: MessageSquare },
     { href: "/webhooks/log", label: "Log webhooks", icon: Webhook },
     { href: "/perfil", label: "Perfil", icon: UserCircle },
   ];

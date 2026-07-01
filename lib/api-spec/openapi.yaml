@@ -26,6 +26,12 @@ tags:
     description: Sales leads from the public landing page
   - name: portal
     description: Public debtor portal (magic link)
+  - name: workflows
+    description: Collections automation workflows
+  - name: tareas
+    description: Ejecutivo tasks created by workflows
+  - name: encuestas
+    description: Client satisfaction surveys
 paths:
   /auth/user:
     get:
@@ -2142,8 +2148,786 @@ paths:
         "401":
           description: Unauthorized
 
+  /workflows:
+    get:
+      operationId: listWorkflows
+      tags: [workflows]
+      summary: List workflows for the current user/org
+      responses:
+        "200":
+          description: Workflows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Workflow"
+    post:
+      operationId: createWorkflow
+      tags: [workflows]
+      summary: Create a workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowDetalle"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /workflows/plantillas:
+    get:
+      operationId: listWorkflowPlantillas
+      tags: [workflows]
+      summary: List predefined workflow templates
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowPlantilla"
+
+  /workflows/dashboard:
+    get:
+      operationId: getWorkflowDashboard
+      tags: [workflows]
+      summary: Workflow dashboard aggregates
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowDashboard"
+
+  /workflows/sugerencia:
+    get:
+      operationId: getSugerenciaWorkflow
+      tags: [workflows]
+      summary: Suggest a template by client score for a cobro
+      parameters:
+        - name: cobroId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SugerenciaWorkflow"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /workflows/from-plantilla:
+    post:
+      operationId: createWorkflowFromPlantilla
+      tags: [workflows]
+      summary: Instantiate a workflow from a template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FromPlantillaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowDetalle"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /workflows/{id}:
+    get:
+      operationId: getWorkflow
+      tags: [workflows]
+      summary: Get a workflow with its steps
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Workflow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowDetalle"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateWorkflow
+      tags: [workflows]
+      summary: Update a workflow (and optionally its steps)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowDetalle"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteWorkflow
+      tags: [workflows]
+      summary: Delete a workflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/{id}/workflow:
+    post:
+      operationId: asignarWorkflow
+      tags: [workflows]
+      summary: Assign a workflow to a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AsignarWorkflowInput"
+      responses:
+        "200":
+          description: Updated cobro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cobro"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: desasignarWorkflow
+      tags: [workflows]
+      summary: Remove the workflow from a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated cobro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cobro"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/{id}/workflow-ejecuciones:
+    get:
+      operationId: listCobroEjecuciones
+      tags: [workflows]
+      summary: Execution history for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Executions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowEjecucion"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tareas:
+    get:
+      operationId: listTareas
+      tags: [tareas]
+      summary: List tasks for the current user
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pendiente, completada]
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tarea"
+
+  /tareas/{id}/completar:
+    post:
+      operationId: completarTarea
+      tags: [tareas]
+      summary: Mark a task as completed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tarea"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /encuestas/stats/resumen:
+    get:
+      operationId: getEncuestasResumen
+      tags: [encuestas]
+      summary: Satisfaction survey results summary
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EncuestasResumen"
+
+  /encuestas/{token}:
+    get:
+      operationId: getEncuesta
+      tags: [encuestas]
+      summary: Get a public survey by token
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Survey
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EncuestaPublica"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: responderEncuesta
+      tags: [encuestas]
+      summary: Submit a survey response
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EncuestaRespuestaInput"
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EncuestaPublica"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
+    WorkflowCondiciones:
+      type: object
+      properties:
+        montoMin:
+          type: ["number", "null"]
+        montoMax:
+          type: ["number", "null"]
+        scores:
+          type: ["array", "null"]
+          items:
+            type: string
+        tiposDocumento:
+          type: ["array", "null"]
+          items:
+            type: string
+        clienteIds:
+          type: ["array", "null"]
+          items:
+            type: integer
+        responsableIds:
+          type: ["array", "null"]
+          items:
+            type: string
+    WorkflowStepConfig:
+      type: object
+      properties:
+        asunto:
+          type: ["string", "null"]
+        mensaje:
+          type: ["string", "null"]
+        tareaTitulo:
+          type: ["string", "null"]
+        descuentoTipo:
+          type: ["string", "null"]
+          enum: [porcentaje, monto]
+        descuentoValor:
+          type: ["number", "null"]
+        nuevoEstado:
+          type: ["string", "null"]
+          enum: [pendiente, pagado, parcial, fallido, cancelado]
+    WorkflowStep:
+      type: object
+      required: [id, workflowId, orden, delayDias, accionTipo]
+      properties:
+        id:
+          type: integer
+        workflowId:
+          type: integer
+        orden:
+          type: integer
+        delayDias:
+          type: integer
+        accionTipo:
+          type: string
+          enum: [enviar_email, enviar_whatsapp, crear_tarea, notificar_admin, aplicar_descuento, cambiar_estado, enviar_comprobante, enviar_encuesta]
+        config:
+          oneOf:
+            - $ref: "#/components/schemas/WorkflowStepConfig"
+            - type: "null"
+    WorkflowStepInput:
+      type: object
+      required: [accionTipo]
+      properties:
+        orden:
+          type: integer
+        delayDias:
+          type: integer
+        accionTipo:
+          type: string
+          enum: [enviar_email, enviar_whatsapp, crear_tarea, notificar_admin, aplicar_descuento, cambiar_estado, enviar_comprobante, enviar_encuesta]
+        config:
+          $ref: "#/components/schemas/WorkflowStepConfig"
+    Workflow:
+      type: object
+      required: [id, userId, nombre, activo, triggerTipo, triggerDias, creadoEn]
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: ["integer", "null"]
+        userId:
+          type: string
+        nombre:
+          type: string
+        descripcion:
+          type: ["string", "null"]
+        activo:
+          type: boolean
+        plantillaKey:
+          type: ["string", "null"]
+        triggerTipo:
+          type: string
+          enum: [cobro_creado, proximo_vencer, vencido, dias_mora, no_pagado_despues, marcado_parcial, email_no_abierto]
+        triggerDias:
+          type: integer
+        condiciones:
+          oneOf:
+            - $ref: "#/components/schemas/WorkflowCondiciones"
+            - type: "null"
+        cobrosUsando:
+          type: integer
+          description: Number of cobros currently assigned to this workflow
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    WorkflowDetalle:
+      allOf:
+        - $ref: "#/components/schemas/Workflow"
+        - type: object
+          properties:
+            steps:
+              type: array
+              items:
+                $ref: "#/components/schemas/WorkflowStep"
+    WorkflowInput:
+      type: object
+      required: [nombre, triggerTipo]
+      properties:
+        nombre:
+          type: string
+        descripcion:
+          type: ["string", "null"]
+        activo:
+          type: boolean
+        triggerTipo:
+          type: string
+          enum: [cobro_creado, proximo_vencer, vencido, dias_mora, no_pagado_despues, marcado_parcial, email_no_abierto]
+        triggerDias:
+          type: integer
+        condiciones:
+          $ref: "#/components/schemas/WorkflowCondiciones"
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStepInput"
+    WorkflowUpdate:
+      type: object
+      properties:
+        nombre:
+          type: string
+        descripcion:
+          type: ["string", "null"]
+        activo:
+          type: boolean
+        triggerTipo:
+          type: string
+          enum: [cobro_creado, proximo_vencer, vencido, dias_mora, no_pagado_despues, marcado_parcial, email_no_abierto]
+        triggerDias:
+          type: integer
+        condiciones:
+          $ref: "#/components/schemas/WorkflowCondiciones"
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStepInput"
+    WorkflowPlantilla:
+      type: object
+      required: [key, nombre, descripcion, categoria, triggerTipo, triggerDias, steps]
+      properties:
+        key:
+          type: string
+        nombre:
+          type: string
+        descripcion:
+          type: string
+        categoria:
+          type: string
+        triggerTipo:
+          type: string
+        triggerDias:
+          type: integer
+        condiciones:
+          oneOf:
+            - $ref: "#/components/schemas/WorkflowCondiciones"
+            - type: "null"
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStepInput"
+    FromPlantillaInput:
+      type: object
+      required: [plantillaKey]
+      properties:
+        plantillaKey:
+          type: string
+        nombre:
+          type: ["string", "null"]
+    AsignarWorkflowInput:
+      type: object
+      required: [workflowId]
+      properties:
+        workflowId:
+          type: integer
+    WorkflowEjecucion:
+      type: object
+      required: [id, cobroId, workflowId, accionTipo, estado, fecha, creadoEn]
+      properties:
+        id:
+          type: integer
+        cobroId:
+          type: integer
+        workflowId:
+          type: integer
+        stepId:
+          type: ["integer", "null"]
+        accionTipo:
+          type: string
+        estado:
+          type: string
+          enum: [enviado, fallido, pendiente, omitido]
+        detalle:
+          type: ["string", "null"]
+        fecha:
+          type: string
+        clienteNombre:
+          type: ["string", "null"]
+        descripcion:
+          type: ["string", "null"]
+        workflowNombre:
+          type: ["string", "null"]
+        creadoEn:
+          type: string
+          format: date-time
+    ProximaAccion:
+      type: object
+      required: [cobroId, accionTipo, fecha]
+      properties:
+        cobroId:
+          type: integer
+        accionTipo:
+          type: string
+        fecha:
+          type: string
+        workflowNombre:
+          type: ["string", "null"]
+        clienteNombre:
+          type: ["string", "null"]
+        descripcion:
+          type: ["string", "null"]
+    WorkflowDashboardItem:
+      type: object
+      required: [id, nombre, activo, cobrosUsando, accionesHoy, accionesSemana]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        activo:
+          type: boolean
+        cobrosUsando:
+          type: integer
+        accionesHoy:
+          type: integer
+        accionesSemana:
+          type: integer
+    WorkflowDashboard:
+      type: object
+      required: [workflows, accionesHoy, accionesSemana, proximas, historial]
+      properties:
+        workflows:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowDashboardItem"
+        accionesHoy:
+          type: integer
+        accionesSemana:
+          type: integer
+        proximas:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProximaAccion"
+        historial:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowEjecucion"
+    Tarea:
+      type: object
+      required: [id, userId, titulo, estado, origen, creadoEn]
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: ["integer", "null"]
+        userId:
+          type: string
+        cobroId:
+          type: ["integer", "null"]
+        titulo:
+          type: string
+        descripcion:
+          type: ["string", "null"]
+        estado:
+          type: string
+          enum: [pendiente, completada]
+        origen:
+          type: string
+          enum: [workflow, manual]
+        clienteNombre:
+          type: ["string", "null"]
+        creadoEn:
+          type: string
+          format: date-time
+        completadoEn:
+          type: ["string", "null"]
+          format: date-time
+    EncuestaPublica:
+      type: object
+      required: [empresa, descripcion, monto, yaRespondida]
+      properties:
+        empresa:
+          type: string
+        descripcion:
+          type: string
+        monto:
+          type: number
+        calificacion:
+          type: ["integer", "null"]
+        comentario:
+          type: ["string", "null"]
+        respondidoEn:
+          type: ["string", "null"]
+          format: date-time
+        yaRespondida:
+          type: boolean
+    EncuestaRespuestaInput:
+      type: object
+      required: [calificacion]
+      properties:
+        calificacion:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comentario:
+          type: ["string", "null"]
+    EncuestaResumenItem:
+      type: object
+      required: [calificacion, cantidad]
+      properties:
+        calificacion:
+          type: integer
+        cantidad:
+          type: integer
+    EncuestaReciente:
+      type: object
+      required: [calificacion]
+      properties:
+        clienteNombre:
+          type: ["string", "null"]
+        calificacion:
+          type: integer
+        comentario:
+          type: ["string", "null"]
+        respondidoEn:
+          type: ["string", "null"]
+          format: date-time
+    EncuestasResumen:
+      type: object
+      required: [total, respondidas, promedio, distribucion, recientes]
+      properties:
+        total:
+          type: integer
+        respondidas:
+          type: integer
+        promedio:
+          type: number
+        distribucion:
+          type: array
+          items:
+            $ref: "#/components/schemas/EncuestaResumenItem"
+        recientes:
+          type: array
+          items:
+            $ref: "#/components/schemas/EncuestaReciente"
+    SugerenciaWorkflow:
+      type: object
+      required: [plantillaKey, categoria, razon]
+      properties:
+        plantillaKey:
+          type: string
+        categoria:
+          type: string
+        score:
+          type: ["integer", "null"]
+        razon:
+          type: string
     AdminUsuario:
       type: object
       required:
@@ -2576,6 +3360,9 @@ components:
         mpPaymentLinkUrl:
           type: ["string", "null"]
           description: MercadoPago checkout URL for the payer
+        workflowId:
+          type: ["integer", "null"]
+          description: ID of the collections workflow assigned to this cobro (null when using simple reminders)
         creadoEn:
           type: string
           format: date-time

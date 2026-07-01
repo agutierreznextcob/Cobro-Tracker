@@ -28,6 +28,11 @@ import LiquidacionesPage from "@/pages/liquidaciones";
 import LiquidacionDetailPage from "@/pages/liquidacion-detail";
 import Notificaciones from "@/pages/notificaciones";
 import RecordatoriosConfig from "@/pages/recordatorios-config";
+import WorkflowsPage from "@/pages/workflows";
+import WorkflowDetail from "@/pages/workflow-detail";
+import TareasPage from "@/pages/tareas";
+import EncuestasPage from "@/pages/encuestas";
+import EncuestaPublicaPage from "@/pages/encuesta-publica";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -120,6 +125,7 @@ function AppRouter() {
       <Route path="/privacidad" component={PrivacidadPage} />
       <Route path="/terminos" component={TerminosPage} />
       <Route path="/portal/:token" component={PortalPage} />
+      <Route path="/encuesta/:token" component={EncuestaPublicaPage} />
       <Route path="/dashboard">
         <AuthGate>
           <Layout>
@@ -207,6 +213,43 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <RecordatoriosConfig />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/workflows" nest={false}>
+        <AuthGate>
+          <Layout>
+            <WorkflowsPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/workflows/nuevo">
+        <AuthGate>
+          <Layout>
+            <WorkflowDetail />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/workflows/:id">
+        {(params) => (
+          <AuthGate>
+            <Layout>
+              <WorkflowDetail />
+            </Layout>
+          </AuthGate>
+        )}
+      </Route>
+      <Route path="/tareas">
+        <AuthGate>
+          <Layout>
+            <TareasPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/encuestas">
+        <AuthGate>
+          <Layout>
+            <EncuestasPage />
           </Layout>
         </AuthGate>
       </Route>

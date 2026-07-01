@@ -46,6 +46,12 @@ export const cobrosTable = pgTable("cobros", {
   clienteNombre: text("cliente_nombre"),
   emailPagador: text("email_pagador"),
   fechaVencimiento: date("fecha_vencimiento", { mode: "string" }),
+  // Intelligent collections workflow assigned to this cobro (null = none). When
+  // set, the workflow engine drives this cobro and the simple-reminder path is
+  // skipped for it. Plain integer (no FK) to keep the column back-compatible and
+  // avoid a schema import cycle; unassignment on workflow delete is handled in app code.
+  workflowId: integer("workflow_id"),
+  workflowIniciadoEn: timestamp("workflow_iniciado_en", { withTimezone: true }),
   flowOrdenId: text("flow_orden_id"),
   flowToken: text("flow_token"),
   flowLinkPago: text("flow_link_pago"),

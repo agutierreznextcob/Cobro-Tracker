@@ -5,6 +5,359 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+export interface WorkflowCondiciones {
+  /** @nullable */
+  montoMin?: number | null;
+  /** @nullable */
+  montoMax?: number | null;
+  /** @nullable */
+  scores?: string[] | null;
+  /** @nullable */
+  tiposDocumento?: string[] | null;
+  /** @nullable */
+  clienteIds?: number[] | null;
+  /** @nullable */
+  responsableIds?: string[] | null;
+}
+
+/**
+ * @nullable
+ */
+export type WorkflowStepConfigDescuentoTipo = typeof WorkflowStepConfigDescuentoTipo[keyof typeof WorkflowStepConfigDescuentoTipo] | null;
+
+
+export const WorkflowStepConfigDescuentoTipo = {
+  porcentaje: 'porcentaje',
+  monto: 'monto',
+} as const;
+
+/**
+ * @nullable
+ */
+export type WorkflowStepConfigNuevoEstado = typeof WorkflowStepConfigNuevoEstado[keyof typeof WorkflowStepConfigNuevoEstado] | null;
+
+
+export const WorkflowStepConfigNuevoEstado = {
+  pendiente: 'pendiente',
+  pagado: 'pagado',
+  parcial: 'parcial',
+  fallido: 'fallido',
+  cancelado: 'cancelado',
+} as const;
+
+export interface WorkflowStepConfig {
+  /** @nullable */
+  asunto?: string | null;
+  /** @nullable */
+  mensaje?: string | null;
+  /** @nullable */
+  tareaTitulo?: string | null;
+  /** @nullable */
+  descuentoTipo?: WorkflowStepConfigDescuentoTipo;
+  /** @nullable */
+  descuentoValor?: number | null;
+  /** @nullable */
+  nuevoEstado?: WorkflowStepConfigNuevoEstado;
+}
+
+export type WorkflowStepAccionTipo = typeof WorkflowStepAccionTipo[keyof typeof WorkflowStepAccionTipo];
+
+
+export const WorkflowStepAccionTipo = {
+  enviar_email: 'enviar_email',
+  enviar_whatsapp: 'enviar_whatsapp',
+  crear_tarea: 'crear_tarea',
+  notificar_admin: 'notificar_admin',
+  aplicar_descuento: 'aplicar_descuento',
+  cambiar_estado: 'cambiar_estado',
+  enviar_comprobante: 'enviar_comprobante',
+  enviar_encuesta: 'enviar_encuesta',
+} as const;
+
+export interface WorkflowStep {
+  id: number;
+  workflowId: number;
+  orden: number;
+  delayDias: number;
+  accionTipo: WorkflowStepAccionTipo;
+  config?: WorkflowStepConfig | null;
+}
+
+export type WorkflowStepInputAccionTipo = typeof WorkflowStepInputAccionTipo[keyof typeof WorkflowStepInputAccionTipo];
+
+
+export const WorkflowStepInputAccionTipo = {
+  enviar_email: 'enviar_email',
+  enviar_whatsapp: 'enviar_whatsapp',
+  crear_tarea: 'crear_tarea',
+  notificar_admin: 'notificar_admin',
+  aplicar_descuento: 'aplicar_descuento',
+  cambiar_estado: 'cambiar_estado',
+  enviar_comprobante: 'enviar_comprobante',
+  enviar_encuesta: 'enviar_encuesta',
+} as const;
+
+export interface WorkflowStepInput {
+  orden?: number;
+  delayDias?: number;
+  accionTipo: WorkflowStepInputAccionTipo;
+  config?: WorkflowStepConfig;
+}
+
+export type WorkflowTriggerTipo = typeof WorkflowTriggerTipo[keyof typeof WorkflowTriggerTipo];
+
+
+export const WorkflowTriggerTipo = {
+  cobro_creado: 'cobro_creado',
+  proximo_vencer: 'proximo_vencer',
+  vencido: 'vencido',
+  dias_mora: 'dias_mora',
+  no_pagado_despues: 'no_pagado_despues',
+  marcado_parcial: 'marcado_parcial',
+  email_no_abierto: 'email_no_abierto',
+} as const;
+
+export interface Workflow {
+  id: number;
+  /** @nullable */
+  organizationId?: number | null;
+  userId: string;
+  nombre: string;
+  /** @nullable */
+  descripcion?: string | null;
+  activo: boolean;
+  /** @nullable */
+  plantillaKey?: string | null;
+  triggerTipo: WorkflowTriggerTipo;
+  triggerDias: number;
+  condiciones?: WorkflowCondiciones | null;
+  /** Number of cobros currently assigned to this workflow */
+  cobrosUsando?: number;
+  creadoEn: string;
+  actualizadoEn?: string;
+}
+
+export type WorkflowDetalle = Workflow & {
+  steps?: WorkflowStep[];
+};
+
+export type WorkflowInputTriggerTipo = typeof WorkflowInputTriggerTipo[keyof typeof WorkflowInputTriggerTipo];
+
+
+export const WorkflowInputTriggerTipo = {
+  cobro_creado: 'cobro_creado',
+  proximo_vencer: 'proximo_vencer',
+  vencido: 'vencido',
+  dias_mora: 'dias_mora',
+  no_pagado_despues: 'no_pagado_despues',
+  marcado_parcial: 'marcado_parcial',
+  email_no_abierto: 'email_no_abierto',
+} as const;
+
+export interface WorkflowInput {
+  nombre: string;
+  /** @nullable */
+  descripcion?: string | null;
+  activo?: boolean;
+  triggerTipo: WorkflowInputTriggerTipo;
+  triggerDias?: number;
+  condiciones?: WorkflowCondiciones;
+  steps?: WorkflowStepInput[];
+}
+
+export type WorkflowUpdateTriggerTipo = typeof WorkflowUpdateTriggerTipo[keyof typeof WorkflowUpdateTriggerTipo];
+
+
+export const WorkflowUpdateTriggerTipo = {
+  cobro_creado: 'cobro_creado',
+  proximo_vencer: 'proximo_vencer',
+  vencido: 'vencido',
+  dias_mora: 'dias_mora',
+  no_pagado_despues: 'no_pagado_despues',
+  marcado_parcial: 'marcado_parcial',
+  email_no_abierto: 'email_no_abierto',
+} as const;
+
+export interface WorkflowUpdate {
+  nombre?: string;
+  /** @nullable */
+  descripcion?: string | null;
+  activo?: boolean;
+  triggerTipo?: WorkflowUpdateTriggerTipo;
+  triggerDias?: number;
+  condiciones?: WorkflowCondiciones;
+  steps?: WorkflowStepInput[];
+}
+
+export interface WorkflowPlantilla {
+  key: string;
+  nombre: string;
+  descripcion: string;
+  categoria: string;
+  triggerTipo: string;
+  triggerDias: number;
+  condiciones?: WorkflowCondiciones | null;
+  steps: WorkflowStepInput[];
+}
+
+export interface FromPlantillaInput {
+  plantillaKey: string;
+  /** @nullable */
+  nombre?: string | null;
+}
+
+export interface AsignarWorkflowInput {
+  workflowId: number;
+}
+
+export type WorkflowEjecucionEstado = typeof WorkflowEjecucionEstado[keyof typeof WorkflowEjecucionEstado];
+
+
+export const WorkflowEjecucionEstado = {
+  enviado: 'enviado',
+  fallido: 'fallido',
+  pendiente: 'pendiente',
+  omitido: 'omitido',
+} as const;
+
+export interface WorkflowEjecucion {
+  id: number;
+  cobroId: number;
+  workflowId: number;
+  /** @nullable */
+  stepId?: number | null;
+  accionTipo: string;
+  estado: WorkflowEjecucionEstado;
+  /** @nullable */
+  detalle?: string | null;
+  fecha: string;
+  /** @nullable */
+  clienteNombre?: string | null;
+  /** @nullable */
+  descripcion?: string | null;
+  /** @nullable */
+  workflowNombre?: string | null;
+  creadoEn: string;
+}
+
+export interface ProximaAccion {
+  cobroId: number;
+  accionTipo: string;
+  fecha: string;
+  /** @nullable */
+  workflowNombre?: string | null;
+  /** @nullable */
+  clienteNombre?: string | null;
+  /** @nullable */
+  descripcion?: string | null;
+}
+
+export interface WorkflowDashboardItem {
+  id: number;
+  nombre: string;
+  activo: boolean;
+  cobrosUsando: number;
+  accionesHoy: number;
+  accionesSemana: number;
+}
+
+export interface WorkflowDashboard {
+  workflows: WorkflowDashboardItem[];
+  accionesHoy: number;
+  accionesSemana: number;
+  proximas: ProximaAccion[];
+  historial: WorkflowEjecucion[];
+}
+
+export type TareaEstado = typeof TareaEstado[keyof typeof TareaEstado];
+
+
+export const TareaEstado = {
+  pendiente: 'pendiente',
+  completada: 'completada',
+} as const;
+
+export type TareaOrigen = typeof TareaOrigen[keyof typeof TareaOrigen];
+
+
+export const TareaOrigen = {
+  workflow: 'workflow',
+  manual: 'manual',
+} as const;
+
+export interface Tarea {
+  id: number;
+  /** @nullable */
+  organizationId?: number | null;
+  userId: string;
+  /** @nullable */
+  cobroId?: number | null;
+  titulo: string;
+  /** @nullable */
+  descripcion?: string | null;
+  estado: TareaEstado;
+  origen: TareaOrigen;
+  /** @nullable */
+  clienteNombre?: string | null;
+  creadoEn: string;
+  /** @nullable */
+  completadoEn?: string | null;
+}
+
+export interface EncuestaPublica {
+  empresa: string;
+  descripcion: string;
+  monto: number;
+  /** @nullable */
+  calificacion?: number | null;
+  /** @nullable */
+  comentario?: string | null;
+  /** @nullable */
+  respondidoEn?: string | null;
+  yaRespondida: boolean;
+}
+
+export interface EncuestaRespuestaInput {
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  calificacion: number;
+  /** @nullable */
+  comentario?: string | null;
+}
+
+export interface EncuestaResumenItem {
+  calificacion: number;
+  cantidad: number;
+}
+
+export interface EncuestaReciente {
+  /** @nullable */
+  clienteNombre?: string | null;
+  calificacion: number;
+  /** @nullable */
+  comentario?: string | null;
+  /** @nullable */
+  respondidoEn?: string | null;
+}
+
+export interface EncuestasResumen {
+  total: number;
+  respondidas: number;
+  promedio: number;
+  distribucion: EncuestaResumenItem[];
+  recientes: EncuestaReciente[];
+}
+
+export interface SugerenciaWorkflow {
+  plantillaKey: string;
+  categoria: string;
+  /** @nullable */
+  score?: number | null;
+  razon: string;
+}
+
 export type AdminUsuarioRole = typeof AdminUsuarioRole[keyof typeof AdminUsuarioRole];
 
 
@@ -318,6 +671,11 @@ export interface Cobro {
      * @nullable
      */
   mpPaymentLinkUrl?: string | null;
+  /**
+     * ID of the collections workflow assigned to this cobro (null when using simple reminders)
+     * @nullable
+     */
+  workflowId?: number | null;
   creadoEn: string;
   actualizadoEn?: string;
 }
@@ -1605,4 +1963,20 @@ soloNoLeidas?: boolean;
 export type ListLeadsParams = {
 estado?: string;
 };
+
+export type GetSugerenciaWorkflowParams = {
+cobroId: number;
+};
+
+export type ListTareasParams = {
+estado?: ListTareasEstado;
+};
+
+export type ListTareasEstado = typeof ListTareasEstado[keyof typeof ListTareasEstado];
+
+
+export const ListTareasEstado = {
+  pendiente: 'pendiente',
+  completada: 'completada',
+} as const;
 

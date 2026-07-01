@@ -98,6 +98,11 @@ export interface Cobro {
      * @nullable
      */
   mpPaymentLinkUrl?: string | null;
+  /**
+     * ID of the collections workflow assigned to this cobro (null when using simple reminders)
+     * @nullable
+     */
+  workflowId?: number | null;
   creadoEn: Date;
   actualizadoEn?: Date;
 }
