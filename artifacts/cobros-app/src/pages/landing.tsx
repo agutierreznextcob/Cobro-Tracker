@@ -361,7 +361,6 @@ function CaracteristicasSection() {
     { title: "Tipo de documento tributario", desc: "Factura afecta, exenta, boleta y más" },
     { title: "Exportación a Excel", desc: "Todos los informes descargables con un clic" },
     { title: "Dashboard en tiempo real", desc: "Métricas y resumen de tu actividad siempre actualizados" },
-    { title: "Módulo de Leads", desc: "Captura y gestiona prospectos desde la landing page" },
     { title: "Ley 21.719", desc: "Plataforma preparada para la ley de protección de datos" },
   ];
   return (
