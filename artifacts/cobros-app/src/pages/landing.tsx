@@ -323,9 +323,9 @@ function ComoFuncionaSection() {
             de principio a fin.
           </p>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="flex flex-wrap justify-center gap-6">
           {steps.map((step, i) => (
-            <div key={i} className="bg-card border rounded-2xl p-7 shadow-sm">
+            <div key={i} className="bg-card border rounded-2xl p-7 shadow-sm w-full sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]">
               <div className="flex items-start justify-between mb-5">
                 <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-sm">
                   <step.icon className="h-5 w-5" />
