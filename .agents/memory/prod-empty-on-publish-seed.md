@@ -33,3 +33,20 @@ idempotent. Hardcoding a password is acceptable ONLY for the shared demo account
 the superadmin is seeded with `passwordHash=null` (sets it via forgot-password —
 which now works because the account exists). Env-var changes (RESEND_*) only take
 effect in prod on the next publish/redeploy.
+
+## Resetting prod cleanly so the seed re-populates it
+
+To force prod back to the canonical seed state (e.g. fixing a schema baked into an
+old prod DB, like a generated-column format change that Publish won't ALTER):
+remove the **production** DB (Database tool → select *Production* → Settings →
+Remove database; 7-day soft-delete) then Republish with *Create production
+database* ON and **"Set up with current development data" OFF**. Empty prod ⇒ the
+startup seed runs and rebuilds everything correctly; the fresh `CREATE TABLE` also
+picks up the current dev schema (so a generated-column expression change lands via
+a clean create, sidestepping the ALTER-is-ignored gotcha).
+
+**Why NOT "overwrite prod with development data":** dev rows drift from the seed
+CODE (seed only inserts-if-missing, so it never updates pre-existing dev rows). We
+saw dev's demo carrying `passwordHash=null` + `subscription_status='prueba'` while
+the seed defines `Demo2024NextCob!` + `activa`. Copying dev → prod would ship those
+STALE values. The empty-prod + seed path yields the intended canonical data.
