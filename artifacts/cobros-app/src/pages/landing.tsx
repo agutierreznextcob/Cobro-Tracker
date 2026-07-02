@@ -7,32 +7,16 @@ import { HeroParticles } from "@/components/hero-particles";
 import {
   ArrowRight,
   BarChart3,
-  Bell,
   Bot,
   CheckCircle2,
   ChevronRight,
-  ClipboardList,
   Coins,
   CreditCard,
-  FileCheck,
-  FileSpreadsheet,
   FileText,
-  Gauge,
-  Globe,
-  LayoutDashboard,
-  Link2,
   LogOut,
-  Percent,
-  Receipt,
-  Share2,
-  ShieldCheck,
   Sparkles,
-  TrendingUp,
   UserCircle,
-  UserPlus,
-  Users,
   UsersRound,
-  Wallet,
   Zap,
 } from "lucide-react";
 
@@ -360,55 +344,50 @@ function ComoFuncionaSection() {
 
 function CaracteristicasSection() {
   const features = [
-    { icon: Link2, title: "Links de pago Flow y MercadoPago", desc: "Genera links de pago con Webpay (Flow) y MercadoPago. Tus clientes pagan online con tarjeta o transferencia." },
-    { icon: Coins, title: "Pagos parciales y abonos", desc: "Acepta abonos y haz seguimiento automático del saldo hasta completar el monto total del cobro." },
-    { icon: Wallet, title: "Cobranza manual", desc: "Registra pagos en efectivo, transferencia o cualquier medio. Mantén todos tus cobros en un solo lugar." },
-    { icon: Bell, title: "Recordatorios automáticos email y WhatsApp", desc: "Envía recordatorios automáticos por email y WhatsApp para que tus clientes no olviden pagar y reduzcas la morosidad." },
-    { icon: Zap, title: "Workflows inteligentes de cobranza", desc: "Motor de workflows con plantillas predefinidas que actúan según el comportamiento del cliente y se detienen solos cuando paga.", premium: true },
-    { icon: Bot, title: "Asistente IA incluido", desc: "Pregúntale sobre tu negocio en lenguaje natural: '¿Cuánto recaudé este mes?' o '¿Qué clientes tienen cobros pendientes?'", premium: true },
-    { icon: Gauge, title: "Scoring de clientes", desc: "Clasifica automáticamente a tus clientes según su comportamiento de pago y prioriza tu gestión de cobranza.", premium: true },
-    { icon: Globe, title: "Portal del deudor", desc: "Cada cliente accede a un link único donde ve todas sus deudas pendientes y puede pagar con un clic.", premium: true },
-    { icon: UsersRound, title: "Gestión de equipos y ejecutivos", desc: "Agrega ejecutivos de cobranza, asigna cobros y mide el rendimiento de cada uno como administrador." },
-    { icon: Users, title: "Gestión de clientes", desc: "Organiza tus clientes con RUT, email y teléfono, con el historial completo de cobros de cada uno." },
-    { icon: ClipboardList, title: "Notas de gestión con historial", desc: "Registra cada llamada, email o visita con su resultado y programa automáticamente la próxima gestión." },
-    { icon: BarChart3, title: "Informes aging", desc: "Reportes de cuentas por cobrar por antigüedad para saber exactamente cuánto y desde cuándo te deben." },
-    { icon: TrendingUp, title: "Proyección de flujo de caja", desc: "Estima cuánto vas a recaudar y cuándo, para planificar la caja de tu negocio con anticipación." },
-    { icon: Percent, title: "Descuentos por mora y negociación", desc: "Aplica descuentos negociados a cobros vencidos para recuperar algo antes que perderlo todo." },
-    { icon: FileCheck, title: "Comprobantes de pago en PDF", desc: "Genera y envía comprobantes de pago automáticos en PDF cada vez que un cliente salda su cobro." },
-    { icon: Receipt, title: "Tipo de documento tributario", desc: "Asocia cada cobro a factura, boleta u otro documento, con cálculo de IVA automático." },
-    { icon: FileSpreadsheet, title: "Exportación a Excel", desc: "Descarga tus cobros e informes en Excel para tu contabilidad o análisis externo." },
-    { icon: LayoutDashboard, title: "Dashboard en tiempo real", desc: "Visualiza recaudación, pendientes, vencidos y métricas clave actualizadas al instante." },
-    { icon: UserPlus, title: "Módulo de Leads", desc: "Captura y gestiona los leads que llegan desde tu landing page para convertirlos en clientes." },
-    { icon: ShieldCheck, title: "Cumplimiento Ley 21.719", desc: "Plataforma alineada con la Ley 21.719 de protección de datos personales en Chile." },
+    { title: "Links de pago", desc: "Webpay (Flow) y MercadoPago integrados" },
+    { title: "Pagos parciales y abonos", desc: "Acepta abonos y hace seguimiento automático del saldo" },
+    { title: "Cobranza manual", desc: "Registra pagos en efectivo, transferencia u otro medio" },
+    { title: "Recordatorios automáticos", desc: "Email y WhatsApp programados antes y después del vencimiento" },
+    { title: "Workflows inteligentes", desc: "Flujos condicionales que se adaptan al comportamiento del cliente" },
+    { title: "Asistente IA incluido", desc: "Pregúntale sobre tu negocio en lenguaje natural" },
+    { title: "Scoring de clientes", desc: "Clasificación automática por historial de pago" },
+    { title: "Portal del deudor", desc: "Link único donde tu cliente ve y paga todas sus deudas" },
+    { title: "Gestión de equipos", desc: "Asigna cobros a ejecutivos y mide su rendimiento" },
+    { title: "Notas de gestión", desc: "Registra llamadas, emails y visitas con historial completo" },
+    { title: "Informes aging", desc: "Cuentas por cobrar clasificadas por antigüedad de deuda" },
+    { title: "Proyección de flujo de caja", desc: "Anticipa cuánto recibirás en los próximos 30/60/90 días" },
+    { title: "Descuentos por mora", desc: "Negocia y aplica descuentos a cobros vencidos" },
+    { title: "Comprobantes en PDF", desc: "Se generan y envían automáticamente al pagar" },
+    { title: "Tipo de documento tributario", desc: "Factura afecta, exenta, boleta y más" },
+    { title: "Exportación a Excel", desc: "Todos los informes descargables con un clic" },
+    { title: "Dashboard en tiempo real", desc: "Métricas y resumen de tu actividad siempre actualizados" },
+    { title: "Módulo de Leads", desc: "Captura y gestiona prospectos desde la landing page" },
+    { title: "Ley 21.719", desc: "Plataforma preparada para la ley de protección de datos" },
   ];
   return (
     <section id="caracteristicas" className="py-20 px-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="text-center mb-14">
           <h2 className="text-3xl font-bold tracking-tight mb-3">Todo lo que necesitas para gestionar tu cobranza</h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
             Una plataforma completa para gestionar tus cobros en Chile, sin complicaciones.
           </p>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="rounded-2xl border border-border/60 overflow-hidden shadow-sm">
           {features.map((f, i) => (
             <div
               key={i}
-              className={`bg-card border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group ${
-                f.premium ? "hover:border-[#F4A800]/40" : "hover:border-primary/30"
+              className={`flex items-center gap-4 px-5 py-3.5 sm:px-6 ${
+                i % 2 === 1 ? "bg-muted/40" : "bg-card"
               }`}
             >
-              <div
-                className={`h-10 w-10 rounded-lg flex items-center justify-center mb-4 transition-colors ${
-                  f.premium
-                    ? "bg-[#F4A800]/10 text-[#F4A800] group-hover:bg-[#F4A800] group-hover:text-black"
-                    : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
-                }`}
-              >
-                <f.icon className="h-5 w-5" />
-              </div>
-              <h3 className="font-semibold mb-2">{f.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+              <span className="font-semibold text-sm sm:text-base flex-1 sm:flex-none sm:w-56 shrink-0">
+                {f.title}
+              </span>
+              <span className="hidden sm:block text-sm text-muted-foreground flex-1">
+                {f.desc}
+              </span>
+              <CheckCircle2 className="h-5 w-5 text-[#F4A800] shrink-0" />
             </div>
           ))}
         </div>

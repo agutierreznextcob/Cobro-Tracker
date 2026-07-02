@@ -1,0 +1,40 @@
+3. ACTUALIZAR SECCIÓN "CARACTERÍSTICAS":
+Reemplazar el grid de tarjetas actual por una 
+tabla compacta de 3 columnas:
+- Columna 1: Nombre de la función (negrita)
+- Columna 2: Descripción breve en letra pequeña 
+  (color gris)
+- Columna 3: Ícono de check ✓ en verde o dorado
+
+La tabla debe tener filas alternadas (blanco y 
+gris muy claro) para facilitar la lectura, 
+sin bordes gruesos — estilo minimalista y limpio.
+
+Incluir estas funciones en la tabla:
+
+| Función | Descripción | ✓ |
+|---|---|---|
+| Links de pago | Webpay (Flow) y MercadoPago integrados | ✓ |
+| Pagos parciales y abonos | Acepta abonos y hace seguimiento automático del saldo | ✓ |
+| Cobranza manual | Registra pagos en efectivo, transferencia u otro medio | ✓ |
+| Recordatorios automáticos | Email y WhatsApp programados antes y después del vencimiento | ✓ |
+| Workflows inteligentes | Flujos condicionales que se adaptan al comportamiento del cliente | ✓ |
+| Asistente IA incluido | Pregúntale sobre tu negocio en lenguaje natural | ✓ |
+| Scoring de clientes | Clasificación automática por historial de pago | ✓ |
+| Portal del deudor | Link único donde tu cliente ve y paga todas sus deudas | ✓ |
+| Gestión de equipos | Asigna cobros a ejecutivos y mide su rendimiento | ✓ |
+| Notas de gestión | Registra llamadas, emails y visitas con historial completo | ✓ |
+| Informes aging | Cuentas por cobrar clasificadas por antigüedad de deuda | ✓ |
+| Proyección de flujo de caja | Anticipa cuánto recibirás en los próximos 30/60/90 días | ✓ |
+| Descuentos por mora | Negocia y aplica descuentos a cobros vencidos | ✓ |
+| Comprobantes en PDF | Se generan y envían automáticamente al pagar | ✓ |
+| Tipo de documento tributario | Factura afecta, exenta, boleta y más | ✓ |
+| Exportación a Excel | Todos los informes descargables con un clic | ✓ |
+| Dashboard en tiempo real | Métricas y resumen de tu actividad siempre actualizados | ✓ |
+| Módulo de Leads | Captura y gestiona prospectos desde la landing page | ✓ |
+| Ley 21.719 | Plataforma preparada para la ley de protección de datos | ✓ |
+
+La tabla debe verse bien tanto en desktop 
+como en móvil (en móvil puede ocultar la 
+columna de descripción y mostrar solo 
+función + check).
