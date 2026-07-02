@@ -32,8 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { isValidRut, formatRut } from "@/lib/rut";
 import { TeamSection } from "@/components/team-section";
-import { LiquidacionesList } from "@/components/liquidaciones-list";
-import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera, ShieldCheck, Download, Landmark } from "lucide-react";
+import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera, ShieldCheck, Download } from "lucide-react";
 
 // Resize a chosen image client-side and return a JPEG data URL. Keeping avatars
 // small (max 256px) lets us store them directly in users.profileImageUrl without
@@ -784,13 +783,6 @@ function ProfileSettings() {
                 </Button>
               </div>
 
-              <div className="pt-4 border-t border-border/50 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Landmark className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold">Liquidaciones Flow</h3>
-                </div>
-                <LiquidacionesList />
-              </div>
             </div>
           ) : (
             <div className="space-y-4">

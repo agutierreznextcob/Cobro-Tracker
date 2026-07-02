@@ -24,8 +24,6 @@ import ClienteDetailPage from "@/pages/cliente-detail";
 import AdminPage from "@/pages/admin";
 import LeadsPage from "@/pages/leads";
 import PortalPage from "@/pages/portal";
-import LiquidacionesPage from "@/pages/liquidaciones";
-import LiquidacionDetailPage from "@/pages/liquidacion-detail";
 import Notificaciones from "@/pages/notificaciones";
 import RecordatoriosConfig from "@/pages/recordatorios-config";
 import WorkflowsPage from "@/pages/workflows";
@@ -202,22 +200,6 @@ function AppRouter() {
           <AuthGate>
             <Layout>
               <ClienteDetailPage />
-            </Layout>
-          </AuthGate>
-        )}
-      </Route>
-      <Route path="/liquidaciones">
-        <AuthGate>
-          <Layout>
-            <LiquidacionesPage />
-          </Layout>
-        </AuthGate>
-      </Route>
-      <Route path="/liquidaciones/:id">
-        {(params) => (
-          <AuthGate>
-            <Layout>
-              <LiquidacionDetailPage params={params} />
             </Layout>
           </AuthGate>
         )}
