@@ -612,12 +612,126 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Cobro"
+        "400":
+          description: Edit not allowed for this cobro state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: eliminarCobro
+      tags: [cobros]
+      summary: Delete a cobro
+      description: >-
+        Hard-deletes a cobro and all its associated data (payment links,
+        reminders, follow-ups, discounts, partial payments) but NOT the client.
+        Not allowed when the cobro is paid or already has confirmed partial
+        payments. Records a snapshot in the superadmin deletion audit log.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EliminarCobroInput"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Deletion not allowed for this cobro state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/{id}/ajustar-monto:
+    post:
+      operationId: ajustarMonto
+      tags: [cobros]
+      summary: Adjust the total amount of a cobro with partial payments
+      description: >-
+        Lowers the total amount of a cobro that has confirmed partial payments.
+        The new amount must be greater than or equal to the amount already paid.
+        If it equals the paid amount, the cobro is marked as paid. Records the
+        adjustment (with an obligatory reason) in the cobro's history.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AjustarMontoInput"
+      responses:
+        "200":
+          description: Adjustment applied, returns updated cobro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cobro"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Cobro not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/{id}/ajustes:
+    get:
+      operationId: listAjustes
+      tags: [cobros]
+      summary: List amount-adjustment history for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of amount adjustments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CobroAjuste"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Cobro not found
 
   /cobros/stats/summary:
     get:
@@ -1420,6 +1534,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/cobros-eliminados:
+    get:
+      operationId: listAdminCobrosEliminados
+      tags: [admin]
+      summary: Deletion audit log of deleted cobros (admin only)
+      responses:
+        "200":
+          description: List of deleted-cobro audit entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CobroEliminado"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not an admin)
 
   /admin/usuarios:
     get:
@@ -3462,6 +3595,78 @@ components:
           pattern: '^\d{4}-\d{2}-\d{2}$'
           description: Due date (YYYY-MM-DD) used to schedule reminders
 
+    AjustarMontoInput:
+      type: object
+      required: [monto, motivo]
+      properties:
+        monto:
+          type: number
+          minimum: 0.01
+          description: New total amount for the cobro. Must be >= the amount already paid.
+        motivo:
+          type: string
+          minLength: 1
+          description: Obligatory reason for the amount adjustment (audit trail)
+
+    EliminarCobroInput:
+      type: object
+      properties:
+        motivo:
+          type: string
+          description: Optional reason for deleting the cobro (stored in the audit log)
+
+    CobroAjuste:
+      type: object
+      required: [id, cobroId, montoOriginal, montoNuevo, motivo, creadoEn]
+      properties:
+        id:
+          type: integer
+        cobroId:
+          type: integer
+        montoOriginal:
+          type: number
+        montoNuevo:
+          type: number
+        motivo:
+          type: string
+        ajustadoPorNombre:
+          type: ["string", "null"]
+        creadoEn:
+          type: string
+          format: date-time
+
+    CobroEliminado:
+      type: object
+      required: [id, cobroIdOriginal, monto, estado, eliminadoEn]
+      properties:
+        id:
+          type: integer
+        cobroIdOriginal:
+          type: integer
+        monto:
+          type: number
+        montoACobrar:
+          type: ["number", "null"]
+        estado:
+          type: string
+        descripcion:
+          type: ["string", "null"]
+        clienteId:
+          type: ["integer", "null"]
+        clienteNombre:
+          type: ["string", "null"]
+        organizationId:
+          type: ["integer", "null"]
+        motivo:
+          type: ["string", "null"]
+        eliminadoPorId:
+          type: ["string", "null"]
+        eliminadoPorNombre:
+          type: ["string", "null"]
+        eliminadoEn:
+          type: string
+          format: date-time
+
     AplicarDescuentoInput:
       type: object
       required: [tipo, valor, motivo]
@@ -3796,11 +4001,24 @@ components:
         estado:
           type: string
           enum: [pendiente, pagado, parcial, fallido, cancelado]
+        monto:
+          type: number
+          minimum: 0.01
+          description: New total amount. Only allowed when the cobro is "pendiente" (no confirmed payments). When incluyeIva is true this is the NETO; server recomputes IVA and total. Changing it invalidates any existing payment links.
+        incluyeIva:
+          type: boolean
+          description: Apply Chilean VAT (IVA 19%). Only honored when tipoDocumento is an "afecta" type and monto is provided.
         descripcion:
           type: string
           minLength: 1
         referencia:
+          type: ["string", "null"]
+        clienteId:
+          type: ["integer", "null"]
+          description: Associate an existing cliente, or null to clear it. Only allowed when the cobro is "pendiente".
+        responsableId:
           type: string
+          description: Reassign the cobro to an ejecutivo/admin of the organization (admin only). Only allowed when the cobro is "pendiente".
         tipoDocumento:
           type: string
           enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento]

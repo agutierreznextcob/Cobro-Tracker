@@ -764,6 +764,59 @@ export interface CobroInput {
   fechaVencimiento?: string;
 }
 
+export interface AjustarMontoInput {
+  /**
+     * New total amount for the cobro. Must be >= the amount already paid.
+     * @minimum 0.01
+     */
+  monto: number;
+  /**
+     * Obligatory reason for the amount adjustment (audit trail)
+     * @minLength 1
+     */
+  motivo: string;
+}
+
+export interface EliminarCobroInput {
+  /** Optional reason for deleting the cobro (stored in the audit log) */
+  motivo?: string;
+}
+
+export interface CobroAjuste {
+  id: number;
+  cobroId: number;
+  montoOriginal: number;
+  montoNuevo: number;
+  motivo: string;
+  /** @nullable */
+  ajustadoPorNombre?: string | null;
+  creadoEn: string;
+}
+
+export interface CobroEliminado {
+  id: number;
+  cobroIdOriginal: number;
+  monto: number;
+  /** @nullable */
+  montoACobrar?: number | null;
+  estado: string;
+  /** @nullable */
+  descripcion?: string | null;
+  /** @nullable */
+  clienteId?: number | null;
+  /** @nullable */
+  clienteNombre?: string | null;
+  /** @nullable */
+  organizationId?: number | null;
+  /** @nullable */
+  motivo?: string | null;
+  /** @nullable */
+  eliminadoPorId?: string | null;
+  /** @nullable */
+  eliminadoPorNombre?: string | null;
+  eliminadoEn: string;
+}
+
 export type AplicarDescuentoInputTipo = typeof AplicarDescuentoInputTipo[keyof typeof AplicarDescuentoInputTipo];
 
 
@@ -1052,9 +1105,24 @@ export const CobroUpdateTipoDocumento = {
 
 export interface CobroUpdate {
   estado?: CobroUpdateEstado;
+  /**
+     * New total amount. Only allowed when the cobro is "pendiente" (no confirmed payments). When incluyeIva is true this is the NETO; server recomputes IVA and total. Changing it invalidates any existing payment links.
+     * @minimum 0.01
+     */
+  monto?: number;
+  /** Apply Chilean VAT (IVA 19%). Only honored when tipoDocumento is an "afecta" type and monto is provided. */
+  incluyeIva?: boolean;
   /** @minLength 1 */
   descripcion?: string;
-  referencia?: string;
+  /** @nullable */
+  referencia?: string | null;
+  /**
+     * Associate an existing cliente, or null to clear it. Only allowed when the cobro is "pendiente".
+     * @nullable
+     */
+  clienteId?: number | null;
+  /** Reassign the cobro to an ejecutivo/admin of the organization (admin only). Only allowed when the cobro is "pendiente". */
+  responsableId?: string;
   /** Chilean electronic tax document type (DTE). */
   tipoDocumento?: CobroUpdateTipoDocumento;
   /**

@@ -538,14 +538,20 @@ export const UpdateCobroParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateCobroBodyMontoMin = 0.01;
+
 
 export const updateCobroBodyFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const UpdateCobroBody = zod.object({
   "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']).optional(),
+  "monto": zod.number().min(updateCobroBodyMontoMin).optional().describe('New total amount. Only allowed when the cobro is \"pendiente\" (no confirmed payments). When incluyeIva is true this is the NETO; server recomputes IVA and total. Changing it invalidates any existing payment links.'),
+  "incluyeIva": zod.boolean().optional().describe('Apply Chilean VAT (IVA 19%). Only honored when tipoDocumento is an \"afecta\" type and monto is provided.'),
   "descripcion": zod.string().min(1).optional(),
-  "referencia": zod.string().optional(),
+  "referencia": zod.string().nullish(),
+  "clienteId": zod.number().nullish().describe('Associate an existing cliente, or null to clear it. Only allowed when the cobro is \"pendiente\".'),
+  "responsableId": zod.string().optional().describe('Reassign the cobro to an ejecutivo\/admin of the organization (admin only). Only allowed when the cobro is \"pendiente\".'),
   "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE).'),
   "fechaVencimiento": zod.string().regex(updateCobroBodyFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD); null clears it')
 })
@@ -581,6 +587,93 @@ export const UpdateCobroResponse = zod.object({
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
+
+
+/**
+ * Hard-deletes a cobro and all its associated data (payment links, reminders, follow-ups, discounts, partial payments) but NOT the client. Not allowed when the cobro is paid or already has confirmed partial payments. Records a snapshot in the superadmin deletion audit log.
+ * @summary Delete a cobro
+ */
+export const EliminarCobroParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EliminarCobroBody = zod.object({
+  "motivo": zod.string().optional().describe('Optional reason for deleting the cobro (stored in the audit log)')
+})
+
+export const EliminarCobroResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * Lowers the total amount of a cobro that has confirmed partial payments. The new amount must be greater than or equal to the amount already paid. If it equals the paid amount, the cobro is marked as paid. Records the adjustment (with an obligatory reason) in the cobro's history.
+ * @summary Adjust the total amount of a cobro with partial payments
+ */
+export const AjustarMontoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ajustarMontoBodyMontoMin = 0.01;
+
+
+
+
+export const AjustarMontoBody = zod.object({
+  "monto": zod.number().min(ajustarMontoBodyMontoMin).describe('New total amount for the cobro. Must be >= the amount already paid.'),
+  "motivo": zod.string().min(1).describe('Obligatory reason for the amount adjustment (audit trail)')
+})
+
+export const ajustarMontoResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const AjustarMontoResponse = zod.object({
+  "id": zod.number(),
+  "monto": zod.number().describe('Original amount in currency units'),
+  "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
+  "montoACobrar": zod.number().optional().describe('Net amount to charge after the current discount (monto - montoDescuento)'),
+  "saldo": zod.number().optional().describe('Outstanding balance (montoACobrar minus confirmed abonos); 0 for terminal states. Present on list and detail responses.'),
+  "incluyeIva": zod.boolean().optional().describe('Whether Chilean VAT (IVA 19%) is applied. When true, `monto` is the total (neto + iva).'),
+  "montoNeto": zod.number().nullish().describe('Net amount before IVA (only set when incluyeIva is true)'),
+  "montoIva": zod.number().nullish().describe('IVA amount (19% of montoNeto, only set when incluyeIva is true)'),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types carry IVA.'),
+  "descripcion": zod.string(),
+  "estado": zod.enum(['pendiente', 'pagado', 'parcial', 'fallido', 'cancelado']),
+  "referencia": zod.string().nullish().describe('Optional external reference (e.g. payment provider ID)'),
+  "organizationId": zod.number().nullish().describe('Organization this cobro belongs to'),
+  "responsableId": zod.string().nullish().describe('User ID of the ejecutivo\/admin this cobro is assigned to'),
+  "responsableNombre": zod.string().nullish().describe('Display name of the assigned ejecutivo\/admin'),
+  "clienteId": zod.number().nullish().describe('ID of the associated cliente'),
+  "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
+  "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
+  "fechaVencimiento": zod.string().regex(ajustarMontoResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
+  "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
+  "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
+  "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "creadoEn": zod.coerce.date(),
+  "actualizadoEn": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary List amount-adjustment history for a cobro
+ */
+export const ListAjustesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListAjustesResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "montoOriginal": zod.number(),
+  "montoNuevo": zod.number(),
+  "motivo": zod.string(),
+  "ajustadoPorNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListAjustesResponse = zod.array(ListAjustesResponseItem)
 
 
 /**
@@ -1138,6 +1231,27 @@ export const GetSubscriptionStatusResponse = zod.object({
 export const StartSubscriptionResponse = zod.object({
   "url": zod.string()
 })
+
+
+/**
+ * @summary Deletion audit log of deleted cobros (admin only)
+ */
+export const ListAdminCobrosEliminadosResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroIdOriginal": zod.number(),
+  "monto": zod.number(),
+  "montoACobrar": zod.number().nullish(),
+  "estado": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "clienteId": zod.number().nullish(),
+  "clienteNombre": zod.string().nullish(),
+  "organizationId": zod.number().nullish(),
+  "motivo": zod.string().nullish(),
+  "eliminadoPorId": zod.string().nullish(),
+  "eliminadoPorNombre": zod.string().nullish(),
+  "eliminadoEn": zod.coerce.date()
+})
+export const ListAdminCobrosEliminadosResponse = zod.array(ListAdminCobrosEliminadosResponseItem)
 
 
 /**

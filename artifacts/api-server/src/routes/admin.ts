@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { db, usersTable, cobrosTable, organizacionesTable } from "@workspace/db";
-import { eq, sql, isNull } from "drizzle-orm";
+import { db, usersTable, cobrosTable, organizacionesTable, cobrosEliminadosTable } from "@workspace/db";
+import type { CobroEliminado } from "@workspace/db";
+import { eq, sql, isNull, desc } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { computeSubscriptionState } from "../lib/subscription";
 import { computePricing } from "../lib/org";
@@ -421,6 +422,38 @@ adminRouter.post("/admin/usuarios/:id/recordatorio-email", async (req, res) => {
     res.json({ ok: true, message: "Recordatorio enviado correctamente." });
   } catch (err) {
     req.log.error({ err }, "Error sending admin recordatorio email");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+function serializeCobroEliminado(c: CobroEliminado) {
+  return {
+    id: c.id,
+    cobroIdOriginal: c.cobroIdOriginal,
+    monto: Number(c.monto),
+    montoACobrar: Number(c.montoACobrar),
+    estado: c.estado,
+    descripcion: c.descripcion,
+    clienteId: c.clienteId ?? null,
+    clienteNombre: c.clienteNombre ?? null,
+    organizationId: c.organizationId ?? null,
+    motivo: c.motivo ?? null,
+    eliminadoPorId: c.eliminadoPorId ?? null,
+    eliminadoPorNombre: c.eliminadoPorNombre ?? null,
+    eliminadoEn: c.eliminadoEn.toISOString(),
+  };
+}
+
+// Superadmin audit log of hard-deleted cobros (newest first).
+adminRouter.get("/admin/cobros-eliminados", async (req, res) => {
+  try {
+    const rows = await db
+      .select()
+      .from(cobrosEliminadosTable)
+      .orderBy(desc(cobrosEliminadosTable.eliminadoEn));
+    res.json(rows.map(serializeCobroEliminado));
+  } catch (err) {
+    req.log.error({ err }, "Error listing deleted cobros");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

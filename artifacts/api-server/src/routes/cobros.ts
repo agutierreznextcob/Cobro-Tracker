@@ -3,6 +3,9 @@ import {
   db,
   cobrosTable,
   cobroDescuentosTable,
+  cobroAjustesTable,
+  cobrosEliminadosTable,
+  comprobantesTable,
   clientesTable,
   seguimientosCobranzaTable,
   pagosParciales,
@@ -10,7 +13,7 @@ import {
   recordatoriosEnviadosTable,
   usersTable,
 } from "@workspace/db";
-import type { Cobro, CobroDescuento } from "@workspace/db";
+import type { Cobro, CobroDescuento, CobroAjuste } from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
 import {
   CreateCobroBody,
@@ -20,6 +23,8 @@ import {
   CreateRecordatorioBody,
   UpdateRecordatorioBody,
   AplicarDescuentoBody,
+  AjustarMontoBody,
+  EliminarCobroBody,
 } from "@workspace/api-zod";
 import { z } from "zod";
 import { getFlowCredentials, getMpCredentials } from "./profile";
@@ -44,6 +49,31 @@ function tipoDocumentoPermiteIva(tipo: TipoDocumento): boolean {
 // Net amount to charge after the current effective discount.
 function montoACobrar(cobro: Pick<Cobro, "monto" | "montoDescuento">): number {
   return Number(cobro.monto) - Number(cobro.montoDescuento ?? 0);
+}
+
+// Computes the charged total and IVA breakdown for an entered amount. When IVA
+// applies, the entered value is the NETO and the server derives iva + total so
+// CLP integer rounding stays server-side (mirrors POST /cobros).
+function computeMontoConIva(
+  montoEntrada: number,
+  aplicaIva: boolean,
+): { montoFinal: number; montoNeto: number | null; montoIva: number | null } {
+  if (!aplicaIva) return { montoFinal: montoEntrada, montoNeto: null, montoIva: null };
+  const montoNeto = Math.round(montoEntrada);
+  const montoIva = Math.round(montoNeto * 0.19);
+  return { montoFinal: montoNeto + montoIva, montoNeto, montoIva };
+}
+
+function serializeAjuste(a: CobroAjuste) {
+  return {
+    id: a.id,
+    cobroId: a.cobroId,
+    montoOriginal: Number(a.montoOriginal),
+    montoNuevo: Number(a.montoNuevo),
+    motivo: a.motivo,
+    ajustadoPorNombre: a.ajustadoPorNombre ?? null,
+    creadoEn: a.creadoEn.toISOString(),
+  };
 }
 
 // Standard JSON serialization for a cobro response (numeric + date conversions
@@ -491,6 +521,247 @@ cobrosRouter.post("/cobros/:id/descuentos", async (req, res) => {
   }
 });
 
+// Amount-adjustment history for a cobro (records of lowering the total under
+// partial payments). Newest first.
+cobrosRouter.get("/cobros/:id/ajustes", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
+  try {
+    const ajustes = await db
+      .select()
+      .from(cobroAjustesTable)
+      .where(eq(cobroAjustesTable.cobroId, paramsParsed.data.id))
+      .orderBy(desc(cobroAjustesTable.creadoEn));
+    res.json(ajustes.map(serializeAjuste));
+  } catch (err) {
+    req.log.error({ err }, "Error listing ajustes");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Adjust (lower) the total amount of a cobro that already has confirmed partial
+// payments. The new amount must be >= what was already paid; if it equals the
+// paid amount the cobro becomes "pagado". Every adjustment is recorded with an
+// obligatory reason. IVA is recomputed treating the entered value the same way as
+// the current cobro (net when incluyeIva, otherwise the final charge).
+cobrosRouter.post("/cobros/:id/ajustar-monto", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const bodyParsed = AjustarMontoBody.safeParse(req.body);
+  if (!bodyParsed.success) {
+    res.status(400).json({ error: bodyParsed.error.message });
+    return;
+  }
+  const { monto: montoEntrada, motivo } = bodyParsed.data;
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
+
+  const user = req.user!;
+  const ajustadoPorNombre =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null;
+
+  try {
+    // Validate + write inside a single transaction, locking the cobro row so a
+    // concurrent abono confirmation can't slip past the `>= pagado` check.
+    type AjusteResult =
+      | { ok: false; status: number; error: string }
+      | { ok: true; cobroId: number; montoOriginal: number; montoNuevo: number; totalPagado: number };
+    const result: AjusteResult = await db.transaction(async (tx): Promise<AjusteResult> => {
+      const [cobro] = await tx
+        .select()
+        .from(cobrosTable)
+        .where(eq(cobrosTable.id, paramsParsed.data.id))
+        .for("update");
+      if (!cobro) {
+        return { ok: false, status: 404, error: "Cobro no encontrado" };
+      }
+      if (cobro.estado !== "parcial") {
+        return {
+          ok: false,
+          status: 400,
+          error: "Solo puedes ajustar el monto total de un cobro con pagos parciales.",
+        };
+      }
+
+      const [sumRow] = await tx
+        .select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
+        .from(pagosParciales)
+        .where(and(eq(pagosParciales.cobroId, cobro.id), eq(pagosParciales.estado, "confirmado")));
+      const totalPagado = sumRow?.total ?? 0;
+
+      const { montoFinal, montoNeto, montoIva } = computeMontoConIva(montoEntrada, cobro.incluyeIva);
+
+      if (montoFinal < totalPagado) {
+        return {
+          ok: false,
+          status: 400,
+          error: `El nuevo monto ($${montoFinal.toLocaleString("es-CL")}) no puede ser menor a lo ya pagado ($${totalPagado.toLocaleString("es-CL")}).`,
+        };
+      }
+      if (montoFinal >= montoACobrar(cobro)) {
+        return {
+          ok: false,
+          status: 400,
+          error: "El nuevo monto debe ser menor al monto actual del cobro.",
+        };
+      }
+
+      const montoOriginal = Number(cobro.monto);
+
+      await tx.insert(cobroAjustesTable).values({
+        cobroId: cobro.id,
+        montoOriginal: String(montoOriginal),
+        montoNuevo: String(montoFinal),
+        motivo,
+        ajustadoPorId: user.id,
+        ajustadoPorNombre,
+      });
+
+      // Lowering the total resets any prior discount (the discount was relative to
+      // the old total) and invalidates existing payment links.
+      await tx
+        .update(cobrosTable)
+        .set({
+          monto: String(montoFinal),
+          montoNeto: montoNeto != null ? String(montoNeto) : null,
+          montoIva: montoIva != null ? String(montoIva) : null,
+          montoDescuento: null,
+          flowOrdenId: null,
+          flowToken: null,
+          flowLinkPago: null,
+          mpPreferenceId: null,
+          mpPaymentLinkUrl: null,
+          actualizadoEn: new Date(),
+        })
+        .where(eq(cobrosTable.id, cobro.id));
+
+      return { ok: true, cobroId: cobro.id, montoOriginal, montoNuevo: montoFinal, totalPagado };
+    });
+
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+
+    const estadoTras = await recalcularEstadoCobro(result.cobroId);
+    if (estadoTras === "pagado") {
+      void emitirComprobante(result.cobroId, { metodo: "manual" }, req.log);
+    }
+    const [refreshed] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, result.cobroId));
+
+    req.log.info(
+      { cobroId: result.cobroId, montoOriginal: result.montoOriginal, montoNuevo: result.montoNuevo, totalPagado: result.totalPagado },
+      "Monto ajustado en cobro con pagos parciales",
+    );
+    if (!refreshed) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+    res.json(serializeCobro(refreshed, result.totalPagado));
+  } catch (err) {
+    req.log.error({ err }, "Error adjusting monto");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Hard-delete a cobro and its children. Blocked when the cobro is paid or already
+// has confirmed partial payments (real money received). Writes a snapshot to the
+// superadmin deletion audit log. The associated cliente is NOT deleted.
+cobrosRouter.delete("/cobros/:id", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const bodyParsed = EliminarCobroBody.safeParse(req.body ?? {});
+  const motivo =
+    bodyParsed.success && typeof bodyParsed.data.motivo === "string" && bodyParsed.data.motivo.trim()
+      ? bodyParsed.data.motivo.trim()
+      : null;
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
+
+  const user = req.user!;
+  const eliminadoPorNombre =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null;
+
+  try {
+    // Validate + delete inside a single transaction, locking the cobro row so a
+    // concurrent abono confirmation can't attach money to a cobro we're deleting.
+    type DeleteResult =
+      | { ok: false; status: number; error: string }
+      | { ok: true; cobroId: number; estado: string };
+    const deleted: DeleteResult = await db.transaction(async (tx): Promise<DeleteResult> => {
+      const [cobro] = await tx
+        .select()
+        .from(cobrosTable)
+        .where(eq(cobrosTable.id, paramsParsed.data.id))
+        .for("update");
+      if (!cobro) {
+        return { ok: false, status: 404, error: "Cobro no encontrado" };
+      }
+      if (cobro.estado === "pagado") {
+        return { ok: false, status: 400, error: "No puedes eliminar un cobro pagado." };
+      }
+
+      const [sumRow] = await tx
+        .select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
+        .from(pagosParciales)
+        .where(and(eq(pagosParciales.cobroId, cobro.id), eq(pagosParciales.estado, "confirmado")));
+      if ((sumRow?.total ?? 0) > 0) {
+        return { ok: false, status: 400, error: "No puedes eliminar un cobro con pagos registrados." };
+      }
+
+      await tx.insert(cobrosEliminadosTable).values({
+        cobroIdOriginal: cobro.id,
+        monto: cobro.monto,
+        montoACobrar: String(montoACobrar(cobro)),
+        estado: cobro.estado,
+        descripcion: cobro.descripcion,
+        clienteId: cobro.clienteId ?? null,
+        clienteNombre: cobro.clienteNombre ?? null,
+        organizationId: cobro.organizationId ?? null,
+        motivo,
+        eliminadoPorId: user.id,
+        eliminadoPorNombre,
+      });
+      // comprobantes has no FK cascade — delete manually before the cobro.
+      await tx.delete(comprobantesTable).where(eq(comprobantesTable.cobroId, cobro.id));
+      // The rest of the children cascade on cobro delete.
+      await tx.delete(cobrosTable).where(eq(cobrosTable.id, cobro.id));
+      return { ok: true, cobroId: cobro.id, estado: cobro.estado };
+    });
+
+    if (!deleted.ok) {
+      res.status(deleted.status).json({ error: deleted.error });
+      return;
+    }
+
+    req.log.info({ cobroId: deleted.cobroId, estado: deleted.estado }, "Cobro eliminado");
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting cobro");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
 const GenerarFlowLinkInput = z.object({
   emailPagador: z.string().email("Email inválido"),
 });
@@ -846,56 +1117,148 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
     return;
   }
 
+  const [current] = await db
+    .select()
+    .from(cobrosTable)
+    .where(eq(cobrosTable.id, paramsParsed.data.id));
+  if (!current) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
+
+  const body = bodyParsed.data as Record<string, unknown>;
+  const fechaVencimiento = body.fechaVencimiento as string | null | undefined;
+  const montoInput = body.monto as number | undefined;
+  const incluyeIvaInput = body.incluyeIva as boolean | undefined;
+  const tipoDocumentoInput = body.tipoDocumento as TipoDocumento | undefined;
+  const clienteIdInput = body.clienteId as number | null | undefined;
+  const responsableIdInput = body.responsableId as string | undefined;
+
+  // "Edit" fields (as opposed to estado/status transitions and due-date changes)
+  // may only be modified while the cobro is still pendiente. A "vencido" cobro is
+  // simply a pendiente one past its due date, so it passes this check too. Amount
+  // changes on a cobro WITH partial payments go through POST /cobros/:id/ajustar-monto.
+  const editFieldsPresent =
+    montoInput !== undefined ||
+    incluyeIvaInput !== undefined ||
+    bodyParsed.data.descripcion !== undefined ||
+    bodyParsed.data.referencia !== undefined ||
+    tipoDocumentoInput !== undefined ||
+    clienteIdInput !== undefined ||
+    responsableIdInput !== undefined;
+  if (editFieldsPresent && current.estado !== "pendiente") {
+    res.status(400).json({
+      error:
+        current.estado === "parcial"
+          ? "Este cobro tiene pagos parciales. Ajusta el monto o aplica un descuento al saldo desde las opciones de pagos parciales."
+          : "Solo puedes editar un cobro pendiente.",
+    });
+    return;
+  }
+
+  // Resetting estado to "pendiente" would re-open full editing (see gate above),
+  // so it must be blocked whenever the cobro has received money. Otherwise a
+  // caller could do parcial→pendiente and then freely edit the amount, bypassing
+  // the audited ajustar-monto flow.
+  if (bodyParsed.data.estado === "pendiente" && current.estado !== "pendiente") {
+    const [abonoRow] = await db
+      .select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
+      .from(pagosParciales)
+      .where(and(eq(pagosParciales.cobroId, current.id), eq(pagosParciales.estado, "confirmado")));
+    if ((abonoRow?.total ?? 0) > 0) {
+      res.status(400).json({
+        error: "No puedes volver a pendiente un cobro con pagos registrados.",
+      });
+      return;
+    }
+  }
+
   const updates: Record<string, unknown> = {
     actualizadoEn: new Date(),
   };
 
-  const fechaVencimiento = (bodyParsed.data as Record<string, unknown>).fechaVencimiento as
-    | string
-    | null
-    | undefined;
-
   if (bodyParsed.data.estado !== undefined) updates.estado = bodyParsed.data.estado;
   if (bodyParsed.data.descripcion !== undefined) updates.descripcion = bodyParsed.data.descripcion;
-  if (bodyParsed.data.referencia !== undefined) updates.referencia = bodyParsed.data.referencia;
+  if (bodyParsed.data.referencia !== undefined) updates.referencia = bodyParsed.data.referencia ?? null;
   if (fechaVencimiento !== undefined) updates.fechaVencimiento = fechaVencimiento;
 
-  const tipoDocumentoInput = (bodyParsed.data as Record<string, unknown>).tipoDocumento as
-    | TipoDocumento
-    | undefined;
-  if (tipoDocumentoInput !== undefined) {
-    updates.tipoDocumento = tipoDocumentoInput;
-    // Switching to a type that can't carry IVA must strip any existing IVA so the
-    // charged amount reverts to the net and the breakdown is always cleared. We
-    // normalize unconditionally (not only when incluyeIva is currently true) so
-    // legacy/inconsistent rows with stale breakdown columns get cleaned up too.
-    if (!tipoDocumentoPermiteIva(tipoDocumentoInput)) {
-      const [current] = await db
-        .select({
-          incluyeIva: cobrosTable.incluyeIva,
-          monto: cobrosTable.monto,
-          montoNeto: cobrosTable.montoNeto,
-          montoIva: cobrosTable.montoIva,
-        })
-        .from(cobrosTable)
-        .where(eq(cobrosTable.id, paramsParsed.data.id));
-      if (current) {
-        updates.incluyeIva = false;
-        updates.montoNeto = null;
-        updates.montoIva = null;
-        // Revert the charged amount to the net. Prefer the stored net; fall back
-        // to deriving it from monto - iva, and finally to monto itself, so a row
-        // with incluyeIva=true but a missing montoNeto never keeps an IVA-included
-        // total after the switch.
-        if (current.incluyeIva) {
-          if (current.montoNeto != null) {
-            updates.monto = current.montoNeto;
-          } else if (current.montoIva != null && current.monto != null) {
-            updates.monto = String(Math.round(Number(current.monto) - Number(current.montoIva)));
-          }
-        }
+  if (tipoDocumentoInput !== undefined) updates.tipoDocumento = tipoDocumentoInput;
+
+  // Resolve the effective document type and whether IVA applies after this edit.
+  const effectiveTipo = tipoDocumentoInput ?? current.tipoDocumento;
+  const effectiveIncluyeIva =
+    tipoDocumentoPermiteIva(effectiveTipo) && (incluyeIvaInput ?? current.incluyeIva);
+
+  if (montoInput !== undefined) {
+    // Recompute the charged total and IVA breakdown from the entered amount, reset
+    // any prior discount (it was relative to the old total) and invalidate existing
+    // payment links (the client must generate new ones for the new amount).
+    const { montoFinal, montoNeto, montoIva } = computeMontoConIva(montoInput, effectiveIncluyeIva);
+    updates.monto = String(montoFinal);
+    updates.incluyeIva = effectiveIncluyeIva;
+    updates.montoNeto = montoNeto != null ? String(montoNeto) : null;
+    updates.montoIva = montoIva != null ? String(montoIva) : null;
+    updates.montoDescuento = null;
+    updates.flowOrdenId = null;
+    updates.flowToken = null;
+    updates.flowLinkPago = null;
+    updates.mpPreferenceId = null;
+    updates.mpPaymentLinkUrl = null;
+  } else if (incluyeIvaInput !== undefined || tipoDocumentoInput !== undefined) {
+    // No new amount, but the IVA applicability may have changed. Recompute the
+    // breakdown/total from the current net so the charged amount stays consistent.
+    const netoActual =
+      current.montoNeto != null
+        ? Number(current.montoNeto)
+        : current.incluyeIva && current.montoIva != null
+          ? Number(current.monto) - Number(current.montoIva)
+          : Number(current.monto);
+    const { montoFinal, montoNeto, montoIva } = computeMontoConIva(netoActual, effectiveIncluyeIva);
+    updates.incluyeIva = effectiveIncluyeIva;
+    updates.montoNeto = montoNeto != null ? String(montoNeto) : null;
+    updates.montoIva = montoIva != null ? String(montoIva) : null;
+    updates.monto = String(montoFinal);
+  }
+
+  // Reassociate the cliente (or clear it). Must be accessible to the user.
+  if (clienteIdInput !== undefined) {
+    if (clienteIdInput === null) {
+      updates.clienteId = null;
+      updates.clienteNombre = null;
+    } else {
+      const ctx = await getOrgContext(userId);
+      const [cliente] = await db
+        .select()
+        .from(clientesTable)
+        .where(eq(clientesTable.id, clienteIdInput));
+      if (!cliente || !userCanAccessCliente(ctx, userId, cliente)) {
+        res.status(404).json({ error: "Cliente no encontrado" });
+        return;
       }
+      updates.clienteId = cliente.id;
+      updates.clienteNombre = cliente.nombre;
     }
+  }
+
+  // Reassign the responsable ejecutivo. Only org admins may assign to another
+  // member of their organization.
+  if (responsableIdInput !== undefined && responsableIdInput !== current.responsableId) {
+    const ctx = await getOrgContext(userId);
+    if (!ctx.isOrgAdmin || ctx.organizationId == null) {
+      res.status(403).json({ error: "No puedes reasignar cobros a otros usuarios." });
+      return;
+    }
+    const [assignee] = await db
+      .select()
+      .from(usersTable)
+      .where(and(eq(usersTable.id, responsableIdInput), eq(usersTable.organizationId, ctx.organizationId)));
+    if (!assignee) {
+      res.status(400).json({ error: "El responsable no pertenece a tu organización." });
+      return;
+    }
+    updates.responsableId = assignee.id;
+    updates.responsableNombre =
+      [assignee.firstName, assignee.lastName].filter(Boolean).join(" ") || assignee.email || null;
   }
 
   try {

@@ -1,0 +1,105 @@
+Agregar funcionalidad de editar y eliminar cobros 
+con las siguientes reglas de negocio:
+
+1. ELIMINAR COBRO:
+En el detalle de cada cobro, agregar botón 
+"Eliminar cobro" con las siguientes condiciones:
+
+PERMITIDO eliminar cuando el cobro está en estado:
+- Pendiente
+- Vencido
+- Fallido
+- Cancelado
+
+NO PERMITIDO eliminar cuando:
+- El cobro está en estado "Pagado" (ya hubo 
+  transacción real de dinero)
+- El cobro está en estado "Parcial" y ya hay 
+  pagos registrados (hay dinero recibido)
+
+Al intentar eliminar mostrar confirmación:
+"¿Estás seguro que deseas eliminar este cobro? 
+Esta acción no se puede deshacer y el cobro 
+no aparecerá en tus informes."
+
+Al eliminar:
+- Eliminar el cobro y todos sus datos asociados
+  (recordatorios, notas de gestión, links de pago)
+- NO eliminar al cliente asociado
+- Registrar en un log interno que el cobro fue 
+  eliminado (fecha, usuario, motivo opcional)
+
+2. EDITAR COBRO:
+En el detalle de cada cobro, agregar botón 
+"Editar cobro" con estas condiciones:
+
+PERMITIDO editar cuando está en estado:
+- Pendiente
+- Vencido
+
+Campos editables:
+- Monto (solo si no tiene pagos parciales)
+- Descripción
+- Fecha de vencimiento
+- Cliente asociado
+- Tipo de documento
+- Referencia
+- Ejecutivo responsable
+
+NO editables nunca:
+- Fecha de creación original
+- Pagos ya registrados
+- Links de pago ya generados (si se cambia el 
+  monto, advertir que los links anteriores 
+  quedarán desactualizados y deberá generar 
+  nuevos)
+
+3. EDITAR COBRO CON PAGOS PARCIALES:
+Cuando un cobro está en estado "Parcial" 
+(tiene abonos pero no está pagado en su 
+totalidad), permitir estas opciones:
+
+A) APLICAR DESCUENTO AL SALDO PENDIENTE:
+   El usuario puede aplicar un descuento 
+   (% o monto fijo) sobre el saldo que queda 
+   por cobrar, no sobre lo ya pagado.
+   Ejemplo: cobro de $100.000, cliente abonó 
+   $60.000, saldo pendiente $40.000. Se aplica 
+   descuento de $10.000 → nuevo saldo = $30.000.
+   Si el descuento cubre el saldo completo, 
+   el cobro se marca automáticamente como "Pagado".
+
+B) MODIFICAR EL MONTO TOTAL DEL COBRO:
+   Permitir bajar el monto total del cobro, 
+   siempre que el nuevo monto sea MAYOR O IGUAL 
+   a lo ya pagado.
+   Ejemplo: cobro de $100.000, cliente abonó 
+   $60.000 → se puede bajar el total a mínimo 
+   $60.000 (quedaría saldado) o a cualquier 
+   valor entre $60.000 y $100.000.
+   Si el nuevo monto total es igual a lo ya 
+   pagado, el cobro se marca como "Pagado" 
+   automáticamente.
+
+C) REGISTRO DEL AJUSTE:
+   Cualquier modificación de monto en un cobro 
+   con pagos parciales debe quedar registrada 
+   en el historial del cobro con:
+   - Monto original
+   - Monto ajustado
+   - Motivo del ajuste (campo de texto obligatorio)
+   - Usuario que realizó el ajuste
+   - Fecha y hora
+
+4. EN INFORMES:
+Los cobros eliminados NO deben aparecer en 
+ningún informe ni exportación Excel.
+Los cobros editados deben reflejar los valores 
+actualizados en todos los informes.
+
+5. AUDITORÍA:
+En el panel de Superadmin, mantener un log de 
+cobros eliminados con: fecha de eliminación, 
+usuario que eliminó, monto original, cliente, 
+motivo (si se indicó). Esto para control interno 
+y prevención de fraude.

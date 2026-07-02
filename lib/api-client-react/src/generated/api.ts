@@ -31,6 +31,7 @@ import type {
   AiConversationInput,
   AiConversationWithMessages,
   AiMessageInput,
+  AjustarMontoInput,
   AplicarDescuentoInput,
   AsignarWorkflowInput,
   AuthResult,
@@ -43,12 +44,15 @@ import type {
   ClienteConScore,
   ClienteInput,
   Cobro,
+  CobroAjuste,
+  CobroEliminado,
   CobroInput,
   CobroUpdate,
   CobrosSummary,
   CompletarPerfilInput,
   DashboardMetricas,
   Descuento,
+  EliminarCobroInput,
   EliminarCuentaInput,
   EmailInput,
   EncuestaPublica,
@@ -1940,6 +1944,229 @@ export const useUpdateCobro = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getUpdateCobroMutationOptions(options));
     }
+
+export const getEliminarCobroUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}`
+}
+
+/**
+ * Hard-deletes a cobro and all its associated data (payment links, reminders, follow-ups, discounts, partial payments) but NOT the client. Not allowed when the cobro is paid or already has confirmed partial payments. Records a snapshot in the superadmin deletion audit log.
+ * @summary Delete a cobro
+ */
+export const eliminarCobro = async (id: number,
+    eliminarCobroInput?: EliminarCobroInput, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getEliminarCobroUrl(id),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      eliminarCobroInput,)
+  }
+);}
+
+
+
+
+export const getEliminarCobroMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof eliminarCobro>>, TError,{id: number;data?: BodyType<EliminarCobroInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof eliminarCobro>>, TError,{id: number;data?: BodyType<EliminarCobroInput>}, TContext> => {
+
+const mutationKey = ['eliminarCobro'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof eliminarCobro>>, {id: number;data?: BodyType<EliminarCobroInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  eliminarCobro(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EliminarCobroMutationResult = NonNullable<Awaited<ReturnType<typeof eliminarCobro>>>
+    export type EliminarCobroMutationBody = BodyType<EliminarCobroInput> | undefined
+    export type EliminarCobroMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete a cobro
+ */
+export const useEliminarCobro = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof eliminarCobro>>, TError,{id: number;data?: BodyType<EliminarCobroInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof eliminarCobro>>,
+        TError,
+        {id: number;data?: BodyType<EliminarCobroInput>},
+        TContext
+      > => {
+      return useMutation(getEliminarCobroMutationOptions(options));
+    }
+
+export const getAjustarMontoUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/ajustar-monto`
+}
+
+/**
+ * Lowers the total amount of a cobro that has confirmed partial payments. The new amount must be greater than or equal to the amount already paid. If it equals the paid amount, the cobro is marked as paid. Records the adjustment (with an obligatory reason) in the cobro's history.
+ * @summary Adjust the total amount of a cobro with partial payments
+ */
+export const ajustarMonto = async (id: number,
+    ajustarMontoInput: AjustarMontoInput, options?: RequestInit): Promise<Cobro> => {
+
+  return customFetch<Cobro>(getAjustarMontoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ajustarMontoInput,)
+  }
+);}
+
+
+
+
+export const getAjustarMontoMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ajustarMonto>>, TError,{id: number;data: BodyType<AjustarMontoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof ajustarMonto>>, TError,{id: number;data: BodyType<AjustarMontoInput>}, TContext> => {
+
+const mutationKey = ['ajustarMonto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof ajustarMonto>>, {id: number;data: BodyType<AjustarMontoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  ajustarMonto(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AjustarMontoMutationResult = NonNullable<Awaited<ReturnType<typeof ajustarMonto>>>
+    export type AjustarMontoMutationBody = BodyType<AjustarMontoInput>
+    export type AjustarMontoMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Adjust the total amount of a cobro with partial payments
+ */
+export const useAjustarMonto = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ajustarMonto>>, TError,{id: number;data: BodyType<AjustarMontoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof ajustarMonto>>,
+        TError,
+        {id: number;data: BodyType<AjustarMontoInput>},
+        TContext
+      > => {
+      return useMutation(getAjustarMontoMutationOptions(options));
+    }
+
+export const getListAjustesUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/ajustes`
+}
+
+/**
+ * @summary List amount-adjustment history for a cobro
+ */
+export const listAjustes = async (id: number, options?: RequestInit): Promise<CobroAjuste[]> => {
+
+  return customFetch<CobroAjuste[]>(getListAjustesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAjustesQueryKey = (id: number,) => {
+    return [
+    `/api/cobros/${id}/ajustes`
+    ] as const;
+    }
+
+
+export const getListAjustesQueryOptions = <TData = Awaited<ReturnType<typeof listAjustes>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAjustes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAjustesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAjustes>>> = ({ signal }) => listAjustes(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAjustes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAjustesQueryResult = NonNullable<Awaited<ReturnType<typeof listAjustes>>>
+export type ListAjustesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List amount-adjustment history for a cobro
+ */
+
+export function useListAjustes<TData = Awaited<ReturnType<typeof listAjustes>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAjustes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAjustesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetCobrosSummaryUrl = () => {
 
@@ -4238,6 +4465,83 @@ export const useStartSubscription = <TError = ErrorType<ErrorResponse | void>,
       > => {
       return useMutation(getStartSubscriptionMutationOptions(options));
     }
+
+export const getListAdminCobrosEliminadosUrl = () => {
+
+
+
+
+  return `/api/admin/cobros-eliminados`
+}
+
+/**
+ * @summary Deletion audit log of deleted cobros (admin only)
+ */
+export const listAdminCobrosEliminados = async ( options?: RequestInit): Promise<CobroEliminado[]> => {
+
+  return customFetch<CobroEliminado[]>(getListAdminCobrosEliminadosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminCobrosEliminadosQueryKey = () => {
+    return [
+    `/api/admin/cobros-eliminados`
+    ] as const;
+    }
+
+
+export const getListAdminCobrosEliminadosQueryOptions = <TData = Awaited<ReturnType<typeof listAdminCobrosEliminados>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminCobrosEliminados>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminCobrosEliminadosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminCobrosEliminados>>> = ({ signal }) => listAdminCobrosEliminados({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminCobrosEliminados>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminCobrosEliminadosQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminCobrosEliminados>>>
+export type ListAdminCobrosEliminadosQueryError = ErrorType<void>
+
+
+/**
+ * @summary Deletion audit log of deleted cobros (admin only)
+ */
+
+export function useListAdminCobrosEliminados<TData = Awaited<ReturnType<typeof listAdminCobrosEliminados>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminCobrosEliminados>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminCobrosEliminadosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListAdminUsuariosUrl = () => {
 

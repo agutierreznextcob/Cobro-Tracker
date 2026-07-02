@@ -10,9 +10,24 @@ import type { CobroUpdateTipoDocumento } from './cobroUpdateTipoDocumento';
 
 export interface CobroUpdate {
   estado?: CobroUpdateEstado;
+  /**
+     * New total amount. Only allowed when the cobro is "pendiente" (no confirmed payments). When incluyeIva is true this is the NETO; server recomputes IVA and total. Changing it invalidates any existing payment links.
+     * @minimum 0.01
+     */
+  monto?: number;
+  /** Apply Chilean VAT (IVA 19%). Only honored when tipoDocumento is an "afecta" type and monto is provided. */
+  incluyeIva?: boolean;
   /** @minLength 1 */
   descripcion?: string;
-  referencia?: string;
+  /** @nullable */
+  referencia?: string | null;
+  /**
+     * Associate an existing cliente, or null to clear it. Only allowed when the cobro is "pendiente".
+     * @nullable
+     */
+  clienteId?: number | null;
+  /** Reassign the cobro to an ejecutivo/admin of the organization (admin only). Only allowed when the cobro is "pendiente". */
+  responsableId?: string;
   /** Chilean electronic tax document type (DTE). */
   tipoDocumento?: CobroUpdateTipoDocumento;
   /**

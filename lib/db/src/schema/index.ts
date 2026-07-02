@@ -3,6 +3,8 @@ export * from "./invitaciones";
 export * from "./clientes";
 export * from "./cobros";
 export * from "./cobro-descuentos";
+export * from "./cobro-ajustes";
+export * from "./cobros-eliminados";
 export * from "./webhook-eventos";
 export * from "./auth";
 export * from "./flow-credentials";

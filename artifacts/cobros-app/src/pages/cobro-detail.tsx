@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   useGetCobro,
   getGetCobroQueryKey,
   useUpdateCobro,
+  useEliminarCobro,
+  useAjustarMonto,
+  useListAjustes,
+  getListAjustesQueryKey,
+  useListClientes,
+  useListMiembros,
+  getListMiembrosQueryKey,
   useGenerarFlowLink,
   useGenerarMpLink,
   useEnviarRecordatorioEmail,
@@ -36,16 +46,31 @@ import {
   type RecordatorioInputCanal,
   type RecordatorioInputMomento,
 } from "@workspace/api-client-react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { formatCurrency, formatDate, formatDateOnly } from "@/lib/format";
-import { tipoDocumentoLabel } from "@/lib/tipo-documento";
+import { tipoDocumentoLabel, TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva, type TipoDocumento } from "@/lib/tipo-documento";
 import { StatusBadge } from "@/components/status-badge";
 import { GestionesSection } from "@/components/gestiones-section";
 import { accionLabel } from "@/lib/workflow-labels";
@@ -81,7 +106,22 @@ import {
   Zap,
   XCircle,
 } from "lucide-react";
-import { CobroUpdateEstado } from "@workspace/api-client-react";
+import { CobroUpdateEstado, type CobroUpdate, type CobroUpdateTipoDocumento } from "@workspace/api-client-react";
+
+const IVA_RATE = 0.19;
+
+const editFormSchema = z.object({
+  monto: z.coerce.number().int("El monto debe ser un número entero").min(1, "El monto debe ser mayor a $0"),
+  tipoDocumento: z.enum(TIPO_DOCUMENTO_VALUES),
+  incluyeIva: z.boolean().default(false),
+  descripcion: z.string().min(1, "La descripción es obligatoria").max(255),
+  referencia: z.string().optional(),
+  clienteId: z.coerce.number().optional(),
+  fechaVencimiento: z.string().optional().or(z.literal("")),
+  responsableId: z.string().optional(),
+});
+
+type EditFormValues = z.infer<typeof editFormSchema>;
 
 function buildWhatsappUrl(opts: {
   clienteNombre: string | null;
@@ -140,6 +180,9 @@ export default function CobroDetail() {
   const enviarRecordatorio = useEnviarRecordatorioEmail();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const isOrgAdmin = user?.orgRole === "admin_org";
 
   // Link generation modal state
   const [showFlowConfig, setShowFlowConfig] = useState(false);
@@ -394,6 +437,164 @@ export default function CobroDetail() {
   const totalAbonado = (abonos ?? []).filter((a) => a.estado === "confirmado").reduce((acc, a) => acc + a.monto, 0);
   const montoACobrar = cobro ? cobro.montoACobrar ?? cobro.monto - (cobro.montoDescuento ?? 0) : 0;
   const saldoPendiente = cobro ? montoACobrar - totalAbonado : 0;
+
+  // --- Editar cobro ---
+  const { data: clientes } = useListClientes();
+  const { data: miembros } = useListMiembros({
+    query: { enabled: isOrgAdmin, queryKey: getListMiembrosQueryKey() },
+  });
+  const miembrosActivos = miembros?.filter((m) => m.activo) ?? [];
+
+  const editForm = useForm<EditFormValues>({
+    resolver: zodResolver(editFormSchema),
+    defaultValues: {
+      monto: 0,
+      tipoDocumento: "sin_documento",
+      incluyeIva: false,
+      descripcion: "",
+      referencia: "",
+      clienteId: undefined,
+      fechaVencimiento: "",
+      responsableId: undefined,
+    },
+  });
+  const [showEditDialog, setShowEditDialog] = useState(false);
+
+  const editTipoDocumento = editForm.watch("tipoDocumento");
+  const editPermiteIva = tipoDocumentoPermiteIva(editTipoDocumento);
+  const editIncluyeIva = editForm.watch("incluyeIva");
+  const editMonto = editForm.watch("monto");
+  const editNeto = Number(editMonto) || 0;
+  const editIva = editIncluyeIva ? Math.round(editNeto * IVA_RATE) : 0;
+  const editTotal = editIncluyeIva ? editNeto + editIva : editNeto;
+
+  useEffect(() => {
+    if (!editPermiteIva && editForm.getValues("incluyeIva")) {
+      editForm.setValue("incluyeIva", false);
+    }
+  }, [editPermiteIva]);
+
+  const openEditDialog = () => {
+    if (!cobro) return;
+    editForm.reset({
+      monto: cobro.incluyeIva ? cobro.montoNeto ?? cobro.monto : cobro.monto,
+      tipoDocumento: ((cobro.tipoDocumento as TipoDocumento) ?? "sin_documento"),
+      incluyeIva: cobro.incluyeIva ?? false,
+      descripcion: cobro.descripcion,
+      referencia: cobro.referencia ?? "",
+      clienteId: cobro.clienteId ?? undefined,
+      fechaVencimiento: cobro.fechaVencimiento ?? "",
+      responsableId: cobro.responsableId ?? undefined,
+    });
+    setShowEditDialog(true);
+  };
+
+  const onEditSubmit = (values: EditFormValues) => {
+    const data: CobroUpdate = {
+      monto: values.monto,
+      tipoDocumento: values.tipoDocumento as CobroUpdateTipoDocumento,
+      incluyeIva: editPermiteIva ? values.incluyeIva : false,
+      descripcion: values.descripcion,
+      referencia: values.referencia || null,
+      clienteId: values.clienteId ?? null,
+      fechaVencimiento: values.fechaVencimiento || null,
+      ...(isOrgAdmin && values.responsableId ? { responsableId: values.responsableId } : {}),
+    };
+    updateCobro.mutate(
+      { id, data },
+      {
+        onSuccess: () => {
+          toast({ title: "Cobro actualizado", description: "Los cambios fueron guardados." });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
+          setShowEditDialog(false);
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo actualizar el cobro.";
+          toast({ title: "Error al actualizar", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  // --- Eliminar cobro ---
+  const eliminarCobro = useEliminarCobro();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteMotivo, setDeleteMotivo] = useState("");
+  const puedeEliminar = !!cobro && cobro.estado !== "pagado" && totalAbonado === 0;
+
+  const handleEliminarCobro = () => {
+    eliminarCobro.mutate(
+      { id, data: { motivo: deleteMotivo.trim() || undefined } },
+      {
+        onSuccess: () => {
+          toast({ title: "Cobro eliminado", description: "El cobro fue eliminado permanentemente." });
+          queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
+          setShowDeleteDialog(false);
+          setLocation("/cobros");
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo eliminar el cobro.";
+          toast({ title: "Error al eliminar", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  // --- Ajustar monto total (parcial) ---
+  const ajustarMonto = useAjustarMonto();
+  const { data: ajustes } = useListAjustes(id, {
+    query: { enabled: !!id, queryKey: getListAjustesQueryKey(id) },
+  });
+  const [showAjustarDialog, setShowAjustarDialog] = useState(false);
+  const [ajusteMontoInput, setAjusteMontoInput] = useState("");
+  const [ajusteMotivoInput, setAjusteMotivoInput] = useState("");
+
+  const openAjustarDialog = () => {
+    setAjusteMontoInput(String(Math.round(montoACobrar)));
+    setAjusteMotivoInput("");
+    setShowAjustarDialog(true);
+  };
+
+  const handleAjustarMonto = () => {
+    const montoNum = Math.round(parseFloat(ajusteMontoInput.replace(/\./g, "").replace(",", ".")));
+    if (!montoNum || montoNum <= 0) {
+      toast({ title: "Monto inválido", description: "Ingresa un monto válido.", variant: "destructive" });
+      return;
+    }
+    if (montoNum < totalAbonado) {
+      toast({ title: "Monto insuficiente", description: `El nuevo monto no puede ser menor a lo ya pagado (${formatCurrency(totalAbonado)}).`, variant: "destructive" });
+      return;
+    }
+    if (montoNum >= Math.round(montoACobrar)) {
+      toast({ title: "Monto inválido", description: `El nuevo monto debe ser menor al monto actual (${formatCurrency(montoACobrar)}).`, variant: "destructive" });
+      return;
+    }
+    if (!ajusteMotivoInput.trim()) {
+      toast({ title: "Motivo requerido", description: "Ingresa el motivo del ajuste.", variant: "destructive" });
+      return;
+    }
+    ajustarMonto.mutate(
+      { id, data: { monto: montoNum, motivo: ajusteMotivoInput.trim() } },
+      {
+        onSuccess: () => {
+          toast({ title: "Monto ajustado", description: "El monto total del cobro fue ajustado." });
+          queryClient.invalidateQueries({ queryKey: getGetCobroQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListAbonosQueryKey(id) });
+          queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListAjustesQueryKey(id) });
+          setShowAjustarDialog(false);
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo ajustar el monto.";
+          toast({ title: "Error al ajustar monto", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
 
   const handleCrearAbono = () => {
     const montoNum = parseFloat(abonoMonto.replace(/\./g, "").replace(",", "."));
@@ -750,7 +951,7 @@ export default function CobroDetail() {
           <p className="text-muted-foreground mt-1">Creado el {formatDate(cobro.creadoEn)}</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="bg-card border rounded-md px-3 py-1.5 shadow-sm flex items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground">Estado:</span>
             <Select
@@ -771,6 +972,28 @@ export default function CobroDetail() {
             </Select>
             {updateCobro.isPending && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground ml-2" />}
           </div>
+
+          {cobro.estado === "pendiente" && (
+            <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={openEditDialog}>
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
+            </Button>
+          )}
+
+          {puedeEliminar && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={() => {
+                setDeleteMotivo("");
+                setShowDeleteDialog(true);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Eliminar
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1898,15 +2121,28 @@ export default function CobroDetail() {
               <CreditCard className="h-4 w-4 text-primary" />
               Pagos parciales (abonos)
             </CardTitle>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5 h-8 text-xs"
-              onClick={() => setShowAbonoForm((v) => !v)}
-            >
-              {showAbonoForm ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-              {showAbonoForm ? "Ocultar" : "Registrar abono"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {cobro.estado === "parcial" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 h-8 text-xs border-amber-600/40 text-amber-700 hover:bg-amber-50 hover:border-amber-600"
+                  onClick={openAjustarDialog}
+                >
+                  <Wallet className="h-3.5 w-3.5" />
+                  Ajustar monto total
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 h-8 text-xs"
+                onClick={() => setShowAbonoForm((v) => !v)}
+              >
+                {showAbonoForm ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                {showAbonoForm ? "Ocultar" : "Registrar abono"}
+              </Button>
+            </div>
           </div>
 
           {/* Resumen */}
@@ -2133,8 +2369,385 @@ export default function CobroDetail() {
         </CardContent>
       </Card>
 
+      {/* Historial de ajustes de monto */}
+      {ajustes && ajustes.length > 0 && (
+        <Card className="shadow-sm border-border/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <History className="h-4 w-4 text-amber-600" />
+              Historial de ajustes de monto
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {[...ajustes]
+                .sort((a, b) => new Date(b.creadoEn).getTime() - new Date(a.creadoEn).getTime())
+                .map((a) => (
+                  <div key={a.id} className="rounded-md border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-sm font-semibold font-mono text-amber-700">
+                        {formatCurrency(a.montoOriginal)} → {formatCurrency(a.montoNuevo)}
+                      </span>
+                    </div>
+                    <p className="text-xs mt-1">{a.motivo}</p>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      <span className="text-[10px] text-muted-foreground">{formatDate(a.creadoEn)}</span>
+                      {a.ajustadoPorNombre && (
+                        <span className="text-[10px] text-muted-foreground">· {a.ajustadoPorNombre}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Historial de gestiones */}
       <GestionesSection cobroId={Number(id)} />
+
+      {/* Dialog: Editar cobro */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar cobro</DialogTitle>
+            <DialogDescription>
+              Solo puedes editar cobros pendientes. Los cambios pueden invalidar links de pago existentes.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                <FormField
+                  control={editForm.control}
+                  name="monto"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{editIncluyeIva ? "Monto neto (sin IVA)" : "Monto"}</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                          <Input
+                            type="number"
+                            step="1"
+                            min="1"
+                            placeholder="0"
+                            className="pl-7 font-mono"
+                            {...field}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="tipoDocumento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de documento</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona el tipo..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {TIPO_DOCUMENTO_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name="referencia"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Referencia (opcional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Factura #, N° de orden..." className="font-mono text-sm" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {editPermiteIva && (
+                <FormField
+                  control={editForm.control}
+                  name="incluyeIva"
+                  render={({ field }) => (
+                    <FormItem className="rounded-lg border border-border/60 p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Incluir IVA (19%)</FormLabel>
+                          <FormDescription>
+                            Si lo activas, el monto ingresado es el neto y se agrega el IVA al total a cobrar.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </div>
+
+                      {editIncluyeIva && (
+                        <div className="rounded-md bg-muted/50 p-3 space-y-1.5 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Neto</span>
+                            <span className="font-mono">{formatCurrency(editNeto)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">IVA (19%)</span>
+                            <span className="font-mono">{formatCurrency(editIva)}</span>
+                          </div>
+                          <div className="flex items-center justify-between pt-1.5 border-t border-border/60">
+                            <span className="font-medium text-primary">Total a cobrar</span>
+                            <span className="font-mono font-bold text-primary">{formatCurrency(editTotal)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={editForm.control}
+                name="descripcion"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descripción</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="¿Por qué es este cobro?"
+                        className="resize-none h-24"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="clienteId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5" />
+                      Cliente (opcional)
+                    </FormLabel>
+                    <Select
+                      onValueChange={(v) => field.onChange(v === "ninguno" ? undefined : Number(v))}
+                      value={field.value ? String(field.value) : "ninguno"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar cliente..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="ninguno">Sin cliente</SelectItem>
+                        {clientes?.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            <div className="flex flex-col items-start">
+                              <span>{c.nombre}</span>
+                              {c.rut && <span className="text-xs text-muted-foreground font-mono">{c.rut}</span>}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {isOrgAdmin && miembrosActivos.length > 0 && (
+                <FormField
+                  control={editForm.control}
+                  name="responsableId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5" />
+                        Ejecutivo responsable
+                      </FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Asignar a..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {miembrosActivos.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              <div className="flex flex-col items-start">
+                                <span>{m.nombre || m.email}</span>
+                                {m.nombre && m.email && (
+                                  <span className="text-xs text-muted-foreground">{m.email}</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Reasigna este cobro a un miembro de tu equipo.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={editForm.control}
+                name="fechaVencimiento"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fecha de vencimiento (opcional)</FormLabel>
+                    <FormControl>
+                      <Input type="date" className="text-sm" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={updateCobro.isPending}>
+                  {updateCobro.isPending ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Guardando...</>
+                  ) : (
+                    "Guardar cambios"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Ajustar monto total */}
+      <Dialog open={showAjustarDialog} onOpenChange={setShowAjustarDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ajustar monto total</DialogTitle>
+            <DialogDescription>
+              Reduce el monto total del cobro. El nuevo monto no puede ser menor a lo ya pagado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md bg-muted/40 px-3 py-2 text-sm space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Monto actual</span>
+                <span className="font-mono font-medium">{formatCurrency(montoACobrar)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Ya pagado</span>
+                <span className="font-mono font-medium text-emerald-700">{formatCurrency(totalAbonado)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="ajusteMonto" className="text-xs">Nuevo monto total (CLP)</Label>
+              <Input
+                id="ajusteMonto"
+                type="number"
+                min="1"
+                placeholder="0"
+                value={ajusteMontoInput}
+                onChange={(e) => setAjusteMontoInput(e.target.value)}
+                className="h-9 font-mono"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Debe ser mayor o igual a lo ya pagado ({formatCurrency(totalAbonado)}) y menor al monto actual.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="ajusteMotivo" className="text-xs">Motivo (obligatorio)</Label>
+              <Textarea
+                id="ajusteMotivo"
+                placeholder="Ej: Acuerdo de rebaja con el cliente"
+                value={ajusteMotivoInput}
+                onChange={(e) => setAjusteMotivoInput(e.target.value)}
+                className="resize-none h-20 text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowAjustarDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAjustarMonto} disabled={ajustarMonto.isPending}>
+              {ajustarMonto.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Ajustando...</>
+              ) : (
+                "Ajustar monto"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog: Eliminar cobro */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este cobro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es permanente e irreversible. El cobro será eliminado por completo.
+              No se eliminará el cliente asociado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1">
+            <Label htmlFor="deleteMotivo" className="text-xs">Motivo (opcional)</Label>
+            <Textarea
+              id="deleteMotivo"
+              placeholder="Ej: Cobro duplicado"
+              value={deleteMotivo}
+              onChange={(e) => setDeleteMotivo(e.target.value)}
+              className="resize-none h-20 text-sm"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminarCobro.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleEliminarCobro();
+              }}
+              disabled={eliminarCobro.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {eliminarCobro.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Eliminando...</>
+              ) : (
+                "Eliminar definitivamente"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
