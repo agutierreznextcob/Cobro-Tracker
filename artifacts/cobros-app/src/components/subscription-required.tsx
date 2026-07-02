@@ -19,9 +19,9 @@ export function SubscriptionRequired() {
   const { data: status } = useGetSubscriptionStatus();
   const startSubscription = useStartSubscription();
 
-  const precio = status?.precioMensual ?? 22598;
-  const precioNeto = status?.precioNeto ?? 18990;
-  const precioIva = status?.precioIva ?? 3608;
+  const precio = status?.precioMensual ?? 29738;
+  const precioNeto = status?.precioNeto ?? 24990;
+  const precioIva = status?.precioIva ?? 4748;
 
   const handleSubscribe = () => {
     startSubscription.mutate(undefined, {

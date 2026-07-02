@@ -88,7 +88,7 @@ Una herramienta para que negocios y profesionales en Chile cobren a sus clientes
 - Dashboard en tiempo real e informes.
 
 ## Precios (CLP)
-- Plan mensual: **$18.990 + IVA** = **$22.598 total/mes** (Neto $18.990 + IVA $3.608).
+- Plan mensual: **$24.990 + IVA** = **$29.738 total/mes** (Neto $24.990 + IVA $4.748).
 - Usuario adicional: **$9.990 + IVA** = **$11.888 total/mes** por persona del equipo.
 - **Prueba gratis de 14 días**, sin tarjeta para empezar. Se cancela cuando quieras.
 

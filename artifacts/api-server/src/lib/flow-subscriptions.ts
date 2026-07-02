@@ -8,15 +8,15 @@ const FLOW_API_URL = "https://www.flow.cl/api";
 // this id so a fresh plan is created at the new PLAN_AMOUNT. The "_iva19" suffix
 // corresponds to the IVA-inclusive price (neto + IVA). Existing subscribers stay
 // on their original plan until they re-subscribe.
-export const PLAN_ID = "cobrosimple_mensual_iva19";
+export const PLAN_ID = "cobrosimple_mensual_2499_iva19";
 export const PLAN_NAME = "Cobro Simple - Plan Mensual";
 // Pricing is IVA-inclusive (Chilean VAT 19%): the customer is charged PLAN_AMOUNT
 // (neto + IVA). PLAN_NETO/PLAN_IVA are exposed so the UI can show a transparent
-// breakdown ("Neto $18.990 + IVA $3.608 = Total $22.598").
+// breakdown ("Neto $24.990 + IVA $4.748 = Total $29.738").
 export const IVA_RATE = 0.19;
-export const PLAN_NETO = 18990; // CLP, neto (sin IVA)
-export const PLAN_IVA = Math.round(PLAN_NETO * IVA_RATE); // CLP, 3608
-export const PLAN_AMOUNT = PLAN_NETO + PLAN_IVA; // CLP, 22598 (total cobrado, IVA incl.)
+export const PLAN_NETO = 24990; // CLP, neto (sin IVA)
+export const PLAN_IVA = Math.round(PLAN_NETO * IVA_RATE); // CLP, 4748
+export const PLAN_AMOUNT = PLAN_NETO + PLAN_IVA; // CLP, 29738 (total cobrado, IVA incl.)
 export const PLAN_CURRENCY = "CLP";
 // Flow plan interval: 1=Diario, 2=Semanal, 3=Mensual, 4=Anual
 const PLAN_INTERVAL_MONTHLY = 3;

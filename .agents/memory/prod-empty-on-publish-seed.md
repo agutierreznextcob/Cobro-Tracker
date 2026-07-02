@@ -48,5 +48,5 @@ a clean create, sidestepping the ALTER-is-ignored gotcha).
 **Why NOT "overwrite prod with development data":** dev rows drift from the seed
 CODE (seed only inserts-if-missing, so it never updates pre-existing dev rows). We
 saw dev's demo carrying `passwordHash=null` + `subscription_status='prueba'` while
-the seed defines `Demo2024NextCob!` + `activa`. Copying dev → prod would ship those
+the seed defines a fixed demo password + `activa`. Copying dev → prod would ship those
 STALE values. The empty-prod + seed path yields the intended canonical data.

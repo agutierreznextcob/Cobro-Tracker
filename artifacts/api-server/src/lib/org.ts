@@ -6,9 +6,9 @@ import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA, IVA_RATE } from "./flow-subscriptions
 // Per-seat pricing (structure only — no real billing yet). Amounts are
 // IVA-inclusive (Chilean VAT 19%): *Neto + *Iva = the charged total. The base
 // plan covers the first seat; each additional active member adds the per-seat total.
-export const PLAN_BASE_NETO = PLAN_NETO; // CLP, 18990
-export const PLAN_BASE_IVA = PLAN_IVA; // CLP, 3608
-export const PLAN_BASE = PLAN_AMOUNT; // CLP, 22598 total (IVA incl.)
+export const PLAN_BASE_NETO = PLAN_NETO; // CLP, 24990
+export const PLAN_BASE_IVA = PLAN_IVA; // CLP, 4748
+export const PLAN_BASE = PLAN_AMOUNT; // CLP, 29738 total (IVA incl.)
 export const COSTO_USUARIO_ADICIONAL_NETO = 9990; // CLP neto, per extra seat
 export const COSTO_USUARIO_ADICIONAL_IVA = Math.round(
   COSTO_USUARIO_ADICIONAL_NETO * IVA_RATE,

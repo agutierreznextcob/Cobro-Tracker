@@ -727,7 +727,7 @@ function ProfileSettings() {
                 {startSubscription.isPending ? (
                   <><Loader2 className="h-4 w-4 animate-spin mr-2" />Redirigiendo...</>
                 ) : (
-                  `Suscribirme - ${formatCLP(subStatus?.precioNeto ?? 18990)} + IVA/mes`
+                  `Suscribirme - ${formatCLP(subStatus?.precioNeto ?? 24990)} + IVA/mes`
                 )}
               </Button>
             </>

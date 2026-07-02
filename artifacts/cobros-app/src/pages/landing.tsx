@@ -14,17 +14,26 @@ import {
   ClipboardList,
   Coins,
   CreditCard,
+  FileCheck,
+  FileSpreadsheet,
+  FileText,
   Gauge,
   Globe,
+  LayoutDashboard,
   Link2,
   LogOut,
   Percent,
+  Receipt,
   Share2,
+  ShieldCheck,
   Sparkles,
+  TrendingUp,
   UserCircle,
+  UserPlus,
   Users,
   UsersRound,
   Wallet,
+  Zap,
 } from "lucide-react";
 
 function LandingNav() {
@@ -238,7 +247,7 @@ function HeroSection() {
           />
         </div>
         <p className="text-sm text-white/60 mt-5">
-          14 días de prueba gratis · Luego $18.990 + IVA ($22.598 total) CLP/mes
+          14 días de prueba gratis · Luego $24.990 + IVA ($29.738 total) CLP/mes
         </p>
 
         {/* App preview mockup */}
@@ -291,21 +300,33 @@ function ComoFuncionaSection() {
   const steps = [
     {
       number: "01",
-      icon: CreditCard,
-      title: "Crea tu cobro",
-      desc: "Ingresa el monto, la descripción y el cliente. Regístralo en segundos, ya sea con link de pago o cobranza manual.",
+      icon: FileText,
+      title: "Registra y organiza",
+      desc: "Crea cobros con tipo de documento, IVA automático y asígnalos a clientes con su historial completo.",
     },
     {
       number: "02",
-      icon: Share2,
-      title: "Comparte el link",
-      desc: "Genera un link de pago con Webpay o MercadoPago y envíalo por WhatsApp o email. También puedes enviar recordatorios automáticos.",
+      icon: CreditCard,
+      title: "Cobra por múltiples canales",
+      desc: "Genera links de pago con Webpay (Flow) y MercadoPago. Acepta pagos totales, parciales y abonos automáticamente.",
     },
     {
       number: "03",
-      icon: Wallet,
-      title: "Haz seguimiento",
-      desc: "Recibe el pago total o por abonos. La plataforma actualiza el estado y tu dashboard en tiempo real.",
+      icon: Zap,
+      title: "Automatiza el seguimiento",
+      desc: "Configura recordatorios simples o workflows inteligentes que actúan según el comportamiento del cliente — se detienen solos cuando paga.",
+    },
+    {
+      number: "04",
+      icon: UsersRound,
+      title: "Gestiona tu equipo",
+      desc: "Asigna cobros a ejecutivos, registra gestiones, mide el rendimiento de cada uno y ve todo consolidado como administrador.",
+    },
+    {
+      number: "05",
+      icon: BarChart3,
+      title: "Analiza y decide",
+      desc: "Dashboard en tiempo real, scoring de clientes, informes aging, proyección de flujo de caja y asistente IA que responde preguntas sobre tu negocio en lenguaje natural.",
     },
   ];
   return (
@@ -314,11 +335,11 @@ function ComoFuncionaSection() {
         <div className="text-center mb-14">
           <h2 className="text-3xl font-bold tracking-tight mb-3">Cómo funciona</h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Tres pasos simples para gestionar la cobranza de tus clientes en
-            Chile.
+            Cinco pasos para gestionar toda la cobranza de tus clientes en Chile,
+            de principio a fin.
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {steps.map((step, i) => (
             <div key={i} className="bg-card border rounded-2xl p-7 shadow-sm">
               <div className="flex items-start justify-between mb-5">
@@ -340,17 +361,25 @@ function ComoFuncionaSection() {
 function CaracteristicasSection() {
   const features = [
     { icon: Link2, title: "Links de pago Flow y MercadoPago", desc: "Genera links de pago con Webpay (Flow) y MercadoPago. Tus clientes pagan online con tarjeta o transferencia." },
-    { icon: Wallet, title: "Cobranza manual", desc: "Registra pagos en efectivo, transferencia o cualquier medio. Mantén todos tus cobros en un solo lugar." },
     { icon: Coins, title: "Pagos parciales y abonos", desc: "Acepta abonos y haz seguimiento automático del saldo hasta completar el monto total del cobro." },
-    { icon: Bell, title: "Recordatorios por email y WhatsApp", desc: "Envía recordatorios a tus clientes para que no se olviden de pagar y reduce la morosidad." },
-    { icon: Bot, title: "Asistente IA incluido", desc: "Pregúntale sobre tu negocio: '¿Cuánto recaudé este mes?' o '¿Qué clientes tienen cobros pendientes?'", premium: true },
+    { icon: Wallet, title: "Cobranza manual", desc: "Registra pagos en efectivo, transferencia o cualquier medio. Mantén todos tus cobros en un solo lugar." },
+    { icon: Bell, title: "Recordatorios automáticos email y WhatsApp", desc: "Envía recordatorios automáticos por email y WhatsApp para que tus clientes no olviden pagar y reduzcas la morosidad." },
+    { icon: Zap, title: "Workflows inteligentes de cobranza", desc: "Motor de workflows con plantillas predefinidas que actúan según el comportamiento del cliente y se detienen solos cuando paga.", premium: true },
+    { icon: Bot, title: "Asistente IA incluido", desc: "Pregúntale sobre tu negocio en lenguaje natural: '¿Cuánto recaudé este mes?' o '¿Qué clientes tienen cobros pendientes?'", premium: true },
+    { icon: Gauge, title: "Scoring de clientes", desc: "Clasifica automáticamente a tus clientes según su comportamiento de pago y prioriza tu gestión de cobranza.", premium: true },
+    { icon: Globe, title: "Portal del deudor", desc: "Cada cliente accede a un link único donde ve todas sus deudas pendientes y puede pagar con un clic.", premium: true },
+    { icon: UsersRound, title: "Gestión de equipos y ejecutivos", desc: "Agrega ejecutivos de cobranza, asigna cobros y mide el rendimiento de cada uno como administrador." },
     { icon: Users, title: "Gestión de clientes", desc: "Organiza tus clientes con RUT, email y teléfono, con el historial completo de cobros de cada uno." },
-    { icon: Gauge, title: "Scoring de clientes", desc: "Identifica automáticamente tus clientes más morosos y prioriza tu gestión de cobranza.", premium: true },
-    { icon: Globe, title: "Portal del deudor", desc: "Tus clientes acceden a un link único donde ven todas sus deudas pendientes y pueden pagar con un clic.", premium: true },
-    { icon: BarChart3, title: "Informes y aging", desc: "Reportes de cuentas por cobrar por antigüedad, proyección de flujo de caja y exportación a Excel." },
-    { icon: Percent, title: "Descuentos por mora", desc: "Aplica descuentos negociados a cobros vencidos para recuperar algo antes que perderlo todo." },
-    { icon: UsersRound, title: "Gestión de equipos", desc: "Agrega ejecutivos de cobranza, asigna cobros y mide el rendimiento de cada uno." },
-    { icon: ClipboardList, title: "Notas de gestión", desc: "Registra cada llamada, email o visita con resultado y programa la próxima gestión automáticamente." },
+    { icon: ClipboardList, title: "Notas de gestión con historial", desc: "Registra cada llamada, email o visita con su resultado y programa automáticamente la próxima gestión." },
+    { icon: BarChart3, title: "Informes aging", desc: "Reportes de cuentas por cobrar por antigüedad para saber exactamente cuánto y desde cuándo te deben." },
+    { icon: TrendingUp, title: "Proyección de flujo de caja", desc: "Estima cuánto vas a recaudar y cuándo, para planificar la caja de tu negocio con anticipación." },
+    { icon: Percent, title: "Descuentos por mora y negociación", desc: "Aplica descuentos negociados a cobros vencidos para recuperar algo antes que perderlo todo." },
+    { icon: FileCheck, title: "Comprobantes de pago en PDF", desc: "Genera y envía comprobantes de pago automáticos en PDF cada vez que un cliente salda su cobro." },
+    { icon: Receipt, title: "Tipo de documento tributario", desc: "Asocia cada cobro a factura, boleta u otro documento, con cálculo de IVA automático." },
+    { icon: FileSpreadsheet, title: "Exportación a Excel", desc: "Descarga tus cobros e informes en Excel para tu contabilidad o análisis externo." },
+    { icon: LayoutDashboard, title: "Dashboard en tiempo real", desc: "Visualiza recaudación, pendientes, vencidos y métricas clave actualizadas al instante." },
+    { icon: UserPlus, title: "Módulo de Leads", desc: "Captura y gestiona los leads que llegan desde tu landing page para convertirlos en clientes." },
+    { icon: ShieldCheck, title: "Cumplimiento Ley 21.719", desc: "Plataforma alineada con la Ley 21.719 de protección de datos personales en Chile." },
   ];
   return (
     <section id="caracteristicas" className="py-20 px-6">
@@ -407,11 +436,11 @@ function PreciosSection() {
             <div className="mb-6">
               <p className="text-xs font-semibold text-[#F4A800] uppercase tracking-wider mb-2">Plan NextCob</p>
               <div className="flex items-end gap-1">
-                <span className="text-4xl font-black">$18.990 + IVA</span>
+                <span className="text-4xl font-black">$24.990 + IVA</span>
                 <span className="text-white/60 pb-1 text-sm">/mes</span>
               </div>
               <p className="text-sm text-white/80 mt-2 font-medium">
-                Neto $18.990 + IVA $3.608 = Total $22.598/mes
+                Neto $24.990 + IVA $4.748 = Total $29.738/mes
               </p>
               <p className="text-sm text-white/60 mt-1">CLP · IVA incluido · Después de tu prueba de 14 días. Cancela cuando quieras.</p>
             </div>
