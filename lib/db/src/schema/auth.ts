@@ -35,13 +35,18 @@ export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 export const usersTable = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   // Permanent, human-friendly, sequential public account identifier shown to
-  // users and support (format NCB-XXXXXXX, zero-padded to 7 digits, and grows
-  // naturally past 7 digits — e.g. NCB-10000000 — so there is never a cap).
+  // users and support (format NCB-XXXXXXXXXX, zero-padded to 10 digits, and
+  // grows naturally past 10 digits — e.g. NCB-10000000000 — so there is never a
+  // cap). Reserved low values: NCB-0000000001 = superadmin, NCB-0000000002 is
+  // intentionally left unassigned, NCB-0000000003 = demo account; real accounts
+  // are handed NCB-0000000004 onward (the identity sequence floor is enforced by
+  // the startup seed, see lib/seed.ts).
   // accountSeq is the sequential source (an identity column, assigned by the DB
   // and never reused); accountId is the formatted string as a STORED generated
   // column, so it is always consistent and directly queryable. Neither is ever
-  // set by the application; the database generates both automatically, so the
-  // identifier is immutable across email/profile changes.
+  // set by the application at runtime (only the one-time startup seed overrides
+  // accountSeq for the reserved accounts); the database generates accountId
+  // automatically, so the identifier is immutable across email/profile changes.
   // Uniqueness is structural, not enforced by a UNIQUE constraint: account_seq
   // is an identity (values never repeat or get reused) and account_id is a pure
   // deterministic function of it, so two rows can never collide. We deliberately
@@ -50,7 +55,7 @@ export const usersTable = pgTable("users", {
   // breaks non-interactive schema sync (dev push and production deploys).
   accountSeq: integer("account_seq").generatedByDefaultAsIdentity(),
   accountId: varchar("account_id").generatedAlwaysAs(
-    sql`'NCB-' || lpad(account_seq::text, 7, '0')`,
+    sql`'NCB-' || lpad(account_seq::text, 10, '0')`,
   ),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
