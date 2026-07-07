@@ -14,5 +14,6 @@ export type RendimientoEjecutivoOrgRole = typeof RendimientoEjecutivoOrgRole[key
 
 export const RendimientoEjecutivoOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;

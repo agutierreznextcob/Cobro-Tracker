@@ -15,5 +15,6 @@ export type AuthUserOrgRole = typeof AuthUserOrgRole[keyof typeof AuthUserOrgRol
 
 export const AuthUserOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;

@@ -15,6 +15,13 @@ export interface MiembroEquipo {
   email: string | null;
   /** @nullable */
   orgRole: MiembroEquipoOrgRole;
+  /**
+     * For ejecutivos, the user id of the supervisor they report to
+     * @nullable
+     */
+  supervisorId?: string | null;
+  /** @nullable */
+  supervisorNombre?: string | null;
   activo: boolean;
   /** Whether this member is the organization owner */
   esOwner: boolean;

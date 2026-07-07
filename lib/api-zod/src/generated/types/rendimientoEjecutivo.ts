@@ -15,6 +15,13 @@ export interface RendimientoEjecutivo {
   email?: string | null;
   /** @nullable */
   orgRole: RendimientoEjecutivoOrgRole;
+  /**
+     * For ejecutivos, the supervisor they report to
+     * @nullable
+     */
+  supervisorId?: string | null;
+  /** @nullable */
+  supervisorNombre?: string | null;
   cobrosAsignados: number;
   cobrosPagados: number;
   cobrosPendientes: number;

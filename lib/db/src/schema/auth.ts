@@ -86,6 +86,10 @@ export const usersTable = pgTable("users", {
   // team member without deleting their data. No hard FK by convention.
   organizationId: integer("organization_id"),
   orgRole: orgRoleEnum("org_role"),
+  // For ejecutivos: users.id of the supervisor they report to (null when the
+  // ejecutivo reports directly to the admin, or for admin/supervisor roles).
+  // No hard FK by convention (matches organizationId).
+  supervisorId: varchar("supervisor_id"),
   activo: boolean("activo").notNull().default(true),
   // Mandatory profile fields collected on first login. profileCompleted gates
   // access to the rest of the platform until the onboarding form is submitted.

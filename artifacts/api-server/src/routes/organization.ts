@@ -7,7 +7,7 @@ import {
   invitacionesTable,
   cobrosTable,
 } from "@workspace/db";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import { InvitarUsuarioBody, UpdateMiembroBody } from "@workspace/api-zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { requireOrgAdmin } from "../middlewares/requireOrgAdmin";
@@ -18,6 +18,27 @@ import { getPublicBaseUrl } from "../lib/flow-api";
 const organizationRouter = Router();
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+// Validates that `supervisorId` is an active member of `organizationId` with
+// the supervisor role. Returns an error string or null when valid.
+async function validarSupervisor(
+  organizationId: number,
+  supervisorId: string,
+): Promise<string | null> {
+  const [sup] = await db
+    .select({ orgRole: usersTable.orgRole, activo: usersTable.activo })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.id, supervisorId),
+        eq(usersTable.organizationId, organizationId),
+      ),
+    );
+  if (!sup || sup.orgRole !== "supervisor" || !sup.activo) {
+    return "El supervisor seleccionado no es válido.";
+  }
+  return null;
+}
 
 function nombreDe(u: { firstName: string | null; lastName: string | null }): string | null {
   const n = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
@@ -92,11 +113,26 @@ organizationRouter.get("/organization/usuarios", async (req, res) => {
       .from(organizacionesTable)
       .where(eq(organizacionesTable.id, ctx.organizationId));
 
+    // Supervisores solo ven su propio equipo (él mismo + sus ejecutivos);
+    // ejecutivos solo se ven a sí mismos. La frontera es el backend, no la UI.
+    const scopeCondition =
+      ctx.orgRole === "admin_org"
+        ? eq(usersTable.organizationId, ctx.organizationId)
+        : and(
+            eq(usersTable.organizationId, ctx.organizationId),
+            inArray(
+              usersTable.id,
+              ctx.orgRole === "supervisor" ? ctx.teamMemberIds : [userId],
+            ),
+          );
+
     const rows = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.organizationId, ctx.organizationId))
+      .where(scopeCondition)
       .orderBy(desc(usersTable.createdAt));
+
+    const nombrePorId = new Map(rows.map((u) => [u.id, nombreDe(u) ?? u.email]));
 
     res.json(
       rows.map((u) => ({
@@ -104,6 +140,10 @@ organizationRouter.get("/organization/usuarios", async (req, res) => {
         nombre: nombreDe(u),
         email: u.email,
         orgRole: u.orgRole,
+        supervisorId: u.supervisorId ?? null,
+        supervisorNombre: u.supervisorId
+          ? (nombrePorId.get(u.supervisorId) ?? null)
+          : null,
         activo: u.activo,
         esOwner: org?.ownerId === u.id,
         createdAt: u.createdAt ? u.createdAt.toISOString() : null,
@@ -156,6 +196,8 @@ organizationRouter.patch(
 
       const nuevoRol = parsed.data.orgRole;
       const nuevoActivo = parsed.data.activo;
+      const nuevoSupervisorId =
+        "supervisorId" in parsed.data ? (parsed.data.supervisorId ?? null) : undefined;
 
       // Guard: the owner must remain an active admin_org.
       if (org?.ownerId === targetId) {
@@ -176,6 +218,33 @@ organizationRouter.patch(
       const updates: Record<string, unknown> = {};
       if (nuevoRol !== undefined) updates.orgRole = nuevoRol;
       if (nuevoActivo !== undefined) updates.activo = nuevoActivo;
+
+      const rolFinal = nuevoRol ?? target.orgRole;
+
+      if (nuevoSupervisorId !== undefined) {
+        if (nuevoSupervisorId !== null && rolFinal !== "ejecutivo") {
+          res.status(400).json({
+            error: "Solo los ejecutivos pueden tener un supervisor asignado.",
+          });
+          return;
+        }
+        if (nuevoSupervisorId !== null) {
+          if (nuevoSupervisorId === targetId) {
+            res.status(400).json({ error: "Un usuario no puede ser su propio supervisor." });
+            return;
+          }
+          const errSup = await validarSupervisor(ctx.organizationId, nuevoSupervisorId);
+          if (errSup) {
+            res.status(400).json({ error: errSup });
+            return;
+          }
+        }
+        updates.supervisorId = nuevoSupervisorId;
+      } else if (nuevoRol !== undefined && nuevoRol !== "ejecutivo") {
+        // Promotions to supervisor/admin clear their own supervisor.
+        updates.supervisorId = null;
+      }
+
       if (Object.keys(updates).length === 0) {
         res.status(400).json({ error: "Nada que actualizar" });
         return;
@@ -188,11 +257,36 @@ organizationRouter.patch(
         .where(eq(usersTable.id, targetId))
         .returning();
 
+      // If a supervisor stops being supervisor, their ejecutivos go back to
+      // reporting directly to the admin.
+      if (target.orgRole === "supervisor" && updated.orgRole !== "supervisor") {
+        await db
+          .update(usersTable)
+          .set({ supervisorId: null, updatedAt: new Date() })
+          .where(
+            and(
+              eq(usersTable.organizationId, ctx.organizationId),
+              eq(usersTable.supervisorId, targetId),
+            ),
+          );
+      }
+
+      let supervisorNombre: string | null = null;
+      if (updated.supervisorId) {
+        const [sup] = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.id, updated.supervisorId));
+        supervisorNombre = sup ? (nombreDe(sup) ?? sup.email) : null;
+      }
+
       res.json({
         id: updated.id,
         nombre: nombreDe(updated),
         email: updated.email,
         orgRole: updated.orgRole,
+        supervisorId: updated.supervisorId ?? null,
+        supervisorNombre,
         activo: updated.activo,
         esOwner: org?.ownerId === updated.id,
         createdAt: updated.createdAt ? updated.createdAt.toISOString() : null,
@@ -276,6 +370,7 @@ function serializeInvitacion(inv: typeof invitacionesTable.$inferSelect) {
     id: inv.id,
     email: inv.email,
     orgRole: inv.orgRole,
+    supervisorId: inv.supervisorId ?? null,
     estado: inv.estado,
     invitadoPorNombre: inv.invitadoPorNombre ?? null,
     creadoEn: inv.creadoEn.toISOString(),
@@ -319,12 +414,22 @@ organizationRouter.post(
     }
     const email = parsed.data.email.trim().toLowerCase();
     const orgRole = parsed.data.orgRole;
+    const supervisorId =
+      orgRole === "ejecutivo" ? (parsed.data.supervisorId ?? null) : null;
 
     try {
       const ctx = await getOrgContext(userId);
       if (ctx.organizationId == null) {
         res.status(404).json({ error: "Organización no encontrada" });
         return;
+      }
+
+      if (supervisorId) {
+        const errSup = await validarSupervisor(ctx.organizationId, supervisorId);
+        if (errSup) {
+          res.status(400).json({ error: errSup });
+          return;
+        }
       }
 
       // Reject if a user with this email already belongs to an organization.
@@ -359,7 +464,7 @@ organizationRouter.post(
       if (existingInv) {
         [inv] = await db
           .update(invitacionesTable)
-          .set({ orgRole, token, expiraEn, invitadoPorId: userId, invitadoPorNombre })
+          .set({ orgRole, supervisorId, token, expiraEn, invitadoPorId: userId, invitadoPorNombre })
           .where(eq(invitacionesTable.id, existingInv.id))
           .returning();
       } else {
@@ -369,6 +474,7 @@ organizationRouter.post(
             organizationId: ctx.organizationId,
             email,
             orgRole,
+            supervisorId,
             token,
             estado: "pendiente",
             invitadoPorId: userId,
@@ -452,23 +558,44 @@ organizationRouter.delete(
   },
 );
 
-// --- Team performance (admin only) ---
+// --- Team performance (admin: all members; supervisor: their team) ---
 organizationRouter.get(
   "/organization/rendimiento",
-  requireOrgAdmin,
   async (req, res) => {
     const userId = req.user!.id;
+    const supervisorFiltro =
+      typeof req.query.supervisorId === "string" && req.query.supervisorId
+        ? req.query.supervisorId
+        : undefined;
     try {
       const ctx = await getOrgContext(userId);
       if (ctx.organizationId == null) {
         res.json([]);
         return;
       }
+      if (!ctx.isOrgAdmin && !ctx.isSupervisor) {
+        res.status(403).json({ error: "No autorizado" });
+        return;
+      }
 
-      const miembros = await db
+      let miembros = await db
         .select()
         .from(usersTable)
         .where(eq(usersTable.organizationId, ctx.organizationId));
+
+      const nombrePorId = new Map(
+        miembros.map((u) => [u.id, nombreDe(u) ?? u.email]),
+      );
+
+      if (ctx.isSupervisor) {
+        // Supervisors only see their own team (their ejecutivos + themselves).
+        miembros = miembros.filter((m) => ctx.teamMemberIds.includes(m.id));
+      } else if (supervisorFiltro) {
+        // Admin drill-down: the supervisor's team (ejecutivos + the supervisor).
+        miembros = miembros.filter(
+          (m) => m.supervisorId === supervisorFiltro || m.id === supervisorFiltro,
+        );
+      }
 
       const stats = await db
         .select({
@@ -502,6 +629,10 @@ organizationRouter.get(
           nombre: nombreDe(m),
           email: m.email,
           orgRole: m.orgRole,
+          supervisorId: m.supervisorId ?? null,
+          supervisorNombre: m.supervisorId
+            ? (nombrePorId.get(m.supervisorId) ?? null)
+            : null,
           cobrosAsignados: asignados,
           cobrosPagados: pagados,
           cobrosPendientes: pendientes,

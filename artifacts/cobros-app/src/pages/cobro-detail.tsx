@@ -183,6 +183,8 @@ export default function CobroDetail() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const isOrgAdmin = user?.orgRole === "admin_org";
+  const isSupervisor = user?.orgRole === "supervisor";
+  const puedeAsignar = isOrgAdmin || isSupervisor;
 
   // Link generation modal state
   const [showFlowConfig, setShowFlowConfig] = useState(false);
@@ -441,9 +443,11 @@ export default function CobroDetail() {
   // --- Editar cobro ---
   const { data: clientes } = useListClientes();
   const { data: miembros } = useListMiembros({
-    query: { enabled: isOrgAdmin, queryKey: getListMiembrosQueryKey() },
+    query: { enabled: puedeAsignar, queryKey: getListMiembrosQueryKey() },
   });
-  const miembrosActivos = miembros?.filter((m) => m.activo) ?? [];
+  const miembrosActivos = (miembros?.filter((m) => m.activo) ?? []).filter(
+    (m) => !isSupervisor || m.id === user?.id || m.supervisorId === user?.id,
+  );
 
   const editForm = useForm<EditFormValues>({
     resolver: zodResolver(editFormSchema),
@@ -498,7 +502,7 @@ export default function CobroDetail() {
       referencia: values.referencia || null,
       clienteId: values.clienteId ?? null,
       fechaVencimiento: values.fechaVencimiento || null,
-      ...(isOrgAdmin && values.responsableId ? { responsableId: values.responsableId } : {}),
+      ...(puedeAsignar && values.responsableId ? { responsableId: values.responsableId } : {}),
     };
     updateCobro.mutate(
       { id, data },
@@ -2574,7 +2578,7 @@ export default function CobroDetail() {
                 )}
               />
 
-              {isOrgAdmin && miembrosActivos.length > 0 && (
+              {puedeAsignar && miembrosActivos.length > 0 && (
                 <FormField
                   control={editForm.control}
                   name="responsableId"

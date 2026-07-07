@@ -1911,7 +1911,14 @@ paths:
     get:
       operationId: getRendimientoEquipo
       tags: [organization]
-      summary: Team performance per ejecutivo (admin only)
+      summary: Team performance per member (admin sees all, supervisor their team)
+      parameters:
+        - name: supervisorId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Admin only — restrict rows to the team of this supervisor
       responses:
         "200":
           description: Performance rows
@@ -4596,7 +4603,7 @@ components:
           enum: [user, admin]
         orgRole:
           type: [string, 'null']
-          enum: [admin_org, ejecutivo, null]
+          enum: [admin_org, supervisor, ejecutivo, null]
           description: Role within the user's organization
         organizationId:
           type: [integer, 'null']
@@ -4839,7 +4846,12 @@ components:
           format: email
         orgRole:
           type: [string, 'null']
-          enum: [admin_org, ejecutivo, null]
+          enum: [admin_org, supervisor, ejecutivo, null]
+        supervisorId:
+          type: [string, 'null']
+          description: For ejecutivos, the user id of the supervisor they report to
+        supervisorNombre:
+          type: [string, 'null']
         activo:
           type: boolean
         esOwner:
@@ -4859,7 +4871,10 @@ components:
           format: email
         orgRole:
           type: string
-          enum: [admin_org, ejecutivo]
+          enum: [admin_org, supervisor, ejecutivo]
+        supervisorId:
+          type: [string, 'null']
+          description: For ejecutivo invitations, the supervisor the new member will report to
         estado:
           type: string
           enum: [pendiente, aceptada, cancelada, expirada]
@@ -4881,14 +4896,20 @@ components:
           format: email
         orgRole:
           type: string
-          enum: [admin_org, ejecutivo]
+          enum: [admin_org, supervisor, ejecutivo]
+        supervisorId:
+          type: [string, 'null']
+          description: For ejecutivo invitations, the supervisor the new member will report to
 
     ActualizarMiembroInput:
       type: object
       properties:
         orgRole:
           type: string
-          enum: [admin_org, ejecutivo]
+          enum: [admin_org, supervisor, ejecutivo]
+        supervisorId:
+          type: [string, 'null']
+          description: For ejecutivos, the supervisor they report to (null = reports to admin)
         activo:
           type: boolean
 
@@ -4903,7 +4924,7 @@ components:
           format: email
         orgRole:
           type: string
-          enum: [admin_org, ejecutivo]
+          enum: [admin_org, supervisor, ejecutivo]
         organizacionNombre:
           type: string
 
@@ -4930,7 +4951,12 @@ components:
           format: email
         orgRole:
           type: [string, 'null']
-          enum: [admin_org, ejecutivo, null]
+          enum: [admin_org, supervisor, ejecutivo, null]
+        supervisorId:
+          type: [string, 'null']
+          description: For ejecutivos, the supervisor they report to
+        supervisorNombre:
+          type: [string, 'null']
         cobrosAsignados:
           type: integer
         cobrosPagados:

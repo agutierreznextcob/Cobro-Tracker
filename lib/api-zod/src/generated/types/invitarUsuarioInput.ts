@@ -10,4 +10,9 @@ import type { InvitarUsuarioInputOrgRole } from './invitarUsuarioInputOrgRole';
 export interface InvitarUsuarioInput {
   email: string;
   orgRole: InvitarUsuarioInputOrgRole;
+  /**
+     * For ejecutivo invitations, the supervisor the new member will report to
+     * @nullable
+     */
+  supervisorId?: string | null;
 }

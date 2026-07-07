@@ -4,8 +4,10 @@ import { z } from "zod/v4";
 
 // Role of a user WITHIN their organization. Distinct from the platform-level
 // users.role (user|admin). admin_org sees and manages everything in the org;
-// ejecutivo only sees/manages the cobros and clientes assigned to them.
-export const orgRoleEnum = pgEnum("org_role", ["admin_org", "ejecutivo"]);
+// supervisor sees/manages only the cobros and clientes of the ejecutivos
+// assigned to them (users.supervisorId) plus their own; ejecutivo only sees
+// and manages what is assigned to them.
+export const orgRoleEnum = pgEnum("org_role", ["admin_org", "supervisor", "ejecutivo"]);
 
 export const organizacionesTable = pgTable("organizaciones", {
   id: serial("id").primaryKey(),

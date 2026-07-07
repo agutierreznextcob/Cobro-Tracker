@@ -12,6 +12,11 @@ export interface Invitacion {
   id: number;
   email: string;
   orgRole: InvitacionOrgRole;
+  /**
+     * For ejecutivo invitations, the supervisor the new member will report to
+     * @nullable
+     */
+  supervisorId?: string | null;
   estado: InvitacionEstado;
   /** @nullable */
   invitadoPorNombre?: string | null;

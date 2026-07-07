@@ -11,5 +11,6 @@ export type ActualizarMiembroInputOrgRole = typeof ActualizarMiembroInputOrgRole
 
 export const ActualizarMiembroInputOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;

@@ -14,5 +14,6 @@ export type MiembroEquipoOrgRole = typeof MiembroEquipoOrgRole[keyof typeof Miem
 
 export const MiembroEquipoOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;

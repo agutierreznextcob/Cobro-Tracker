@@ -9,5 +9,10 @@ import type { ActualizarMiembroInputOrgRole } from './actualizarMiembroInputOrgR
 
 export interface ActualizarMiembroInput {
   orgRole?: ActualizarMiembroInputOrgRole;
+  /**
+     * For ejecutivos, the supervisor they report to (null = reports to admin)
+     * @nullable
+     */
+  supervisorId?: string | null;
   activo?: boolean;
 }

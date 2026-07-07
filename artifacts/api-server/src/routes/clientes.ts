@@ -5,7 +5,7 @@ import { eq, and, or, ilike, desc, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { EnviarPortalClienteBody } from "@workspace/api-zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
-import { getOrgContext, userCanAccessCliente, getRemitenteContacto, cobroScopeCondition } from "../lib/org";
+import { getOrgContext, userCanAccessCliente, getRemitenteContacto, cobroScopeCondition, clienteScopeCondition } from "../lib/org";
 import { computeClienteScores } from "../lib/scoring";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import { sendPortalEmail } from "../lib/email";
@@ -35,11 +35,8 @@ clientesRouter.get("/clientes", async (req, res) => {
 
   try {
     const ctx = await getOrgContext(userId);
-    // admin_org sees every client in the organization; everyone else only their own.
-    const baseWhere: SQL =
-      ctx.isOrgAdmin && ctx.organizationId != null
-        ? eq(clientesTable.organizationId, ctx.organizationId)
-        : eq(clientesTable.userId, userId);
+    // admin_org sees every client in the org; supervisor their team's; everyone else their own.
+    const baseWhere: SQL = clienteScopeCondition(ctx, userId);
     const rows = await db
       .select()
       .from(clientesTable)

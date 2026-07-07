@@ -532,6 +532,8 @@ export async function procesarWorkflows(log: RunLogger): Promise<WorkflowsRunRes
         organizationId: cobro.organizationId,
         orgRole: null,
         isOrgAdmin: cobro.organizationId != null,
+        isSupervisor: false,
+        teamMemberIds: [],
       };
       const scope = cobro.organizationId != null
         ? eq(cobrosTable.organizationId, cobro.organizationId)

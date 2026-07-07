@@ -107,11 +107,29 @@ async function assignOrganization(user: {
       const expirada =
         inv?.expiraEn != null && inv.expiraEn.getTime() < Date.now();
       if (inv && !expirada) {
+        // Revalidar el supervisor al momento de aceptar: pudo haber sido
+        // degradado o desactivado entre la invitación y la aceptación.
+        let supervisorId: string | null = null;
+        if (inv.orgRole === "ejecutivo" && inv.supervisorId) {
+          const [sup] = await db
+            .select({ id: usersTable.id })
+            .from(usersTable)
+            .where(
+              and(
+                eq(usersTable.id, inv.supervisorId),
+                eq(usersTable.organizationId, inv.organizationId),
+                eq(usersTable.orgRole, "supervisor"),
+                eq(usersTable.activo, true),
+              ),
+            );
+          supervisorId = sup ? inv.supervisorId : null;
+        }
         await db
           .update(usersTable)
           .set({
             organizationId: inv.organizationId,
             orgRole: inv.orgRole,
+            supervisorId,
             activo: true,
           })
           .where(eq(usersTable.id, user.id));
@@ -162,7 +180,7 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   let companyName: string | null = null;
   let firstName = req.user.firstName;
   let lastName = req.user.lastName;
-  let orgRole: "admin_org" | "ejecutivo" | null = null;
+  let orgRole: "admin_org" | "supervisor" | "ejecutivo" | null = null;
   let organizationId: number | null = null;
   let activo = true;
   let emailVerified = false;

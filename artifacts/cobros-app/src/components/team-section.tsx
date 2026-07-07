@@ -63,8 +63,11 @@ function formatCLP(value: number): string {
 
 const ORG_ROLE_LABEL: Record<string, string> = {
   admin_org: "Administrador",
+  supervisor: "Supervisor",
   ejecutivo: "Ejecutivo",
 };
+
+type OrgRole = "admin_org" | "supervisor" | "ejecutivo";
 
 export function TeamSection() {
   const { toast } = useToast();
@@ -81,7 +84,8 @@ export function TeamSection() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin_org" | "ejecutivo">("ejecutivo");
+  const [inviteRole, setInviteRole] = useState<OrgRole>("ejecutivo");
+  const [inviteSupervisorId, setInviteSupervisorId] = useState<string>("ninguno");
   const [deactivateTarget, setDeactivateTarget] = useState<{ id: string; nombre: string } | null>(
     null,
   );
@@ -103,7 +107,16 @@ export function TeamSection() {
       return;
     }
     invitar.mutate(
-      { data: { email, orgRole: inviteRole } },
+      {
+        data: {
+          email,
+          orgRole: inviteRole,
+          supervisorId:
+            inviteRole === "ejecutivo" && inviteSupervisorId !== "ninguno"
+              ? inviteSupervisorId
+              : null,
+        },
+      },
       {
         onSuccess: () => {
           toast({
@@ -113,6 +126,7 @@ export function TeamSection() {
           invalidateTeam();
           setInviteEmail("");
           setInviteRole("ejecutivo");
+          setInviteSupervisorId("ninguno");
           setInviteOpen(false);
         },
         onError: (err: unknown) => {
@@ -123,7 +137,7 @@ export function TeamSection() {
     );
   };
 
-  const handleRoleChange = (id: string, orgRole: "admin_org" | "ejecutivo") => {
+  const handleRoleChange = (id: string, orgRole: OrgRole) => {
     updateMiembro.mutate(
       { id, data: { orgRole } },
       {
@@ -133,6 +147,23 @@ export function TeamSection() {
         },
         onError: (err: unknown) => {
           const msg = err instanceof Error ? err.message : "No se pudo actualizar el rol.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  const handleSupervisorChange = (id: string, supervisorId: string | null) => {
+    updateMiembro.mutate(
+      { id, data: { supervisorId } },
+      {
+        onSuccess: () => {
+          toast({ title: "Supervisor actualizado" });
+          invalidateTeam();
+        },
+        onError: (err: unknown) => {
+          const msg =
+            err instanceof Error ? err.message : "No se pudo actualizar el supervisor.";
           toast({ title: "Error", description: msg, variant: "destructive" });
         },
       },
@@ -174,6 +205,9 @@ export function TeamSection() {
   };
 
   const pendientes = (invitaciones ?? []).filter((i) => i.estado === "pendiente");
+  const supervisores = (miembros ?? []).filter(
+    (m) => m.orgRole === "supervisor" && m.activo,
+  );
 
   return (
     <Card className="shadow-sm border-border/50">
@@ -247,6 +281,7 @@ export function TeamSection() {
                   <TableRow>
                     <TableHead>Usuario</TableHead>
                     <TableHead>Rol</TableHead>
+                    <TableHead>Supervisor</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -273,9 +308,7 @@ export function TeamSection() {
                         ) : (
                           <Select
                             value={m.orgRole ?? "ejecutivo"}
-                            onValueChange={(v) =>
-                              handleRoleChange(m.id, v as "admin_org" | "ejecutivo")
-                            }
+                            onValueChange={(v) => handleRoleChange(m.id, v as OrgRole)}
                             disabled={!m.activo || updateMiembro.isPending}
                           >
                             <SelectTrigger className="h-8 w-[150px] text-xs">
@@ -285,11 +318,41 @@ export function TeamSection() {
                               <SelectItem value="ejecutivo" className="text-xs">
                                 Ejecutivo
                               </SelectItem>
+                              <SelectItem value="supervisor" className="text-xs">
+                                Supervisor
+                              </SelectItem>
                               <SelectItem value="admin_org" className="text-xs">
                                 Administrador
                               </SelectItem>
                             </SelectContent>
                           </Select>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {m.orgRole === "ejecutivo" && !m.esOwner ? (
+                          <Select
+                            value={m.supervisorId ?? "ninguno"}
+                            onValueChange={(v) =>
+                              handleSupervisorChange(m.id, v === "ninguno" ? null : v)
+                            }
+                            disabled={!m.activo || updateMiembro.isPending}
+                          >
+                            <SelectTrigger className="h-8 w-[170px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ninguno" className="text-xs">
+                                Sin supervisor
+                              </SelectItem>
+                              {supervisores.map((s) => (
+                                <SelectItem key={s.id} value={s.id} className="text-xs">
+                                  {s.nombre ?? s.email ?? "—"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -378,17 +441,36 @@ export function TeamSection() {
               <Label>Rol</Label>
               <Select
                 value={inviteRole}
-                onValueChange={(v) => setInviteRole(v as "admin_org" | "ejecutivo")}
+                onValueChange={(v) => setInviteRole(v as OrgRole)}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ejecutivo">Ejecutivo</SelectItem>
+                  <SelectItem value="supervisor">Supervisor</SelectItem>
                   <SelectItem value="admin_org">Administrador</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {inviteRole === "ejecutivo" && supervisores.length > 0 && (
+              <div className="space-y-2">
+                <Label>Supervisor</Label>
+                <Select value={inviteSupervisorId} onValueChange={setInviteSupervisorId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ninguno">Sin supervisor (reporta al administrador)</SelectItem>
+                    {supervisores.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.nombre ?? s.email ?? "—"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {org && (
               <p className="text-xs text-muted-foreground rounded-md bg-muted/40 p-3">
                 Agregar un usuario suma {formatCLP(org.costoUsuarioAdicional)}/mes a tu plan (IVA incluido).

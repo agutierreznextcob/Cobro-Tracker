@@ -73,6 +73,7 @@ import type {
   GestionInput,
   GestionMetricaEjecutivo,
   GetDashboardMetricsParams,
+  GetRendimientoEquipoParams,
   GetSugerenciaWorkflowParams,
   HealthStatus,
   Invitacion,
@@ -5635,20 +5636,27 @@ export const useCancelarInvitacion = <TError = ErrorType<void>,
       return useMutation(getCancelarInvitacionMutationOptions(options));
     }
 
-export const getGetRendimientoEquipoUrl = () => {
+export const getGetRendimientoEquipoUrl = (params?: GetRendimientoEquipoParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/organization/rendimiento`
+  return stringifiedParams.length > 0 ? `/api/organization/rendimiento?${stringifiedParams}` : `/api/organization/rendimiento`
 }
 
 /**
- * @summary Team performance per ejecutivo (admin only)
+ * @summary Team performance per member (admin sees all, supervisor their team)
  */
-export const getRendimientoEquipo = async ( options?: RequestInit): Promise<RendimientoEjecutivo[]> => {
+export const getRendimientoEquipo = async (params?: GetRendimientoEquipoParams, options?: RequestInit): Promise<RendimientoEjecutivo[]> => {
 
-  return customFetch<RendimientoEjecutivo[]>(getGetRendimientoEquipoUrl(),
+  return customFetch<RendimientoEjecutivo[]>(getGetRendimientoEquipoUrl(params),
   {
     ...options,
     method: 'GET'
@@ -5661,23 +5669,23 @@ export const getRendimientoEquipo = async ( options?: RequestInit): Promise<Rend
 
 
 
-export const getGetRendimientoEquipoQueryKey = () => {
+export const getGetRendimientoEquipoQueryKey = (params?: GetRendimientoEquipoParams,) => {
     return [
-    `/api/organization/rendimiento`
+    `/api/organization/rendimiento`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetRendimientoEquipoQueryOptions = <TData = Awaited<ReturnType<typeof getRendimientoEquipo>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRendimientoEquipo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetRendimientoEquipoQueryOptions = <TData = Awaited<ReturnType<typeof getRendimientoEquipo>>, TError = ErrorType<void>>(params?: GetRendimientoEquipoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRendimientoEquipo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetRendimientoEquipoQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetRendimientoEquipoQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRendimientoEquipo>>> = ({ signal }) => getRendimientoEquipo({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRendimientoEquipo>>> = ({ signal }) => getRendimientoEquipo(params, { signal, ...requestOptions });
 
 
 
@@ -5691,15 +5699,15 @@ export type GetRendimientoEquipoQueryError = ErrorType<void>
 
 
 /**
- * @summary Team performance per ejecutivo (admin only)
+ * @summary Team performance per member (admin sees all, supervisor their team)
  */
 
 export function useGetRendimientoEquipo<TData = Awaited<ReturnType<typeof getRendimientoEquipo>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRendimientoEquipo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetRendimientoEquipoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRendimientoEquipo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetRendimientoEquipoQueryOptions(options)
+  const queryOptions = getGetRendimientoEquipoQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

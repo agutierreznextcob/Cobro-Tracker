@@ -34,7 +34,7 @@ import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } fro
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro } from "../lib/recordatorios";
 import { emitirComprobante } from "../lib/comprobante-service";
-import { getOrgContext, cobroScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto } from "../lib/org";
+import { getOrgContext, cobroScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
 
 const cobrosRouter = Router();
 
@@ -236,16 +236,21 @@ cobrosRouter.post("/cobros", async (req, res) => {
   try {
     const ctx = user ? await getOrgContext(user.id) : null;
 
-    // Determine who the cobro is assigned to. Only org admins may assign a cobro
-    // to another member of their organization; otherwise it defaults to the
-    // creator. The assignee must belong to the same organization.
+    // Determine who the cobro is assigned to. Org admins may assign a cobro to
+    // any member of their organization; supervisors only to members of their
+    // team; otherwise it defaults to the creator.
     let responsableId: string | null = user?.id ?? null;
     let responsableNombre: string | null = user
       ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null
       : null;
 
     if (responsableIdInput && responsableIdInput !== user?.id) {
-      if (!ctx?.isOrgAdmin || ctx.organizationId == null) {
+      if (
+        !ctx ||
+        ctx.organizationId == null ||
+        !user ||
+        !canAssignTo(ctx, user.id, responsableIdInput)
+      ) {
         res.status(403).json({ error: "No puedes asignar cobros a otros usuarios." });
         return;
       }
@@ -1240,11 +1245,11 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
     }
   }
 
-  // Reassign the responsable ejecutivo. Only org admins may assign to another
-  // member of their organization.
+  // Reassign the responsable. Org admins may assign to any member of their
+  // organization; supervisors only within their team.
   if (responsableIdInput !== undefined && responsableIdInput !== current.responsableId) {
     const ctx = await getOrgContext(userId);
-    if (!ctx.isOrgAdmin || ctx.organizationId == null) {
+    if (ctx.organizationId == null || !canAssignTo(ctx, userId, responsableIdInput)) {
       res.status(403).json({ error: "No puedes reasignar cobros a otros usuarios." });
       return;
     }

@@ -90,6 +90,7 @@ export * from './gestionResultado';
 export * from './gestionTipo';
 export * from './getDashboardMetricsParams';
 export * from './getDashboardMetricsPeriodo';
+export * from './getRendimientoEquipoParams';
 export * from './getSugerenciaWorkflowParams';
 export * from './healthStatus';
 export * from './invitacion';

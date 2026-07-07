@@ -11,5 +11,6 @@ export type InvitarUsuarioInputOrgRole = typeof InvitarUsuarioInputOrgRole[keyof
 
 export const InvitarUsuarioInputOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;

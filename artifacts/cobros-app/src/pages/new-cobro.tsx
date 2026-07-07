@@ -42,12 +42,16 @@ export default function NewCobro() {
   const createCobro = useCreateCobro();
   const { user } = useAuth();
   const isOrgAdmin = user?.orgRole === "admin_org";
+  const isSupervisor = user?.orgRole === "supervisor";
+  const puedeAsignar = isOrgAdmin || isSupervisor;
 
   const { data: clientes } = useListClientes();
   const { data: miembros } = useListMiembros({
-    query: { enabled: isOrgAdmin, queryKey: getListMiembrosQueryKey() },
+    query: { enabled: puedeAsignar, queryKey: getListMiembrosQueryKey() },
   });
-  const miembrosActivos = miembros?.filter((m) => m.activo) ?? [];
+  const miembrosActivos = (miembros?.filter((m) => m.activo) ?? []).filter(
+    (m) => !isSupervisor || m.id === user?.id || m.supervisorId === user?.id,
+  );
 
   const { data: workflowsList } = useListWorkflows({
     query: { queryKey: getListWorkflowsQueryKey() },
@@ -110,7 +114,7 @@ export default function NewCobro() {
       emailPagador: values.emailPagador || selectedCliente?.email || undefined,
       clienteId: values.clienteId || undefined,
       fechaVencimiento: values.fechaVencimiento || undefined,
-      responsableId: isOrgAdmin ? values.responsableId || undefined : undefined,
+      responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
     };
 
     if (automatizacion === "workflow" && !workflowSeleccionado) {
@@ -354,7 +358,7 @@ export default function NewCobro() {
                 )}
               />
 
-              {isOrgAdmin && miembrosActivos.length > 0 && (
+              {puedeAsignar && miembrosActivos.length > 0 && (
                 <FormField
                   control={form.control}
                   name="responsableId"

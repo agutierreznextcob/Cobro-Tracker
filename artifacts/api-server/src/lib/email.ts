@@ -506,7 +506,7 @@ export interface InvitacionEmailData {
   organizacionNombre: string;
   invitadoPorNombre: string | null;
   invitadoPorEmail?: string | null;
-  orgRole: "admin_org" | "ejecutivo";
+  orgRole: "admin_org" | "supervisor" | "ejecutivo";
   ctaUrl: string;
 }
 
@@ -521,7 +521,12 @@ export async function sendInvitacionEmail(
   }
 
   const invitador = data.invitadoPorNombre || "El equipo";
-  const rolTexto = data.orgRole === "admin_org" ? "administrador" : "ejecutivo";
+  const rolTexto =
+    data.orgRole === "admin_org"
+      ? "administrador"
+      : data.orgRole === "supervisor"
+        ? "supervisor"
+        : "ejecutivo";
 
   const { error } = await client.emails.send({
     ...buildRemitente({ nombre: data.invitadoPorNombre, email: data.invitadoPorEmail }),

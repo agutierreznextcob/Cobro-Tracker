@@ -1633,6 +1633,7 @@ export type AuthUserOrgRole = typeof AuthUserOrgRole[keyof typeof AuthUserOrgRol
 
 export const AuthUserOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;
 
@@ -1824,6 +1825,7 @@ export type MiembroEquipoOrgRole = typeof MiembroEquipoOrgRole[keyof typeof Miem
 
 export const MiembroEquipoOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;
 
@@ -1835,6 +1837,13 @@ export interface MiembroEquipo {
   email: string | null;
   /** @nullable */
   orgRole: MiembroEquipoOrgRole;
+  /**
+     * For ejecutivos, the user id of the supervisor they report to
+     * @nullable
+     */
+  supervisorId?: string | null;
+  /** @nullable */
+  supervisorNombre?: string | null;
   activo: boolean;
   /** Whether this member is the organization owner */
   esOwner: boolean;
@@ -1847,6 +1856,7 @@ export type InvitacionOrgRole = typeof InvitacionOrgRole[keyof typeof Invitacion
 
 export const InvitacionOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;
 
@@ -1864,6 +1874,11 @@ export interface Invitacion {
   id: number;
   email: string;
   orgRole: InvitacionOrgRole;
+  /**
+     * For ejecutivo invitations, the supervisor the new member will report to
+     * @nullable
+     */
+  supervisorId?: string | null;
   estado: InvitacionEstado;
   /** @nullable */
   invitadoPorNombre?: string | null;
@@ -1877,12 +1892,18 @@ export type InvitarUsuarioInputOrgRole = typeof InvitarUsuarioInputOrgRole[keyof
 
 export const InvitarUsuarioInputOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;
 
 export interface InvitarUsuarioInput {
   email: string;
   orgRole: InvitarUsuarioInputOrgRole;
+  /**
+     * For ejecutivo invitations, the supervisor the new member will report to
+     * @nullable
+     */
+  supervisorId?: string | null;
 }
 
 export type ActualizarMiembroInputOrgRole = typeof ActualizarMiembroInputOrgRole[keyof typeof ActualizarMiembroInputOrgRole];
@@ -1890,11 +1911,17 @@ export type ActualizarMiembroInputOrgRole = typeof ActualizarMiembroInputOrgRole
 
 export const ActualizarMiembroInputOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;
 
 export interface ActualizarMiembroInput {
   orgRole?: ActualizarMiembroInputOrgRole;
+  /**
+     * For ejecutivos, the supervisor they report to (null = reports to admin)
+     * @nullable
+     */
+  supervisorId?: string | null;
   activo?: boolean;
 }
 
@@ -1903,6 +1930,7 @@ export type InvitacionPublicaOrgRole = typeof InvitacionPublicaOrgRole[keyof typ
 
 export const InvitacionPublicaOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;
 
@@ -1921,6 +1949,7 @@ export type RendimientoEjecutivoOrgRole = typeof RendimientoEjecutivoOrgRole[key
 
 export const RendimientoEjecutivoOrgRole = {
   admin_org: 'admin_org',
+  supervisor: 'supervisor',
   ejecutivo: 'ejecutivo',
 } as const;
 
@@ -1932,6 +1961,13 @@ export interface RendimientoEjecutivo {
   email?: string | null;
   /** @nullable */
   orgRole: RendimientoEjecutivoOrgRole;
+  /**
+     * For ejecutivos, the supervisor they report to
+     * @nullable
+     */
+  supervisorId?: string | null;
+  /** @nullable */
+  supervisorNombre?: string | null;
   cobrosAsignados: number;
   cobrosPagados: number;
   cobrosPendientes: number;
@@ -2038,6 +2074,13 @@ export const ListWebhookEventosResultado = {
   exitoso: 'exitoso',
   fallido: 'fallido',
 } as const;
+
+export type GetRendimientoEquipoParams = {
+/**
+ * Admin only — restrict rows to the team of this supervisor
+ */
+supervisorId?: string;
+};
 
 export type ListNotificacionesParams = {
 soloNoLeidas?: boolean;

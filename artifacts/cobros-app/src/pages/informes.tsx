@@ -131,14 +131,17 @@ export default function Informes() {
 
   const { user } = useAuth();
   const isOrgAdmin = user?.orgRole === "admin_org";
+  const isSupervisor = user?.orgRole === "supervisor";
+  const veRendimiento = isOrgAdmin || isSupervisor;
+  const [filtroSupervisor, setFiltroSupervisor] = useState<string>("todos");
 
   const { data: cobros, isLoading } = useListCobros(
     {},
     { query: { queryKey: ["listCobros", {}] as const } },
   );
 
-  const { data: rendimiento } = useGetRendimientoEquipo({
-    query: { enabled: isOrgAdmin, queryKey: getGetRendimientoEquipoQueryKey() },
+  const { data: rendimiento } = useGetRendimientoEquipo(undefined, {
+    query: { enabled: veRendimiento, queryKey: getGetRendimientoEquipoQueryKey() },
   });
 
   const minDate = useMemo(() => {
@@ -736,15 +739,39 @@ export default function Informes() {
         )}
       </Card>
 
-      {/* Team performance (admin only) */}
-      {isOrgAdmin && rendimiento && rendimiento.length > 0 && (
+      {/* Team performance (admin: all; supervisor: their team) */}
+      {veRendimiento && rendimiento && rendimiento.length > 0 && (
         <Card className="p-5 shadow-sm">
-          <h2 className="text-sm font-semibold mb-4">Rendimiento del equipo</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="text-sm font-semibold">
+              {isSupervisor ? "Rendimiento de mi equipo" : "Rendimiento del equipo"}
+            </h2>
+            {isOrgAdmin && rendimiento.some((r) => r.orgRole === "supervisor") && (
+              <Select value={filtroSupervisor} onValueChange={setFiltroSupervisor}>
+                <SelectTrigger className="h-8 w-[220px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos" className="text-xs">
+                    Todos los equipos
+                  </SelectItem>
+                  {rendimiento
+                    .filter((r) => r.orgRole === "supervisor")
+                    .map((s) => (
+                      <SelectItem key={s.usuarioId} value={s.usuarioId} className="text-xs">
+                        Equipo de {s.nombre ?? s.email ?? "supervisor"}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Ejecutivo</TableHead>
+                  <TableHead>Miembro</TableHead>
+                  {isOrgAdmin && <TableHead>Supervisor</TableHead>}
                   <TableHead className="text-right">Asignados</TableHead>
                   <TableHead className="text-right">Pagados</TableHead>
                   <TableHead className="text-right">Pendientes</TableHead>
@@ -753,7 +780,14 @@ export default function Informes() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rendimiento.map((r) => (
+                {rendimiento
+                  .filter(
+                    (r) =>
+                      filtroSupervisor === "todos" ||
+                      r.usuarioId === filtroSupervisor ||
+                      r.supervisorId === filtroSupervisor,
+                  )
+                  .map((r) => (
                   <TableRow key={r.usuarioId}>
                     <TableCell className="font-medium">
                       {r.nombre ?? r.email ?? "—"}
@@ -762,7 +796,17 @@ export default function Informes() {
                           Admin
                         </span>
                       )}
+                      {r.orgRole === "supervisor" && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Supervisor
+                        </span>
+                      )}
                     </TableCell>
+                    {isOrgAdmin && (
+                      <TableCell className="text-muted-foreground text-xs">
+                        {r.supervisorNombre ?? "—"}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">{r.cobrosAsignados}</TableCell>
                     <TableCell className="text-right text-emerald-600">{r.cobrosPagados}</TableCell>
                     <TableCell className="text-right text-amber-600">{r.cobrosPendientes}</TableCell>

@@ -15,6 +15,8 @@ export const invitacionesTable = pgTable("invitaciones", {
   organizationId: integer("organization_id").notNull(),
   email: varchar("email").notNull(),
   orgRole: orgRoleEnum("org_role").notNull().default("ejecutivo"),
+  // For ejecutivo invitations: the supervisor the new member will report to.
+  supervisorId: varchar("supervisor_id"),
   token: varchar("token").notNull().unique(),
   estado: invitacionEstadoEnum("estado").notNull().default("pendiente"),
   // User id + cached name of the admin who sent the invitation.
