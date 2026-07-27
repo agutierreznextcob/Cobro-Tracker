@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import {
   db,
   cobrosTable,
@@ -19,14 +19,22 @@ import { requireSubscription } from "../middlewares/requireSubscription";
 
 const gestionesRouter = Router();
 
-gestionesRouter.use((req, res, next) => {
-  if (!req.isAuthenticated()) {
-    res.status(401).json({ error: "No autorizado" });
-    return;
-  }
-  next();
-});
-gestionesRouter.use(requireSubscription);
+// Scope auth to this router's own paths. A blanket `use()` without a path
+// would intercept EVERY request that reaches this router — including public
+// routes mounted after it (e.g. /public/portal/:token) — because Express
+// routers pass unmatched requests through their middlewares in mount order.
+const requireAuthGestiones = [
+  (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "No autorizado" });
+      return;
+    }
+    next();
+  },
+  requireSubscription,
+];
+gestionesRouter.use("/gestiones", requireAuthGestiones);
+gestionesRouter.use("/cobros/:id/gestiones", requireAuthGestiones);
 
 const CobroIdParam = z.object({ id: z.coerce.number().int().positive() });
 

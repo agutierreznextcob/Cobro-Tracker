@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetCliente, useUpdateCliente, useEnviarPortalCliente, getGetClienteQueryKey } from "@workspace/api-client-react";
+import { useGetCliente, useUpdateCliente, useEnviarPortalCliente, useRegenerarPortalCliente, getGetClienteQueryKey } from "@workspace/api-client-react";
 import type { EnviarPortalInputCanal } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -18,7 +18,7 @@ import { ScoreBadge, SCORE_META } from "@/components/score-badge";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, Send, Link2, Copy, Check, Gauge, TrendingUp, Minus, TrendingDown } from "lucide-react";
+import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, Send, Link2, Copy, Check, Gauge, TrendingUp, Minus, TrendingDown, RefreshCw } from "lucide-react";
 
 const editSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio").max(200),
@@ -126,6 +126,27 @@ function EnviarPortalDialog({
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
   const enviarPortal = useEnviarPortalCliente();
+  const regenerarPortal = useRegenerarPortalCliente();
+
+  const onRegenerar = () => {
+    regenerarPortal.mutate(
+      { id: cliente.id },
+      {
+        onSuccess: (res) => {
+          setUrl(res.url);
+          setCopied(false);
+          toast({
+            title: "Link regenerado",
+            description:
+              "El enlace anterior quedó invalidado. Comparte el nuevo enlace con el cliente.",
+          });
+        },
+        onError: () => {
+          toast({ title: "Error", description: "No se pudo regenerar el link.", variant: "destructive" });
+        },
+      },
+    );
+  };
 
   const tieneEmail = !!cliente.email;
   const tieneTelefono = !!cliente.telefono;
@@ -225,7 +246,24 @@ function EnviarPortalDialog({
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onRegenerar}
+              disabled={regenerarPortal.isPending}
+              className="gap-1.5 text-muted-foreground"
+              title="Invalida el enlace anterior y genera uno nuevo"
+            >
+              {regenerarPortal.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              Regenerar link
+            </Button>
+            <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cerrar
             </Button>
@@ -240,6 +278,7 @@ function EnviarPortalDialog({
                 </>
               )}
             </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

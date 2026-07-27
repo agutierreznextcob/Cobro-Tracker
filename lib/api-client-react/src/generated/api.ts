@@ -111,6 +111,7 @@ import type {
   RecordatorioUpdate,
   RecordatoriosDefaultInput,
   RecordatoriosRunResult,
+  RegenerarPortalResult,
   RegisterInput,
   RegisterResult,
   RendimientoEjecutivo,
@@ -6922,6 +6923,76 @@ export const useEnviarPortalCliente = <TError = ErrorType<void | ErrorResponse>,
         TContext
       > => {
       return useMutation(getEnviarPortalClienteMutationOptions(options));
+    }
+
+export const getRegenerarPortalClienteUrl = (id: number,) => {
+
+
+
+
+  return `/api/clientes/${id}/portal/regenerar`
+}
+
+/**
+ * @summary Rotate the debtor portal token, invalidating the previous link
+ */
+export const regenerarPortalCliente = async (id: number, options?: RequestInit): Promise<RegenerarPortalResult> => {
+
+  return customFetch<RegenerarPortalResult>(getRegenerarPortalClienteUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRegenerarPortalClienteMutationOptions = <TError = ErrorType<void | ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerarPortalCliente>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof regenerarPortalCliente>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['regenerarPortalCliente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof regenerarPortalCliente>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  regenerarPortalCliente(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegenerarPortalClienteMutationResult = NonNullable<Awaited<ReturnType<typeof regenerarPortalCliente>>>
+
+    export type RegenerarPortalClienteMutationError = ErrorType<void | ErrorResponse>
+
+    /**
+ * @summary Rotate the debtor portal token, invalidating the previous link
+ */
+export const useRegenerarPortalCliente = <TError = ErrorType<void | ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerarPortalCliente>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof regenerarPortalCliente>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRegenerarPortalClienteMutationOptions(options));
     }
 
 export const getRunRecordatoriosUrl = () => {

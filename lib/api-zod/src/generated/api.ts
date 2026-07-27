@@ -1861,6 +1861,19 @@ export const EnviarPortalClienteResponse = zod.object({
 
 
 /**
+ * @summary Rotate the debtor portal token, invalidating the previous link
+ */
+export const RegenerarPortalClienteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RegenerarPortalClienteResponse = zod.object({
+  "ok": zod.boolean(),
+  "url": zod.string()
+})
+
+
+/**
  * @summary Manually trigger the daily reminder engine (admin or cron secret)
  */
 export const RunRecordatoriosResponse = zod.object({

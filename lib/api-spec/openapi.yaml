@@ -2319,6 +2319,33 @@ paths:
         "401":
           description: Unauthorized
 
+  /clientes/{id}/portal/regenerar:
+    post:
+      operationId: regenerarPortalCliente
+      tags: [clientes]
+      summary: Rotate the debtor portal token, invalidating the previous link
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: New portal link generated (previous link is now invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegenerarPortalResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+
   /recordatorios/run:
     post:
       operationId: runRecordatorios
@@ -4411,6 +4438,15 @@ components:
           type: boolean
         mensaje:
           type: ["string", "null"]
+
+    RegenerarPortalResult:
+      type: object
+      required: [ok, url]
+      properties:
+        ok:
+          type: boolean
+        url:
+          type: string
 
     RecordatoriosRunResult:
       type: object

@@ -206,6 +206,42 @@ clientesRouter.patch("/clientes/:id", async (req, res) => {
   }
 });
 
+// Rotate the debtor portal token for a cliente, invalidating any previously
+// shared link. Org-guarded like every other :id route.
+clientesRouter.post("/clientes/:id/portal/regenerar", async (req, res) => {
+  const userId = req.user!.id;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+
+  try {
+    const ctx = await getOrgContext(userId);
+    const [cliente] = await db
+      .select()
+      .from(clientesTable)
+      .where(eq(clientesTable.id, id));
+
+    if (!cliente || !userCanAccessCliente(ctx, userId, cliente)) {
+      res.status(404).json({ error: "Cliente no encontrado" });
+      return;
+    }
+
+    const token = randomBytes(24).toString("base64url");
+    await db
+      .update(clientesTable)
+      .set({ portalToken: token, actualizadoEn: new Date() })
+      .where(eq(clientesTable.id, id));
+
+    req.log.info({ clienteId: id }, "Portal token regenerated");
+    res.json({ ok: true, url: `${getPublicBaseUrl()}/portal/${token}` });
+  } catch (err) {
+    req.log.error({ err }, "Error regenerating portal token");
+    res.status(500).json({ error: "Error interno" });
+  }
+});
+
 // Generate (or reuse) the debtor portal magic link for a cliente and send it
 // via email and/or WhatsApp. Org-guarded like every other :id route.
 clientesRouter.post("/clientes/:id/portal", async (req, res) => {

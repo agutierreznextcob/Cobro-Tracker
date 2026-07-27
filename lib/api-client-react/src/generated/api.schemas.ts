@@ -1524,6 +1524,11 @@ export interface EnviarPortalResult {
   mensaje?: string | null;
 }
 
+export interface RegenerarPortalResult {
+  ok: boolean;
+  url: string;
+}
+
 export interface RecordatoriosRunResult {
   ok: boolean;
   fecha: string;

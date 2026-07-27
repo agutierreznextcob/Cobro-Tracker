@@ -158,6 +158,7 @@ export * from './recordatoriosRunResult';
 export * from './recordatorioUpdate';
 export * from './recordatorioUpdateCanal';
 export * from './recordatorioUpdateMomento';
+export * from './regenerarPortalResult';
 export * from './registerInput';
 export * from './registerResult';
 export * from './rendimientoEjecutivo';
