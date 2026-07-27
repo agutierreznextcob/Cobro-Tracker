@@ -24,8 +24,12 @@ import { organizationRouter } from "./organization";
 // webhooks, encuestas) deben ir ANTES de cualquier router con auth "en blanco"
 // (Router.use sin path). Nunca agregues un guard sin path a un router montado
 // en esta cadena — delimítalo por prefijo (ver gestiones.ts como ejemplo).
-// Guardia de regresión: scripts/e2e-public-routes.ts (workflow e2e-public-routes)
-// verifica que las rutas públicas respondan sin sesión y sin 401/403.
+// Guardias de regresión:
+// - scripts/e2e-public-routes.ts (workflow e2e-public-routes): runtime, verifica
+//   que las rutas públicas respondan sin sesión y sin 401/403.
+// - scripts/check-auth-guards.ts (workflow check-auth-guards): estático, falla
+//   sin servidor si un router agrega un use() sin path fuera de la lista blanca
+//   o si un router con blanket guard se monta antes que las rutas públicas.
 const router: IRouter = Router();
 
 router.use(healthRouter);
