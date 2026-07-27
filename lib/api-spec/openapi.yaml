@@ -3494,6 +3494,14 @@ components:
         actualizadoEn:
           type: string
           format: date-time
+        portalTokenGeneradoEn:
+          type: ["string", "null"]
+          format: date-time
+        portalEnviadoEn:
+          type: ["string", "null"]
+          format: date-time
+        portalEnviadoCanal:
+          type: ["string", "null"]
         cobros:
           type: array
           items:
@@ -4443,6 +4451,11 @@ components:
           type: boolean
         whatsappEnviado:
           type: boolean
+        portalEnviadoEn:
+          type: ["string", "null"]
+          format: date-time
+        portalEnviadoCanal:
+          type: ["string", "null"]
         mensaje:
           type: ["string", "null"]
 

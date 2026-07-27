@@ -707,6 +707,12 @@ export interface ClienteConHistorial {
   userId: string;
   creadoEn: string;
   actualizadoEn: string;
+  /** @nullable */
+  portalTokenGeneradoEn?: string | null;
+  /** @nullable */
+  portalEnviadoEn?: string | null;
+  /** @nullable */
+  portalEnviadoCanal?: string | null;
   cobros: Cobro[];
   scoreDetalle: ScoreDetalle;
 }
@@ -1520,6 +1526,10 @@ export interface EnviarPortalResult {
   url: string;
   emailEnviado?: boolean;
   whatsappEnviado?: boolean;
+  /** @nullable */
+  portalEnviadoEn?: string | null;
+  /** @nullable */
+  portalEnviadoCanal?: string | null;
   /** @nullable */
   mensaje?: string | null;
 }

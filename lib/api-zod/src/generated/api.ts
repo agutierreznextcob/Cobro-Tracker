@@ -224,6 +224,9 @@ export const GetClienteResponse = zod.object({
   "userId": zod.string(),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date(),
+  "portalTokenGeneradoEn": zod.coerce.date().nullish(),
+  "portalEnviadoEn": zod.coerce.date().nullish(),
+  "portalEnviadoCanal": zod.string().nullish(),
   "cobros": zod.array(zod.object({
   "id": zod.number(),
   "monto": zod.number().describe('Original amount in currency units'),
@@ -1860,6 +1863,8 @@ export const EnviarPortalClienteResponse = zod.object({
   "url": zod.string(),
   "emailEnviado": zod.boolean().optional(),
   "whatsappEnviado": zod.boolean().optional(),
+  "portalEnviadoEn": zod.coerce.date().nullish(),
+  "portalEnviadoCanal": zod.string().nullish(),
   "mensaje": zod.string().nullish()
 })
 

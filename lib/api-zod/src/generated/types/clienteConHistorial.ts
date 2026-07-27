@@ -20,6 +20,12 @@ export interface ClienteConHistorial {
   userId: string;
   creadoEn: Date;
   actualizadoEn: Date;
+  /** @nullable */
+  portalTokenGeneradoEn?: Date | null;
+  /** @nullable */
+  portalEnviadoEn?: Date | null;
+  /** @nullable */
+  portalEnviadoCanal?: string | null;
   cobros: Cobro[];
   scoreDetalle: ScoreDetalle;
 }

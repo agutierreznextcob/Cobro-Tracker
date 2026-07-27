@@ -231,7 +231,7 @@ clientesRouter.post("/clientes/:id/portal/regenerar", async (req, res) => {
     const token = randomBytes(24).toString("base64url");
     await db
       .update(clientesTable)
-      .set({ portalToken: token, actualizadoEn: new Date() })
+      .set({ portalToken: token, portalTokenGeneradoEn: new Date(), actualizadoEn: new Date() })
       .where(eq(clientesTable.id, id));
 
     req.log.info({ clienteId: id }, "Portal token regenerated");
@@ -277,7 +277,7 @@ clientesRouter.post("/clientes/:id/portal", async (req, res) => {
       token = randomBytes(24).toString("base64url");
       await db
         .update(clientesTable)
-        .set({ portalToken: token, actualizadoEn: new Date() })
+        .set({ portalToken: token, portalTokenGeneradoEn: new Date(), actualizadoEn: new Date() })
         .where(eq(clientesTable.id, id));
     }
 
@@ -320,8 +320,29 @@ clientesRouter.post("/clientes/:id/portal", async (req, res) => {
       whatsappEnviado = result.ok;
     }
 
+    // Record the last successful send (date + channel(s) that actually went out)
+    // so ejecutivos can see whether the debtor already got the current link.
+    let portalEnviadoEn: Date | null = null;
+    let portalEnviadoCanal: string | null = null;
+    if (emailEnviado || whatsappEnviado) {
+      portalEnviadoEn = new Date();
+      portalEnviadoCanal =
+        emailEnviado && whatsappEnviado ? "ambos" : emailEnviado ? "email" : "whatsapp";
+      await db
+        .update(clientesTable)
+        .set({ portalEnviadoEn, portalEnviadoCanal, actualizadoEn: new Date() })
+        .where(eq(clientesTable.id, id));
+    }
+
     req.log.info({ clienteId: id, canal, emailEnviado, whatsappEnviado }, "Portal link sent");
-    res.json({ ok: true, url, emailEnviado, whatsappEnviado });
+    res.json({
+      ok: true,
+      url,
+      emailEnviado,
+      whatsappEnviado,
+      portalEnviadoEn: portalEnviadoEn ? portalEnviadoEn.toISOString() : null,
+      portalEnviadoCanal,
+    });
   } catch (err) {
     req.log.error({ err }, "Error sending portal link");
     res.status(500).json({ error: "Error interno" });

@@ -115,19 +115,46 @@ function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nomb
   );
 }
 
+const CANAL_LABEL: Record<string, string> = {
+  email: "email",
+  whatsapp: "WhatsApp",
+  ambos: "email y WhatsApp",
+};
+
 function EnviarPortalDialog({
   cliente,
+  onChanged,
 }: {
-  cliente: { id: number; nombre: string; email?: string | null; telefono?: string | null };
+  cliente: {
+    id: number;
+    nombre: string;
+    email?: string | null;
+    telefono?: string | null;
+    portalEnviadoEn?: string | null;
+    portalEnviadoCanal?: string | null;
+    portalTokenGeneradoEn?: string | null;
+  };
+  onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [canal, setCanal] = useState<EnviarPortalInputCanal>("email");
   const [url, setUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [regenerado, setRegenerado] = useState(false);
+  // Local overrides so the dialog reflects the latest send/regeneration
+  // immediately, before the cliente query refetches.
+  const [ultimoEnvio, setUltimoEnvio] = useState<{ en: string; canal: string | null } | null>(null);
+  const [tokenGeneradoLocal, setTokenGeneradoLocal] = useState<string | null>(null);
   const { toast } = useToast();
   const enviarPortal = useEnviarPortalCliente();
   const regenerarPortal = useRegenerarPortalCliente();
+
+  const envioEn = ultimoEnvio?.en ?? cliente.portalEnviadoEn ?? null;
+  const envioCanal = ultimoEnvio ? ultimoEnvio.canal : cliente.portalEnviadoCanal ?? null;
+  const tokenGeneradoEn = tokenGeneradoLocal ?? cliente.portalTokenGeneradoEn ?? null;
+  // The debtor has a stale link when the token was rotated after the last send.
+  const linkDesactualizado =
+    !!envioEn && !!tokenGeneradoEn && new Date(tokenGeneradoEn) > new Date(envioEn);
 
   const onRegenerar = () => {
     regenerarPortal.mutate(
@@ -137,6 +164,8 @@ function EnviarPortalDialog({
           setUrl(res.url);
           setCopied(false);
           setRegenerado(true);
+          setTokenGeneradoLocal(new Date().toISOString());
+          onChanged();
           toast({
             title: "Link regenerado",
             description:
@@ -160,6 +189,10 @@ function EnviarPortalDialog({
         onSuccess: (res) => {
           setUrl(res.url);
           setRegenerado(false);
+          if (res.portalEnviadoEn) {
+            setUltimoEnvio({ en: res.portalEnviadoEn, canal: res.portalEnviadoCanal ?? null });
+          }
+          onChanged();
           const partes: string[] = [];
           if (res.emailEnviado) partes.push("email");
           if (res.whatsappEnviado) partes.push("WhatsApp");
@@ -198,6 +231,8 @@ function EnviarPortalDialog({
           setUrl(null);
           setCopied(false);
           setRegenerado(false);
+          setUltimoEnvio(null);
+          setTokenGeneradoLocal(null);
         }
       }}
     >
@@ -215,6 +250,30 @@ function EnviarPortalDialog({
             Genera un enlace privado para que {cliente.nombre} vea y pague sus cobros pendientes
             sin necesidad de iniciar sesión.
           </p>
+
+          {envioEn ? (
+            <div className="rounded-lg border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                Último envío:{" "}
+                <span className="font-medium text-foreground">
+                  {new Date(envioEn).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}
+                </span>
+                {envioCanal ? <> por {CANAL_LABEL[envioCanal] ?? envioCanal}</> : null}
+              </span>
+            </div>
+          ) : (
+            <div className="rounded-lg border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
+              El enlace del portal aún no se ha enviado a este cliente.
+            </div>
+          )}
+
+          {linkDesactualizado && !regenerado && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+              El enlace se regeneró después del último envío: el cliente tiene un link antiguo que
+              ya no funciona. Reenvíale el enlace vigente.
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Enviar por</Label>
@@ -346,7 +405,7 @@ export default function ClienteDetailPage() {
           Clientes
         </Link>
         <div className="flex items-center gap-2">
-          <EnviarPortalDialog cliente={data} />
+          <EnviarPortalDialog cliente={data} onChanged={handleUpdated} />
           <EditClienteDialog cliente={data} onUpdated={handleUpdated} />
         </div>
       </div>

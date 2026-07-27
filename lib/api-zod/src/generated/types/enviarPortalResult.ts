@@ -12,5 +12,9 @@ export interface EnviarPortalResult {
   emailEnviado?: boolean;
   whatsappEnviado?: boolean;
   /** @nullable */
+  portalEnviadoEn?: Date | null;
+  /** @nullable */
+  portalEnviadoCanal?: string | null;
+  /** @nullable */
   mensaje?: string | null;
 }

@@ -13,6 +13,11 @@ export const clientesTable = pgTable("clientes", {
   organizationId: integer("organization_id"),
   // Unique token for the public debtor portal magic link (generated on demand).
   portalToken: text("portal_token").unique(),
+  // When the current portal token was generated/rotated (to detect stale links).
+  portalTokenGeneradoEn: timestamp("portal_token_generado_en"),
+  // Last successful portal-link send: when and through which channel(s).
+  portalEnviadoEn: timestamp("portal_enviado_en"),
+  portalEnviadoCanal: text("portal_enviado_canal"),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),
 });
