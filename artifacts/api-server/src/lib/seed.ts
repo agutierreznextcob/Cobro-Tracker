@@ -32,10 +32,21 @@ function dateOffset(days: number): string {
 
 async function ensureDemoUser(): Promise<string | null> {
   const [existing] = await db
-    .select({ id: usersTable.id })
+    .select({ id: usersTable.id, passwordHash: usersTable.passwordHash })
     .from(usersTable)
     .where(eq(usersTable.email, DEMO_EMAIL));
-  if (existing) return existing.id;
+  if (existing) {
+    // Self-heal: the demo account must always be able to log in with the known
+    // demo password (e2e scripts depend on it). Backfill if the hash is missing.
+    if (!existing.passwordHash) {
+      await db
+        .update(usersTable)
+        .set({ passwordHash: await hashPassword(DEMO_PASSWORD) })
+        .where(eq(usersTable.id, existing.id));
+      logger.info({ email: DEMO_EMAIL }, "Seed: demo account password backfilled");
+    }
+    return existing.id;
+  }
 
   const passwordHash = await hashPassword(DEMO_PASSWORD);
   const [created] = await db
