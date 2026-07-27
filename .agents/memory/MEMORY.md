@@ -12,6 +12,8 @@
 - [Landing public AI chat](landing-public-chat.md) — unauth sales chatbot is its OWN router mounted before auth-gated aiRouter; public LLM endpoints MUST stay rate-limited (in-memory, single-instance only).
 - [Flow plan pricing & IVA](flow-plan-pricing.md) — platform prices are IVA-inclusive (neto+IVA=total); changing the charged amount REQUIRES bumping PLAN_ID or Flow keeps the old price.
 - [Comprobante auto-delivery](comprobante-delivery.md) — receipt email idempotent+retryable via emailEnviado(success-only)+emailIntentoEn(TTL claim); residual dup-send is an accepted tradeoff, stop re-hardening.
+- [pagadoEn & revenue accounting](pagado-en-revenue.md) — every estado-writing path must maintain pagadoEn; revenue reports use pagadoEn + abonos + net-of-descuento, never raw monto/creadoEn.
+- [MP webhook owner-token verification](mp-webhook-owner-token.md) — re-verify MP payments with the cobro owner's token before applying estado changes (prevents cross-tenant tampering).
 - [Cobro saldo on list/detail](cobro-saldo.md) — GET /cobros & /cobros/:id expose `saldo` (montoACobrar minus confirmed abonos, 0 for terminal); use it (not montoACobrar) for parcial in aging/receivables.
 - [Profile edit, avatar & deactivation](profile-edit-and-deactivation.md) — avatar=base64 data URL in profileImageUrl (no object storage); RUT read-only server-side; deactivated user loses access via /auth/user→null + computeSubscriptionState !activo gate.
 - [drizzle push UNIQUE-on-populated-table](drizzle-push-unique-on-populated-table.md) — adding UNIQUE to a table with rows makes push demand interactive truncate confirm (fails non-TTY); drop it if uniqueness is structural, or use a plain index.

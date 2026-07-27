@@ -39,7 +39,7 @@ import {
 } from "../lib/auth";
 import { hashPassword, verifyPassword, isStrongPassword } from "../lib/password";
 import { createAuthToken, consumeAuthToken } from "../lib/tokens";
-import { sendVerificacionEmail, sendResetPasswordEmail } from "../lib/email";
+import { sendVerificacionEmail, sendResetPasswordEmail, sendWelcomeEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import { normalizeRut } from "../lib/rut";
 
@@ -718,10 +718,23 @@ router.get("/auth/verify-email", async (req: Request, res: Response) => {
       res.redirect(`${base}/login?verificado=0`);
       return;
     }
-    await db
+    const [verified] = await db
       .update(usersTable)
       .set({ emailVerified: true })
-      .where(eq(usersTable.id, userId));
+      .where(eq(usersTable.id, userId))
+      .returning();
+    // Welcome email (fire-and-forget; verification already succeeded).
+    if (verified?.email) {
+      void sendWelcomeEmail(
+        {
+          email: verified.email,
+          nombre: verified.firstName ?? null,
+          accountId: verified.accountId ?? null,
+          ctaUrl: `${base}/login`,
+        },
+        req.log,
+      ).catch((err) => req.log.warn({ err }, "Error sending welcome email"));
+    }
     res.redirect(`${base}/login?verificado=1`);
   } catch (err) {
     req.log.error({ err }, "Error verifying email");

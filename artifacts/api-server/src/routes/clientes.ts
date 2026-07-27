@@ -10,6 +10,7 @@ import { computeClienteScores } from "../lib/scoring";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import { sendPortalEmail } from "../lib/email";
 import { isWhatsAppConfigured, sendWhatsAppMensaje } from "../lib/whatsapp";
+import { isValidRut } from "../lib/rut";
 
 const clientesRouter = Router();
 
@@ -24,7 +25,13 @@ clientesRouter.use(requireSubscription);
 
 const ClienteInputSchema = z.object({
   nombre: z.string().min(1).max(200),
-  rut: z.string().max(20).optional(),
+  rut: z
+    .string()
+    .max(20)
+    .optional()
+    .refine((v) => !v || v.trim() === "" || isValidRut(v), {
+      message: "RUT inválido",
+    }),
   email: z.string().email().max(200).optional().or(z.literal("")),
   telefono: z.string().max(30).optional(),
 });

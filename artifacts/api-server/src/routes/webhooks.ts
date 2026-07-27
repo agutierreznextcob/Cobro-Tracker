@@ -1,11 +1,11 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { Router } from "express";
-import { db, cobrosTable, webhookEventosTable, pagosParciales, usersTable } from "@workspace/db";
+import { db, cobrosTable, webhookEventosTable, pagosParciales, usersTable, mpCredencialesTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { ReceiveCobroWebhookBody } from "@workspace/api-zod";
 import { verificarPagoFlow } from "../lib/flow-api";
 import { obtenerPagoMp } from "../lib/mp-api";
-import { getFlowCredentials } from "./profile";
+import { getFlowCredentials, getMpCredentials } from "./profile";
 import {
   getFlowAdminCreds,
   flowAdminConfigured,
@@ -74,11 +74,66 @@ async function aplicarEstadoCobro(
 
   const filas = await db
     .update(cobrosTable)
-    .set({ estado: nuevoEstado, actualizadoEn: new Date(), ...(opts?.extra ?? {}) })
+    .set({
+      estado: nuevoEstado,
+      actualizadoEn: new Date(),
+      // Track the payment confirmation timestamp for accurate revenue reporting.
+      pagadoEn:
+        nuevoEstado === "pagado"
+          ? sql`coalesce(${cobrosTable.pagadoEn}, now())`
+          : nuevoEstado === "parcial"
+            ? sql`${cobrosTable.pagadoEn}`
+            : null,
+      ...(opts?.extra ?? {}),
+    })
     .where(where)
     .returning({ id: cobrosTable.id });
 
   return filas.length > 0;
+}
+
+/**
+ * Recalcula el estado de un cobro a partir de sus abonos confirmados, usando el
+ * monto neto (monto - descuento) y manteniendo pagadoEn consistente:
+ * se fija al primer paso a "pagado" y se conserva si ya existía.
+ * Compartido por los webhooks de Flow y MercadoPago para abonos.
+ */
+async function recalcularCobroDesdeAbonos(
+  cobroId: number,
+): Promise<"pagado" | "parcial" | "pendiente"> {
+  const [sumResult] = await db
+    .select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
+    .from(pagosParciales)
+    .where(and(eq(pagosParciales.cobroId, cobroId), eq(pagosParciales.estado, "confirmado")));
+  const [cobro] = await db
+    .select({ monto: cobrosTable.monto, montoDescuento: cobrosTable.montoDescuento })
+    .from(cobrosTable)
+    .where(eq(cobrosTable.id, cobroId));
+  const totalPagado = sumResult?.total ?? 0;
+  const montoTotal = Math.max(
+    Number(cobro?.monto ?? 0) - Number(cobro?.montoDescuento ?? 0),
+    0,
+  );
+  const nuevoEstado: "pagado" | "parcial" | "pendiente" =
+    totalPagado >= montoTotal && montoTotal > 0
+      ? "pagado"
+      : totalPagado > 0
+        ? "parcial"
+        : "pendiente";
+  await db
+    .update(cobrosTable)
+    .set({
+      estado: nuevoEstado,
+      actualizadoEn: new Date(),
+      pagadoEn:
+        nuevoEstado === "pagado"
+          ? sql`coalesce(${cobrosTable.pagadoEn}, now())`
+          : nuevoEstado === "parcial"
+            ? sql`${cobrosTable.pagadoEn}`
+            : null,
+    })
+    .where(eq(cobrosTable.id, cobroId));
+  return nuevoEstado;
 }
 
 function verifySignature(rawBody: Buffer, signatureHeader: string, secret: string): boolean {
@@ -160,13 +215,8 @@ webhooksRouter.post("/webhooks/flow", async (req, res) => {
       req.log.info({ abonoId: abono.id, cobroId: abono.cobroId, flowStatus: pagoStatus.status }, "Flow abono payment verified");
       if (pagoStatus.status === 2) {
         await db.update(pagosParciales).set({ estado: "confirmado", confirmadoEn: new Date() }).where(eq(pagosParciales.id, abono.id));
-        // Recalculate cobro estado from confirmed abonos
-        const [sumResult] = await db.select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
-          .from(pagosParciales).where(and(eq(pagosParciales.cobroId, abono.cobroId), eq(pagosParciales.estado, "confirmado")));
-        const totalPagado = sumResult?.total ?? 0;
-        const montoTotal = Number(cobroParcial.monto);
-        const nuevoEstadoCobro: "pagado" | "parcial" | "pendiente" = totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
-        await db.update(cobrosTable).set({ estado: nuevoEstadoCobro, actualizadoEn: new Date() }).where(eq(cobrosTable.id, abono.cobroId));
+        // Recalculate cobro estado from confirmed abonos (net of discounts, keeps pagadoEn consistent)
+        const nuevoEstadoCobro = await recalcularCobroDesdeAbonos(abono.cobroId);
         await logEvento({ evento: "flow.abono.confirmado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id} confirmado, cobro ahora ${nuevoEstadoCobro}` });
         emitirComprobanteSiPagado(nuevoEstadoCobro, abono.cobroId, "flow", token.trim(), req.log);
       } else if (pagoStatus.status === 3 || pagoStatus.status === 4) {
@@ -306,16 +356,42 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
     // We need a token to call MP API. We'll look up cobros with mpPreferenceId set first,
     // then match by external_reference "cobro-{id}".
 
-    // Use the MP_ACCESS_TOKEN env var as a fallback global token for webhook verification
-    const globalToken = process.env.MP_ACCESS_TOKEN;
-    if (!globalToken) {
-      req.log.warn("MP_ACCESS_TOKEN not set — cannot verify MercadoPago payment");
-      await logEvento({ evento: "mp.webhook.error", cobroId: null, ipOrigen: ip, exitoso: false, detalle: "MP_ACCESS_TOKEN no configurado" });
+    // Candidate tokens: the global MP_ACCESS_TOKEN (if configured) plus every
+    // merchant's stored OAuth token. Payments created with a user-specific token
+    // may not be visible to the global token, so we try each until one works.
+    const candidateTokens: string[] = [];
+    if (process.env.MP_ACCESS_TOKEN) candidateTokens.push(process.env.MP_ACCESS_TOKEN);
+    const credRows = await db
+      .select({ userId: mpCredencialesTable.userId })
+      .from(mpCredencialesTable);
+    for (const row of credRows) {
+      try {
+        const tok = await getMpCredentials(row.userId);
+        if (tok && !candidateTokens.includes(tok)) candidateTokens.push(tok);
+      } catch {
+        // Skip tokens that fail to decrypt; others may still work.
+      }
+    }
+    if (candidateTokens.length === 0) {
+      req.log.warn("No MercadoPago tokens available — cannot verify payment");
+      await logEvento({ evento: "mp.webhook.error", cobroId: null, ipOrigen: ip, exitoso: false, detalle: "Sin tokens de MercadoPago configurados" });
       res.status(200).json({ ok: false, error: "Token MP no configurado" });
       return;
     }
 
-    const payment = await obtenerPagoMp(globalToken, paymentId);
+    let payment: Awaited<ReturnType<typeof obtenerPagoMp>> | null = null;
+    let lastErr: unknown = null;
+    for (const tok of candidateTokens) {
+      try {
+        payment = await obtenerPagoMp(tok, paymentId);
+        break;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    if (!payment) {
+      throw lastErr ?? new Error("No se pudo verificar el pago de MercadoPago con ningún token");
+    }
     req.log.info({ paymentId, status: payment.status, externalRef: payment.external_reference }, "MercadoPago payment verified");
 
     // Map MP status
@@ -325,6 +401,27 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
     };
 
     const ref = payment.external_reference ?? "";
+
+    // Seguridad: la verificación inicial pudo hacerse con el token de cualquier
+    // comercio; antes de aplicar cambios, re-verificamos el pago con el token del
+    // dueño del cobro (o el token global de plataforma). Así un comercio no puede
+    // forzar cambios de estado en cobros de otra organización usando un
+    // external_reference ajeno.
+    const verificarConTokenPropietario = async (
+      responsableId: string | null,
+    ): Promise<typeof payment | null> => {
+      const ownerToken = responsableId ? await getMpCredentials(responsableId) : null;
+      const trusted = ownerToken ?? process.env.MP_ACCESS_TOKEN ?? null;
+      if (!trusted) return null;
+      try {
+        const verificado = await obtenerPagoMp(trusted, paymentId);
+        // El external_reference debe coincidir con el que motivó la búsqueda.
+        if ((verificado.external_reference ?? "") !== ref) return null;
+        return verificado;
+      } catch {
+        return null;
+      }
+    };
 
     // Check if this is an abono payment "abono-{id}"
     const abonoMatch = ref.match(/^abono-(\d+)$/);
@@ -336,15 +433,20 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
         res.status(200).json({ ok: true });
         return;
       }
+      const [cobroPadre] = await db
+        .select({ responsableId: cobrosTable.responsableId })
+        .from(cobrosTable)
+        .where(eq(cobrosTable.id, abono.cobroId));
+      const pagoVerificado = await verificarConTokenPropietario(cobroPadre?.responsableId ?? null);
+      if (!pagoVerificado) {
+        await logEvento({ evento: "mp.webhook.error", cobroId: abono.cobroId, ipOrigen: ip, exitoso: false, detalle: `Abono #${abonoId}: no se pudo verificar el pago ${paymentId} con el token del propietario` });
+        res.status(200).json({ ok: false, error: "Verificación de propietario fallida" });
+        return;
+      }
+      payment = pagoVerificado;
       if (payment.status === "approved") {
         await db.update(pagosParciales).set({ estado: "confirmado", mpPaymentId: String(paymentId), confirmadoEn: new Date() }).where(eq(pagosParciales.id, abonoId));
-        const [sumResult] = await db.select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
-          .from(pagosParciales).where(and(eq(pagosParciales.cobroId, abono.cobroId), eq(pagosParciales.estado, "confirmado")));
-        const [cobroParcial] = await db.select({ monto: cobrosTable.monto }).from(cobrosTable).where(eq(cobrosTable.id, abono.cobroId));
-        const totalPagado = sumResult?.total ?? 0;
-        const montoTotal = Number(cobroParcial?.monto ?? 0);
-        const nuevoEstadoCobro: "pagado" | "parcial" | "pendiente" = totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
-        await db.update(cobrosTable).set({ estado: nuevoEstadoCobro, actualizadoEn: new Date() }).where(eq(cobrosTable.id, abono.cobroId));
+        const nuevoEstadoCobro = await recalcularCobroDesdeAbonos(abono.cobroId);
         await logEvento({ evento: "mp.abono.confirmado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId} confirmado, cobro ahora ${nuevoEstadoCobro}` });
         emitirComprobanteSiPagado(nuevoEstadoCobro, abono.cobroId, "mp", String(paymentId), req.log);
       } else if (["rejected", "cancelled", "refunded"].includes(payment.status)) {
@@ -371,6 +473,14 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
       res.status(200).json({ ok: false, error: "Cobro no encontrado" });
       return;
     }
+
+    const pagoVerificado = await verificarConTokenPropietario(cobro.responsableId ?? null);
+    if (!pagoVerificado) {
+      await logEvento({ evento: "mp.webhook.error", cobroId: cobro.id, ipOrigen: ip, exitoso: false, detalle: `No se pudo verificar el pago ${paymentId} con el token del propietario del cobro` });
+      res.status(200).json({ ok: false, error: "Verificación de propietario fallida" });
+      return;
+    }
+    payment = pagoVerificado;
 
     const nuevoEstado = estadoMap[payment.status];
     if (!nuevoEstado || nuevoEstado === "pendiente") {

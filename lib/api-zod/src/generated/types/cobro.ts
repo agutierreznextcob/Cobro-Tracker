@@ -103,6 +103,11 @@ export interface Cobro {
      * @nullable
      */
   workflowId?: number | null;
+  /**
+     * When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.
+     * @nullable
+     */
+  pagadoEn?: Date | null;
   creadoEn: Date;
   actualizadoEn?: Date;
 }

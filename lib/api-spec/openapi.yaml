@@ -3561,6 +3561,10 @@ components:
         workflowId:
           type: ["integer", "null"]
           description: ID of the collections workflow assigned to this cobro (null when using simple reminders)
+        pagadoEn:
+          type: ["string", "null"]
+          format: date-time
+          description: When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.
         creadoEn:
           type: string
           format: date-time

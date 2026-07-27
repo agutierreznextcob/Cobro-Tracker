@@ -95,6 +95,7 @@ function serializeCobro(cobro: Cobro, abonado?: number) {
     incluyeIva: cobro.incluyeIva,
     montoNeto: cobro.montoNeto != null ? Number(cobro.montoNeto) : null,
     montoIva: cobro.montoIva != null ? Number(cobro.montoIva) : null,
+    pagadoEn: cobro.pagadoEn ? cobro.pagadoEn.toISOString() : null,
     creadoEn: cobro.creadoEn.toISOString(),
     actualizadoEn: cobro.actualizadoEn.toISOString(),
   };
@@ -148,7 +149,18 @@ async function recalcularEstadoCobro(
   const montoTotal = montoACobrar(cobro);
   const nuevoEstado: "pagado" | "parcial" | "pendiente" =
     totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
-  await db.update(cobrosTable).set({ estado: nuevoEstado, actualizadoEn: new Date() }).where(eq(cobrosTable.id, cobroId));
+  await db
+    .update(cobrosTable)
+    .set({
+      estado: nuevoEstado,
+      actualizadoEn: new Date(),
+      // Set pagadoEn on first transition to pagado; clear it if the state drops back.
+      pagadoEn:
+        nuevoEstado === "pagado"
+          ? sql`coalesce(${cobrosTable.pagadoEn}, now())`
+          : null,
+    })
+    .where(eq(cobrosTable.id, cobroId));
   return nuevoEstado;
 }
 
@@ -1182,7 +1194,15 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
     actualizadoEn: new Date(),
   };
 
-  if (bodyParsed.data.estado !== undefined) updates.estado = bodyParsed.data.estado;
+  if (bodyParsed.data.estado !== undefined) {
+    updates.estado = bodyParsed.data.estado;
+    // Record when the cobro was confirmed as paid (keep the first timestamp);
+    // clear it if the estado moves away from pagado.
+    updates.pagadoEn =
+      bodyParsed.data.estado === "pagado"
+        ? sql`coalesce(${cobrosTable.pagadoEn}, now())`
+        : null;
+  }
   if (bodyParsed.data.descripcion !== undefined) updates.descripcion = bodyParsed.data.descripcion;
   if (bodyParsed.data.referencia !== undefined) updates.referencia = bodyParsed.data.referencia ?? null;
   if (fechaVencimiento !== undefined) updates.fechaVencimiento = fechaVencimiento;

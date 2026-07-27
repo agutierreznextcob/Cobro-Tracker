@@ -6,6 +6,7 @@ import {
   organizacionesTable,
   invitacionesTable,
   cobrosTable,
+  pagosParciales,
 } from "@workspace/db";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import { InvitarUsuarioBody, UpdateMiembroBody } from "@workspace/api-zod";
@@ -597,31 +598,61 @@ organizationRouter.get(
         );
       }
 
+      // Sum the net amount to charge (monto - descuento), not the raw monto,
+      // so discounts don't inflate recaudado/pendiente figures.
       const stats = await db
         .select({
           responsableId: cobrosTable.responsableId,
           estado: cobrosTable.estado,
           cantidad: sql<number>`count(*)::int`,
-          monto: sql<number>`coalesce(sum(${cobrosTable.monto})::float, 0)`,
+          monto: sql<number>`coalesce(sum(${cobrosTable.monto} - coalesce(${cobrosTable.montoDescuento}, 0))::float, 0)`,
         })
         .from(cobrosTable)
         .where(eq(cobrosTable.organizationId, ctx.organizationId))
         .groupBy(cobrosTable.responsableId, cobrosTable.estado);
+
+      // Confirmed partial payments (abonos) on non-terminal cobros, per responsable.
+      // They count as recaudado and reduce the outstanding pendiente.
+      const abonosStats = await db
+        .select({
+          responsableId: cobrosTable.responsableId,
+          abonado: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)`,
+        })
+        .from(pagosParciales)
+        .innerJoin(cobrosTable, eq(pagosParciales.cobroId, cobrosTable.id))
+        .where(
+          and(
+            eq(cobrosTable.organizationId, ctx.organizationId),
+            eq(pagosParciales.estado, "confirmado"),
+            sql`${cobrosTable.estado} in ('pendiente', 'parcial')`,
+          ),
+        )
+        .groupBy(cobrosTable.responsableId);
+      const abonadoPorResp = new Map(
+        abonosStats.map((s) => [s.responsableId, s.abonado ?? 0]),
+      );
 
       const rows = miembros.map((m) => {
         const mine = stats.filter((s) => s.responsableId === m.id);
         const pagados = mine
           .filter((s) => s.estado === "pagado")
           .reduce((a, s) => a + s.cantidad, 0);
-        const montoRecaudado = mine
-          .filter((s) => s.estado === "pagado")
-          .reduce((a, s) => a + (s.monto ?? 0), 0);
+        const abonado = abonadoPorResp.get(m.id) ?? 0;
+        // Recaudado = fully paid cobros + confirmed abonos on open/parcial cobros.
+        const montoRecaudado =
+          mine
+            .filter((s) => s.estado === "pagado")
+            .reduce((a, s) => a + (s.monto ?? 0), 0) + abonado;
         const pendientes = mine
           .filter((s) => s.estado === "pendiente" || s.estado === "parcial")
           .reduce((a, s) => a + s.cantidad, 0);
-        const montoPendiente = mine
-          .filter((s) => s.estado === "pendiente" || s.estado === "parcial")
-          .reduce((a, s) => a + (s.monto ?? 0), 0);
+        // Pendiente = outstanding balance (net amount minus confirmed abonos).
+        const montoPendiente = Math.max(
+          mine
+            .filter((s) => s.estado === "pendiente" || s.estado === "parcial")
+            .reduce((a, s) => a + (s.monto ?? 0), 0) - abonado,
+          0,
+        );
         const asignados = mine.reduce((a, s) => a + s.cantidad, 0);
 
         return {

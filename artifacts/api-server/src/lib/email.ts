@@ -378,6 +378,52 @@ export async function sendVerificacionEmail(
   return { ok: true };
 }
 
+export async function sendWelcomeEmail(
+  data: {
+    email: string;
+    nombre?: string | null;
+    accountId?: string | null;
+    ctaUrl: string;
+  },
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping welcome email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const saludo = data.nombre ? `Hola ${data.nombre}` : "Hola";
+  const { error } = await client.emails.send({
+    ...buildRemitente(),
+    to: [data.email],
+    subject: "¡Bienvenido a NextCob! Tu cuenta está activa",
+    html: buildEmailHtml({
+      title: "Bienvenido a NextCob",
+      previewText: "Tu cuenta está activa. Comienza a gestionar tus cobros hoy.",
+      heading: `${saludo}, ¡bienvenido a NextCob! 🎉`,
+      bodyLines: [
+        `Tu correo fue confirmado y tu cuenta ya está activa. Desde hoy puedes crear cobros, generar links de pago, programar recordatorios automáticos y hacer seguimiento de tus clientes.`,
+        ...(data.accountId
+          ? [
+              `Tu ID de cuenta es <strong>${data.accountId}</strong>. Guárdalo para cualquier consulta de soporte.`,
+            ]
+          : []),
+        `Si tienes dudas, responde este correo y te ayudaremos.`,
+      ],
+      ctaText: "Ir a mi panel",
+      ctaUrl: data.ctaUrl,
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending welcome email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
 export async function sendResetPasswordEmail(
   data: { email: string; nombre?: string | null; ctaUrl: string },
   log?: { warn: (obj: object, msg: string) => void },

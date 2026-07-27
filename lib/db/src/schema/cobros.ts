@@ -57,6 +57,9 @@ export const cobrosTable = pgTable("cobros", {
   flowLinkPago: text("flow_link_pago"),
   mpPreferenceId: text("mp_preference_id"),
   mpPaymentLinkUrl: text("mp_payment_link_url"),
+  // When the cobro was confirmed as fully paid (webhook, recalc or manual).
+  // Used for accurate revenue-by-period reporting; null until paid.
+  pagadoEn: timestamp("pagado_en", { withTimezone: true }),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),
 });

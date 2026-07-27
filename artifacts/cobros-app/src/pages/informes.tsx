@@ -184,7 +184,9 @@ export default function Informes() {
   const filtered = useMemo(() => {
     if (!cobros) return [] as Cobro[];
     return cobros.filter((c) => {
-      const d = parseISO(c.creadoEn);
+      // Paid cobros are scoped by payment date (revenue belongs to the period
+      // it was collected); other states by creation date.
+      const d = parseISO(c.estado === "pagado" ? (c.pagadoEn ?? c.creadoEn) : c.creadoEn);
       if (d < range.desde || d > range.hasta) return false;
       if (filterTipoDoc !== "todos" && tipoDocumentoOf(c) !== filterTipoDoc) return false;
       return true;
@@ -212,10 +214,20 @@ export default function Informes() {
     const buckets = new Map<number, number>();
     for (const s of starts) buckets.set(bucketStart(s, gran).getTime(), 0);
     for (const c of filtered) {
-      if (c.estado !== "pagado") continue;
-      const key = bucketStart(parseISO(c.creadoEn), gran).getTime();
-      const recaudado = c.montoACobrar ?? c.monto - (c.montoDescuento ?? 0);
-      buckets.set(key, (buckets.get(key) ?? 0) + recaudado);
+      if (c.estado === "pagado") {
+        // Bucket by the payment confirmation date when available (accurate
+        // revenue reporting); fall back to the creation date for legacy rows.
+        const fecha = c.pagadoEn ?? c.creadoEn;
+        const key = bucketStart(parseISO(fecha), gran).getTime();
+        const recaudado = c.montoACobrar ?? c.monto - (c.montoDescuento ?? 0);
+        buckets.set(key, (buckets.get(key) ?? 0) + recaudado);
+      } else if (c.estado === "parcial") {
+        // Confirmed abonos on partially-paid cobros are real revenue too.
+        const abonado = Math.max((c.montoACobrar ?? c.monto) - (c.saldo ?? 0), 0);
+        if (abonado <= 0) continue;
+        const key = bucketStart(parseISO(c.creadoEn), gran).getTime();
+        buckets.set(key, (buckets.get(key) ?? 0) + abonado);
+      }
     }
     return [...buckets.entries()]
       .sort((a, b) => a[0] - b[0])
@@ -274,7 +286,11 @@ export default function Informes() {
 
   const summary = useMemo(() => {
     const pagados = filtered.filter((c) => c.estado === "pagado");
-    const totalRecaudado = pagados.reduce((a, c) => a + montoCobrar(c), 0);
+    // Total collected = fully paid cobros + confirmed abonos on parcial cobros.
+    const abonadoParcial = filtered
+      .filter((c) => c.estado === "parcial")
+      .reduce((a, c) => a + Math.max((c.montoACobrar ?? c.monto) - (c.saldo ?? 0), 0), 0);
+    const totalRecaudado = pagados.reduce((a, c) => a + montoCobrar(c), 0) + abonadoParcial;
     const countPagado = pagados.length;
     const totalCobros = filtered.length;
     const ticket = countPagado > 0 ? totalRecaudado / countPagado : 0;

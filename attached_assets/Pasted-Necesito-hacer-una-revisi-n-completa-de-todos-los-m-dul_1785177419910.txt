@@ -1,0 +1,103 @@
+Necesito hacer una revisión completa de todos los 
+módulos de la plataforma para asegurar que todo 
+funciona correctamente antes de salir a vender.
+
+Por favor revisar y confirmar el estado de cada 
+uno de estos módulos, indicando si funciona 
+correctamente o si hay algún error:
+
+1. AUTENTICACIÓN:
+- Registro de nueva cuenta (email + contraseña + RUT)
+- Validación de RUT chileno
+- Control de 1 solo trial por RUT
+- Login con email y contraseña
+- Recuperación de contraseña (llega el email)
+- Verificación de email al registrarse
+- Bloqueo tras 5 intentos fallidos
+
+2. PERFIL Y ORGANIZACIÓN:
+- Completar perfil obligatorio al primer login
+- Editar datos del perfil
+- Sección de suscripción con precio correcto 
+  ($24.990 + IVA = $29.738/mes)
+- Mi Equipo: invitar usuarios (Supervisor y Ejecutivo)
+- Asignación de Ejecutivos a Supervisores
+- Eliminar usuarios del equipo
+- ID de cuenta formato NCB-XXXXXXXXXX visible
+
+3. COBROS:
+- Crear cobro con todos los campos
+  (monto, IVA, tipo de documento, cliente, 
+  ejecutivo, fecha vencimiento, referencia)
+- Toggle IVA funciona y calcula correctamente
+- Tipo de documento tributario seleccionable
+- Asignar cobro a ejecutivo o supervisor
+- Selección de automatización al crear cobro
+  (sin automatización / recordatorio simple / 
+  workflow inteligente)
+- Lista de cobros con filtros (estado, método, 
+  búsqueda por cliente)
+- Editar cobro (pendiente y vencido)
+- Eliminar cobro (solo estados permitidos)
+- Descuento en cobros con pagos parciales
+
+4. LINKS DE PAGO:
+- Generar link de Flow correctamente
+- Generar link de MercadoPago correctamente
+- Webhook Flow actualiza estado al pagar
+- Webhook MercadoPago actualiza estado al pagar
+- Pagos parciales registrados correctamente
+- Estado cambia automáticamente según pagos
+
+5. CLIENTES:
+- Crear cliente (nombre, RUT, email, teléfono)
+- Validación RUT y email chileno
+- Editar cliente
+- Ver historial de cobros por cliente
+- Scoring automático visible en lista
+- Portal del deudor: generar link único por cliente
+
+6. RECORDATORIOS Y WORKFLOWS:
+- Recordatorio simple: programar y verificar envío
+- Workflow inteligente: crear desde plantilla
+- Workflow: crear personalizado con pasos
+- Dashboard de workflows activos
+- Historial de acciones ejecutadas
+- Cron job diario ejecutándose correctamente
+
+7. EMAILS:
+- Salen desde cobros@nextcob.com ✓
+- Reply-To apunta al email del ejecutivo/usuario
+- Recordatorio manual llega correctamente
+- Comprobante PDF al marcar como pagado
+- Email de bienvenida al registrarse
+
+8. INFORMES:
+- Gráficos de revenue por período
+- Filtros de fecha funcionando
+- Reporte aging (cuentas por cobrar por antigüedad)
+- Proyección de flujo de caja
+- Rendimiento por ejecutivo
+- Rendimiento por supervisor
+- Distribución por tipo de documento
+- Exportación a Excel completa
+
+9. MÓDULOS ADICIONALES:
+- Asistente IA responde preguntas correctamente
+- Leads: formulario landing llega al dashboard
+- Notificaciones funcionando
+- Log de webhooks visible
+- Scoring de clientes calculado correctamente
+
+10. SUPERADMIN (agutierrez@nextcob.com):
+- Lista de todos los usuarios registrados
+- Métricas globales de la plataforma
+- Buscador por ID NCB-XXXXXXXXXX
+- Log de cobros eliminados
+- Extender trial de usuarios
+
+Por favor revisar cada punto, indicar cuáles 
+funcionan correctamente ✅ y cuáles tienen 
+problemas ❌, y corregir los que fallen.
+Hacer las correcciones necesarias y confirmar 
+cuando todo esté funcionando.

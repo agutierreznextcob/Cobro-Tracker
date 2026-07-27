@@ -249,6 +249,7 @@ export const GetClienteResponse = zod.object({
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })),
@@ -463,6 +464,7 @@ export const ListCobrosResponseItem = zod.object({
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -526,6 +528,7 @@ export const GetCobroResponse = zod.object({
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -584,6 +587,7 @@ export const UpdateCobroResponse = zod.object({
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -652,6 +656,7 @@ export const AjustarMontoResponse = zod.object({
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -1069,6 +1074,7 @@ export const AplicarDescuentoResponse = zod.object({
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -2196,6 +2202,7 @@ export const AsignarWorkflowResponse = zod.object({
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
@@ -2236,6 +2243,7 @@ export const DesasignarWorkflowResponse = zod.object({
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
+  "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
   "actualizadoEn": zod.coerce.date().optional()
 })
