@@ -64,8 +64,8 @@ export default function PortalPage() {
           </div>
           <h1 className="text-xl font-bold tracking-tight">Enlace no válido</h1>
           <p className="text-sm text-muted-foreground mt-2">
-            Este enlace de pago no existe o ha expirado. Solicita uno nuevo a la empresa que te
-            contactó.
+            Este enlace de pago ya no está disponible: es posible que haya sido reemplazado por uno
+            nuevo. Pide el enlace actualizado a la empresa que te contactó.
           </p>
         </div>
       </div>

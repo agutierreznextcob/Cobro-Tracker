@@ -124,6 +124,7 @@ function EnviarPortalDialog({
   const [canal, setCanal] = useState<EnviarPortalInputCanal>("email");
   const [url, setUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [regenerado, setRegenerado] = useState(false);
   const { toast } = useToast();
   const enviarPortal = useEnviarPortalCliente();
   const regenerarPortal = useRegenerarPortalCliente();
@@ -135,10 +136,11 @@ function EnviarPortalDialog({
         onSuccess: (res) => {
           setUrl(res.url);
           setCopied(false);
+          setRegenerado(true);
           toast({
             title: "Link regenerado",
             description:
-              "El enlace anterior quedó invalidado. Comparte el nuevo enlace con el cliente.",
+              "El enlace anterior quedó invalidado. Reenvía el nuevo enlace al cliente.",
           });
         },
         onError: () => {
@@ -157,6 +159,7 @@ function EnviarPortalDialog({
       {
         onSuccess: (res) => {
           setUrl(res.url);
+          setRegenerado(false);
           const partes: string[] = [];
           if (res.emailEnviado) partes.push("email");
           if (res.whatsappEnviado) partes.push("WhatsApp");
@@ -194,6 +197,7 @@ function EnviarPortalDialog({
         if (!o) {
           setUrl(null);
           setCopied(false);
+          setRegenerado(false);
         }
       }}
     >
@@ -231,6 +235,15 @@ function EnviarPortalDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {regenerado && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+              El enlace anterior quedó invalidado: si el cliente lo abre verá un error.{" "}
+              {tieneEmail || tieneTelefono
+                ? "Reenvíale el nuevo enlace por el canal seleccionado."
+                : "Este cliente no tiene email ni teléfono registrado: copia el nuevo enlace y compártelo manualmente."}
+            </div>
+          )}
 
           {url && (
             <div className="space-y-1.5">
@@ -274,7 +287,7 @@ function EnviarPortalDialog({
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4" /> {url ? "Reenviar" : "Enviar"}
+                  <Send className="h-4 w-4" /> {regenerado ? "Reenviar nuevo enlace" : url ? "Reenviar" : "Enviar"}
                 </>
               )}
             </Button>

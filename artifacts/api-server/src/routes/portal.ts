@@ -74,7 +74,10 @@ portalRouter.get("/public/portal/:token", async (req, res) => {
       .where(eq(clientesTable.portalToken, token));
 
     if (!cliente) {
-      res.status(404).json({ error: "Portal no encontrado o enlace expirado." });
+      res.status(404).json({
+        error:
+          "Este enlace ya no está disponible: es posible que haya sido reemplazado por uno nuevo. Pide el enlace actualizado a la empresa que te contactó.",
+      });
       return;
     }
 
