@@ -1,4 +1,8 @@
-const MP_API_URL = "https://api.mercadopago.com";
+// Base URL is resolved at call time so tests can point it at a local stub
+// (MP_API_BASE_URL). Production/dev never set it, so the real API is used.
+function mpApiUrl(): string {
+  return process.env.MP_API_BASE_URL ?? "https://api.mercadopago.com";
+}
 
 export interface MpPreferenciaParams {
   title: string;
@@ -45,7 +49,7 @@ export async function crearPreferenciaMp(
     auto_return: "approved" as const,
   };
 
-  const res = await fetch(`${MP_API_URL}/checkout/preferences`, {
+  const res = await fetch(`${mpApiUrl()}/checkout/preferences`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -67,7 +71,7 @@ export async function obtenerPagoMp(
   accessToken: string,
   paymentId: string,
 ): Promise<MpPaymentStatus> {
-  const res = await fetch(`${MP_API_URL}/v1/payments/${paymentId}`, {
+  const res = await fetch(`${mpApiUrl()}/v1/payments/${paymentId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 

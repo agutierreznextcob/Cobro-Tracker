@@ -1,6 +1,10 @@
 import { createHmac } from "crypto";
 
-const FLOW_API_URL = "https://www.flow.cl/api";
+// Base URL is resolved at call time so tests can point it at a local stub
+// (FLOW_API_BASE_URL). Production/dev never set it, so the real API is used.
+function flowApiUrl(): string {
+  return process.env.FLOW_API_BASE_URL ?? "https://www.flow.cl/api";
+}
 
 export interface FlowOrdenParams {
   commerceOrder: string;
@@ -77,7 +81,7 @@ export async function crearOrdenFlow(
 
   const body = buildSignedBody(payload, secretKey);
 
-  const res = await fetch(`${FLOW_API_URL}/payment/create`, {
+  const res = await fetch(`${flowApiUrl()}/payment/create`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -104,7 +108,7 @@ export async function verificarPagoFlow(
   const params: Record<string, string | number> = { apiKey, token };
   const qs = buildSignedQuery(params, secretKey);
 
-  const res = await fetch(`${FLOW_API_URL}/payment/getStatus?${qs}`, {
+  const res = await fetch(`${flowApiUrl()}/payment/getStatus?${qs}`, {
     method: "GET",
   });
 
@@ -156,7 +160,7 @@ export async function listarLiquidaciones(
   if (opts.limit !== undefined) params.limit = opts.limit;
 
   const qs = buildSignedQuery(params, secretKey);
-  const res = await fetch(`${FLOW_API_URL}/settlement/getList?${qs}`);
+  const res = await fetch(`${flowApiUrl()}/settlement/getList?${qs}`);
 
   if (!res.ok) {
     const text = await res.text();
@@ -173,7 +177,7 @@ export async function obtenerDetalleLiquidacion(
 ): Promise<FlowLiquidacionDetalle> {
   const params: Record<string, string | number> = { apiKey, id };
   const qs = buildSignedQuery(params, secretKey);
-  const res = await fetch(`${FLOW_API_URL}/settlement/get?${qs}`);
+  const res = await fetch(`${flowApiUrl()}/settlement/get?${qs}`);
 
   if (!res.ok) {
     const text = await res.text();
