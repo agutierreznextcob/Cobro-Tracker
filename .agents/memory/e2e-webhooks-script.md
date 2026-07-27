@@ -17,3 +17,5 @@ Gotchas:
 - Cobros with no cliente/emailPagador make comprobante emission a safe no-op (row created, no email). Cleanup must also delete encuestas + comprobantes + webhook_eventos rows for the test cobros.
 
 Covered contract: pagado/parcial never degraded by late fallido/cancelado (Flow & MP, atomic SQL), approved wins over manual estados, MP `refunded` is the only allowed downgrade (clears pagadoEn), abono webhooks recalc estado net-of-descuento, owner-token external_reference mismatch blocks estado change.
+
+Subscription webhook variant: `artifacts/api-server/scripts/e2e-flow-subscription.ts` reuses the same pattern for the platform Flow subscription webhook (`/webhooks/flow-subscription`). `flow-subscriptions.ts` now shares `flowApiUrl()` from flow-api.ts (env-overridable). Stub serves `/subscription/get`; only FLOW_ADMIN_* need to EXIST (signature ignored). Covers activa/morosa/cancelada/reactivación, unknown/missing subscriptionId, and Flow API 500 (state untouched, always 200).

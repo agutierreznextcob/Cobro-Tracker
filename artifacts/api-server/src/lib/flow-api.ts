@@ -2,7 +2,7 @@ import { createHmac } from "crypto";
 
 // Base URL is resolved at call time so tests can point it at a local stub
 // (FLOW_API_BASE_URL). Production/dev never set it, so the real API is used.
-function flowApiUrl(): string {
+export function flowApiUrl(): string {
   return process.env.FLOW_API_BASE_URL ?? "https://www.flow.cl/api";
 }
 

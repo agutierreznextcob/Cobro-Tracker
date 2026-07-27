@@ -26,6 +26,6 @@
 - [Supervisor role scoping](supervisor-role.md) — admin→supervisor→ejecutivo; team scoping backend-enforced in lib/org.ts; /organization/usuarios role-scoped (never revert to org-wide); invite supervisorId revalidated on accept.
 - [Router blanket auth](router-blanket-auth.md) — never pathless `use(authGuard)` on routers in the shared /api chain; it 401s public routes mounted after (portal/leads/webhooks); scope guards per prefix.
 - [Gestiones agenda contract](gestiones-agenda-contract.md) — /gestiones/agenda must filter to gestiones with BOTH proximaGestionEn AND proximaGestionTipo non-null; contract requires non-null tipo + dashboard indexes label map by it.
-- [E2E webhook test (Flow/MP stubs)](e2e-webhooks-script.md) — webhooks tested sans real payments via FLOW_API_BASE_URL/MP_API_BASE_URL stubs + real router mounted locally; owner-token stub must use decrypted real creds.
+- [E2E webhook test (Flow/MP stubs)](e2e-webhooks-script.md) — cobro AND platform-subscription webhooks tested sans real payments via FLOW/MP base-URL stubs + real router mounted locally; owner-token stub must use decrypted real creds.
 - [E2E money-flow script](e2e-money-flow-script.md) — rerunnable script verifying cobro→abonos→estado→informes/rendimiento numbers; demo login + descuento enum gotchas inside.
 - [Cobro edit/delete money-safety](cobro-edit-delete-money-safety.md) — money-received cobros can't be freely edited/deleted; DELETE+ajustar-monto validate under FOR UPDATE row lock; block estado→pendiente when abonos>0.

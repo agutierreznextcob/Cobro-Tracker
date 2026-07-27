@@ -1,6 +1,4 @@
-import { buildSignedBody, buildSignedQuery, getPublicBaseUrl } from "./flow-api";
-
-const FLOW_API_URL = "https://www.flow.cl/api";
+import { buildSignedBody, buildSignedQuery, flowApiUrl, getPublicBaseUrl } from "./flow-api";
 
 // Platform plan: monthly recurring charge to the platform's own Flow account.
 // NOTE: Flow does not let `ensurePlan` change the price of an EXISTING planId
@@ -43,7 +41,7 @@ export function flowAdminConfigured(): boolean {
 
 async function flowPost<T>(path: string, params: Record<string, string | number>, secretKey: string): Promise<T> {
   const body = buildSignedBody(params, secretKey);
-  const res = await fetch(`${FLOW_API_URL}${path}`, {
+  const res = await fetch(`${flowApiUrl()}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -57,7 +55,7 @@ async function flowPost<T>(path: string, params: Record<string, string | number>
 
 async function flowGet<T>(path: string, params: Record<string, string | number>, secretKey: string): Promise<T> {
   const qs = buildSignedQuery(params, secretKey);
-  const res = await fetch(`${FLOW_API_URL}${path}?${qs}`, { method: "GET" });
+  const res = await fetch(`${flowApiUrl()}${path}?${qs}`, { method: "GET" });
   const text = await res.text();
   if (!res.ok) {
     throw new Error(`Flow ${path} error ${res.status}: ${text}`);
