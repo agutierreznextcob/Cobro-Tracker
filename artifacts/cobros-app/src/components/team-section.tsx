@@ -52,6 +52,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, Users, UserPlus, MailCheck, X, ShieldCheck, Trash2 } from "lucide-react";
+import { OrgChart } from "@/components/org-chart";
 
 function formatCLP(value: number): string {
   return new Intl.NumberFormat("es-CL", {
@@ -210,6 +211,7 @@ export function TeamSection() {
   );
 
   return (
+    <div className="space-y-6">
     <Card className="shadow-sm border-border/50">
       <CardHeader className="bg-muted/20 border-b border-border/50">
         <CardTitle className="flex items-center gap-2">
@@ -528,5 +530,9 @@ export function TeamSection() {
         </AlertDialogContent>
       </AlertDialog>
     </Card>
+
+    {/* Organigrama: solo visible para el Administrador (TeamSection ya está gateado a admin_org). */}
+    <OrgChart miembros={miembros ?? []} />
+    </div>
   );
 }

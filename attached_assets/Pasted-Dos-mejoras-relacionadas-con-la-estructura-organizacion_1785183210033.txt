@@ -1,0 +1,78 @@
+Dos mejoras relacionadas con la estructura 
+organizacional:
+
+1. CARGO VISIBLE EN PERFIL:
+En la sección "Mi Perfil", agregar el cargo 
+del usuario claramente visible junto al nombre 
+y correo:
+- Administrador de organización
+- Supervisor
+- Ejecutivo de cobranza
+
+El cargo debe mostrarse como un badge o etiqueta 
+visual destacada, no solo como texto plano.
+El cargo lo asigna el Admin al invitar — 
+el usuario no puede cambiarlo desde su perfil.
+
+2. ORGANIGRAMA DEL EQUIPO (solo visible para Admin):
+Agregar en el menú "Mi Equipo" una vista de 
+organigrama que muestre la estructura completa 
+de la organización:
+
+Vista tipo árbol jerárquico:
+- Nivel 1: Administrador (nombre, cargo, correo)
+  └── Nivel 2: Supervisor 1 (nombre, cargo, correo)
+       └── Nivel 3: Ejecutivo 1 (nombre, cargo, correo)
+       └── Nivel 3: Ejecutivo 2 (nombre, cargo, correo)
+  └── Nivel 2: Supervisor 2 (nombre, cargo, correo)
+       └── Nivel 3: Ejecutivo 3 (nombre, cargo, correo)
+
+Cada nodo del organigrama muestra:
+- Nombre completo
+- Cargo (badge de color distinto por rol)
+- Correo electrónico
+- Estado: Activo/Inactivo
+
+Colores sugeridos por cargo:
+- Admin: dorado (#F4A800)
+- Supervisor: azul oscuro (#1A1333)
+- Ejecutivo: gris (#666666)
+
+3. CUMPLIMIENTO LEY 21.719 EN EL ORGANIGRAMA:
+El organigrama contiene datos personales 
+(nombre y correo de los usuarios). Para cumplir 
+la ley de protección de datos:
+
+- El organigrama es visible SOLO para el 
+  Administrador de la organización
+- Los Supervisores NO pueden ver el organigrama 
+  completo, solo su propio equipo
+- Los Ejecutivos NO pueden ver el organigrama
+- Agregar en la página del organigrama una 
+  nota legal discreta:
+  "Los datos mostrados corresponden a miembros 
+  de tu organización y son tratados conforme 
+  a la Ley 21.719 de Protección de Datos 
+  Personales."
+
+4. REVISIÓN COMPLETA LEY 21.719:
+Revisar toda la plataforma y confirmar que 
+se cumplen estos requisitos:
+
+✓ Política de privacidad visible en nextcob.com/privacidad
+✓ Términos y condiciones en nextcob.com/terminos
+✓ Checkbox de aceptación en registro (no preseleccionado)
+✓ Botón "Descargar mis datos" en Perfil
+✓ Botón "Eliminar mi cuenta" en Perfil
+✓ Datos de terceros (clientes/deudores) solo 
+  accesibles por el usuario que los ingresó 
+  y su organización
+✓ Emails enviados solo para el fin declarado 
+  (cobranza), no para marketing sin consentimiento
+✓ Contraseñas hasheadas con bcrypt
+✓ Acceso por roles (cada usuario solo ve 
+  lo que le corresponde)
+✓ Log de cobros eliminados para auditoría
+
+Si algún punto no está implementado, 
+corregirlo y confirmar.

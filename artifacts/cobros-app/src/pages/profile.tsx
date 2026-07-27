@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { isValidRut, formatRut } from "@/lib/rut";
 import { TeamSection } from "@/components/team-section";
+import { OrgRoleBadge } from "@/components/org-role-badge";
 import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera, ShieldCheck, Download } from "lucide-react";
 
 // Resize a chosen image client-side and return a JPEG data URL. Keeping avatars
@@ -625,7 +626,10 @@ function ProfileSettings() {
               </div>
             )}
             <div>
-              <p className="text-lg font-semibold">{displayName}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-lg font-semibold">{displayName}</p>
+                <OrgRoleBadge orgRole={user?.orgRole} />
+              </div>
               {user?.email && <p className="text-sm text-muted-foreground">{user.email}</p>}
             </div>
           </div>
