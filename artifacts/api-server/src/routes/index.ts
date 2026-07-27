@@ -20,6 +20,12 @@ import { subscriptionRouter } from "./subscription";
 import { adminRouter } from "./admin";
 import { organizationRouter } from "./organization";
 
+// ORDEN DE MONTAJE: los routers con rutas públicas (portal, leads, chat,
+// webhooks, encuestas) deben ir ANTES de cualquier router con auth "en blanco"
+// (Router.use sin path). Nunca agregues un guard sin path a un router montado
+// en esta cadena — delimítalo por prefijo (ver gestiones.ts como ejemplo).
+// Guardia de regresión: scripts/e2e-public-routes.ts (workflow e2e-public-routes)
+// verifica que las rutas públicas respondan sin sesión y sin 401/403.
 const router: IRouter = Router();
 
 router.use(healthRouter);

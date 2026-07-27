@@ -6,4 +6,4 @@ Rule: never add a pathless `router.use(authGuard)` to a router mounted in the sh
 
 **Why:** gestiones' blanket auth silently 401'd the public debtor portal (`/public/portal/:token`) and everything mounted after it — Express routers run pathless middlewares for every request that reaches them, matched route or not.
 
-**How to apply:** when adding a new router or auth guard, list its route prefixes and attach the guard per-prefix; verify public endpoints (portal, leads, webhooks, encuestas, public chat) still respond unauthenticated after mounting.
+**How to apply:** when adding a new router or auth guard, list its route prefixes and attach the guard per-prefix; verify public endpoints (portal, leads, webhooks, encuestas, public chat) still respond unauthenticated after mounting — run the `e2e-public-routes` script/workflow in the api-server scripts dir (asserts no 401/403 + per-endpoint contract).
