@@ -888,9 +888,20 @@ export interface EncuestaEmailData {
   empresa: string;
   descripcion: string;
   ctaUrl: string;
+  /** Base URL for one-click answers; `?calificacion=N` is appended per option. */
+  respuestaBaseUrl?: string;
   remitenteNombre?: string | null;
   remitenteEmail?: string | null;
 }
+
+// One-click survey options: each is a unique link that records the answer
+// directly (calificacion 1..5) without any extra form.
+const ENCUESTA_OPCIONES: { calificacion: number; emoji: string; label: string; color: string }[] = [
+  { calificacion: 5, emoji: "👍", label: "Excelente", color: "#059669" },
+  { calificacion: 4, emoji: "😊", label: "Buena", color: "#2563eb" },
+  { calificacion: 3, emoji: "😐", label: "Regular", color: "#d97706" },
+  { calificacion: 1, emoji: "👎", label: "Mala", color: "#dc2626" },
+];
 
 // Invites the client to rate their payment experience via a public 1-question survey.
 export async function sendEncuestaEmail(
@@ -914,10 +925,19 @@ export async function sendEncuestaEmail(
       heading: `Gracias por tu pago, ${escapeHtml(nombre)} 🙏`,
       bodyLines: [
         `<strong>${escapeHtml(data.empresa)}</strong> agradece tu pago del cobro por <strong>${escapeHtml(data.descripcion)}</strong>.`,
-        `Nos ayudaría mucho conocer tu opinión. Solo te tomará unos segundos calificar tu experiencia.`,
+        `<strong>¿Cómo fue tu experiencia de pago?</strong> Haz clic en una opción — un solo clic registra tu respuesta:`,
+        ...(data.respuestaBaseUrl
+          ? [
+              `<table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;"><tr>${ENCUESTA_OPCIONES.map(
+                (o) =>
+                  `<td align="center" style="padding:4px;"><a href="${data.respuestaBaseUrl}?calificacion=${o.calificacion}" target="_blank" style="display:inline-block;background:${o.color};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;padding:10px 12px;white-space:nowrap;">${o.emoji} ${o.label}</a></td>`,
+              ).join("")}</tr></table>`,
+            ]
+          : [`Nos ayudaría mucho conocer tu opinión. Solo te tomará unos segundos calificar tu experiencia.`]),
       ],
-      ctaText: "Calificar mi experiencia",
-      ctaUrl: data.ctaUrl,
+      ...(data.respuestaBaseUrl
+        ? {}
+        : { ctaText: "Calificar mi experiencia", ctaUrl: data.ctaUrl }),
       footerNote: "Tu opinión es anónima para el equipo de cobranza y nos ayuda a mejorar.",
     }),
   });

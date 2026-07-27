@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "wouter";
 import {
   useGetEncuesta,
@@ -23,6 +23,29 @@ export default function EncuestaPublicaPage() {
   const [hover, setHover] = useState(0);
   const [comentario, setComentario] = useState("");
   const [enviado, setEnviado] = useState(false);
+
+  // One-click flow: the email buttons land here with ?calificacion=N. Record it
+  // automatically on first render in a real browser (email prefetchers don't
+  // execute JS, so they can't register phantom answers via the GET redirect).
+  const autoSubmitted = useRef(false);
+  useEffect(() => {
+    if (autoSubmitted.current || !data || data.yaRespondida) return;
+    const param = Number(new URLSearchParams(window.location.search).get("calificacion"));
+    if (![1, 2, 3, 4, 5].includes(param)) return;
+    autoSubmitted.current = true;
+    setCalificacion(param);
+    responder
+      .mutateAsync({ token, data: { calificacion: param, comentario: null } })
+      .then(() => {
+        setEnviado(true);
+        void queryClient.invalidateQueries({ queryKey: getGetEncuestaQueryKey(token) });
+      })
+      .catch(() => {
+        // Fall back to manual selection UI.
+        autoSubmitted.current = false;
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, token]);
 
   async function handleSubmit() {
     if (calificacion < 1) return;

@@ -943,8 +943,13 @@ function SatisfaccionReport() {
                   style={{ width: `${(d.cantidad / maxDist) * 100}%` }}
                 />
               </div>
-              <span className="w-8 text-right text-sm tabular-nums text-muted-foreground">
+              <span className="w-20 text-right text-sm tabular-nums text-muted-foreground">
                 {d.cantidad}
+                {data.respondidas > 0 && (
+                  <span className="ml-1 text-xs">
+                    ({Math.round((d.cantidad / data.respondidas) * 100)}%)
+                  </span>
+                )}
               </span>
             </div>
           ))}

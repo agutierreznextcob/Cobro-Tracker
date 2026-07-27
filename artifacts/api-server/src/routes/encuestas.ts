@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, encuestasTable, cobrosTable, type Encuesta } from "@workspace/db";
-import { and, eq, isNotNull, desc, type SQL } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, desc, type SQL } from "drizzle-orm";
 import { ResponderEncuestaBody } from "@workspace/api-zod";
 import { getOrgContext, type OrgContext } from "../lib/org";
 
@@ -31,7 +31,9 @@ encuestasRouter.get("/encuestas/stats/resumen", async (req, res) => {
       .orderBy(desc(encuestasTable.respondidoEn));
 
     const respondidasRows = rows.filter((r) => r.calificacion != null);
-    const total = rows.length;
+    // "Enviadas" = emails que realmente salieron (o ya respondidas); las
+    // encuestas programadas aún no enviadas no cuentan.
+    const total = rows.filter((r) => r.emailEnviadoEn != null || r.respondidoEn != null).length;
     const respondidas = respondidasRows.length;
     const promedio =
       respondidas > 0
@@ -110,6 +112,20 @@ encuestasRouter.get("/encuestas/:token", async (req, res) => {
   }
 });
 
+// One-click answer entry point from the email buttons. Deliberately does NOT
+// mutate on GET: email scanners/prefetchers follow links automatically, which
+// would register phantom answers. Instead it redirects to the public survey
+// page with the chosen rating; the page records it via POST when it renders in
+// a real browser — still a single click for the user, no extra form.
+encuestasRouter.get("/encuestas/:token/responder", async (req, res) => {
+  const calificacion = Number(req.query.calificacion);
+  if (![1, 2, 3, 4, 5].includes(calificacion)) {
+    res.status(400).json({ error: "Calificación inválida" });
+    return;
+  }
+  res.redirect(`/encuesta/${encodeURIComponent(req.params.token)}?calificacion=${calificacion}`);
+});
+
 encuestasRouter.post("/encuestas/:token", async (req, res) => {
   const parsed = ResponderEncuestaBody.safeParse(req.body);
   if (!parsed.success) {
@@ -142,11 +158,14 @@ encuestasRouter.post("/encuestas/:token", async (req, res) => {
         comentario: parsed.data.comentario ?? null,
         respondidoEn: new Date(),
       })
-      .where(and(eq(encuestasTable.id, encuesta.id), isNotNull(encuestasTable.token)))
+      // Atomic single-response guard: a concurrent first answer wins and this
+      // update becomes a no-op instead of overwriting it.
+      .where(and(eq(encuestasTable.id, encuesta.id), isNull(encuestasTable.calificacion)))
       .returning();
     res.json(
       serializePublica(
-        updated!,
+        // A concurrent first answer may have won the race; return its state.
+        updated ?? (await loadEncuestaConCobro(req.params.token))!.encuesta,
         cobro?.clienteNombre ?? "",
         cobro?.descripcion ?? "",
         cobro ? Number(cobro.monto) : 0,

@@ -19,6 +19,15 @@ export const encuestasTable = pgTable(
     calificacion: integer("calificacion"),
     comentario: text("comentario"),
     respondidoEn: timestamp("respondido_en", { withTimezone: true }),
+    // Deferred delivery: the survey email is sent ~1h after payment (so the
+    // client isn't hit with receipt + survey at once). Sweep sends when due.
+    enviarEn: timestamp("enviar_en", { withTimezone: true }).notNull().defaultNow(),
+    // Set only on successful send (idempotency), claim timestamp guards retries.
+    emailEnviadoEn: timestamp("email_enviado_en", { withTimezone: true }),
+    emailIntentoEn: timestamp("email_intento_en", { withTimezone: true }),
+    // Failed-send counter; the sweep gives up after a few attempts (or is set to
+    // a terminal value when the survey should never be sent, e.g. refunded cobro).
+    emailIntentos: integer("email_intentos").notNull().default(0),
     creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

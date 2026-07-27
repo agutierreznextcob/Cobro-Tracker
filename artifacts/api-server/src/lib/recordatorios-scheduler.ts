@@ -1,8 +1,12 @@
 import { logger } from "./logger";
 import { fechaHoySantiago, procesarRecordatorios } from "./recordatorios";
 import { procesarWorkflows } from "./workflows-engine";
+import { procesarEncuestasPendientes } from "./encuestas-service";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
+// Surveys are scheduled ~1h after payment; sweep often so delivery stays close
+// to the intended time.
+const ENCUESTAS_INTERVAL_MS = 5 * 60 * 1000;
 
 let lastProcessedDate: string | null = null;
 let timer: NodeJS.Timeout | null = null;
@@ -46,5 +50,17 @@ export function startRecordatoriosScheduler(): void {
   runTick();
   timer = setInterval(runTick, CHECK_INTERVAL_MS);
   if (typeof timer.unref === "function") timer.unref();
+
+  // Deferred satisfaction surveys: sweep due sends every few minutes. The
+  // claim/TTL logic in procesarEncuestasPendientes makes overlapping runs safe.
+  const runEncuestas = () => {
+    procesarEncuestasPendientes(runLogger).catch((err) =>
+      logger.error({ err }, "Error no controlado procesando encuestas pendientes"),
+    );
+  };
+  runEncuestas();
+  const encuestasTimer = setInterval(runEncuestas, ENCUESTAS_INTERVAL_MS);
+  if (typeof encuestasTimer.unref === "function") encuestasTimer.unref();
+
   logger.info({}, "Scheduler de recordatorios iniciado");
 }
