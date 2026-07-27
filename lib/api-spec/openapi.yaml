@@ -1559,6 +1559,13 @@ paths:
       operationId: listAdminUsuarios
       tags: [admin]
       summary: List all platform users (admin only)
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search by account ID (NCB), email, RUT or name (case-insensitive substring)
+          schema:
+            type: string
       responses:
         "200":
           description: List of platform users

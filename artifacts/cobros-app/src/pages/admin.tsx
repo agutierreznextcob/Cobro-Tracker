@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useListAdminUsuarios,
   useGetAdminMetricas,
@@ -416,22 +416,32 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
 }
 
 export default function AdminPage() {
-  const { data: usuarios, isLoading } = useListAdminUsuarios();
+  const [busqueda, setBusqueda] = useState("");
+  // Debounce so we don't hit the server on every keystroke; the search itself
+  // runs server-side (accountId/email/RUT/nombre) so the panel stays fast with
+  // many accounts.
+  const [busquedaDebounced, setBusquedaDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setBusquedaDebounced(busqueda.trim()), 300);
+    return () => clearTimeout(t);
+  }, [busqueda]);
+
+  const q = busquedaDebounced;
+  const { data: usuarios, isLoading } = useListAdminUsuarios(
+    q ? { q } : undefined,
+    {
+      query: {
+        queryKey: getListAdminUsuariosQueryKey(q ? { q } : undefined),
+        placeholderData: (prev) => prev,
+      },
+    },
+  );
   const { data: metricas } = useGetAdminMetricas();
   const { data: cobrosEliminados, isLoading: isLoadingEliminados } = useListAdminCobrosEliminados({
     query: { queryKey: getListAdminCobrosEliminadosQueryKey() },
   });
-  const [busqueda, setBusqueda] = useState("");
 
-  const q = busqueda.trim().toLowerCase();
-  const usuariosFiltrados = (usuarios ?? []).filter(
-    (u) =>
-      q === "" ||
-      (u.accountId ?? "").toLowerCase().includes(q) ||
-      (u.nombre ?? "").toLowerCase().includes(q) ||
-      (u.email ?? "").toLowerCase().includes(q) ||
-      (u.rut ?? "").toLowerCase().includes(q),
-  );
+  const usuariosFiltrados = usuarios ?? [];
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">

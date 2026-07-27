@@ -2085,6 +2085,13 @@ export const ListWebhookEventosResultado = {
   fallido: 'fallido',
 } as const;
 
+export type ListAdminUsuariosParams = {
+/**
+ * Search by account ID (NCB), email, RUT or name (case-insensitive substring)
+ */
+q?: string;
+};
+
 export type GetRendimientoEquipoParams = {
 /**
  * Admin only — restrict rows to the team of this supervisor

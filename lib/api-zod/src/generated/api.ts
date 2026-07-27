@@ -1263,6 +1263,10 @@ export const ListAdminCobrosEliminadosResponse = zod.array(ListAdminCobrosElimin
 /**
  * @summary List all platform users (admin only)
  */
+export const ListAdminUsuariosQueryParams = zod.object({
+  "q": zod.coerce.string().optional().describe('Search by account ID (NCB), email, RUT or name (case-insensitive substring)')
+})
+
 export const ListAdminUsuariosResponseItem = zod.object({
   "id": zod.string(),
   "accountId": zod.string().nullable().describe('Permanent human-friendly account identifier (NCB-XXXXXXX).'),

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, cobrosTable, organizacionesTable, cobrosEliminadosTable } from "@workspace/db";
 import type { CobroEliminado } from "@workspace/db";
-import { eq, sql, isNull, desc } from "drizzle-orm";
+import { eq, sql, isNull, desc, or, ilike } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { computeSubscriptionState } from "../lib/subscription";
 import { computePricing } from "../lib/org";
@@ -97,8 +97,26 @@ interface EnrichedUsuario {
   totalRecaudado: number;
 }
 
-async function buildUsuarios(): Promise<EnrichedUsuario[]> {
-  const rows = await db.select().from(usersTable);
+// Optional server-side search: case-insensitive substring match over account ID
+// (NCB), email, RUT and full name, so the superadmin panel doesn't need to ship
+// the whole user list to the browser to find one account.
+async function buildUsuarios(q?: string): Promise<EnrichedUsuario[]> {
+  const term = q?.trim();
+  const query = db.select().from(usersTable);
+  // Escape LIKE wildcards so searching e.g. "100%" matches literally.
+  const pattern = term
+    ? `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+    : null;
+  const rows = pattern
+    ? await query.where(
+        or(
+          ilike(usersTable.accountId, pattern),
+          ilike(usersTable.email, pattern),
+          ilike(usersTable.rut, pattern),
+          sql`concat_ws(' ', ${usersTable.firstName}, ${usersTable.lastName}) ilike ${pattern}`,
+        ),
+      )
+    : await query;
   const { miembros, recaudado } = await buildOrgAggregates();
 
   return rows
@@ -165,7 +183,8 @@ async function buildUsuarios(): Promise<EnrichedUsuario[]> {
 
 adminRouter.get("/admin/usuarios", async (req, res) => {
   try {
-    const usuarios = await buildUsuarios();
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    const usuarios = await buildUsuarios(q);
     res.json(usuarios);
   } catch (err) {
     req.log.error({ err }, "Error listing admin usuarios");

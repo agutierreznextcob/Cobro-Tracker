@@ -86,6 +86,7 @@ import type {
   LeadsCount,
   LiquidacionDetalle,
   LiquidacionListResponse,
+  ListAdminUsuariosParams,
   ListClientesParams,
   ListCobrosParams,
   ListLeadsParams,
@@ -4545,20 +4546,27 @@ export function useListAdminCobrosEliminados<TData = Awaited<ReturnType<typeof l
 
 
 
-export const getListAdminUsuariosUrl = () => {
+export const getListAdminUsuariosUrl = (params?: ListAdminUsuariosParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/admin/usuarios`
+  return stringifiedParams.length > 0 ? `/api/admin/usuarios?${stringifiedParams}` : `/api/admin/usuarios`
 }
 
 /**
  * @summary List all platform users (admin only)
  */
-export const listAdminUsuarios = async ( options?: RequestInit): Promise<AdminUsuario[]> => {
+export const listAdminUsuarios = async (params?: ListAdminUsuariosParams, options?: RequestInit): Promise<AdminUsuario[]> => {
 
-  return customFetch<AdminUsuario[]>(getListAdminUsuariosUrl(),
+  return customFetch<AdminUsuario[]>(getListAdminUsuariosUrl(params),
   {
     ...options,
     method: 'GET'
@@ -4571,23 +4579,23 @@ export const listAdminUsuarios = async ( options?: RequestInit): Promise<AdminUs
 
 
 
-export const getListAdminUsuariosQueryKey = () => {
+export const getListAdminUsuariosQueryKey = (params?: ListAdminUsuariosParams,) => {
     return [
-    `/api/admin/usuarios`
+    `/api/admin/usuarios`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListAdminUsuariosQueryOptions = <TData = Awaited<ReturnType<typeof listAdminUsuarios>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsuarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAdminUsuariosQueryOptions = <TData = Awaited<ReturnType<typeof listAdminUsuarios>>, TError = ErrorType<void>>(params?: ListAdminUsuariosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsuarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListAdminUsuariosQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListAdminUsuariosQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminUsuarios>>> = ({ signal }) => listAdminUsuarios({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminUsuarios>>> = ({ signal }) => listAdminUsuarios(params, { signal, ...requestOptions });
 
 
 
@@ -4605,11 +4613,11 @@ export type ListAdminUsuariosQueryError = ErrorType<void>
  */
 
 export function useListAdminUsuarios<TData = Awaited<ReturnType<typeof listAdminUsuarios>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsuarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListAdminUsuariosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsuarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListAdminUsuariosQueryOptions(options)
+  const queryOptions = getListAdminUsuariosQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

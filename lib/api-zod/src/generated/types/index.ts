@@ -110,6 +110,7 @@ export * from './leadsCount';
 export * from './liquidacion';
 export * from './liquidacionDetalle';
 export * from './liquidacionListResponse';
+export * from './listAdminUsuariosParams';
 export * from './listClientesParams';
 export * from './listCobrosEstado';
 export * from './listCobrosMetodo';
