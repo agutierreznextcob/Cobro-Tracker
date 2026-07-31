@@ -22,13 +22,14 @@ import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, 
 
 const editSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio").max(200),
+  empresa: z.string().max(200).optional(),
   rut: z.string().max(20).optional(),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   telefono: z.string().max(30).optional(),
 });
 type EditForm = z.infer<typeof editSchema>;
 
-function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nombre: string; rut?: string | null; email?: string | null; telefono?: string | null }; onUpdated: () => void }) {
+function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nombre: string; empresa?: string | null; rut?: string | null; email?: string | null; telefono?: string | null }; onUpdated: () => void }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const updateCliente = useUpdateCliente();
@@ -37,6 +38,7 @@ function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nomb
     resolver: zodResolver(editSchema),
     values: {
       nombre: cliente.nombre,
+      empresa: cliente.empresa ?? "",
       rut: cliente.rut ?? "",
       email: cliente.email ?? "",
       telefono: cliente.telefono ?? "",
@@ -45,7 +47,7 @@ function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nomb
 
   const onSubmit = (values: EditForm) => {
     updateCliente.mutate(
-      { id: cliente.id, data: { nombre: values.nombre, rut: values.rut || undefined, email: values.email || undefined, telefono: values.telefono || undefined } },
+      { id: cliente.id, data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut || undefined, email: values.email || undefined, telefono: values.telefono || undefined } },
       {
         onSuccess: () => {
           toast({ title: "Cliente actualizado" });
@@ -76,6 +78,13 @@ function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nomb
               <FormItem>
                 <FormLabel>Nombre *</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="empresa" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Empresa</FormLabel>
+                <FormControl><Input placeholder="Empresa (opcional)" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -418,6 +427,7 @@ export default function ClienteDetailPage() {
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-bold tracking-tight">{data.nombre}</h1>
+              {data.empresa && <p className="text-muted-foreground text-sm mt-0.5">{data.empresa}</p>}
               {data.rut && <p className="text-muted-foreground font-mono text-sm mt-0.5">{data.rut}</p>}
               <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
                 {data.email && (

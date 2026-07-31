@@ -25,6 +25,7 @@ clientesRouter.use(requireSubscription);
 
 const ClienteInputSchema = z.object({
   nombre: z.string().min(1).max(200),
+  empresa: z.string().max(200).optional().or(z.literal("")),
   rut: z
     .string()
     .max(20)
@@ -91,11 +92,12 @@ clientesRouter.post("/clientes", async (req, res) => {
 
   try {
     const ctx = await getOrgContext(userId);
-    const { nombre, rut, email, telefono } = parsed.data;
+    const { nombre, empresa, rut, email, telefono } = parsed.data;
     const [created] = await db
       .insert(clientesTable)
       .values({
         nombre,
+        empresa: empresa || null,
         rut: rut || null,
         email: email || null,
         telefono: telefono || null,
@@ -108,6 +110,98 @@ clientesRouter.post("/clientes", async (req, res) => {
     res.status(201).json(created);
   } catch (err) {
     req.log.error({ err }, "Error creating cliente");
+    res.status(500).json({ error: "Error interno" });
+  }
+});
+
+// ── Bulk import ───────────────────────────────────────────────────────────────
+// The frontend parses the uploaded Excel and sends plain rows; we validate each
+// row (RUT chileno, email) and skip duplicates (existing RUT in the caller's
+// scope or repeated within the file), returning a per-row summary.
+const ImportarClienteRow = z.object({
+  nombre: z.string().max(200).optional().or(z.literal("")),
+  empresa: z.string().max(200).optional().or(z.literal("")),
+  rut: z.string().max(20).optional().or(z.literal("")),
+  email: z.string().max(200).optional().or(z.literal("")),
+  telefono: z.string().max(30).optional().or(z.literal("")),
+});
+const ImportarClientesBody = z.object({
+  clientes: z.array(ImportarClienteRow).min(1).max(500),
+});
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+clientesRouter.post("/clientes/importar", async (req, res) => {
+  const userId = req.user!.id;
+  const parsed = ImportarClientesBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Datos de importación inválidos" });
+    return;
+  }
+
+  try {
+    const ctx = await getOrgContext(userId);
+    // Existing RUTs within the caller's visibility scope (normalized).
+    const existentes = await db
+      .select({ rut: clientesTable.rut })
+      .from(clientesTable)
+      .where(clienteScopeCondition(ctx, userId));
+    const normalizar = (r: string) => r.replace(/\./g, "").replace(/-/g, "").toLowerCase();
+    const rutsExistentes = new Set(
+      existentes.map((e) => (e.rut ? normalizar(e.rut) : "")).filter(Boolean),
+    );
+
+    const omitidos: { fila: number; nombre: string; motivo: string }[] = [];
+    const aInsertar: {
+      nombre: string;
+      empresa: string | null;
+      rut: string;
+      email: string;
+      telefono: string | null;
+    }[] = [];
+    const vistosEnArchivo = new Set<string>();
+
+    parsed.data.clientes.forEach((row, i) => {
+      const fila = i + 2; // 1-based + header row, matches the Excel row number
+      const nombre = (row.nombre ?? "").trim();
+      const rut = (row.rut ?? "").trim();
+      const email = (row.email ?? "").trim();
+      const telefono = (row.telefono ?? "").trim();
+      const empresa = (row.empresa ?? "").trim();
+
+      const omitir = (motivo: string): void => {
+        omitidos.push({ fila, nombre: nombre || "(sin nombre)", motivo });
+      };
+      if (!nombre) return omitir("Falta el nombre");
+      if (!rut) return omitir("Falta el RUT");
+      if (!isValidRut(rut)) return omitir(`RUT inválido (${rut})`);
+      if (!email) return omitir("Falta el email");
+      if (!EMAIL_RE.test(email)) return omitir(`Email inválido (${email})`);
+
+      const rutNorm = normalizar(rut);
+      if (rutsExistentes.has(rutNorm)) return omitir(`RUT ya existe (${rut})`);
+      if (vistosEnArchivo.has(rutNorm)) return omitir(`RUT repetido en el archivo (${rut})`);
+
+      vistosEnArchivo.add(rutNorm);
+      aInsertar.push({ nombre, empresa: empresa || null, rut, email, telefono: telefono || null });
+    });
+
+    if (aInsertar.length > 0) {
+      await db.insert(clientesTable).values(
+        aInsertar.map((c) => ({
+          ...c,
+          userId,
+          organizationId: ctx.organizationId ?? null,
+        })),
+      );
+    }
+
+    req.log.info(
+      { importados: aInsertar.length, omitidos: omitidos.length },
+      "Clientes importados masivamente",
+    );
+    res.json({ importados: aInsertar.length, omitidos });
+  } catch (err) {
+    req.log.error({ err }, "Error importing clientes");
     res.status(500).json({ error: "Error interno" });
   }
 });
@@ -185,11 +279,12 @@ clientesRouter.patch("/clientes/:id", async (req, res) => {
       return;
     }
 
-    const { nombre, rut, email, telefono } = parsed.data;
+    const { nombre, empresa, rut, email, telefono } = parsed.data;
     const [updated] = await db
       .update(clientesTable)
       .set({
         nombre,
+        empresa: empresa || null,
         rut: rut || null,
         email: email || null,
         telefono: telefono || null,

@@ -474,6 +474,61 @@ export interface SubscriptionStatus {
   precioNeto: number;
   /** Monthly IVA (19%) amount in CLP */
   precioIva: number;
+  /** Extra active seats beyond the base plan (real-time count) */
+  usuariosAdicionales?: number;
+  costoUsuarioAdicionalNeto?: number;
+  costoUsuarioAdicionalIva?: number;
+  costoUsuarioAdicional?: number;
+  totalNetoMensual?: number;
+  totalIvaMensual?: number;
+  /** Total monthly charge in CLP (base + extra seats, IVA incl.) */
+  totalMensual?: number;
+}
+
+export type PrepagoInputMeses = typeof PrepagoInputMeses[keyof typeof PrepagoInputMeses];
+
+
+export const PrepagoInputMeses = {
+  NUMBER_1: 1,
+  NUMBER_3: 3,
+  NUMBER_6: 6,
+  NUMBER_12: 12,
+} as const;
+
+export interface PrepagoInput {
+  meses: PrepagoInputMeses;
+}
+
+export interface PrepagoResponse {
+  url: string;
+  meses: number;
+  neto: number;
+  iva: number;
+  total: number;
+}
+
+export type ImportarClientesInputClientesItem = {
+  nombre?: string;
+  empresa?: string;
+  rut?: string;
+  email?: string;
+  telefono?: string;
+};
+
+export interface ImportarClientesInput {
+  /** @maxItems 500 */
+  clientes: ImportarClientesInputClientesItem[];
+}
+
+export type ImportarClientesResultOmitidosItem = {
+  fila: number;
+  nombre: string;
+  motivo: string;
+};
+
+export interface ImportarClientesResult {
+  importados: number;
+  omitidos: ImportarClientesResultOmitidosItem[];
 }
 
 export interface SubscribeResponse {
@@ -487,6 +542,8 @@ export interface HealthStatus {
 export interface Cliente {
   id: number;
   nombre: string;
+  /** @nullable */
+  empresa?: string | null;
   /** @nullable */
   rut?: string | null;
   /** @nullable */
@@ -528,6 +585,8 @@ export interface ClienteConScore {
   id: number;
   nombre: string;
   /** @nullable */
+  empresa?: string | null;
+  /** @nullable */
   rut?: string | null;
   /** @nullable */
   email?: string | null;
@@ -561,6 +620,7 @@ export interface ScoreDetalle {
 export interface ClienteInput {
   /** @minLength 1 */
   nombre: string;
+  empresa?: string;
   rut?: string;
   email?: string;
   telefono?: string;
@@ -698,6 +758,8 @@ export interface Cobro {
 export interface ClienteConHistorial {
   id: number;
   nombre: string;
+  /** @nullable */
+  empresa?: string | null;
   /** @nullable */
   rut?: string | null;
   /** @nullable */

@@ -10,6 +10,7 @@ import {
   getGetOrganizationQueryKey,
   getListMiembrosQueryKey,
   getListInvitacionesQueryKey,
+  getGetSubscriptionStatusQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -95,6 +96,8 @@ export function TeamSection() {
     queryClient.invalidateQueries({ queryKey: getGetOrganizationQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListMiembrosQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListInvitacionesQueryKey() });
+    // Seat changes alter the monthly total shown in the Suscripción card.
+    queryClient.invalidateQueries({ queryKey: getGetSubscriptionStatusQueryKey() });
   };
 
   const handleInvite = () => {

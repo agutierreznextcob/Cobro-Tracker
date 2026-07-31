@@ -267,6 +267,33 @@ paths:
         "401":
           description: Unauthorized
 
+  /clientes/importar:
+    post:
+      operationId: importarClientes
+      tags: [clientes]
+      summary: Bulk-import clientes from parsed spreadsheet rows
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportarClientesInput"
+      responses:
+        "200":
+          description: Import summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportarClientesResult"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+
   /clientes/{id}:
     get:
       operationId: getCliente
@@ -1507,6 +1534,39 @@ paths:
                 $ref: "#/components/schemas/SubscriptionStatus"
         "401":
           description: Unauthorized
+
+  /subscription/prepago:
+    post:
+      operationId: startPrepago
+      tags: [subscription]
+      summary: Pay N months of the platform subscription upfront (returns Flow payment URL)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrepagoInput"
+      responses:
+        "200":
+          description: Flow payment URL and charge breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrepagoResponse"
+        "400":
+          description: Invalid months
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "503":
+          description: Prepago temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /subscription/subscribe:
     post:
@@ -3320,6 +3380,85 @@ components:
         precioIva:
           type: integer
           description: Monthly IVA (19%) amount in CLP
+        usuariosAdicionales:
+          type: integer
+          description: Extra active seats beyond the base plan (real-time count)
+        costoUsuarioAdicionalNeto:
+          type: integer
+        costoUsuarioAdicionalIva:
+          type: integer
+        costoUsuarioAdicional:
+          type: integer
+        totalNetoMensual:
+          type: integer
+        totalIvaMensual:
+          type: integer
+        totalMensual:
+          type: integer
+          description: Total monthly charge in CLP (base + extra seats, IVA incl.)
+
+    PrepagoInput:
+      type: object
+      required: [meses]
+      properties:
+        meses:
+          type: integer
+          enum: [1, 3, 6, 12]
+
+    PrepagoResponse:
+      type: object
+      required: [url, meses, neto, iva, total]
+      properties:
+        url:
+          type: string
+        meses:
+          type: integer
+        neto:
+          type: integer
+        iva:
+          type: integer
+        total:
+          type: integer
+
+    ImportarClientesInput:
+      type: object
+      required: [clientes]
+      properties:
+        clientes:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            properties:
+              nombre:
+                type: string
+              empresa:
+                type: string
+              rut:
+                type: string
+              email:
+                type: string
+              telefono:
+                type: string
+
+    ImportarClientesResult:
+      type: object
+      required: [importados, omitidos]
+      properties:
+        importados:
+          type: integer
+        omitidos:
+          type: array
+          items:
+            type: object
+            required: [fila, nombre, motivo]
+            properties:
+              fila:
+                type: integer
+              nombre:
+                type: string
+              motivo:
+                type: string
 
     SubscribeResponse:
       type: object
@@ -3344,6 +3483,8 @@ components:
           type: integer
         nombre:
           type: string
+        empresa:
+          type: ["string", "null"]
         rut:
           type: ["string", "null"]
         email:
@@ -3395,6 +3536,8 @@ components:
           type: integer
         nombre:
           type: string
+        empresa:
+          type: ["string", "null"]
         rut:
           type: ["string", "null"]
         email:
@@ -3464,6 +3607,8 @@ components:
         nombre:
           type: string
           minLength: 1
+        empresa:
+          type: string
         rut:
           type: string
         email:
@@ -3480,6 +3625,8 @@ components:
           type: integer
         nombre:
           type: string
+        empresa:
+          type: ["string", "null"]
         rut:
           type: ["string", "null"]
         email:

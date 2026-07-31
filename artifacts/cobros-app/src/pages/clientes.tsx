@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "wouter";
+import * as XLSX from "xlsx";
 import {
   useListClientes,
   useCreateCliente,
+  useImportarClientes,
   getListClientesQueryKey,
   useListAdminUsuarios,
   type AdminUsuario,
+  type ImportarClientesResult,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -19,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight, Shield } from "lucide-react";
+import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight, Shield, Download, Upload, Building2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { ScoreBadge } from "@/components/score-badge";
 import { formatCurrency } from "@/lib/format";
@@ -43,6 +46,7 @@ function validarRut(rut: string): boolean {
 
 const clienteSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio").max(200),
+  empresa: z.string().max(200).optional(),
   rut: z
     .string()
     .min(1, "El RUT es obligatorio")
@@ -72,12 +76,12 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
 
   const form = useForm<ClienteForm>({
     resolver: zodResolver(clienteSchema),
-    defaultValues: { nombre: "", rut: "", email: "", telefono: "" },
+    defaultValues: { nombre: "", empresa: "", rut: "", email: "", telefono: "" },
   });
 
   const onSubmit = (values: ClienteForm) => {
     createCliente.mutate(
-      { data: { nombre: values.nombre, rut: values.rut, email: values.email, telefono: values.telefono } },
+      { data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut, email: values.email, telefono: values.telefono } },
       {
         onSuccess: () => {
           toast({ title: "Cliente creado", description: "El cliente fue creado exitosamente." });
@@ -114,6 +118,19 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
                   <FormLabel>Nombre *</FormLabel>
                   <FormControl>
                     <Input placeholder="Nombre completo o razón social" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="empresa"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Empresa</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Empresa (opcional)" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -170,6 +187,136 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
         </Form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Importación masiva desde Excel ───────────────────────────────────────────
+const PLANTILLA_HEADERS = ["Nombre", "Empresa (opcional)", "RUT", "Email", "Teléfono"];
+
+function descargarPlantilla() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    PLANTILLA_HEADERS,
+    ["María Pérez González", "Comercial Andina SpA", "12.345.678-5", "maria.perez@ejemplo.cl", "+56 9 1234 5678"],
+  ]);
+  ws["!cols"] = [{ wch: 28 }, { wch: 24 }, { wch: 14 }, { wch: 28 }, { wch: 18 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+  XLSX.writeFile(wb, "plantilla-clientes.xlsx");
+}
+
+function ImportarClientesButton({ onImported }: { onImported: () => void }) {
+  const { toast } = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const importar = useImportarClientes();
+  const [resultado, setResultado] = useState<ImportarClientesResult | null>(null);
+
+  const handleFile = async (file: File) => {
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // header:1 keeps positional columns so renamed headers still work.
+      const rows = XLSX.utils.sheet_to_json<(string | number | undefined)[]>(ws, { header: 1 });
+      const clientes = rows
+        .slice(1) // skip header row
+        .filter((r) => r && r.some((c) => String(c ?? "").trim() !== ""))
+        .map((r) => ({
+          nombre: String(r[0] ?? "").trim(),
+          empresa: String(r[1] ?? "").trim(),
+          rut: String(r[2] ?? "").trim(),
+          email: String(r[3] ?? "").trim(),
+          telefono: String(r[4] ?? "").trim(),
+        }));
+      if (clientes.length === 0) {
+        toast({ title: "Archivo vacío", description: "El Excel no contiene filas de clientes.", variant: "destructive" });
+        return;
+      }
+      if (clientes.length > 500) {
+        toast({ title: "Demasiadas filas", description: "Máximo 500 clientes por importación.", variant: "destructive" });
+        return;
+      }
+      importar.mutate(
+        { data: { clientes } },
+        {
+          onSuccess: (res) => {
+            setResultado(res);
+            onImported();
+          },
+          onError: () => {
+            toast({ title: "Error", description: "No se pudo importar el archivo.", variant: "destructive" });
+          },
+        },
+      );
+    } catch {
+      toast({ title: "Archivo inválido", description: "No se pudo leer el Excel. Usa la plantilla.", variant: "destructive" });
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleFile(file);
+          e.target.value = "";
+        }}
+      />
+      <Button variant="outline" size="sm" className="gap-1.5" onClick={descargarPlantilla}>
+        <Download className="h-4 w-4" />
+        Descargar plantilla Excel
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        disabled={importar.isPending}
+        onClick={() => inputRef.current?.click()}
+      >
+        {importar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        Importar clientes
+      </Button>
+
+      <Dialog open={resultado != null} onOpenChange={(o) => !o && setResultado(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Resultado de la importación</DialogTitle>
+          </DialogHeader>
+          {resultado && (
+            <div className="space-y-3 pt-1">
+              <p className="text-sm">
+                <CheckCircle2 className="inline h-4 w-4 text-emerald-500 mr-1.5 -mt-0.5" />
+                <strong>{resultado.importados}</strong> cliente{resultado.importados !== 1 ? "s" : ""} importado{resultado.importados !== 1 ? "s" : ""} correctamente
+                {resultado.omitidos.length > 0 && (
+                  <>
+                    , <strong>{resultado.omitidos.length}</strong> omitido{resultado.omitidos.length !== 1 ? "s" : ""} por duplicado o error
+                  </>
+                )}
+                .
+              </p>
+              {resultado.omitidos.length > 0 && (
+                <div className="max-h-56 overflow-y-auto rounded-lg border">
+                  {resultado.omitidos.map((o, i) => (
+                    <div key={i} className="flex items-start gap-2 px-3 py-2 text-xs border-b last:border-b-0">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                      <span>
+                        Fila {o.fila} — <strong>{o.nombre}</strong>: {o.motivo}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button size="sm" onClick={() => setResultado(null)}>Entendido</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -339,7 +486,10 @@ export default function ClientesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
           <p className="text-muted-foreground mt-1">Gestiona tu cartera de clientes y su historial de cobros.</p>
         </div>
-        <NuevoClienteDialog onCreated={handleCreated} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ImportarClientesButton onImported={handleCreated} />
+          <NuevoClienteDialog onCreated={handleCreated} />
+        </div>
       </div>
 
       {isAdmin && (
@@ -405,6 +555,12 @@ export default function ClientesPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{cliente.nombre}</p>
+                        {cliente.empresa && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                            <Building2 className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{cliente.empresa}</span>
+                          </div>
+                        )}
                         {cliente.rut && (
                           <p className="text-xs text-muted-foreground font-mono mt-0.5">{cliente.rut}</p>
                         )}

@@ -9,6 +9,7 @@ import {
   getGetMpCredentialsQueryKey,
   useGetSubscriptionStatus,
   useStartSubscription,
+  useStartPrepago,
   getGetSubscriptionStatusQueryKey,
   useCompletarPerfil,
   exportarDatos,
@@ -34,6 +35,90 @@ import { isValidRut, formatRut } from "@/lib/rut";
 import { TeamSection } from "@/components/team-section";
 import { OrgRoleBadge } from "@/components/org-role-badge";
 import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera, ShieldCheck, Download } from "lucide-react";
+
+// Prepago: pay 1/3/6/12 months upfront via a one-off Flow payment. Shows the
+// full Neto + IVA = Total breakdown (base plan + extra seats) before paying.
+type SubStatusLike = {
+  totalNetoMensual?: number;
+  totalIvaMensual?: number;
+  totalMensual?: number;
+  precioNeto: number;
+  precioIva: number;
+  precioMensual: number;
+  usuariosAdicionales?: number;
+};
+
+const PREPAGO_OPCIONES: { meses: 1 | 3 | 6 | 12; label: string }[] = [
+  { meses: 1, label: "1 mes" },
+  { meses: 3, label: "3 meses" },
+  { meses: 6, label: "6 meses" },
+  { meses: 12, label: "12 meses" },
+];
+
+function PrepagoSection({
+  subStatus,
+  meses,
+  setMeses,
+  onPagar,
+  pending,
+}: {
+  subStatus: SubStatusLike;
+  meses: 1 | 3 | 6 | 12;
+  setMeses: (m: 1 | 3 | 6 | 12) => void;
+  onPagar: () => void;
+  pending: boolean;
+}) {
+  const netoMensual = subStatus.totalNetoMensual ?? subStatus.precioNeto;
+  const ivaMensual = subStatus.totalIvaMensual ?? subStatus.precioIva;
+  const totalMensual = subStatus.totalMensual ?? subStatus.precioMensual;
+  const neto = netoMensual * meses;
+  const iva = ivaMensual * meses;
+  const total = neto + iva;
+
+  return (
+    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+      <div>
+        <p className="text-sm font-medium">Pagar por adelantado</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Paga 1, 3, 6 o 12 meses de una vez y extiende la vigencia de tu suscripción.
+        </p>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {PREPAGO_OPCIONES.map((op) => (
+          <button
+            key={op.meses}
+            type="button"
+            onClick={() => setMeses(op.meses)}
+            className={`rounded-md border px-2 py-1.5 text-sm font-medium transition-colors ${
+              meses === op.meses
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {op.label}
+          </button>
+        ))}
+      </div>
+      <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
+        <p>
+          Mensual: Neto {formatCLP(netoMensual)} + IVA {formatCLP(ivaMensual)} = {formatCLP(totalMensual)}
+          {(subStatus.usuariosAdicionales ?? 0) > 0 &&
+            ` (incluye ${subStatus.usuariosAdicionales} usuario${subStatus.usuariosAdicionales !== 1 ? "s" : ""} extra)`}
+        </p>
+        <p className="font-medium text-foreground">
+          Total {meses} {meses === 1 ? "mes" : "meses"}: Neto {formatCLP(neto)} + IVA {formatCLP(iva)} = {formatCLP(total)} (IVA incl.)
+        </p>
+      </div>
+      <Button onClick={onPagar} disabled={pending} className="w-full sm:w-auto">
+        {pending ? (
+          <><Loader2 className="h-4 w-4 animate-spin mr-2" />Redirigiendo a Flow...</>
+        ) : (
+          `Pagar ${formatCLP(total)} con Flow`
+        )}
+      </Button>
+    </div>
+  );
+}
 
 // Resize a chosen image client-side and return a JPEG data URL. Keeping avatars
 // small (max 256px) lets us store them directly in users.profileImageUrl without
@@ -485,6 +570,23 @@ function ProfileSettings() {
   // Subscription state
   const { data: subStatus, isLoading: subLoading } = useGetSubscriptionStatus();
   const startSubscription = useStartSubscription();
+  const startPrepago = useStartPrepago();
+  const [prepagoMeses, setPrepagoMeses] = useState<1 | 3 | 6 | 12>(1);
+
+  const handlePrepago = () => {
+    startPrepago.mutate(
+      { data: { meses: prepagoMeses } },
+      {
+        onSuccess: (data) => {
+          window.location.href = data.url;
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo iniciar el pago anticipado.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  };
 
   const handleSubscribe = () => {
     startSubscription.mutate(undefined, {
@@ -501,6 +603,17 @@ function ProfileSettings() {
   // Handle the redirect back from Flow's card-registration page.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const prepagoRet = params.get("prepago");
+    if (prepagoRet === "retorno") {
+      toast({
+        title: "Pago en proceso",
+        description:
+          "Si el pago fue exitoso, tu suscripción se extenderá en unos segundos. Actualiza la página para ver la nueva fecha de vencimiento.",
+      });
+      queryClient.invalidateQueries({ queryKey: getGetSubscriptionStatusQueryKey() });
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
     const result = params.get("suscripcion");
     if (!result) return;
     if (result === "exito") {
@@ -678,20 +791,31 @@ function ProfileSettings() {
               <span className="text-sm">Verificando suscripción...</span>
             </div>
           ) : subStatus?.status === "activa" ? (
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-green-800 dark:text-green-300">Suscripción activa</p>
-                <p className="text-xs text-green-600 dark:text-green-400">
-                  {subStatus.periodEnd
-                    ? `Próximo cobro: ${formatFecha(subStatus.periodEnd)}`
-                    : `Plan mensual ${formatCLP(subStatus.precioNeto)} + IVA/mes`}
-                </p>
-                <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-0.5">
-                  Neto {formatCLP(subStatus.precioNeto)} + IVA {formatCLP(subStatus.precioIva)} = Total {formatCLP(subStatus.precioMensual)} (IVA incl.)
-                </p>
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-green-800 dark:text-green-300">Suscripción activa</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    {subStatus.periodEnd
+                      ? `Vigente hasta: ${formatFecha(subStatus.periodEnd)}`
+                      : `Plan mensual ${formatCLP(subStatus.precioNeto)} + IVA/mes`}
+                  </p>
+                  <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-0.5">
+                    {(subStatus.usuariosAdicionales ?? 0) > 0
+                      ? `Plan base ${formatCLP(subStatus.precioMensual)} + ${subStatus.usuariosAdicionales} usuario${subStatus.usuariosAdicionales !== 1 ? "s" : ""} extra × ${formatCLP(subStatus.costoUsuarioAdicional ?? 0)} = ${formatCLP(subStatus.totalMensual ?? subStatus.precioMensual)}/mes (IVA incl.)`
+                      : `Neto ${formatCLP(subStatus.precioNeto)} + IVA ${formatCLP(subStatus.precioIva)} = Total ${formatCLP(subStatus.precioMensual)}/mes (IVA incl.)`}
+                  </p>
+                </div>
               </div>
-            </div>
+              <PrepagoSection
+                subStatus={subStatus}
+                meses={prepagoMeses}
+                setMeses={setPrepagoMeses}
+                onPagar={handlePrepago}
+                pending={startPrepago.isPending}
+              />
+            </>
           ) : subStatus?.status === "prueba" ? (
             <>
               <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
@@ -715,6 +839,13 @@ function ProfileSettings() {
                   `Suscribirme - ${formatCLP(subStatus.precioNeto)} + IVA/mes`
                 )}
               </Button>
+              <PrepagoSection
+                subStatus={subStatus}
+                meses={prepagoMeses}
+                setMeses={setPrepagoMeses}
+                onPagar={handlePrepago}
+                pending={startPrepago.isPending}
+              />
             </>
           ) : (
             <>
@@ -734,6 +865,15 @@ function ProfileSettings() {
                   `Suscribirme - ${formatCLP(subStatus?.precioNeto ?? 24990)} + IVA/mes`
                 )}
               </Button>
+              {subStatus && (
+                <PrepagoSection
+                  subStatus={subStatus}
+                  meses={prepagoMeses}
+                  setMeses={setPrepagoMeses}
+                  onPagar={handlePrepago}
+                  pending={startPrepago.isPending}
+                />
+              )}
             </>
           )}
         </CardContent>

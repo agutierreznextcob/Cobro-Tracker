@@ -10,6 +10,8 @@ export interface Cliente {
   id: number;
   nombre: string;
   /** @nullable */
+  empresa?: string | null;
+  /** @nullable */
   rut?: string | null;
   /** @nullable */
   email?: string | null;

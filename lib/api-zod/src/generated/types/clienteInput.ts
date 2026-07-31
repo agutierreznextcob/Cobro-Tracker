@@ -9,6 +9,7 @@
 export interface ClienteInput {
   /** @minLength 1 */
   nombre: string;
+  empresa?: string;
   rut?: string;
   email?: string;
   telefono?: string;

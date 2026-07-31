@@ -21,4 +21,13 @@ export interface SubscriptionStatus {
   precioNeto: number;
   /** Monthly IVA (19%) amount in CLP */
   precioIva: number;
+  /** Extra active seats beyond the base plan (real-time count) */
+  usuariosAdicionales?: number;
+  costoUsuarioAdicionalNeto?: number;
+  costoUsuarioAdicionalIva?: number;
+  costoUsuarioAdicional?: number;
+  totalNetoMensual?: number;
+  totalIvaMensual?: number;
+  /** Total monthly charge in CLP (base + extra seats, IVA incl.) */
+  totalMensual?: number;
 }

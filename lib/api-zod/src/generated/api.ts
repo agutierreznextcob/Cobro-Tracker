@@ -174,6 +174,7 @@ export const ListClientesQueryParams = zod.object({
 export const ListClientesResponseItem = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
+  "empresa": zod.string().nullish(),
   "rut": zod.string().nullish(),
   "email": zod.string().nullish(),
   "telefono": zod.string().nullish(),
@@ -199,9 +200,37 @@ export const ListClientesResponse = zod.array(ListClientesResponseItem)
 
 export const CreateClienteBody = zod.object({
   "nombre": zod.string().min(1),
+  "empresa": zod.string().optional(),
   "rut": zod.string().optional(),
   "email": zod.string().email().optional(),
   "telefono": zod.string().optional()
+})
+
+
+/**
+ * @summary Bulk-import clientes from parsed spreadsheet rows
+ */
+export const importarClientesBodyClientesMax = 500;
+
+
+
+export const ImportarClientesBody = zod.object({
+  "clientes": zod.array(zod.object({
+  "nombre": zod.string().optional(),
+  "empresa": zod.string().optional(),
+  "rut": zod.string().optional(),
+  "email": zod.string().optional(),
+  "telefono": zod.string().optional()
+})).max(importarClientesBodyClientesMax)
+})
+
+export const ImportarClientesResponse = zod.object({
+  "importados": zod.number(),
+  "omitidos": zod.array(zod.object({
+  "fila": zod.number(),
+  "nombre": zod.string(),
+  "motivo": zod.string()
+}))
 })
 
 
@@ -218,6 +247,7 @@ export const getClienteResponseCobrosItemFechaVencimientoRegExp = new RegExp('^\
 export const GetClienteResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
+  "empresa": zod.string().nullish(),
   "rut": zod.string().nullish(),
   "email": zod.string().nullish(),
   "telefono": zod.string().nullish(),
@@ -284,6 +314,7 @@ export const UpdateClienteParams = zod.object({
 
 export const UpdateClienteBody = zod.object({
   "nombre": zod.string().min(1),
+  "empresa": zod.string().optional(),
   "rut": zod.string().optional(),
   "email": zod.string().email().optional(),
   "telefono": zod.string().optional()
@@ -292,6 +323,7 @@ export const UpdateClienteBody = zod.object({
 export const UpdateClienteResponse = zod.object({
   "id": zod.number(),
   "nombre": zod.string(),
+  "empresa": zod.string().nullish(),
   "rut": zod.string().nullish(),
   "email": zod.string().nullish(),
   "telefono": zod.string().nullish(),
@@ -1230,7 +1262,30 @@ export const GetSubscriptionStatusResponse = zod.object({
   "tieneSuscripcion": zod.boolean(),
   "precioMensual": zod.number().describe('Monthly charged total in CLP, IVA included (neto + IVA)'),
   "precioNeto": zod.number().describe('Monthly net price in CLP, before IVA'),
-  "precioIva": zod.number().describe('Monthly IVA (19%) amount in CLP')
+  "precioIva": zod.number().describe('Monthly IVA (19%) amount in CLP'),
+  "usuariosAdicionales": zod.number().optional().describe('Extra active seats beyond the base plan (real-time count)'),
+  "costoUsuarioAdicionalNeto": zod.number().optional(),
+  "costoUsuarioAdicionalIva": zod.number().optional(),
+  "costoUsuarioAdicional": zod.number().optional(),
+  "totalNetoMensual": zod.number().optional(),
+  "totalIvaMensual": zod.number().optional(),
+  "totalMensual": zod.number().optional().describe('Total monthly charge in CLP (base + extra seats, IVA incl.)')
+})
+
+
+/**
+ * @summary Pay N months of the platform subscription upfront (returns Flow payment URL)
+ */
+export const StartPrepagoBody = zod.object({
+  "meses": zod.union([zod.literal(1),zod.literal(3),zod.literal(6),zod.literal(12)])
+})
+
+export const StartPrepagoResponse = zod.object({
+  "url": zod.string(),
+  "meses": zod.number(),
+  "neto": zod.number(),
+  "iva": zod.number(),
+  "total": zod.number()
 })
 
 

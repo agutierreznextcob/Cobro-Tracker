@@ -76,6 +76,8 @@ import type {
   GetRendimientoEquipoParams,
   GetSugerenciaWorkflowParams,
   HealthStatus,
+  ImportarClientesInput,
+  ImportarClientesResult,
   Invitacion,
   InvitacionPublica,
   InvitarUsuarioInput,
@@ -105,6 +107,8 @@ import type {
   OkResponse,
   OrganizacionInfo,
   PortalData,
+  PrepagoInput,
+  PrepagoResponse,
   Recordatorio,
   RecordatorioDefault,
   RecordatorioEnviado,
@@ -964,6 +968,77 @@ export const useCreateCliente = <TError = ErrorType<ErrorResponse | void>,
         TContext
       > => {
       return useMutation(getCreateClienteMutationOptions(options));
+    }
+
+export const getImportarClientesUrl = () => {
+
+
+
+
+  return `/api/clientes/importar`
+}
+
+/**
+ * @summary Bulk-import clientes from parsed spreadsheet rows
+ */
+export const importarClientes = async (importarClientesInput: ImportarClientesInput, options?: RequestInit): Promise<ImportarClientesResult> => {
+
+  return customFetch<ImportarClientesResult>(getImportarClientesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      importarClientesInput,)
+  }
+);}
+
+
+
+
+export const getImportarClientesMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importarClientes>>, TError,{data: BodyType<ImportarClientesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importarClientes>>, TError,{data: BodyType<ImportarClientesInput>}, TContext> => {
+
+const mutationKey = ['importarClientes'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importarClientes>>, {data: BodyType<ImportarClientesInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importarClientes(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportarClientesMutationResult = NonNullable<Awaited<ReturnType<typeof importarClientes>>>
+    export type ImportarClientesMutationBody = BodyType<ImportarClientesInput>
+    export type ImportarClientesMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Bulk-import clientes from parsed spreadsheet rows
+ */
+export const useImportarClientes = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importarClientes>>, TError,{data: BodyType<ImportarClientesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importarClientes>>,
+        TError,
+        {data: BodyType<ImportarClientesInput>},
+        TContext
+      > => {
+      return useMutation(getImportarClientesMutationOptions(options));
     }
 
 export const getGetClienteUrl = (id: number,) => {
@@ -4398,6 +4473,77 @@ export function useGetSubscriptionStatus<TData = Awaited<ReturnType<typeof getSu
 
 
 
+
+export const getStartPrepagoUrl = () => {
+
+
+
+
+  return `/api/subscription/prepago`
+}
+
+/**
+ * @summary Pay N months of the platform subscription upfront (returns Flow payment URL)
+ */
+export const startPrepago = async (prepagoInput: PrepagoInput, options?: RequestInit): Promise<PrepagoResponse> => {
+
+  return customFetch<PrepagoResponse>(getStartPrepagoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      prepagoInput,)
+  }
+);}
+
+
+
+
+export const getStartPrepagoMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startPrepago>>, TError,{data: BodyType<PrepagoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startPrepago>>, TError,{data: BodyType<PrepagoInput>}, TContext> => {
+
+const mutationKey = ['startPrepago'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startPrepago>>, {data: BodyType<PrepagoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  startPrepago(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartPrepagoMutationResult = NonNullable<Awaited<ReturnType<typeof startPrepago>>>
+    export type StartPrepagoMutationBody = BodyType<PrepagoInput>
+    export type StartPrepagoMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Pay N months of the platform subscription upfront (returns Flow payment URL)
+ */
+export const useStartPrepago = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startPrepago>>, TError,{data: BodyType<PrepagoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startPrepago>>,
+        TError,
+        {data: BodyType<PrepagoInput>},
+        TContext
+      > => {
+      return useMutation(getStartPrepagoMutationOptions(options));
+    }
 
 export const getStartSubscriptionUrl = () => {
 
