@@ -106,7 +106,6 @@ export const usersTable = pgTable("users", {
   subscriptionPeriodEnd: timestamp("subscription_period_end", { withTimezone: true }),
   // Renewal reminder bookkeeping: the periodEnd for which a 7-days-before
   // renewal notice was already emailed (prevents duplicate notices per period).
-  renovacionAvisoParaEl: timestamp("renovacion_aviso_para_el", { withTimezone: true }),
   // Ley 21.719: timestamp the user accepted the Privacy Policy + Terms of Use at
   // registration (consent record). Null for accounts created before this field
   // or seeded by migration (demo/superadmin).

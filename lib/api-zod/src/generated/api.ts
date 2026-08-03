@@ -1274,22 +1274,6 @@ export const GetSubscriptionStatusResponse = zod.object({
 
 
 /**
- * @summary Pay N months of the platform subscription upfront (returns Flow payment URL)
- */
-export const StartPrepagoBody = zod.object({
-  "meses": zod.union([zod.literal(1),zod.literal(3),zod.literal(6),zod.literal(12)])
-})
-
-export const StartPrepagoResponse = zod.object({
-  "url": zod.string(),
-  "meses": zod.number(),
-  "neto": zod.number(),
-  "iva": zod.number(),
-  "total": zod.number()
-})
-
-
-/**
  * @summary Start the platform subscription (returns Flow card-registration URL)
  */
 export const StartSubscriptionResponse = zod.object({

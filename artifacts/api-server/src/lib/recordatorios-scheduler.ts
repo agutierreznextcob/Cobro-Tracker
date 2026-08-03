@@ -2,7 +2,6 @@ import { logger } from "./logger";
 import { fechaHoySantiago, procesarRecordatorios } from "./recordatorios";
 import { procesarWorkflows } from "./workflows-engine";
 import { procesarEncuestasPendientes } from "./encuestas-service";
-import { procesarAvisosRenovacion } from "./renovacion-avisos";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 // Surveys are scheduled ~1h after payment; sweep often so delivery stays close
@@ -27,8 +26,6 @@ async function tick(): Promise<void> {
     // engines coexisten: procesarRecordatorios ignora cobros con workflowId y
     // procesarWorkflows sólo actúa sobre cobros con workflowId asignado.
     await procesarWorkflows(runLogger);
-    // Avisos de renovación de suscripción (7 días antes del vencimiento).
-    await procesarAvisosRenovacion(runLogger);
     lastProcessedDate = hoy;
   } catch (err) {
     logger.error({ err }, "Error en el scheduler de recordatorios");

@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { Router } from "express";
-import { db, cobrosTable, webhookEventosTable, pagosParciales, usersTable, mpCredencialesTable, prepagosTable } from "@workspace/db";
+import { db, cobrosTable, webhookEventosTable, pagosParciales, usersTable, mpCredencialesTable} from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { ReceiveCobroWebhookBody } from "@workspace/api-zod";
 import { verificarPagoFlow } from "../lib/flow-api";
@@ -715,108 +715,6 @@ webhooksRouter.get("/webhooks/eventos/export", (req, res, next) => {
   }
 });
 
-// Flow one-off prepago confirmation (urlConfirmation of /subscription/prepago
-// orders). We re-verify the payment with the platform's own Flow creds, then
-// atomically claim the prepago row (pendiente→pagado) and extend the user's
-// subscription_period_end by N months. Idempotent: duplicate webhooks can't
-// double-extend because only the claiming request applies the extension.
-webhooksRouter.post("/webhooks/flow-prepago", async (req, res) => {
-  const ip = getClientIp(req as Parameters<typeof getClientIp>[0]);
-  const token = (req.body?.token ?? req.query?.token) as string | undefined;
-
-  // Always answer 200 so Flow does not retry unrecoverable cases.
-  if (!token || typeof token !== "string") {
-    res.json({ ok: true });
-    return;
-  }
-  if (!flowAdminConfigured()) {
-    req.log.error("Flow admin creds not configured; cannot process prepago webhook");
-    res.json({ ok: true });
-    return;
-  }
-
-  try {
-    const [prepago] = await db
-      .select()
-      .from(prepagosTable)
-      .where(eq(prepagosTable.flowToken, token));
-    if (!prepago) {
-      await logEvento({
-        evento: "prepago.webhook",
-        exitoso: false,
-        ipOrigen: ip,
-        detalle: `Sin prepago para token ${token.slice(0, 12)}…`,
-      });
-      res.json({ ok: true });
-      return;
-    }
-
-    const creds = getFlowAdminCreds();
-    const status = await verificarPagoFlow(creds.apiKey, creds.secretKey, token);
-
-    if (status.status !== 2) {
-      // Rejected/cancelled → close the row; pending → leave for a later webhook.
-      if (status.status === 3 || status.status === 4) {
-        await db
-          .update(prepagosTable)
-          .set({ estado: "rechazado" })
-          .where(and(eq(prepagosTable.id, prepago.id), eq(prepagosTable.estado, "pendiente")));
-      }
-      res.json({ ok: true });
-      return;
-    }
-
-    // Paid — claim + entitlement extension in ONE transaction so a crash
-    // between them can't leave a "pagado" row whose months were never applied.
-    // Only the claiming request (pendiente→pagado) extends the period, so a
-    // duplicate webhook can't double-extend either.
-    const claimed = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .update(prepagosTable)
-        .set({ estado: "pagado", pagadoEn: new Date() })
-        .where(and(eq(prepagosTable.id, prepago.id), eq(prepagosTable.estado, "pendiente")))
-        .returning();
-      if (!row) return null; // already applied
-
-      // Extend from the later of now / current periodEnd / trial end, in SQL
-      // for atomicity, and activate the subscription.
-      await tx
-        .update(usersTable)
-        .set({
-          subscriptionStatus: "activa",
-          subscriptionPeriodEnd: sql`GREATEST(now(), COALESCE(${usersTable.subscriptionPeriodEnd}, now()), COALESCE(${usersTable.trialEndsAt}, now())) + make_interval(months => ${row.meses})`,
-        })
-        .where(eq(usersTable.id, row.userId));
-      return row;
-    });
-    if (!claimed) {
-      res.json({ ok: true });
-      return;
-    }
-
-    await logEvento({
-      evento: "prepago.pagado",
-      exitoso: true,
-      ipOrigen: ip,
-      detalle: `Usuario ${claimed.userId}: +${claimed.meses} meses ($${claimed.montoTotal})`,
-    });
-    req.log.info(
-      { userId: claimed.userId, meses: claimed.meses, total: claimed.montoTotal },
-      "Prepago aplicado — suscripción extendida",
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    req.log.error({ err }, "Error processing prepago webhook");
-    await logEvento({
-      evento: "prepago.webhook",
-      exitoso: false,
-      ipOrigen: ip,
-      detalle: err instanceof Error ? err.message : "Error desconocido",
-    });
-    res.json({ ok: true });
-  }
-});
-
 // Flow calls this URL (the plan's urlCallback) on each recurring charge of a
 // platform subscription. We re-fetch the authoritative subscription state from
 // Flow and update the user's subscription_status accordingly. Security: we
@@ -871,19 +769,11 @@ webhooksRouter.post("/webhooks/flow-subscription", async (req, res) => {
     const sub = await getSubscription(creds, subscriptionId);
     const mapped = mapSubscription(sub);
 
-    // Never SHRINK the entitlement: the user may have prepaid months beyond
-    // the recurring plan's period end. Keep the later date, and stay "activa"
-    // while that later date is still in the future.
     await db
       .update(usersTable)
       .set({
-        subscriptionStatus:
-          mapped.status === "activa"
-            ? "activa"
-            : sql`CASE WHEN COALESCE(${usersTable.subscriptionPeriodEnd}, to_timestamp(0)) > now() THEN 'activa' ELSE ${mapped.status} END`,
-        subscriptionPeriodEnd: mapped.periodEnd
-          ? sql`GREATEST(COALESCE(${usersTable.subscriptionPeriodEnd}, to_timestamp(0)), ${mapped.periodEnd.toISOString()}::timestamptz)`
-          : usersTable.subscriptionPeriodEnd,
+        subscriptionStatus: mapped.status,
+        subscriptionPeriodEnd: mapped.periodEnd,
       })
       .where(eq(usersTable.id, user.id));
 

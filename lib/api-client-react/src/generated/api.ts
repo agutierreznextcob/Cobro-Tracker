@@ -107,8 +107,6 @@ import type {
   OkResponse,
   OrganizacionInfo,
   PortalData,
-  PrepagoInput,
-  PrepagoResponse,
   Recordatorio,
   RecordatorioDefault,
   RecordatorioEnviado,
@@ -4473,77 +4471,6 @@ export function useGetSubscriptionStatus<TData = Awaited<ReturnType<typeof getSu
 
 
 
-
-export const getStartPrepagoUrl = () => {
-
-
-
-
-  return `/api/subscription/prepago`
-}
-
-/**
- * @summary Pay N months of the platform subscription upfront (returns Flow payment URL)
- */
-export const startPrepago = async (prepagoInput: PrepagoInput, options?: RequestInit): Promise<PrepagoResponse> => {
-
-  return customFetch<PrepagoResponse>(getStartPrepagoUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      prepagoInput,)
-  }
-);}
-
-
-
-
-export const getStartPrepagoMutationOptions = <TError = ErrorType<ErrorResponse | void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startPrepago>>, TError,{data: BodyType<PrepagoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof startPrepago>>, TError,{data: BodyType<PrepagoInput>}, TContext> => {
-
-const mutationKey = ['startPrepago'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startPrepago>>, {data: BodyType<PrepagoInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  startPrepago(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type StartPrepagoMutationResult = NonNullable<Awaited<ReturnType<typeof startPrepago>>>
-    export type StartPrepagoMutationBody = BodyType<PrepagoInput>
-    export type StartPrepagoMutationError = ErrorType<ErrorResponse | void>
-
-    /**
- * @summary Pay N months of the platform subscription upfront (returns Flow payment URL)
- */
-export const useStartPrepago = <TError = ErrorType<ErrorResponse | void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startPrepago>>, TError,{data: BodyType<PrepagoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof startPrepago>>,
-        TError,
-        {data: BodyType<PrepagoInput>},
-        TContext
-      > => {
-      return useMutation(getStartPrepagoMutationOptions(options));
-    }
 
 export const getStartSubscriptionUrl = () => {
 

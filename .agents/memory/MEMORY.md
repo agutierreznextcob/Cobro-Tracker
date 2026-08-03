@@ -30,5 +30,5 @@
 - [E2E webhook test (Flow/MP stubs)](e2e-webhooks-script.md) — cobro AND platform-subscription webhooks tested sans real payments via FLOW/MP base-URL stubs + real router mounted locally; owner-token stub must use decrypted real creds.
 - [E2E money-flow script](e2e-money-flow-script.md) — rerunnable script verifying cobro→abonos→estado→informes/rendimiento numbers; demo login + descuento enum gotchas inside.
 - [Static auth-guard check](static-auth-guard-check.md) — check-auth-guards script statically fails on pathless auth use() outside whitelist; stale lib/db d.ts fix: tsc -b lib/db.
-- [Prepago suscripción](prepago-suscripcion.md) — claim+extensión en UNA transacción; webhook recurrente nunca achica periodEnd (GREATEST); precios por-asiento duplicados org.ts↔subscription.ts; UI prepago también para prueba/vencida.
+- [Suscripción: solo mensual (Fintoc pendiente)](suscripcion-modelo.md) — prepago N meses fue REVERTIDO a pedido del usuario; botón Suscribirse inactivo hasta integrar Fintoc; desglose en vivo desde /subscription/status; precios per-seat duplicados org.ts↔subscription.ts.
 - [Cobro edit/delete money-safety](cobro-edit-delete-money-safety.md) — money-received cobros can't be freely edited/deleted; DELETE+ajustar-monto validate under FOR UPDATE row lock; block estado→pendiente when abonos>0.

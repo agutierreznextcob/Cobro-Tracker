@@ -485,28 +485,6 @@ export interface SubscriptionStatus {
   totalMensual?: number;
 }
 
-export type PrepagoInputMeses = typeof PrepagoInputMeses[keyof typeof PrepagoInputMeses];
-
-
-export const PrepagoInputMeses = {
-  NUMBER_1: 1,
-  NUMBER_3: 3,
-  NUMBER_6: 6,
-  NUMBER_12: 12,
-} as const;
-
-export interface PrepagoInput {
-  meses: PrepagoInputMeses;
-}
-
-export interface PrepagoResponse {
-  url: string;
-  meses: number;
-  neto: number;
-  iva: number;
-  total: number;
-}
-
 export type ImportarClientesInputClientesItem = {
   nombre?: string;
   empresa?: string;

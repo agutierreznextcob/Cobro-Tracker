@@ -1535,39 +1535,6 @@ paths:
         "401":
           description: Unauthorized
 
-  /subscription/prepago:
-    post:
-      operationId: startPrepago
-      tags: [subscription]
-      summary: Pay N months of the platform subscription upfront (returns Flow payment URL)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PrepagoInput"
-      responses:
-        "200":
-          description: Flow payment URL and charge breakdown
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PrepagoResponse"
-        "400":
-          description: Invalid months
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Unauthorized
-        "503":
-          description: Prepago temporarily unavailable
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
   /subscription/subscribe:
     post:
       operationId: startSubscription
@@ -3396,29 +3363,6 @@ components:
         totalMensual:
           type: integer
           description: Total monthly charge in CLP (base + extra seats, IVA incl.)
-
-    PrepagoInput:
-      type: object
-      required: [meses]
-      properties:
-        meses:
-          type: integer
-          enum: [1, 3, 6, 12]
-
-    PrepagoResponse:
-      type: object
-      required: [url, meses, neto, iva, total]
-      properties:
-        url:
-          type: string
-        meses:
-          type: integer
-        neto:
-          type: integer
-        iva:
-          type: integer
-        total:
-          type: integer
 
     ImportarClientesInput:
       type: object
