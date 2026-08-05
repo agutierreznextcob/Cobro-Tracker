@@ -71,7 +71,7 @@ const ORG_ROLE_LABEL: Record<string, string> = {
 
 type OrgRole = "admin_org" | "supervisor" | "ejecutivo";
 
-export function TeamSection() {
+export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -215,17 +215,24 @@ export function TeamSection() {
 
   return (
     <div className="space-y-6">
-    <Card className="shadow-sm border-border/50">
-      <CardHeader className="bg-muted/20 border-b border-border/50">
-        <CardTitle className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-primary" />
-          Mi equipo
-        </CardTitle>
-        <CardDescription>
+    <Card className={embedded ? "border-0 shadow-none bg-transparent rounded-none" : "shadow-sm border-border/50"}>
+      {!embedded && (
+        <CardHeader className="bg-muted/20 border-b border-border/50">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            Mi equipo
+          </CardTitle>
+          <CardDescription>
+            Invita ejecutivos y administra los roles de tu organización.
+          </CardDescription>
+        </CardHeader>
+      )}
+      {embedded && (
+        <p className="text-sm text-muted-foreground mb-4 -mt-1">
           Invita ejecutivos y administra los roles de tu organización.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-6 space-y-6">
+        </p>
+      )}
+      <CardContent className={embedded ? "p-0 space-y-6" : "pt-6 space-y-6"}>
         {/* Pricing breakdown */}
         {org && (
           <div className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-2">

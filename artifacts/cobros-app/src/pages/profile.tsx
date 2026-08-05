@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import {
   useGetFlowCredentials,
   useSaveFlowCredentials,
@@ -18,6 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth, type AuthUser } from "@workspace/replit-auth-web";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -503,7 +505,7 @@ function EditProfileDialog({ user }: { user: AuthUser }) {
   );
 }
 
-function ChangePasswordCard() {
+function ChangePasswordForm() {
   const { toast } = useToast();
   const changePassword = useChangePassword();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -551,17 +553,6 @@ function ChangePasswordCard() {
   };
 
   return (
-    <Card className="shadow-sm border-border/50">
-      <CardHeader className="bg-muted/20 border-b border-border/50">
-        <CardTitle className="flex items-center gap-2">
-          <KeyRound className="h-4 w-4 text-primary" />
-          Cambiar contraseña
-        </CardTitle>
-        <CardDescription>
-          Mínimo 8 caracteres, con al menos una mayúscula y un número.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
           <div className="space-y-1.5">
             <Label htmlFor="current-password">Contraseña actual</Label>
@@ -621,8 +612,41 @@ function ChangePasswordCard() {
             Actualizar contraseña
           </Button>
         </form>
-      </CardContent>
-    </Card>
+  );
+}
+
+function PerfilSeccion({
+  value,
+  icon: Icon,
+  title,
+  description,
+  iconClassName,
+  children,
+}: {
+  value: string;
+  icon: React.ComponentType<{ className?: string }>;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  iconClassName?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <AccordionItem
+      value={value}
+      className="border border-border/50 rounded-lg shadow-sm bg-card overflow-hidden"
+      data-testid={`seccion-${value}`}
+    >
+      <AccordionTrigger className="px-4 sm:px-6 py-4 hover:no-underline hover:bg-muted/30 data-[state=open]:bg-muted/20 data-[state=open]:border-b data-[state=open]:border-border/50">
+        <span className="flex items-center gap-2 text-base font-semibold">
+          <Icon className={cn("h-4 w-4 text-primary", iconClassName)} />
+          {title}
+        </span>
+      </AccordionTrigger>
+      <AccordionContent className="px-4 sm:px-6 pt-5 pb-6">
+        {description && <p className="text-sm text-muted-foreground mb-4">{description}</p>}
+        {children}
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
@@ -755,17 +779,10 @@ function ProfileSettings() {
         <p className="text-muted-foreground mt-1">Gestiona tu cuenta y conexiones</p>
       </div>
 
-      <Card className="shadow-sm border-border/50">
-        <CardHeader className="bg-muted/20 border-b border-border/50">
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-4 w-4 text-primary" />
-              Información de cuenta
-            </CardTitle>
-            {user && <EditProfileDialog user={user} />}
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
+      <Accordion type="single" collapsible defaultValue="info" className="space-y-3">
+
+      <PerfilSeccion value="info" icon={User} title="Información personal">
+          <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {user?.profileImageUrl ? (
               <img
@@ -785,6 +802,8 @@ function ProfileSettings() {
               </div>
               {user?.email && <p className="text-sm text-muted-foreground">{user.email}</p>}
             </div>
+          </div>
+          {user && <EditProfileDialog user={user} />}
           </div>
 
           <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-t border-border/50 pt-6">
@@ -813,20 +832,14 @@ function ProfileSettings() {
               <dd className="text-sm mt-0.5">{user?.address || "—"}</dd>
             </div>
           </dl>
-        </CardContent>
-      </Card>
+      </PerfilSeccion>
 
-      <ChangePasswordCard />
+      <PerfilSeccion value="password" icon={KeyRound} title="Cambiar contraseña" description="Mínimo 8 caracteres, con al menos una mayúscula y un número.">
+        <ChangePasswordForm />
+      </PerfilSeccion>
 
-      <Card className="shadow-sm border-border/50">
-        <CardHeader className="bg-muted/20 border-b border-border/50">
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4 text-primary" />
-            Suscripción
-          </CardTitle>
-          <CardDescription>Tu plan de NextCob.</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-4">
+      <PerfilSeccion value="suscripcion" icon={CreditCard} title="Suscripción" description="Tu plan de NextCob.">
+        <div className="space-y-4">
           {subLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -878,22 +891,17 @@ function ProfileSettings() {
               <SuscribirseButton />
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </PerfilSeccion>
 
-      {user?.orgRole === "admin_org" && <TeamSection />}
+      {user?.orgRole === "admin_org" && (
+        <PerfilSeccion value="equipo" icon={User} title="Mi Equipo">
+          <TeamSection embedded />
+        </PerfilSeccion>
+      )}
 
-      <Card className="shadow-sm border-border/50">
-        <CardHeader className="bg-muted/20 border-b border-border/50">
-          <CardTitle className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-primary" />
-            Conectar Flow
-          </CardTitle>
-          <CardDescription>
-            Ingresa tus credenciales de Flow para generar links de pago reales. Se guardan encriptadas con AES-256.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-4">
+      <PerfilSeccion value="flow" icon={KeyRound} title="Conectar Flow" description="Ingresa tus credenciales de Flow para generar links de pago reales. Se guardan encriptadas con AES-256.">
+        <div className="space-y-4">
           {credLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1002,21 +1010,11 @@ function ProfileSettings() {
               </p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </PerfilSeccion>
 
-      {/* MercadoPago credentials card */}
-      <Card className="shadow-sm border-border/50">
-        <CardHeader className="bg-muted/20 border-b border-border/50">
-          <CardTitle className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-[#009ee3]" />
-            Conectar MercadoPago
-          </CardTitle>
-          <CardDescription>
-            Ingresa tu Access Token de producción de MercadoPago para generar links de pago. Se guarda encriptado con AES-256.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-4">
+      <PerfilSeccion value="mercadopago" icon={KeyRound} iconClassName="text-[#009ee3]" title="Conectar MercadoPago" description="Ingresa tu Access Token de producción de MercadoPago para generar links de pago. Se guarda encriptado con AES-256.">
+        <div className="space-y-4">
           {mpLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1103,10 +1101,14 @@ function ProfileSettings() {
               </p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </PerfilSeccion>
 
-      <PrivacySection />
+      <PerfilSeccion value="privacidad" icon={ShieldCheck} title="Mis datos y privacidad" description="Descarga una copia de tus datos o elimina tu cuenta de forma permanente, según la Ley N° 21.719.">
+        <PrivacySection />
+      </PerfilSeccion>
+
+      </Accordion>
     </div>
   );
 }
@@ -1169,18 +1171,7 @@ function PrivacySection() {
   };
 
   return (
-    <Card className="shadow-sm border-border/50">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          Mis datos y privacidad
-        </CardTitle>
-        <CardDescription>
-          Descarga una copia de tus datos o elimina tu cuenta de forma
-          permanente, según la Ley N° 21.719.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+      <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-foreground">
@@ -1281,7 +1272,6 @@ function PrivacySection() {
             </DialogContent>
           </Dialog>
         </div>
-      </CardContent>
-    </Card>
+      </div>
   );
 }
