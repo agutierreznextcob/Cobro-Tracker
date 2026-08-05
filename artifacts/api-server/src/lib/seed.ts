@@ -6,7 +6,7 @@ import {
   clientesTable,
   pagosParciales,
 } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { hashPassword } from "./password";
 import { logger } from "./logger";
 
@@ -89,12 +89,41 @@ async function ensureDemoUser(): Promise<string | null> {
   return after ? after.id : null;
 }
 
+// One-time repair for an already-seeded superadmin that has no password yet:
+// the nextcob.com domain is not verified in Resend, so the "forgot password"
+// email can't reach the superadmin's own inbox. This bcrypt hash corresponds to
+// a temporary password shared with the owner out-of-band; it is applied ONLY
+// while password_hash is NULL, so it can never overwrite a password the owner
+// later sets or changes.
+const SUPERADMIN_TEMP_PASSWORD_HASH =
+  "$2b$10$3/m3m2qWjwLCycnWYpR2h.f.rQrC0PxaOv5sJGFIuTxPYCdZdLoue";
+
 async function ensureSuperadmin(): Promise<string | null> {
   const [existing] = await db
-    .select({ id: usersTable.id })
+    .select({ id: usersTable.id, passwordHash: usersTable.passwordHash })
     .from(usersTable)
     .where(eq(usersTable.email, SUPERADMIN_EMAIL));
-  if (existing) return existing.id;
+  if (existing) {
+    if (!existing.passwordHash) {
+      // Repair: temp password + permanent-access fields, atomic and idempotent.
+      await db
+        .update(usersTable)
+        .set({
+          passwordHash: SUPERADMIN_TEMP_PASSWORD_HASH,
+          subscriptionStatus: "activa",
+          activo: true,
+          trialEndsAt: FAR_FUTURE,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        })
+        .where(and(eq(usersTable.id, existing.id), isNull(usersTable.passwordHash)));
+      logger.info(
+        { email: SUPERADMIN_EMAIL },
+        "Seed: superadmin temp password set (was NULL)",
+      );
+    }
+    return existing.id;
+  }
 
   // No password: the superadmin sets it via the "forgot password" flow (now
   // deliverable because the account exists). role=admin grants permanent access.
@@ -108,8 +137,9 @@ async function ensureSuperadmin(): Promise<string | null> {
       email: SUPERADMIN_EMAIL,
       firstName: "Soporte",
       lastName: "NextCob",
-      passwordHash: null,
+      passwordHash: SUPERADMIN_TEMP_PASSWORD_HASH,
       emailVerified: true,
+      trialEndsAt: FAR_FUTURE,
       esDemo: false,
       activo: true,
       subscriptionStatus: "activa",

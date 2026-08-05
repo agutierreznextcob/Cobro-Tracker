@@ -50,3 +50,8 @@ CODE (seed only inserts-if-missing, so it never updates pre-existing dev rows). 
 saw dev's demo carrying `passwordHash=null` + `subscription_status='prueba'` while
 the seed defines a fixed demo password + `activa`. Copying dev → prod would ship those
 STALE values. The empty-prod + seed path yields the intended canonical data.
+
+## Superadmin sin contraseña (ago 2026)
+- El superadmin se creaba con passwordHash NULL ("la fija por olvidé mi contraseña"), pero el dominio nextcob.com NO está verificado en Resend, así que su email de reset se redirige a un inbox de respaldo (SUPERADMIN_RECOVERY_EMAIL, default el gmail del demo) — no llega a la propia casilla.
+- **Fix durable:** el seed ahora repara al superadmin en cada boot: si passwordHash es NULL le aplica un hash de contraseña temporal (compartida una vez con el dueño por chat) + trialEndsAt 2099 + activa. Solo actúa con hash NULL, nunca pisa una contraseña ya configurada.
+- **How to apply:** cambios al seed solo llegan a producción al REPUBLICAR. Para que el reset llegue a @nextcob.com hay que verificar el dominio en Resend y quitar el fallback de respaldo en auth.ts.
