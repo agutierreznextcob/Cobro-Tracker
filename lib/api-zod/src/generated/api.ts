@@ -134,6 +134,25 @@ export const ResetPasswordResponse = zod.object({
 
 
 /**
+ * @summary Change the current user's password (requires the current password)
+ */
+export const ChangePasswordHeader = zod.object({
+  "Authorization": zod.string().optional().describe('Opaque session token — Bearer <sid>.')
+})
+
+export const ChangePasswordBody = zod.object({
+  "currentPassword": zod.string(),
+  "newPassword": zod.string().describe('Mínimo 8 caracteres, con al menos una mayúscula y un número.')
+})
+
+export const ChangePasswordResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().nullish(),
+  "code": zod.string().nullish().describe('Machine-readable code (e.g. email_no_verificado, cuenta_bloqueada).')
+})
+
+
+/**
  * @summary Resend the email verification link
  */
 export const ResendVerificationBody = zod.object({
@@ -1333,6 +1352,34 @@ export const ListAdminUsuariosResponseItem = zod.object({
   "totalRecaudado": zod.number().describe('Total collected (paid cobros) for the user\'s organization.')
 })
 export const ListAdminUsuariosResponse = zod.array(ListAdminUsuariosResponseItem)
+
+
+/**
+ * @summary Registro de pagos de suscripción de la plataforma (admin only)
+ */
+export const ListPagosSuscripcionQueryParams = zod.object({
+  "desde": zod.coerce.string().optional().describe('Filtra pagos con fecha >= desde (ISO date)'),
+  "hasta": zod.coerce.string().optional().describe('Filtra pagos con fecha <= hasta (ISO date)'),
+  "estado": zod.enum(['pagado', 'pendiente', 'fallido']).optional()
+})
+
+export const ListPagosSuscripcionResponseItem = zod.object({
+  "id": zod.number(),
+  "fecha": zod.string().describe('Fecha del pago (ISO datetime)'),
+  "accountId": zod.string().nullish().describe('ID de cuenta del cliente (NCB-XXXXXXXXXX)'),
+  "clienteNombre": zod.string().nullish(),
+  "clienteEmail": zod.string().nullish(),
+  "plan": zod.string().describe('\"base\" o \"con usuarios extra\"'),
+  "detalle": zod.string().describe('Ej: \"Plan base + 2 usuarios extra\"'),
+  "usuariosAdicionales": zod.number(),
+  "montoNeto": zod.number(),
+  "montoIva": zod.number(),
+  "montoTotal": zod.number(),
+  "estado": zod.enum(['pagado', 'pendiente', 'fallido']),
+  "metodo": zod.string(),
+  "periodoHasta": zod.string().nullish()
+})
+export const ListPagosSuscripcionResponse = zod.array(ListPagosSuscripcionResponseItem)
 
 
 /**

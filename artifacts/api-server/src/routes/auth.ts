@@ -12,6 +12,8 @@ import {
   ResetPasswordResponse,
   ResendVerificationBody,
   ResendVerificationResponse,
+  ChangePasswordBody,
+  ChangePasswordResponse,
 } from "@workspace/api-zod";
 import {
   db,
@@ -664,6 +666,74 @@ router.post("/auth/reset-password", async (req: Request, res: Response) => {
     req.log.error({ err }, "Error resetting password");
     res.status(400).json(
       ResetPasswordResponse.parse({
+        ok: false,
+        mensaje: "No se pudo actualizar la contraseña.",
+      }),
+    );
+  }
+});
+
+// Cambiar contraseña (usuario autenticado, requiere la contraseña actual).
+router.post("/auth/change-password", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated() || !req.user) {
+    res.status(401).json(
+      ChangePasswordResponse.parse({ ok: false, mensaje: "No autorizado." }),
+    );
+    return;
+  }
+
+  const parsed = ChangePasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json(
+      ChangePasswordResponse.parse({ ok: false, mensaje: "Datos inválidos." }),
+    );
+    return;
+  }
+
+  const { currentPassword, newPassword } = parsed.data;
+  if (!isStrongPassword(newPassword)) {
+    res.status(400).json(
+      ChangePasswordResponse.parse({
+        ok: false,
+        mensaje:
+          "La nueva contraseña debe tener al menos 8 caracteres, una mayúscula y un número.",
+      }),
+    );
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select({ passwordHash: usersTable.passwordHash })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id));
+    const valid = user ? await verifyPassword(currentPassword, user.passwordHash) : false;
+    if (!valid) {
+      res.status(400).json(
+        ChangePasswordResponse.parse({
+          ok: false,
+          mensaje: "La contraseña actual no es correcta",
+        }),
+      );
+      return;
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await db
+      .update(usersTable)
+      .set({ passwordHash, failedLoginAttempts: 0, lockedUntil: null })
+      .where(eq(usersTable.id, req.user.id));
+
+    res.json(
+      ChangePasswordResponse.parse({
+        ok: true,
+        mensaje: "Contraseña actualizada correctamente",
+      }),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Error changing password");
+    res.status(400).json(
+      ChangePasswordResponse.parse({
         ok: false,
         mensaje: "No se pudo actualizar la contraseña.",
       }),

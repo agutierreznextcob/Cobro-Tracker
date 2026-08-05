@@ -12,6 +12,7 @@ import {
   useCompletarPerfil,
   exportarDatos,
   useEliminarCuenta,
+  useChangePassword,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth, type AuthUser } from "@workspace/replit-auth-web";
@@ -502,6 +503,129 @@ function EditProfileDialog({ user }: { user: AuthUser }) {
   );
 }
 
+function ChangePasswordCard() {
+  const { toast } = useToast();
+  const changePassword = useChangePassword();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast({ title: "Campos requeridos", description: "Completa todos los campos.", variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Error", description: "Las contraseñas no coinciden", variant: "destructive" });
+      return;
+    }
+    if (!/^(?=.*[A-Z])(?=.*\d).{8,}$/.test(newPassword)) {
+      toast({
+        title: "Contraseña débil",
+        description: "La nueva contraseña debe tener al menos 8 caracteres, una mayúscula y un número.",
+        variant: "destructive",
+      });
+      return;
+    }
+    changePassword.mutate(
+      { data: { currentPassword, newPassword } },
+      {
+        onSuccess: () => {
+          toast({ title: "Contraseña actualizada correctamente" });
+          setCurrentPassword("");
+          setNewPassword("");
+          setConfirmPassword("");
+        },
+        onError: (err: unknown) => {
+          const mensaje =
+            (err as { mensaje?: string } | null)?.mensaje ||
+            ((err as { data?: { mensaje?: string } } | null)?.data?.mensaje) ||
+            "No se pudo actualizar la contraseña.";
+          toast({ title: "Error", description: mensaje, variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  return (
+    <Card className="shadow-sm border-border/50">
+      <CardHeader className="bg-muted/20 border-b border-border/50">
+        <CardTitle className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-primary" />
+          Cambiar contraseña
+        </CardTitle>
+        <CardDescription>
+          Mínimo 8 caracteres, con al menos una mayúscula y un número.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+          <div className="space-y-1.5">
+            <Label htmlFor="current-password">Contraseña actual</Label>
+            <div className="relative">
+              <Input
+                id="current-password"
+                type={showCurrent ? "text" : "password"}
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                data-testid="input-current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrent((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                tabIndex={-1}
+              >
+                {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-password">Nueva contraseña</Label>
+            <div className="relative">
+              <Input
+                id="new-password"
+                type={showNew ? "text" : "password"}
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                data-testid="input-new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                tabIndex={-1}
+              >
+                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirm-password">Confirmar nueva contraseña</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              data-testid="input-confirm-password"
+            />
+          </div>
+          <Button type="submit" disabled={changePassword.isPending} data-testid="button-actualizar-password">
+            {changePassword.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Actualizar contraseña
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ProfileSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -691,6 +815,8 @@ function ProfileSettings() {
           </dl>
         </CardContent>
       </Card>
+
+      <ChangePasswordCard />
 
       <Card className="shadow-sm border-border/50">
         <CardHeader className="bg-muted/20 border-b border-border/50">

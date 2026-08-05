@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@workspace/replit-auth-web";
+import SuscripcionesRegistro from "./suscripciones-registro";
 import { useListCobros, useListClientes } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -65,6 +67,16 @@ const METODOS: { value: NonNullable<MetodoFilter>; label: string }[] = [
 ];
 
 export default function CobrosList() {
+  // La cuenta superadmin no gestiona cobros propios: su módulo de Cobros
+  // muestra el registro de pagos de suscripciones de la plataforma.
+  const { user } = useAuth();
+  if (user?.role === "admin") {
+    return <SuscripcionesRegistro />;
+  }
+  return <CobrosListNormal />;
+}
+
+function CobrosListNormal() {
   const [filterEstado, setFilterEstado] = useState<EstadoFilter>(undefined);
   const [filterMetodo, setFilterMetodo] = useState<MetodoFilter>(undefined);
   const [filterScore, setFilterScore] = useState<ScoreCategoria | undefined>(undefined);

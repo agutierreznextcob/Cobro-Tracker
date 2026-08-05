@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { Router } from "express";
-import { db, cobrosTable, webhookEventosTable, pagosParciales, usersTable, mpCredencialesTable} from "@workspace/db";
+import { db, cobrosTable, webhookEventosTable, pagosParciales, usersTable, mpCredencialesTable, pagosSuscripcionTable } from "@workspace/db";
+import { computePricing } from "../lib/org";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { ReceiveCobroWebhookBody } from "@workspace/api-zod";
 import { verificarPagoFlow } from "../lib/flow-api";
@@ -783,6 +784,53 @@ webhooksRouter.post("/webhooks/flow-subscription", async (req, res) => {
       ipOrigen: ip,
       detalle: `Usuario ${user.id} → ${mapped.status}`,
     });
+
+    // Libro de ingresos: registra el cargo de suscripción (una fila por
+    // usuario+período; idempotente frente a reintentos del webhook).
+    if (mapped.status === "activa" && mapped.periodEnd) {
+      try {
+        let miembrosActivos = 1;
+        if (user.organizationId != null) {
+          const [cnt] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(usersTable)
+            .where(
+              and(
+                eq(usersTable.organizationId, user.organizationId),
+                eq(usersTable.activo, true),
+              ),
+            );
+          miembrosActivos = cnt?.count ?? 1;
+        }
+        const pricing = computePricing(miembrosActivos);
+        const neto =
+          pricing.planBaseNeto +
+          pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalNeto;
+        const iva =
+          pricing.planBaseIva +
+          pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalIva;
+        // Idempotente frente a reintentos/concurrencia: la unicidad
+        // (user_id, periodo_hasta) vive en la BD; un conflicto es éxito.
+        await db
+          .insert(pagosSuscripcionTable)
+          .values({
+            userId: user.id,
+            fecha: new Date(),
+            usuariosAdicionales: pricing.usuariosAdicionales,
+            montoNeto: neto,
+            montoIva: iva,
+            montoTotal: neto + iva,
+            estado: "pagado",
+            metodo: "flow",
+            periodoHasta: mapped.periodEnd,
+          })
+          .onConflictDoNothing({
+            target: [pagosSuscripcionTable.userId, pagosSuscripcionTable.periodoHasta],
+          });
+      } catch (err) {
+        req.log.error({ err }, "No se pudo registrar el pago de suscripción");
+      }
+    }
 
     req.log.info({ userId: user.id, status: mapped.status }, "Subscription status updated via webhook");
     res.json({ ok: true });

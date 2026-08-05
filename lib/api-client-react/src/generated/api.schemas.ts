@@ -358,6 +358,42 @@ export interface SugerenciaWorkflow {
   razon: string;
 }
 
+export type PagoSuscripcionEstado = typeof PagoSuscripcionEstado[keyof typeof PagoSuscripcionEstado];
+
+
+export const PagoSuscripcionEstado = {
+  pagado: 'pagado',
+  pendiente: 'pendiente',
+  fallido: 'fallido',
+} as const;
+
+export interface PagoSuscripcion {
+  id: number;
+  /** Fecha del pago (ISO datetime) */
+  fecha: string;
+  /**
+     * ID de cuenta del cliente (NCB-XXXXXXXXXX)
+     * @nullable
+     */
+  accountId?: string | null;
+  /** @nullable */
+  clienteNombre?: string | null;
+  /** @nullable */
+  clienteEmail?: string | null;
+  /** "base" o "con usuarios extra" */
+  plan: string;
+  /** Ej: "Plan base + 2 usuarios extra" */
+  detalle: string;
+  usuariosAdicionales: number;
+  montoNeto: number;
+  montoIva: number;
+  montoTotal: number;
+  estado: PagoSuscripcionEstado;
+  metodo: string;
+  /** @nullable */
+  periodoHasta?: string | null;
+}
+
 export type AdminUsuarioRole = typeof AdminUsuarioRole[keyof typeof AdminUsuarioRole];
 
 
@@ -1823,6 +1859,12 @@ export interface ResetPasswordInput {
   confirmPassword: string;
 }
 
+export interface ChangePasswordInput {
+  currentPassword: string;
+  /** Mínimo 8 caracteres, con al menos una mayúscula y un número. */
+  newPassword: string;
+}
+
 export interface AuthResult {
   ok: boolean;
   /** @nullable */
@@ -2141,6 +2183,27 @@ export type ListAdminUsuariosParams = {
  */
 q?: string;
 };
+
+export type ListPagosSuscripcionParams = {
+/**
+ * Filtra pagos con fecha >= desde (ISO date)
+ */
+desde?: string;
+/**
+ * Filtra pagos con fecha <= hasta (ISO date)
+ */
+hasta?: string;
+estado?: ListPagosSuscripcionEstado;
+};
+
+export type ListPagosSuscripcionEstado = typeof ListPagosSuscripcionEstado[keyof typeof ListPagosSuscripcionEstado];
+
+
+export const ListPagosSuscripcionEstado = {
+  pagado: 'pagado',
+  pendiente: 'pendiente',
+  fallido: 'fallido',
+} as const;
 
 export type GetRendimientoEquipoParams = {
 /**

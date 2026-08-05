@@ -39,6 +39,7 @@ import type {
   AuthUserEnvelope,
   AvisarClienteInput,
   AvisarClienteResult,
+  ChangePasswordInput,
   Cliente,
   ClienteConHistorial,
   ClienteConScore,
@@ -94,6 +95,7 @@ import type {
   ListLeadsParams,
   ListLiquidacionesParams,
   ListNotificacionesParams,
+  ListPagosSuscripcionParams,
   ListTareasParams,
   ListWebhookEventosParams,
   LoginInput,
@@ -106,6 +108,7 @@ import type {
   Notificacion,
   OkResponse,
   OrganizacionInfo,
+  PagoSuscripcion,
   PortalData,
   Recordatorio,
   RecordatorioDefault,
@@ -578,6 +581,77 @@ export const useResetPassword = <TError = ErrorType<AuthResult>,
         TContext
       > => {
       return useMutation(getResetPasswordMutationOptions(options));
+    }
+
+export const getChangePasswordUrl = () => {
+
+
+
+
+  return `/api/auth/change-password`
+}
+
+/**
+ * @summary Change the current user's password (requires the current password)
+ */
+export const changePassword = async (changePasswordInput: ChangePasswordInput, options?: RequestInit): Promise<AuthResult> => {
+
+  return customFetch<AuthResult>(getChangePasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      changePasswordInput,)
+  }
+);}
+
+
+
+
+export const getChangePasswordMutationOptions = <TError = ErrorType<AuthResult>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext> => {
+
+const mutationKey = ['changePassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changePassword>>, {data: BodyType<ChangePasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  changePassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChangePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
+    export type ChangePasswordMutationBody = BodyType<ChangePasswordInput>
+    export type ChangePasswordMutationError = ErrorType<AuthResult>
+
+    /**
+ * @summary Change the current user's password (requires the current password)
+ */
+export const useChangePassword = <TError = ErrorType<AuthResult>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof changePassword>>,
+        TError,
+        {data: BodyType<ChangePasswordInput>},
+        TContext
+      > => {
+      return useMutation(getChangePasswordMutationOptions(options));
     }
 
 export const getResendVerificationUrl = () => {
@@ -4691,6 +4765,90 @@ export function useListAdminUsuarios<TData = Awaited<ReturnType<typeof listAdmin
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListAdminUsuariosQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListPagosSuscripcionUrl = (params?: ListPagosSuscripcionParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/pagos-suscripcion?${stringifiedParams}` : `/api/admin/pagos-suscripcion`
+}
+
+/**
+ * @summary Registro de pagos de suscripción de la plataforma (admin only)
+ */
+export const listPagosSuscripcion = async (params?: ListPagosSuscripcionParams, options?: RequestInit): Promise<PagoSuscripcion[]> => {
+
+  return customFetch<PagoSuscripcion[]>(getListPagosSuscripcionUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPagosSuscripcionQueryKey = (params?: ListPagosSuscripcionParams,) => {
+    return [
+    `/api/admin/pagos-suscripcion`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPagosSuscripcionQueryOptions = <TData = Awaited<ReturnType<typeof listPagosSuscripcion>>, TError = ErrorType<void>>(params?: ListPagosSuscripcionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPagosSuscripcion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPagosSuscripcionQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPagosSuscripcion>>> = ({ signal }) => listPagosSuscripcion(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPagosSuscripcion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPagosSuscripcionQueryResult = NonNullable<Awaited<ReturnType<typeof listPagosSuscripcion>>>
+export type ListPagosSuscripcionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Registro de pagos de suscripción de la plataforma (admin only)
+ */
+
+export function useListPagosSuscripcion<TData = Awaited<ReturnType<typeof listPagosSuscripcion>>, TError = ErrorType<void>>(
+ params?: ListPagosSuscripcionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPagosSuscripcion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPagosSuscripcionQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

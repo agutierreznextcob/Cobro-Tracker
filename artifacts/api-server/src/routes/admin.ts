@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, cobrosTable, organizacionesTable, cobrosEliminadosTable } from "@workspace/db";
+import { db, usersTable, cobrosTable, organizacionesTable, cobrosEliminadosTable, pagosSuscripcionTable } from "@workspace/db";
 import type { CobroEliminado } from "@workspace/db";
 import { eq, sql, isNull, desc, or, ilike } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
@@ -188,6 +188,77 @@ adminRouter.get("/admin/usuarios", async (req, res) => {
     res.json(usuarios);
   } catch (err) {
     req.log.error({ err }, "Error listing admin usuarios");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Registro de pagos de suscripción de la plataforma (libro de ingresos de
+// NextCob SpA). Une cada pago con los datos actuales del cliente.
+adminRouter.get("/admin/pagos-suscripcion", async (req, res) => {
+  try {
+    const desde = typeof req.query.desde === "string" ? req.query.desde : null;
+    const hasta = typeof req.query.hasta === "string" ? req.query.hasta : null;
+    const estado = typeof req.query.estado === "string" ? req.query.estado : null;
+
+    const conds = [];
+    if (desde) conds.push(sql`${pagosSuscripcionTable.fecha} >= ${new Date(desde)}`);
+    if (hasta) {
+      const h = new Date(hasta);
+      h.setUTCHours(23, 59, 59, 999);
+      conds.push(sql`${pagosSuscripcionTable.fecha} <= ${h}`);
+    }
+    if (estado === "pagado" || estado === "pendiente" || estado === "fallido") {
+      conds.push(eq(pagosSuscripcionTable.estado, estado));
+    }
+
+    const base = db
+      .select({
+        pago: pagosSuscripcionTable,
+        accountId: usersTable.accountId,
+        firstName: usersTable.firstName,
+        lastName: usersTable.lastName,
+        companyName: usersTable.companyName,
+        email: usersTable.email,
+      })
+      .from(pagosSuscripcionTable)
+      .leftJoin(usersTable, eq(usersTable.id, pagosSuscripcionTable.userId))
+      .orderBy(desc(pagosSuscripcionTable.fecha));
+
+    const rows = conds.length
+      ? await base.where(conds.reduce((a, b) => sql`${a} AND ${b}`))
+      : await base;
+
+    res.json(
+      rows.map((r) => {
+        const extra = r.pago.usuariosAdicionales;
+        const nombre =
+          r.companyName ||
+          [r.firstName, r.lastName].filter(Boolean).join(" ").trim() ||
+          null;
+        return {
+          id: r.pago.id,
+          fecha: r.pago.fecha.toISOString(),
+          accountId: r.accountId,
+          clienteNombre: nombre,
+          clienteEmail: r.email,
+          plan: extra > 0 ? "con usuarios extra" : "base",
+          detalle:
+            r.pago.detalle ||
+            (extra > 0
+              ? `Plan base + ${extra} usuario${extra === 1 ? "" : "s"} extra`
+              : "Plan base"),
+          usuariosAdicionales: extra,
+          montoNeto: r.pago.montoNeto,
+          montoIva: r.pago.montoIva,
+          montoTotal: r.pago.montoTotal,
+          estado: r.pago.estado,
+          metodo: r.pago.metodo,
+          periodoHasta: r.pago.periodoHasta?.toISOString() ?? null,
+        };
+      }),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Error listando pagos de suscripción");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

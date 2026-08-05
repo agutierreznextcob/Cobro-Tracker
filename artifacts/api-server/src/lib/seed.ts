@@ -4,7 +4,6 @@ import {
   cobrosTable,
   trialRutsTable,
   clientesTable,
-  pagosParciales,
 } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { hashPassword } from "./password";
@@ -221,203 +220,23 @@ async function ensureDemoCobros(demoUserId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Superadmin (NCB-0000000001) sample data: realistic clientes + cobros so the
-// account has something to show. Client "scores" are NOT stored — they are
-// derived on the fly from each cliente's cobro/abono history (see lib/scoring),
-// so the histories below are crafted to land in the intended categories
-// (excelente / bueno / regular / riesgoso).
-// ---------------------------------------------------------------------------
-
-function offsetDate(days: number): Date {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + days);
-  return d;
-}
-
-const IVA_RATE = 0.19;
-
-interface AbonoDef {
-  monto: number;
-  confirmadoOffset: number; // días respecto a hoy (negativo = pasado)
-  metodo: "manual" | "flow" | "mp";
-}
-
-interface CobroDef {
-  clienteKey: string;
-  descripcion: string;
-  tipoDocumento: "factura_afecta" | "factura_exenta" | "boleta_afecta" | "boleta_exenta";
-  // Para documentos afectos pasamos el neto y el IVA se calcula; para exentos
-  // pasamos el monto final directo.
-  neto?: number;
-  monto?: number;
-  estado: "pendiente" | "pagado" | "parcial" | "cancelado";
-  vencOffset: number; // días de vencimiento respecto a hoy
-  creadoOffset: number; // días de creación respecto a hoy
-  abono?: AbonoDef;
-}
-
-interface ClienteDef {
-  key: string;
-  nombre: string;
-  rut: string;
-  email: string;
-  telefono: string;
-}
-
-async function ensureSuperadminSampleData(superadminUserId: string): Promise<void> {
-  const clientes: ClienteDef[] = [
-    {
-      key: "andes",
-      nombre: "Comercial Andes Ltda",
-      rut: "76543210-3",
-      email: "pagos@comercialandes.cl",
-      telefono: "+56 2 2345 6789",
-    },
-    {
-      key: "rojas",
-      nombre: "María Fernanda Rojas Contreras",
-      rut: "15678234-3",
-      email: "mf.rojas@gmail.com",
-      telefono: "+56 9 8123 4567",
-    },
-    {
-      key: "pacifico",
-      nombre: "Constructora Pacífico SpA",
-      rut: "77111222-6",
-      email: "cobranzas@constructorapacifico.cl",
-      telefono: "+56 2 2987 6543",
-    },
-    {
-      key: "munoz",
-      nombre: "Jorge Ignacio Muñoz Tapia",
-      rut: "9876543-3",
-      email: "jorge.munoz@outlook.cl",
-      telefono: "+56 9 7654 3210",
-    },
-    {
-      key: "maule",
-      nombre: "Distribuidora del Maule Ltda",
-      rut: "78900100-6",
-      email: "finanzas@distribuidoramaule.cl",
-      telefono: "+56 71 220 3040",
-    },
-  ];
-
-  const nombreByKey = new Map(clientes.map((c) => [c.key, c.nombre]));
-
-  const cobros: CobroDef[] = [
-    // Comercial Andes Ltda → EXCELENTE (todo pagado y a tiempo)
-    { clienteKey: "andes", descripcion: "Factura servicios logísticos - Marzo", tipoDocumento: "factura_afecta", neto: 800000, estado: "pagado", vencOffset: -50, creadoOffset: -80, abono: { monto: 952000, confirmadoOffset: -52, metodo: "manual" } },
-    { clienteKey: "andes", descripcion: "Boleta arriendo bodega - Abril", tipoDocumento: "boleta_afecta", neto: 250000, estado: "pagado", vencOffset: -30, creadoOffset: -55, abono: { monto: 297500, confirmadoOffset: -31, metodo: "flow" } },
-    { clienteKey: "andes", descripcion: "Factura proyecto integración - Mayo", tipoDocumento: "factura_afecta", neto: 1200000, estado: "pagado", vencOffset: -15, creadoOffset: -40, abono: { monto: 1428000, confirmadoOffset: -16, metodo: "manual" } },
-
-    // María Fernanda Rojas → BUENO (2 pagados a tiempo + 1 vencido reciente)
-    { clienteKey: "rojas", descripcion: "Clases particulares - Marzo", tipoDocumento: "boleta_exenta", monto: 120000, estado: "pagado", vencOffset: -25, creadoOffset: -60, abono: { monto: 120000, confirmadoOffset: -26, metodo: "manual" } },
-    { clienteKey: "rojas", descripcion: "Asesoría tributaria personas - Abril", tipoDocumento: "factura_afecta", neto: 400000, estado: "pagado", vencOffset: -12, creadoOffset: -45, abono: { monto: 476000, confirmadoOffset: -13, metodo: "mp" } },
-    { clienteKey: "rojas", descripcion: "Declaración de renta 2025", tipoDocumento: "factura_afecta", neto: 300000, estado: "pendiente", vencOffset: -8, creadoOffset: -20 },
-
-    // Constructora Pacífico SpA → REGULAR (1 pagado, 1 parcial, 2 vencidos)
-    { clienteKey: "pacifico", descripcion: "Factura obra gruesa - Etapa 1", tipoDocumento: "factura_afecta", neto: 1500000, estado: "pagado", vencOffset: -40, creadoOffset: -75, abono: { monto: 1785000, confirmadoOffset: -45, metodo: "manual" } },
-    { clienteKey: "pacifico", descripcion: "Factura materiales - Etapa 2", tipoDocumento: "factura_afecta", neto: 900000, estado: "parcial", vencOffset: -20, creadoOffset: -50, abono: { monto: 400000, confirmadoOffset: -18, metodo: "manual" } },
-    { clienteKey: "pacifico", descripcion: "Servicios de fiscalización (exento)", tipoDocumento: "factura_exenta", monto: 650000, estado: "pendiente", vencOffset: -15, creadoOffset: -30 },
-    { clienteKey: "pacifico", descripcion: "Boleta arriendo maquinaria", tipoDocumento: "boleta_afecta", neto: 200000, estado: "pendiente", vencOffset: -22, creadoOffset: -35 },
-
-    // Jorge Ignacio Muñoz → RIESGOSO (nada pagado, vencidos + parcial)
-    { clienteKey: "munoz", descripcion: "Factura remodelación local", tipoDocumento: "factura_afecta", neto: 500000, estado: "pendiente", vencOffset: -35, creadoOffset: -60 },
-    { clienteKey: "munoz", descripcion: "Boleta mano de obra", tipoDocumento: "boleta_afecta", neto: 150000, estado: "pendiente", vencOffset: -28, creadoOffset: -50 },
-    { clienteKey: "munoz", descripcion: "Honorarios diseño (exento)", tipoDocumento: "factura_exenta", monto: 300000, estado: "parcial", vencOffset: 10, creadoOffset: -25, abono: { monto: 80000, confirmadoOffset: -5, metodo: "manual" } },
-
-    // Distribuidora del Maule Ltda → mix (pagado + por vencer + cancelado)
-    { clienteKey: "maule", descripcion: "Factura pedido mayorista - Abril", tipoDocumento: "factura_afecta", neto: 700000, estado: "pagado", vencOffset: -10, creadoOffset: -35, abono: { monto: 833000, confirmadoOffset: -11, metodo: "flow" } },
-    { clienteKey: "maule", descripcion: "Boleta despacho menor (exento)", tipoDocumento: "boleta_exenta", monto: 95000, estado: "pendiente", vencOffset: 15, creadoOffset: -5 },
-    { clienteKey: "maule", descripcion: "Factura pedido anulado - duplicado", tipoDocumento: "factura_afecta", neto: 450000, estado: "cancelado", vencOffset: -5, creadoOffset: -20 },
-  ];
-
-  const superadminNombre = "Soporte NextCob";
-
-  // Todo en una transacción: si algo falla, nada queda a medias, así el guard
-  // "¿ya tiene clientes?" es idempotente Y reanudable (solo hay clientes si la
-  // siembra completa se confirmó). La verificación va dentro de la transacción
-  // para cerrar cualquier carrera entre arranques concurrentes.
-  const seeded = await db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select({ id: clientesTable.id })
-      .from(clientesTable)
-      .where(eq(clientesTable.userId, superadminUserId))
-      .limit(1);
-    if (existing) return false;
-
-    const clienteRows = await tx
-      .insert(clientesTable)
-      .values(
-        clientes.map((c) => ({
-          nombre: c.nombre,
-          rut: c.rut,
-          email: c.email,
-          telefono: c.telefono,
-          userId: superadminUserId,
-        })),
-      )
-      .returning({ id: clientesTable.id, nombre: clientesTable.nombre });
-
-    const idByNombre = new Map(clienteRows.map((r) => [r.nombre, r.id]));
-
-    for (const c of cobros) {
-      const nombre = nombreByKey.get(c.clienteKey);
-      const clienteId = nombre ? idByNombre.get(nombre) : undefined;
-      const afecta = c.tipoDocumento === "factura_afecta" || c.tipoDocumento === "boleta_afecta";
-
-      let monto: number;
-      let montoNeto: number | null = null;
-      let montoIva: number | null = null;
-      if (afecta && c.neto != null) {
-        montoNeto = c.neto;
-        montoIva = Math.round(c.neto * IVA_RATE);
-        monto = montoNeto + montoIva;
-      } else {
-        monto = c.monto ?? 0;
-      }
-
-      const [cobroRow] = await tx
-        .insert(cobrosTable)
-        .values({
-          monto: monto.toFixed(2),
-          incluyeIva: afecta,
-          montoNeto: montoNeto != null ? montoNeto.toFixed(2) : null,
-          montoIva: montoIva != null ? montoIva.toFixed(2) : null,
-          tipoDocumento: c.tipoDocumento,
-          descripcion: c.descripcion,
-          estado: c.estado,
-          responsableId: superadminUserId,
-          responsableNombre: superadminNombre,
-          clienteId: clienteId ?? null,
-          clienteNombre: nombre ?? null,
-          emailPagador: null,
-          fechaVencimiento: dateOffset(c.vencOffset),
-          creadoEn: offsetDate(c.creadoOffset),
-          actualizadoEn: offsetDate(c.creadoOffset),
-        })
-        .returning({ id: cobrosTable.id });
-
-      if (cobroRow && c.abono) {
-        await tx.insert(pagosParciales).values({
-          cobroId: cobroRow.id,
-          monto: c.abono.monto.toFixed(2),
-          metodo: c.abono.metodo,
-          estado: "confirmado",
-          confirmadoEn: offsetDate(c.abono.confirmadoOffset),
-          creadoEn: offsetDate(c.abono.confirmadoOffset),
-          notas: "Pago de muestra",
-        });
-      }
-    }
-    return true;
-  });
-
-  if (seeded) {
+// El superadmin ya no lleva cobros propios: su módulo de Cobros muestra el
+// registro de pagos de suscripción de la plataforma. Limpieza idempotente en
+// cada arranque: elimina los cobros/clientes de muestra (y cualquier cobro
+// residual) de la cuenta superadmin. Los abonos se borran por cascada.
+async function cleanupSuperadminSampleData(superadminUserId: string): Promise<void> {
+  const deletedCobros = await db
+    .delete(cobrosTable)
+    .where(eq(cobrosTable.responsableId, superadminUserId))
+    .returning({ id: cobrosTable.id });
+  const deletedClientes = await db
+    .delete(clientesTable)
+    .where(eq(clientesTable.userId, superadminUserId))
+    .returning({ id: clientesTable.id });
+  if (deletedCobros.length || deletedClientes.length) {
     logger.info(
-      { superadminUserId, clientes: clientes.length, cobros: cobros.length },
-      "Seed: superadmin sample clientes + cobros created",
+      { cobros: deletedCobros.length, clientes: deletedClientes.length },
+      "Seed: superadmin sample cobros/clientes removed",
     );
   }
 }
@@ -465,7 +284,7 @@ export async function seedEssentialAccounts(): Promise<void> {
     await ensureDemoCobros(demoUserId);
   }
   if (superadminUserId) {
-    await ensureSuperadminSampleData(superadminUserId);
+    await cleanupSuperadminSampleData(superadminUserId);
   }
   // Must run after the reserved accounts are inserted so the sequence floor
   // accounts for their explicit account_seq values.
