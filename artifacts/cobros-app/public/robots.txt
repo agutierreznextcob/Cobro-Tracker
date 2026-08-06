@@ -1,2 +1,11 @@
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /cobros
+Disallow: /clientes
+Disallow: /perfil
+Disallow: /admin
+Disallow: /portal/
+Disallow: /encuesta/
+
+Sitemap: https://nextcob.com/sitemap.xml
