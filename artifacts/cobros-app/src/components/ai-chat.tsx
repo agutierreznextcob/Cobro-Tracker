@@ -161,7 +161,7 @@ export function AiChat() {
       {/* Floating button — bottom-right and raised to clear the Replit feedback button */}
       <button
         onClick={() => (open ? handleClose() : handleOpen())}
-        className={`fixed bottom-24 right-6 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${
+        className={`fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${
           open ? "bg-secondary text-foreground" : "bg-primary text-primary-foreground hover:bg-primary/90"
         }`}
         title="Asistente IA"
@@ -172,7 +172,7 @@ export function AiChat() {
 
       {/* Chat panel — anchored bottom-right */}
       {open && (
-        <div className="fixed bottom-44 right-6 z-50 w-[380px] max-w-[calc(100vw-3rem)] h-[520px] max-h-[calc(100vh-13rem)] flex flex-col rounded-2xl border bg-card shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-24 right-4 z-50 w-[380px] max-w-[calc(100vw-3rem)] h-[520px] max-h-[calc(100vh-8rem)] flex flex-col rounded-2xl border bg-card shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-card shrink-0">
             <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground">

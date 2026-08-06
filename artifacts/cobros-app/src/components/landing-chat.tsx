@@ -176,7 +176,7 @@ export function LandingChat() {
       {/* Floating button — bottom-right */}
       <button
         onClick={() => (open ? setOpen(false) : handleOpen())}
-        className="fixed bottom-24 right-6 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105"
+        className="fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105"
         style={{ backgroundColor: open ? "#4b3fb0" : MORADO }}
         title="¿Dudas? Pregúntale a nuestro asistente"
         aria-label="Abrir chat de ayuda"
@@ -196,7 +196,7 @@ export function LandingChat() {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-44 right-6 z-50 w-[380px] max-w-[calc(100vw-3rem)] h-[540px] max-h-[calc(100vh-13rem)] flex flex-col rounded-2xl border bg-card shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-24 right-4 z-50 w-[380px] max-w-[calc(100vw-3rem)] h-[540px] max-h-[calc(100vh-8rem)] flex flex-col rounded-2xl border bg-card shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 shrink-0 text-white" style={{ backgroundColor: MORADO }}>
             <div
