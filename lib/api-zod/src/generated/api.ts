@@ -1934,6 +1934,131 @@ export const GetPortalDeudorResponse = zod.object({
 
 
 /**
+ * @summary Get bank transfer details for current user
+ */
+export const GetDatosBancariosResponse = zod.object({
+  "configurado": zod.boolean(),
+  "banco": zod.string().nullish(),
+  "tipoCuenta": zod.string().nullish(),
+  "numeroCuenta": zod.string().nullish(),
+  "titularNombre": zod.string().nullish(),
+  "titularRut": zod.string().nullish(),
+  "emailComprobantes": zod.string().nullish()
+})
+
+
+/**
+ * @summary Save or update bank transfer details for current user
+ */
+export const saveDatosBancariosBodyBancoMax = 60;
+
+export const saveDatosBancariosBodyTipoCuentaMax = 40;
+
+export const saveDatosBancariosBodyNumeroCuentaMax = 40;
+
+export const saveDatosBancariosBodyTitularNombreMax = 120;
+
+export const saveDatosBancariosBodyTitularRutMax = 20;
+
+export const saveDatosBancariosBodyEmailComprobantesMax = 200;
+
+
+
+export const SaveDatosBancariosBody = zod.object({
+  "banco": zod.string().min(1).max(saveDatosBancariosBodyBancoMax),
+  "tipoCuenta": zod.string().min(1).max(saveDatosBancariosBodyTipoCuentaMax),
+  "numeroCuenta": zod.string().min(1).max(saveDatosBancariosBodyNumeroCuentaMax),
+  "titularNombre": zod.string().min(1).max(saveDatosBancariosBodyTitularNombreMax),
+  "titularRut": zod.string().min(1).max(saveDatosBancariosBodyTitularRutMax),
+  "emailComprobantes": zod.string().email().max(saveDatosBancariosBodyEmailComprobantesMax)
+})
+
+export const SaveDatosBancariosResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Delete bank transfer details for current user
+ */
+export const DeleteDatosBancariosResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Debtor uploads a transfer receipt for a pending cobro (no auth)
+ */
+export const SubirComprobantePortalParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+
+export const subirComprobantePortalBodyNombreArchivoMax = 200;
+
+export const subirComprobantePortalBodyComentarioMax = 500;
+
+
+
+export const SubirComprobantePortalBody = zod.object({
+  "cobroId": zod.number(),
+  "archivo": zod.string().min(1).describe('Data URL (image\/\* or application\/pdf) base64, máx ~1.5M chars'),
+  "nombreArchivo": zod.string().max(subirComprobantePortalBodyNombreArchivoMax).nullish(),
+  "comentario": zod.string().max(subirComprobantePortalBodyComentarioMax).nullish()
+})
+
+export const SubirComprobantePortalResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary List transfer receipts uploaded for a cobro
+ */
+export const ListComprobantesTransferenciaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListComprobantesTransferenciaResponseItem = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "archivo": zod.string(),
+  "nombreArchivo": zod.string().nullish(),
+  "comentario": zod.string().nullish(),
+  "estado": zod.enum(['pendiente', 'confirmado', 'rechazado']),
+  "creadoEn": zod.coerce.date(),
+  "resueltoEn": zod.coerce.date().nullish()
+})
+export const ListComprobantesTransferenciaResponse = zod.array(ListComprobantesTransferenciaResponseItem)
+
+
+/**
+ * @summary Confirm a transfer receipt and mark the cobro as paid
+ */
+export const ConfirmarComprobanteTransferenciaParams = zod.object({
+  "id": zod.coerce.number(),
+  "comprobanteId": zod.coerce.number()
+})
+
+export const ConfirmarComprobanteTransferenciaResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Reject a transfer receipt
+ */
+export const RechazarComprobanteTransferenciaParams = zod.object({
+  "id": zod.coerce.number(),
+  "comprobanteId": zod.coerce.number()
+})
+
+export const RechazarComprobanteTransferenciaResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary Generate the debtor portal link for a cliente and send it
  */
 export const EnviarPortalClienteParams = zod.object({

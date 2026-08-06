@@ -12,6 +12,7 @@ import {
   recordatoriosTable,
   recordatoriosEnviadosTable,
   usersTable,
+  comprobantesTransferenciaTable,
 } from "@workspace/db";
 import type { Cobro, CobroDescuento, CobroAjuste } from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
@@ -35,6 +36,7 @@ import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro } from "../lib/recordatorios";
 import { emitirComprobante } from "../lib/comprobante-service";
 import { getOrgContext, cobroScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
+import { getDatosBancariosUsuario, buildDatosBancariosHtml } from "../lib/datos-bancarios";
 
 const cobrosRouter = Router();
 
@@ -1040,8 +1042,11 @@ cobrosRouter.post("/cobros/:id/avisar", async (req, res) => {
         return;
       }
       const remitente = await getRemitenteContacto(cobro.responsableId);
+      const esManual = !cobro.flowLinkPago && !cobro.mpPaymentLinkUrl;
+      const datosBancarios = esManual ? await getDatosBancariosUsuario(cobro.responsableId) : null;
       const emailResult = await sendAvisoManualEmail(
         {
+          datosBancariosHtml: datosBancarios ? buildDatosBancariosHtml(datosBancarios) : null,
           emailPagador: cobro.emailPagador,
           clienteNombre: cobro.clienteNombre,
           descripcion: cobro.descripcion,
@@ -1539,6 +1544,139 @@ cobrosRouter.post("/cobros/:id/abonos/:abonoId/confirmar", async (req, res) => {
     res.json({ ...updated, monto: Number(updated.monto), creadoEn: updated.creadoEn.toISOString(), confirmadoEn: updated.confirmadoEn?.toISOString() ?? null });
   } catch (err) {
     req.log.error({ err }, "Error confirming abono");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// --- Comprobantes de transferencia (subidos por el deudor desde el portal) ---
+
+cobrosRouter.get("/cobros/:id/comprobantes-transferencia", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  if (!paramsParsed.success) { res.status(400).json({ error: "ID inválido" }); return; }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
+  try {
+    const rows = await db
+      .select()
+      .from(comprobantesTransferenciaTable)
+      .where(eq(comprobantesTransferenciaTable.cobroId, paramsParsed.data.id))
+      .orderBy(desc(comprobantesTransferenciaTable.creadoEn));
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        cobroId: r.cobroId,
+        archivo: r.archivo,
+        nombreArchivo: r.nombreArchivo,
+        comentario: r.comentario,
+        estado: r.estado,
+        creadoEn: r.creadoEn.toISOString(),
+        resueltoEn: r.resueltoEn ? r.resueltoEn.toISOString() : null,
+      })),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Error listing transfer receipts");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+cobrosRouter.post("/cobros/:id/comprobantes-transferencia/:comprobanteId/confirmar", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  const comprobanteId = Number(req.params.comprobanteId);
+  if (!paramsParsed.success || isNaN(comprobanteId)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
+  try {
+    // Transacción: lock del cobro, exigir estado cobrable, claim del
+    // comprobante y transición a pagado como una sola unidad. Así un fallo
+    // parcial nunca deja un comprobante confirmado con el cobro impago, ni
+    // convierte en pagado un cobro cancelado/fallido.
+    const resultado = await db.transaction(async (tx) => {
+      const [cobro] = await tx
+        .select({ id: cobrosTable.id, estado: cobrosTable.estado })
+        .from(cobrosTable)
+        .where(eq(cobrosTable.id, paramsParsed.data.id))
+        .for("update");
+      if (!cobro) return { error: "Cobro no encontrado" as const };
+      if (cobro.estado !== "pendiente" && cobro.estado !== "parcial" && cobro.estado !== "pagado") {
+        return { error: `El cobro está en estado "${cobro.estado}" y no puede confirmarse como pagado.` as const };
+      }
+
+      // Claim: solo un confirmar/rechazar gana sobre un comprobante pendiente.
+      const [comprobante] = await tx
+        .update(comprobantesTransferenciaTable)
+        .set({ estado: "confirmado", resueltoEn: new Date() })
+        .where(
+          and(
+            eq(comprobantesTransferenciaTable.id, comprobanteId),
+            eq(comprobantesTransferenciaTable.cobroId, paramsParsed.data.id),
+            eq(comprobantesTransferenciaTable.estado, "pendiente"),
+          ),
+        )
+        .returning({ id: comprobantesTransferenciaTable.id });
+      if (!comprobante) return { error: "El comprobante no existe o ya fue resuelto." as const };
+
+      // El dinero manda: nunca degrada un estado; pagadoEn se conserva si ya existía.
+      await tx
+        .update(cobrosTable)
+        .set({ estado: "pagado", pagadoEn: sql`coalesce(${cobrosTable.pagadoEn}, now())` })
+        .where(eq(cobrosTable.id, paramsParsed.data.id));
+      return { ok: true as const };
+    });
+
+    if ("error" in resultado) {
+      res.status(400).json({ error: resultado.error });
+      return;
+    }
+
+    // Solo tras el commit: efectos secundarios (email de comprobante, encuesta).
+    void emitirComprobante(paramsParsed.data.id, { metodo: "manual" }, req.log);
+
+    req.log.info(
+      { cobroId: paramsParsed.data.id, comprobanteId },
+      "Comprobante de transferencia confirmado; cobro marcado pagado",
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error confirming transfer receipt");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+cobrosRouter.post("/cobros/:id/comprobantes-transferencia/:comprobanteId/rechazar", async (req, res) => {
+  const paramsParsed = GetCobroParams.safeParse({ id: Number(req.params.id) });
+  const comprobanteId = Number(req.params.comprobanteId);
+  if (!paramsParsed.success || isNaN(comprobanteId)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const userId = req.user!.id;
+  if (!(await userMayAccessCobroId(userId, paramsParsed.data.id))) {
+    res.status(404).json({ error: "Cobro no encontrado" });
+    return;
+  }
+  try {
+    const [comprobante] = await db
+      .update(comprobantesTransferenciaTable)
+      .set({ estado: "rechazado", resueltoEn: new Date() })
+      .where(
+        and(
+          eq(comprobantesTransferenciaTable.id, comprobanteId),
+          eq(comprobantesTransferenciaTable.cobroId, paramsParsed.data.id),
+          eq(comprobantesTransferenciaTable.estado, "pendiente"),
+        ),
+      )
+      .returning({ id: comprobantesTransferenciaTable.id });
+    if (!comprobante) {
+      res.status(400).json({ error: "El comprobante no existe o ya fue resuelto." });
+      return;
+    }
+    req.log.info({ cobroId: paramsParsed.data.id, comprobanteId }, "Comprobante de transferencia rechazado");
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error rejecting transfer receipt");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

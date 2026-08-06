@@ -26,3 +26,5 @@ export * from "./workflow-steps";
 export * from "./workflow-ejecuciones";
 export * from "./tareas";
 export * from "./encuestas";
+export * from "./datos-bancarios";
+export * from "./comprobantes-transferencia";

@@ -15,6 +15,7 @@ import {
   organizacionesTable,
   authTokensTable,
   invitacionesTable,
+  datosBancariosTable,
 } from "@workspace/db";
 import { eq, and, ne, inArray } from "drizzle-orm";
 import { CompletarPerfilBody, EliminarCuentaBody } from "@workspace/api-zod";
@@ -285,6 +286,101 @@ profileRouter.delete("/profile/mp-credentials", async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Error deleting MP credentials");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// ── Datos bancarios para cobranza manual (transferencias) ──────────────────
+
+const DatosBancariosInputSchema = z.object({
+  banco: z.string().trim().min(1, "Banco requerido").max(60),
+  tipoCuenta: z.string().trim().min(1, "Tipo de cuenta requerido").max(40),
+  numeroCuenta: z
+    .string()
+    .trim()
+    .min(1, "Número de cuenta requerido")
+    .max(40)
+    .regex(/^[\d\s-]+$/, "El número de cuenta solo puede contener dígitos, espacios y guiones"),
+  titularNombre: z.string().trim().min(1, "Nombre del titular requerido").max(120),
+  titularRut: z.string().trim().min(1, "RUT del titular requerido").max(20),
+  emailComprobantes: z.string().trim().email("Email inválido").max(200),
+});
+
+profileRouter.get("/profile/datos-bancarios", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const [row] = await db
+      .select()
+      .from(datosBancariosTable)
+      .where(eq(datosBancariosTable.userId, userId));
+    if (!row) {
+      res.json({ configurado: false });
+      return;
+    }
+    let numeroCuenta: string | null = null;
+    try {
+      numeroCuenta = decrypt(row.numeroCuentaEncrypted, row.numeroCuentaIv, row.numeroCuentaAuthTag);
+    } catch {
+      numeroCuenta = null;
+    }
+    res.json({
+      configurado: true,
+      banco: row.banco,
+      tipoCuenta: row.tipoCuenta,
+      numeroCuenta,
+      titularNombre: row.titularNombre,
+      titularRut: row.titularRut,
+      emailComprobantes: row.emailComprobantes,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error getting datos bancarios");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+profileRouter.put("/profile/datos-bancarios", async (req, res) => {
+  const userId = req.user!.id;
+  const parsed = DatosBancariosInputSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Datos inválidos" });
+    return;
+  }
+  const rutNormalizado = normalizeRut(parsed.data.titularRut);
+  if (!rutNormalizado) {
+    res.status(400).json({ error: "El RUT del titular no es válido" });
+    return;
+  }
+  try {
+    const enc = encrypt(parsed.data.numeroCuenta);
+    const values = {
+      banco: parsed.data.banco,
+      tipoCuenta: parsed.data.tipoCuenta,
+      numeroCuentaEncrypted: enc.encrypted,
+      numeroCuentaIv: enc.iv,
+      numeroCuentaAuthTag: enc.authTag,
+      titularNombre: parsed.data.titularNombre,
+      titularRut: rutNormalizado,
+      emailComprobantes: parsed.data.emailComprobantes,
+      actualizadoEn: new Date(),
+    };
+    await db
+      .insert(datosBancariosTable)
+      .values({ userId, ...values })
+      .onConflictDoUpdate({ target: datosBancariosTable.userId, set: values });
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error saving datos bancarios");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+profileRouter.delete("/profile/datos-bancarios", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    await db.delete(datosBancariosTable).where(eq(datosBancariosTable.userId, userId));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting datos bancarios");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

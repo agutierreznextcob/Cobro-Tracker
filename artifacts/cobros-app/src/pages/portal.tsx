@@ -1,8 +1,83 @@
 import { useParams } from "wouter";
-import { useGetPortalDeudor } from "@workspace/api-client-react";
+import { useRef, useState } from "react";
+import { useGetPortalDeudor, useSubirComprobantePortal } from "@workspace/api-client-react";
 import type { PortalCobro } from "@workspace/api-client-react";
 import { formatCurrency, formatShortDate } from "@/lib/format";
-import { Building2, CheckCircle2, Clock, AlertTriangle, ExternalLink, Receipt } from "lucide-react";
+import { Building2, CheckCircle2, Clock, AlertTriangle, ExternalLink, Receipt, Upload, Loader2, FileCheck2 } from "lucide-react";
+
+const MAX_COMPROBANTE_CHARS = 1_500_000;
+
+function SubirComprobanteButton({ token, cobroId }: { token: string; cobroId: number }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const subir = useSubirComprobantePortal();
+  const [enviado, setEnviado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = (file: File) => {
+    setError(null);
+    if (!/^(image\/(png|jpe?g|webp|gif)|application\/pdf)$/.test(file.type)) {
+      setError("Sube una imagen (JPG, PNG) o un PDF.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = String(reader.result ?? "");
+      if (dataUrl.length > MAX_COMPROBANTE_CHARS) {
+        setError("El archivo es muy pesado. Máximo ~1 MB.");
+        return;
+      }
+      try {
+        await subir.mutateAsync({
+          token,
+          data: { cobroId, archivo: dataUrl, nombreArchivo: file.name },
+        });
+        setEnviado(true);
+      } catch (err: unknown) {
+        const msg =
+          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+          "No se pudo enviar el comprobante. Inténtalo de nuevo.";
+        setError(msg);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  if (enviado) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700" data-testid="comprobante-enviado">
+        <FileCheck2 className="h-4 w-4" />
+        Comprobante enviado. Te confirmarán el pago pronto.
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={subir.isPending}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[#6C5CE7] px-4 py-2 text-sm font-medium text-[#6C5CE7] hover:bg-[#6C5CE7]/5 transition-colors disabled:opacity-60"
+        data-testid="button-subir-comprobante"
+      >
+        {subir.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+        {subir.isPending ? "Enviando..." : "Enviar comprobante"}
+      </button>
+      {error && <span className="text-[11px] text-red-600 max-w-52 text-right">{error}</span>}
+    </div>
+  );
+}
 
 const ESTADO_META: Record<
   PortalCobro["estado"],
@@ -144,9 +219,7 @@ export default function PortalPage() {
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                     ) : (
-                      <span className="text-xs text-muted-foreground italic">
-                        Contacta a la empresa
-                      </span>
+                      <SubirComprobanteButton token={token!} cobroId={c.id} />
                     )}
                   </div>
                 </div>

@@ -2,6 +2,7 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Home, Plus, Search, Users, Webhook, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useListNotificaciones, getListNotificacionesQueryKey } from "@workspace/api-client-react";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
 import { useLeadsCountPolling } from "@/hooks/use-leads-count-polling";
@@ -55,6 +56,50 @@ function LeadsNavItem({
   );
 }
 
+function NotificacionesNavItem({
+  location,
+  onNavigate,
+}: {
+  location: string;
+  onNavigate: () => void;
+}) {
+  // Comparte cache con useNotificacionesPolling (misma query key), sin refetch propio.
+  const { data } = useListNotificaciones(
+    { soloNoLeidas: true },
+    { query: { queryKey: getListNotificacionesQueryKey({ soloNoLeidas: true }) } },
+  );
+  const noLeidas = data?.length ?? 0;
+  const active = location === "/notificaciones";
+  return (
+    <Link
+      href="/notificaciones"
+      onClick={onNavigate}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+      }`}
+    >
+      <Bell
+        className={`h-4 w-4 shrink-0 ${
+          active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+        }`}
+      />
+      <span>Notificaciones</span>
+      {noLeidas > 0 && (
+        <span
+          data-testid="badge-notificaciones"
+          className={`ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold ${
+            active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground"
+          }`}
+        >
+          {noLeidas > 99 ? "99+" : noLeidas}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
@@ -69,7 +114,6 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
     { href: "/cobros/informes", label: "Informes", icon: BarChart3 },
     { href: "/clientes", label: "Clientes", icon: Users },
-    { href: "/notificaciones", label: "Notificaciones", icon: Bell },
     { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock },
     { href: "/workflows", label: "Automatización", icon: Workflow },
     { href: "/tareas", label: "Tareas", icon: CheckSquare },
@@ -145,8 +189,8 @@ export function Layout({ children }: { children: ReactNode }) {
           {navItems.map((item) => {
             const isActive = location === item.href;
             return (
+              <div key={item.href} className="space-y-0.5">
               <Link
-                key={item.href}
                 href={item.href}
                 onClick={closeMobile}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
@@ -162,6 +206,10 @@ export function Layout({ children }: { children: ReactNode }) {
                 />
                 <span>{item.label}</span>
               </Link>
+              {item.href === "/clientes" && (
+                <NotificacionesNavItem location={location} onNavigate={closeMobile} />
+              )}
+              </div>
             );
           })}
 

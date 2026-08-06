@@ -51,7 +51,10 @@ import type {
   CobroUpdate,
   CobrosSummary,
   CompletarPerfilInput,
+  ComprobanteTransferencia,
   DashboardMetricas,
+  DatosBancariosInput,
+  DatosBancariosStatus,
   Descuento,
   EliminarCobroInput,
   EliminarCuentaInput,
@@ -123,6 +126,7 @@ import type {
   RendimientoEjecutivo,
   ResetPasswordInput,
   SeguimientoCobranza,
+  SubirComprobanteInput,
   SubscribeResponse,
   SubscriptionStatus,
   SugerenciaWorkflow,
@@ -7091,6 +7095,517 @@ export function useGetPortalDeudor<TData = Awaited<ReturnType<typeof getPortalDe
 
 
 
+
+export const getGetDatosBancariosUrl = () => {
+
+
+
+
+  return `/api/profile/datos-bancarios`
+}
+
+/**
+ * @summary Get bank transfer details for current user
+ */
+export const getDatosBancarios = async ( options?: RequestInit): Promise<DatosBancariosStatus> => {
+
+  return customFetch<DatosBancariosStatus>(getGetDatosBancariosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDatosBancariosQueryKey = () => {
+    return [
+    `/api/profile/datos-bancarios`
+    ] as const;
+    }
+
+
+export const getGetDatosBancariosQueryOptions = <TData = Awaited<ReturnType<typeof getDatosBancarios>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDatosBancarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDatosBancariosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDatosBancarios>>> = ({ signal }) => getDatosBancarios({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDatosBancarios>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDatosBancariosQueryResult = NonNullable<Awaited<ReturnType<typeof getDatosBancarios>>>
+export type GetDatosBancariosQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get bank transfer details for current user
+ */
+
+export function useGetDatosBancarios<TData = Awaited<ReturnType<typeof getDatosBancarios>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDatosBancarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDatosBancariosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveDatosBancariosUrl = () => {
+
+
+
+
+  return `/api/profile/datos-bancarios`
+}
+
+/**
+ * @summary Save or update bank transfer details for current user
+ */
+export const saveDatosBancarios = async (datosBancariosInput: DatosBancariosInput, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getSaveDatosBancariosUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      datosBancariosInput,)
+  }
+);}
+
+
+
+
+export const getSaveDatosBancariosMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDatosBancarios>>, TError,{data: BodyType<DatosBancariosInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveDatosBancarios>>, TError,{data: BodyType<DatosBancariosInput>}, TContext> => {
+
+const mutationKey = ['saveDatosBancarios'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveDatosBancarios>>, {data: BodyType<DatosBancariosInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveDatosBancarios(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveDatosBancariosMutationResult = NonNullable<Awaited<ReturnType<typeof saveDatosBancarios>>>
+    export type SaveDatosBancariosMutationBody = BodyType<DatosBancariosInput>
+    export type SaveDatosBancariosMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Save or update bank transfer details for current user
+ */
+export const useSaveDatosBancarios = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDatosBancarios>>, TError,{data: BodyType<DatosBancariosInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveDatosBancarios>>,
+        TError,
+        {data: BodyType<DatosBancariosInput>},
+        TContext
+      > => {
+      return useMutation(getSaveDatosBancariosMutationOptions(options));
+    }
+
+export const getDeleteDatosBancariosUrl = () => {
+
+
+
+
+  return `/api/profile/datos-bancarios`
+}
+
+/**
+ * @summary Delete bank transfer details for current user
+ */
+export const deleteDatosBancarios = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getDeleteDatosBancariosUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteDatosBancariosMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDatosBancarios>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDatosBancarios>>, TError,void, TContext> => {
+
+const mutationKey = ['deleteDatosBancarios'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDatosBancarios>>, void> = () => {
+
+
+          return  deleteDatosBancarios(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDatosBancariosMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDatosBancarios>>>
+
+    export type DeleteDatosBancariosMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete bank transfer details for current user
+ */
+export const useDeleteDatosBancarios = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDatosBancarios>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDatosBancarios>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeleteDatosBancariosMutationOptions(options));
+    }
+
+export const getSubirComprobantePortalUrl = (token: string,) => {
+
+
+
+
+  return `/api/public/portal/${token}/comprobante`
+}
+
+/**
+ * @summary Debtor uploads a transfer receipt for a pending cobro (no auth)
+ */
+export const subirComprobantePortal = async (token: string,
+    subirComprobanteInput: SubirComprobanteInput, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getSubirComprobantePortalUrl(token),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      subirComprobanteInput,)
+  }
+);}
+
+
+
+
+export const getSubirComprobantePortalMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof subirComprobantePortal>>, TError,{token: string;data: BodyType<SubirComprobanteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof subirComprobantePortal>>, TError,{token: string;data: BodyType<SubirComprobanteInput>}, TContext> => {
+
+const mutationKey = ['subirComprobantePortal'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof subirComprobantePortal>>, {token: string;data: BodyType<SubirComprobanteInput>}> = (props) => {
+          const {token,data} = props ?? {};
+
+          return  subirComprobantePortal(token,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubirComprobantePortalMutationResult = NonNullable<Awaited<ReturnType<typeof subirComprobantePortal>>>
+    export type SubirComprobantePortalMutationBody = BodyType<SubirComprobanteInput>
+    export type SubirComprobantePortalMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Debtor uploads a transfer receipt for a pending cobro (no auth)
+ */
+export const useSubirComprobantePortal = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof subirComprobantePortal>>, TError,{token: string;data: BodyType<SubirComprobanteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof subirComprobantePortal>>,
+        TError,
+        {token: string;data: BodyType<SubirComprobanteInput>},
+        TContext
+      > => {
+      return useMutation(getSubirComprobantePortalMutationOptions(options));
+    }
+
+export const getListComprobantesTransferenciaUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/comprobantes-transferencia`
+}
+
+/**
+ * @summary List transfer receipts uploaded for a cobro
+ */
+export const listComprobantesTransferencia = async (id: number, options?: RequestInit): Promise<ComprobanteTransferencia[]> => {
+
+  return customFetch<ComprobanteTransferencia[]>(getListComprobantesTransferenciaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListComprobantesTransferenciaQueryKey = (id: number,) => {
+    return [
+    `/api/cobros/${id}/comprobantes-transferencia`
+    ] as const;
+    }
+
+
+export const getListComprobantesTransferenciaQueryOptions = <TData = Awaited<ReturnType<typeof listComprobantesTransferencia>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listComprobantesTransferencia>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListComprobantesTransferenciaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listComprobantesTransferencia>>> = ({ signal }) => listComprobantesTransferencia(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listComprobantesTransferencia>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListComprobantesTransferenciaQueryResult = NonNullable<Awaited<ReturnType<typeof listComprobantesTransferencia>>>
+export type ListComprobantesTransferenciaQueryError = ErrorType<void>
+
+
+/**
+ * @summary List transfer receipts uploaded for a cobro
+ */
+
+export function useListComprobantesTransferencia<TData = Awaited<ReturnType<typeof listComprobantesTransferencia>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listComprobantesTransferencia>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListComprobantesTransferenciaQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getConfirmarComprobanteTransferenciaUrl = (id: number,
+    comprobanteId: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/comprobantes-transferencia/${comprobanteId}/confirmar`
+}
+
+/**
+ * @summary Confirm a transfer receipt and mark the cobro as paid
+ */
+export const confirmarComprobanteTransferencia = async (id: number,
+    comprobanteId: number, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getConfirmarComprobanteTransferenciaUrl(id,comprobanteId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getConfirmarComprobanteTransferenciaMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmarComprobanteTransferencia>>, TError,{id: number;comprobanteId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmarComprobanteTransferencia>>, TError,{id: number;comprobanteId: number}, TContext> => {
+
+const mutationKey = ['confirmarComprobanteTransferencia'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmarComprobanteTransferencia>>, {id: number;comprobanteId: number}> = (props) => {
+          const {id,comprobanteId} = props ?? {};
+
+          return  confirmarComprobanteTransferencia(id,comprobanteId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmarComprobanteTransferenciaMutationResult = NonNullable<Awaited<ReturnType<typeof confirmarComprobanteTransferencia>>>
+
+    export type ConfirmarComprobanteTransferenciaMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Confirm a transfer receipt and mark the cobro as paid
+ */
+export const useConfirmarComprobanteTransferencia = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmarComprobanteTransferencia>>, TError,{id: number;comprobanteId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmarComprobanteTransferencia>>,
+        TError,
+        {id: number;comprobanteId: number},
+        TContext
+      > => {
+      return useMutation(getConfirmarComprobanteTransferenciaMutationOptions(options));
+    }
+
+export const getRechazarComprobanteTransferenciaUrl = (id: number,
+    comprobanteId: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/comprobantes-transferencia/${comprobanteId}/rechazar`
+}
+
+/**
+ * @summary Reject a transfer receipt
+ */
+export const rechazarComprobanteTransferencia = async (id: number,
+    comprobanteId: number, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getRechazarComprobanteTransferenciaUrl(id,comprobanteId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRechazarComprobanteTransferenciaMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rechazarComprobanteTransferencia>>, TError,{id: number;comprobanteId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rechazarComprobanteTransferencia>>, TError,{id: number;comprobanteId: number}, TContext> => {
+
+const mutationKey = ['rechazarComprobanteTransferencia'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rechazarComprobanteTransferencia>>, {id: number;comprobanteId: number}> = (props) => {
+          const {id,comprobanteId} = props ?? {};
+
+          return  rechazarComprobanteTransferencia(id,comprobanteId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RechazarComprobanteTransferenciaMutationResult = NonNullable<Awaited<ReturnType<typeof rechazarComprobanteTransferencia>>>
+
+    export type RechazarComprobanteTransferenciaMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Reject a transfer receipt
+ */
+export const useRechazarComprobanteTransferencia = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rechazarComprobanteTransferencia>>, TError,{id: number;comprobanteId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rechazarComprobanteTransferencia>>,
+        TError,
+        {id: number;comprobanteId: number},
+        TContext
+      > => {
+      return useMutation(getRechazarComprobanteTransferenciaMutationOptions(options));
+    }
 
 export const getEnviarPortalClienteUrl = (id: number,) => {
 

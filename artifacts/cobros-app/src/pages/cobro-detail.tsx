@@ -43,6 +43,8 @@ import {
   getListCobroEjecucionesQueryKey,
   useGetSugerenciaWorkflow,
   getGetSugerenciaWorkflowQueryKey,
+  useGetDatosBancarios,
+  getGetDatosBancariosQueryKey,
   type RecordatorioInputCanal,
   type RecordatorioInputMomento,
 } from "@workspace/api-client-react";
@@ -73,6 +75,7 @@ import { formatCurrency, formatDate, formatDateOnly } from "@/lib/format";
 import { tipoDocumentoLabel, TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva, type TipoDocumento } from "@/lib/tipo-documento";
 import { StatusBadge } from "@/components/status-badge";
 import { GestionesSection } from "@/components/gestiones-section";
+import { ComprobantesTransferenciaSection } from "@/components/comprobantes-transferencia-section";
 import { accionLabel } from "@/lib/workflow-labels";
 import {
   ArrowLeft,
@@ -658,6 +661,11 @@ export default function CobroDetail() {
 
   const noTieneLink = !cobro?.flowLinkPago && !cobro?.mpPaymentLinkUrl;
 
+  // Datos bancarios del usuario: se incluyen en los mensajes de cobros manuales.
+  const { data: datosBancarios } = useGetDatosBancarios({
+    query: { enabled: noTieneLink, queryKey: getGetDatosBancariosQueryKey() },
+  });
+
   const handleAvisarEmail = () => {
     avisarCliente.mutate(
       { id, data: { tipo: "email" } },
@@ -682,7 +690,18 @@ export default function CobroDetail() {
     if (!cobro) return;
     const monto = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(cobro.monto));
     const nombre = cobro.clienteNombre || "cliente";
-    const msg = `Hola ${nombre}, tienes un cobro pendiente de ${monto} por concepto de "${cobro.descripcion}". Por favor comunícate para coordinar el pago.`;
+    let msg = `Hola ${nombre}, tienes un cobro pendiente de ${monto} por concepto de "${cobro.descripcion}".`;
+    if (datosBancarios?.configurado) {
+      msg +=
+        `\n\nDatos para transferir:` +
+        `\n🏦 ${datosBancarios.banco} | ${datosBancarios.tipoCuenta}` +
+        `\n📝 N° ${datosBancarios.numeroCuenta}` +
+        `\n👤 ${datosBancarios.titularNombre} | RUT ${datosBancarios.titularRut}` +
+        `\n📧 Comprobante a: ${datosBancarios.emailComprobantes}` +
+        `\n\nUna vez transferido, envía el comprobante para confirmar tu pago. ¡Gracias!`;
+    } else {
+      msg += ` Por favor comunícate para coordinar el pago.`;
+    }
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
 
     avisarCliente.mutate(
@@ -1634,6 +1653,18 @@ export default function CobroDetail() {
                   Este cobro no tiene pasarela de pago. Registra los avisos que hagas al cliente.
                 </p>
 
+                {isPendiente && datosBancarios && !datosBancarios.configurado && (
+                  <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 px-3 py-2" data-testid="aviso-sin-datos-bancarios">
+                    <p className="text-xs text-amber-800 dark:text-amber-300">
+                      Para incluir datos de transferencia en tus cobros, configura tu cuenta bancaria en{" "}
+                      <Link href="/perfil" className="font-medium underline underline-offset-2">
+                        Perfil → Datos bancarios
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                )}
+
                 {/* Acciones */}
                 {isPendiente && (
                   <div className="flex flex-col gap-2">
@@ -2116,6 +2147,9 @@ export default function CobroDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Comprobantes de transferencia enviados por el cliente */}
+      <ComprobantesTransferenciaSection cobroId={id} />
 
       {/* Abonos / pagos parciales */}
       <Card className="shadow-sm border-border/50">

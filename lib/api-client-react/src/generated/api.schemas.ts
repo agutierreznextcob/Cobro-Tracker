@@ -1131,6 +1131,79 @@ export interface MpCredentialsStatus {
   configurado: boolean;
 }
 
+export interface DatosBancariosStatus {
+  configurado: boolean;
+  banco?: string | null;
+  tipoCuenta?: string | null;
+  numeroCuenta?: string | null;
+  titularNombre?: string | null;
+  titularRut?: string | null;
+  emailComprobantes?: string | null;
+}
+
+export interface DatosBancariosInput {
+  /**
+     * @minLength 1
+     * @maxLength 60
+     */
+  banco: string;
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  tipoCuenta: string;
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  numeroCuenta: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  titularNombre: string;
+  /**
+     * @minLength 1
+     * @maxLength 20
+     */
+  titularRut: string;
+  /** @maxLength 200 */
+  emailComprobantes: string;
+}
+
+export interface SubirComprobanteInput {
+  cobroId: number;
+  /**
+     * Data URL (image/* or application/pdf) base64, máx ~1.5M chars
+     * @minLength 1
+     */
+  archivo: string;
+  /** @maxLength 200 */
+  nombreArchivo?: string | null;
+  /** @maxLength 500 */
+  comentario?: string | null;
+}
+
+export type ComprobanteTransferenciaEstado = typeof ComprobanteTransferenciaEstado[keyof typeof ComprobanteTransferenciaEstado];
+
+
+export const ComprobanteTransferenciaEstado = {
+  pendiente: 'pendiente',
+  confirmado: 'confirmado',
+  rechazado: 'rechazado',
+} as const;
+
+export interface ComprobanteTransferencia {
+  id: number;
+  cobroId: number;
+  archivo: string;
+  nombreArchivo?: string | null;
+  comentario?: string | null;
+  estado: ComprobanteTransferenciaEstado;
+  creadoEn: string;
+  resueltoEn?: string | null;
+}
+
 export interface MpCredentialsInput {
   /** @minLength 1 */
   accessToken: string;

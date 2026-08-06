@@ -34,8 +34,9 @@ import {
 } from "@/components/ui/dialog";
 import { isValidRut, formatRut } from "@/lib/rut";
 import { TeamSection } from "@/components/team-section";
+import { DatosBancariosSection } from "@/components/datos-bancarios-section";
 import { OrgRoleBadge } from "@/components/org-role-badge";
-import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera, ShieldCheck, Download } from "lucide-react";
+import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera, ShieldCheck, Download, Landmark } from "lucide-react";
 
 // Desglose mensual en tiempo real: plan base + usuarios extra = total mensual.
 // Los montos vienen del backend (/subscription/status) y se refrescan cuando el
@@ -1102,6 +1103,10 @@ function ProfileSettings() {
             </div>
           )}
         </div>
+      </PerfilSeccion>
+
+      <PerfilSeccion value="banco" icon={Landmark} title="Datos bancarios para transferencias" description="Cuenta a la que tus clientes transfieren en cobros manuales. Se incluye en emails y WhatsApp cuando el cobro no tiene link de pago.">
+        <DatosBancariosSection />
       </PerfilSeccion>
 
       <PerfilSeccion value="privacidad" icon={ShieldCheck} title="Mis datos y privacidad" description="Descarga una copia de tus datos o elimina tu cuenta de forma permanente, según la Ley N° 21.719.">

@@ -207,6 +207,8 @@ export interface AvisoManualEmailData {
   comercioNombre: string;
   remitenteNombre?: string | null;
   remitenteEmail?: string | null;
+  /** Bloque HTML con datos bancarios para transferencia (cobros manuales). */
+  datosBancariosHtml?: string | null;
 }
 
 export async function sendAvisoManualEmail(
@@ -238,7 +240,10 @@ export async function sendAvisoManualEmail(
           <strong>Concepto:</strong> ${data.descripcion}<br/>
           <strong>Monto:</strong> <span style="font-family:monospace;font-weight:700;color:#2563eb;">${montoFormato}</span>
         </span>`,
-        `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
+        ...(data.datosBancariosHtml ? [data.datosBancariosHtml] : []),
+        data.datosBancariosHtml
+          ? `Una vez realizada la transferencia, responde este correo adjuntando el comprobante, o envíalo al email indicado arriba.`
+          : `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
       ],
       ctaText: responderUrl ? `Responder al cobro` : undefined,
       ctaUrl: responderUrl ?? undefined,
@@ -472,6 +477,8 @@ export interface SecuenciaRecordatorioData {
   diasVencido: number;
   remitenteNombre?: string | null;
   remitenteEmail?: string | null;
+  /** Bloque HTML con datos bancarios para transferencia (cobros manuales). */
+  datosBancariosHtml?: string | null;
 }
 
 export async function sendSecuenciaRecordatorioEmail(
@@ -525,9 +532,12 @@ export async function sendSecuenciaRecordatorioEmail(
           <strong>Concepto:</strong> ${data.descripcion}<br/>
           <strong>Monto:</strong> <span style="font-family:monospace;font-weight:700;color:#2563eb;">${montoFormato}</span>
         </span>`,
+        ...(!tieneLink && data.datosBancariosHtml ? [data.datosBancariosHtml] : []),
         tieneLink
           ? `Puedes pagar de forma rápida y segura haciendo clic en el botón a continuación.`
-          : `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
+          : data.datosBancariosHtml
+            ? `Una vez realizada la transferencia, responde este correo adjuntando el comprobante, o envíalo al email indicado arriba.`
+            : `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
       ],
       ctaText: tieneLink
         ? `Pagar ${montoFormato}`

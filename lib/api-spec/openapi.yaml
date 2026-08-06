@@ -2391,6 +2391,189 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /profile/datos-bancarios:
+    get:
+      operationId: getDatosBancarios
+      tags: [profile]
+      summary: Get bank transfer details for current user
+      responses:
+        "200":
+          description: Bank details (configurado=false when not set)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatosBancariosStatus"
+        "401":
+          description: Unauthorized
+    put:
+      operationId: saveDatosBancarios
+      tags: [profile]
+      summary: Save or update bank transfer details for current user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatosBancariosInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+    delete:
+      operationId: deleteDatosBancarios
+      tags: [profile]
+      summary: Delete bank transfer details for current user
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          description: Unauthorized
+
+  /public/portal/{token}/comprobante:
+    post:
+      operationId: subirComprobantePortal
+      tags: [portal]
+      summary: Debtor uploads a transfer receipt for a pending cobro (no auth)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubirComprobanteInput"
+      responses:
+        "200":
+          description: Receipt stored and executive notified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Invalid token or cobro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cobros/{id}/comprobantes-transferencia:
+    get:
+      operationId: listComprobantesTransferencia
+      tags: [cobros]
+      summary: List transfer receipts uploaded for a cobro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Receipts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComprobanteTransferencia"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  /cobros/{id}/comprobantes-transferencia/{comprobanteId}/confirmar:
+    post:
+      operationId: confirmarComprobanteTransferencia
+      tags: [cobros]
+      summary: Confirm a transfer receipt and mark the cobro as paid
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: comprobanteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Confirmed; cobro marked pagado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Invalid state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  /cobros/{id}/comprobantes-transferencia/{comprobanteId}/rechazar:
+    post:
+      operationId: rechazarComprobanteTransferencia
+      tags: [cobros]
+      summary: Reject a transfer receipt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: comprobanteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Invalid state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
   /clientes/{id}/portal:
     post:
       operationId: enviarPortalCliente
@@ -4187,6 +4370,106 @@ components:
       properties:
         configurado:
           type: boolean
+
+    DatosBancariosStatus:
+      type: object
+      required: [configurado]
+      properties:
+        configurado:
+          type: boolean
+        banco:
+          type: string
+          nullable: true
+        tipoCuenta:
+          type: string
+          nullable: true
+        numeroCuenta:
+          type: string
+          nullable: true
+        titularNombre:
+          type: string
+          nullable: true
+        titularRut:
+          type: string
+          nullable: true
+        emailComprobantes:
+          type: string
+          nullable: true
+
+    DatosBancariosInput:
+      type: object
+      required: [banco, tipoCuenta, numeroCuenta, titularNombre, titularRut, emailComprobantes]
+      properties:
+        banco:
+          type: string
+          minLength: 1
+          maxLength: 60
+        tipoCuenta:
+          type: string
+          minLength: 1
+          maxLength: 40
+        numeroCuenta:
+          type: string
+          minLength: 1
+          maxLength: 40
+        titularNombre:
+          type: string
+          minLength: 1
+          maxLength: 120
+        titularRut:
+          type: string
+          minLength: 1
+          maxLength: 20
+        emailComprobantes:
+          type: string
+          format: email
+          maxLength: 200
+
+    SubirComprobanteInput:
+      type: object
+      required: [cobroId, archivo]
+      properties:
+        cobroId:
+          type: integer
+        archivo:
+          type: string
+          description: Data URL (image/* or application/pdf) base64, máx ~1.5M chars
+          minLength: 1
+        nombreArchivo:
+          type: string
+          maxLength: 200
+          nullable: true
+        comentario:
+          type: string
+          maxLength: 500
+          nullable: true
+
+    ComprobanteTransferencia:
+      type: object
+      required: [id, cobroId, archivo, estado, creadoEn]
+      properties:
+        id:
+          type: integer
+        cobroId:
+          type: integer
+        archivo:
+          type: string
+        nombreArchivo:
+          type: string
+          nullable: true
+        comentario:
+          type: string
+          nullable: true
+        estado:
+          type: string
+          enum: [pendiente, confirmado, rechazado]
+        creadoEn:
+          type: string
+          format: date-time
+        resueltoEn:
+          type: string
+          format: date-time
+          nullable: true
 
     MpCredentialsInput:
       type: object

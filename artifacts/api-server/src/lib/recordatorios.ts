@@ -11,6 +11,12 @@ import {
 import { and, eq, isNotNull, isNull, inArray } from "drizzle-orm";
 import { sendSecuenciaRecordatorioEmail } from "./email";
 import { getRemitenteContacto } from "./org";
+import {
+  getDatosBancariosUsuario,
+  buildDatosBancariosHtml,
+  buildDatosBancariosTextoWa,
+  type DatosBancariosDecrypted,
+} from "./datos-bancarios";
 import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "./whatsapp";
 
 type Canal = "email" | "whatsapp" | "ambos";
@@ -68,7 +74,11 @@ function esDueHoy(momento: Momento, diasOffset: number, vencimiento: string, hoy
 
 // --- WhatsApp helpers ---
 
-function buildWaMensaje(cobro: typeof cobrosTable.$inferSelect, linkPago: string | null): string {
+function buildWaMensaje(
+  cobro: typeof cobrosTable.$inferSelect,
+  linkPago: string | null,
+  datosBancarios?: DatosBancariosDecrypted | null,
+): string {
   const nombre = cobro.clienteNombre || "cliente";
   const monto = new Intl.NumberFormat("es-CL", {
     style: "currency",
@@ -76,8 +86,13 @@ function buildWaMensaje(cobro: typeof cobrosTable.$inferSelect, linkPago: string
     maximumFractionDigits: 0,
   }).format(Math.round(Number(cobro.monto)));
   let msg = `Hola ${nombre}, tienes un cobro pendiente de ${monto} por concepto de "${cobro.descripcion}".`;
-  if (linkPago) msg += ` Puedes pagar aquí: ${linkPago}`;
-  else msg += ` Por favor comunícate para coordinar el pago.`;
+  if (linkPago) {
+    msg += ` Puedes pagar aquí: ${linkPago}`;
+  } else if (datosBancarios) {
+    msg += `\n\n${buildDatosBancariosTextoWa(datosBancarios)}\n\nUna vez transferido, envía el comprobante para confirmar tu pago. ¡Gracias!`;
+  } else {
+    msg += ` Por favor comunícate para coordinar el pago.`;
+  }
   return msg;
 }
 
@@ -218,6 +233,16 @@ export async function procesarRecordatorios(
 
   log.info({ fecha: hoy, cobros: cobros.length }, "Procesando recordatorios del día");
 
+  // Cache por responsable para no desencriptar datos bancarios en cada cobro.
+  const datosBancariosCache = new Map<string, DatosBancariosDecrypted | null>();
+  async function datosBancariosDe(responsableId: string | null): Promise<DatosBancariosDecrypted | null> {
+    if (!responsableId) return null;
+    if (!datosBancariosCache.has(responsableId)) {
+      datosBancariosCache.set(responsableId, await getDatosBancariosUsuario(responsableId));
+    }
+    return datosBancariosCache.get(responsableId) ?? null;
+  }
+
   for (const cobro of cobros) {
     const vencimiento = cobro.fechaVencimiento;
     if (!vencimiento) continue;
@@ -249,8 +274,10 @@ export async function procesarRecordatorios(
             continue;
           }
           const remitente = await getRemitenteContacto(cobro.responsableId);
+          const datosBancarios = linkPago ? null : await datosBancariosDe(cobro.responsableId);
           const result = await sendSecuenciaRecordatorioEmail(
             {
+              datosBancariosHtml: datosBancarios ? buildDatosBancariosHtml(datosBancarios) : null,
               emailPagador: cobro.emailPagador,
               clienteNombre: cobro.clienteNombre,
               descripcion: cobro.descripcion,
@@ -287,7 +314,8 @@ export async function procesarRecordatorios(
               .where(eq(clientesTable.id, cobro.clienteId));
             telefono = cliente?.telefono ?? null;
           }
-          const mensaje = buildWaMensaje(cobro, linkPago);
+          const datosBancarios = linkPago ? null : await datosBancariosDe(cobro.responsableId);
+          const mensaje = buildWaMensaje(cobro, linkPago, datosBancarios);
 
           if (isWhatsAppConfigured() && telefono && sanitizePhone(telefono)) {
             const result = await sendWhatsAppMensaje({ telefono, mensaje }, log);

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateCobro, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, useListWorkflows, getListWorkflowsQueryKey, useListWorkflowPlantillas, useCreateWorkflowFromPlantilla, useAsignarWorkflow, type CobroInput } from "@workspace/api-client-react";
+import { useCreateCobro, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, useListWorkflows, getListWorkflowsQueryKey, useListWorkflowPlantillas, useCreateWorkflowFromPlantilla, useAsignarWorkflow, useGetDatosBancarios, getGetDatosBancariosQueryKey, type CobroInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLocation } from "wouter";
@@ -40,6 +40,9 @@ export default function NewCobro() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createCobro = useCreateCobro();
+  const { data: datosBancarios } = useGetDatosBancarios({
+    query: { queryKey: getGetDatosBancariosQueryKey() },
+  });
   const { user } = useAuth();
   const isOrgAdmin = user?.orgRole === "admin_org";
   const isSupervisor = user?.orgRole === "supervisor";
@@ -532,6 +535,18 @@ export default function NewCobro() {
                   </div>
                 )}
               </div>
+
+              {datosBancarios && !datosBancarios.configurado && (
+                <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 px-3 py-2" data-testid="aviso-sin-datos-bancarios">
+                  <p className="text-xs text-amber-800 dark:text-amber-300">
+                    Para incluir datos de transferencia en tus cobros, configura tu cuenta bancaria en{" "}
+                    <Link href="/perfil" className="font-medium underline underline-offset-2">
+                      Perfil → Datos bancarios
+                    </Link>
+                    .
+                  </p>
+                </div>
+              )}
 
               <div className="flex justify-end pt-4 border-t border-border/50">
                 <Button
