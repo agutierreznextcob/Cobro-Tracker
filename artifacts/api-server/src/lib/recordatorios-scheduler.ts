@@ -2,6 +2,11 @@ import { logger } from "./logger";
 import { fechaHoySantiago, procesarRecordatorios } from "./recordatorios";
 import { procesarWorkflows } from "./workflows-engine";
 import { procesarEncuestasPendientes } from "./encuestas-service";
+import {
+  reveniuConfigured,
+  sincronizarMontosReveniu,
+  procesarGraciaPagosFallidos,
+} from "./reveniu";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 // Surveys are scheduled ~1h after payment; sweep often so delivery stays close
@@ -26,6 +31,12 @@ async function tick(): Promise<void> {
     // engines coexisten: procesarRecordatorios ignora cobros con workflowId y
     // procesarWorkflows sólo actúa sobre cobros con workflowId asignado.
     await procesarWorkflows(runLogger);
+    // Suscripciones Reveniu (una vez al día): sincroniza el monto mensual
+    // (base + usuarios extra activos) y procesa la gracia de pagos fallidos.
+    if (reveniuConfigured()) {
+      await sincronizarMontosReveniu(logger);
+      await procesarGraciaPagosFallidos(logger);
+    }
     lastProcessedDate = hoy;
   } catch (err) {
     logger.error({ err }, "Error en el scheduler de recordatorios");

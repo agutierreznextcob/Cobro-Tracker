@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA } from "./flow-subscriptions";
 
 export interface SubscriptionState {
-  status: "prueba" | "activa" | "vencida";
+  status: "prueba" | "activa" | "vencida" | "cancelada";
   hasAccess: boolean;
   isAdmin: boolean;
   trialEndsAt: string | null;
@@ -25,10 +25,11 @@ export interface SubscriptionState {
 }
 
 export interface UserSubscriptionRow {
-  subscriptionStatus: "prueba" | "activa" | "vencida";
+  subscriptionStatus: "prueba" | "activa" | "vencida" | "cancelada";
   trialEndsAt: Date | null;
   subscriptionPeriodEnd: Date | null;
   flowSubscriptionId: string | null;
+  reveniuSubscriptionId?: number | null;
   role: "user" | "admin";
   activo: boolean;
   esDemo?: boolean;
@@ -57,6 +58,13 @@ export function computeSubscriptionState(
   } else if (row.subscriptionStatus === "activa") {
     // Active subscription: trust it. Webhook flips to "vencida" on failed charge.
     hasAccess = true;
+  } else if (row.subscriptionStatus === "cancelada") {
+    // Renovación cancelada: conserva el acceso hasta el fin del período ya
+    // pagado; después queda sin acceso (sin nuevos cobros).
+    hasAccess = periodEnd ? periodEnd.getTime() > now : false;
+    diasRestantes = periodEnd
+      ? Math.max(0, Math.ceil((periodEnd.getTime() - now) / MS_PER_DAY))
+      : 0;
   } else if (row.subscriptionStatus === "prueba") {
     const trialMs = trialEndsAt ? trialEndsAt.getTime() : 0;
     hasAccess = trialMs > now;
@@ -80,7 +88,7 @@ export function computeSubscriptionState(
     trialEndsAt: trialEndsAt ? trialEndsAt.toISOString() : null,
     diasRestantes,
     periodEnd: periodEnd ? periodEnd.toISOString() : null,
-    tieneSuscripcion: Boolean(row.flowSubscriptionId),
+    tieneSuscripcion: Boolean(row.flowSubscriptionId || row.reveniuSubscriptionId),
     precioMensual: PLAN_AMOUNT,
     precioNeto: PLAN_NETO,
     precioIva: PLAN_IVA,
@@ -119,6 +127,7 @@ export async function getSubscriptionState(userId: string): Promise<Subscription
       trialEndsAt: usersTable.trialEndsAt,
       subscriptionPeriodEnd: usersTable.subscriptionPeriodEnd,
       flowSubscriptionId: usersTable.flowSubscriptionId,
+      reveniuSubscriptionId: usersTable.reveniuSubscriptionId,
       role: usersTable.role,
       activo: usersTable.activo,
       esDemo: usersTable.esDemo,

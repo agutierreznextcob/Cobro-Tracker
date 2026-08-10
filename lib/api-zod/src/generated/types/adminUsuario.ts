@@ -45,4 +45,19 @@ export interface AdminUsuario {
   montoMensual: number;
   /** Total collected (paid cobros) for the user's organization. */
   totalRecaudado: number;
+  /**
+     * Date of the last successful subscription payment.
+     * @nullable
+     */
+  ultimoPagoEn: string | null;
+  /**
+     * Amount (CLP, IVA incl.) of the last subscription payment.
+     * @nullable
+     */
+  ultimoPagoMonto: number | null;
+  /**
+     * Next scheduled subscription charge date (active subs only).
+     * @nullable
+     */
+  proximoCobroEn: string | null;
 }

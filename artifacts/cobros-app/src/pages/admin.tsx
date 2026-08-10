@@ -89,6 +89,13 @@ function EstadoBadge({ u }: { u: AdminUsuario }) {
   if (u.subscriptionStatus === "prueba") {
     return <Badge variant="secondary">Prueba</Badge>;
   }
+  if (u.subscriptionStatus === "cancelada") {
+    return (
+      <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-500">
+        Cancelada
+      </Badge>
+    );
+  }
   return <Badge variant="destructive">Vencida</Badge>;
 }
 
@@ -532,6 +539,8 @@ export default function AdminPage() {
                     <TableHead>RUT</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Vencimiento</TableHead>
+                    <TableHead>Último pago</TableHead>
+                    <TableHead>Próximo cobro</TableHead>
                     <TableHead className="text-right">Usuarios</TableHead>
                     <TableHead className="text-right">Plan mensual</TableHead>
                     <TableHead className="text-right">Recaudado</TableHead>
@@ -571,6 +580,27 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm">
                         <VencimientoCell u={u} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {u.ultimoPagoEn ? (
+                          <>
+                            {formatFecha(u.ultimoPagoEn)}
+                            {u.ultimoPagoMonto != null && (
+                              <span className="text-xs text-muted-foreground">
+                                {" "}· {formatCLP(u.ultimoPagoMonto)}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {u.proximoCobroEn ? (
+                          formatFecha(u.proximoCobroEn)
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         {u.isAdmin ? "—" : 1 + u.usuariosExtra}

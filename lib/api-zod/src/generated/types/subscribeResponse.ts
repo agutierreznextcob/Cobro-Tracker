@@ -7,5 +7,8 @@
  */
 
 export interface SubscribeResponse {
-  url: string;
+  /** Reveniu completion URL to POST the TBK_TOKEN form to */
+  completionUrl: string;
+  /** Value for the hidden TBK_TOKEN input */
+  securityToken: string;
 }

@@ -10,6 +10,9 @@ import {
   getGetMpCredentialsQueryKey,
   useGetSubscriptionStatus,
   getGetSubscriptionStatusQueryKey,
+  useStartSubscription,
+  useCancelSubscription,
+  useGetPaymentMethodUrl,
   useCompletarPerfil,
   exportarDatos,
   useEliminarCuenta,
@@ -71,13 +74,146 @@ type SubStatusDesglose = {
   totalMensual?: number;
 };
 
-// Botón de suscripción sin funcionalidad activa: el cobro mensual automático
-// se activará cuando se integre Fintoc.
+// Redirige al checkout de Reveniu vía form POST con el input oculto TBK_TOKEN
+// (Transbank OneClick). El backend crea la suscripción y devuelve
+// completionUrl + securityToken.
+function redirectToReveniu(completionUrl: string, securityToken: string) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = completionUrl;
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = "TBK_TOKEN";
+  input.value = securityToken;
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Botón de suscripción: inicia el checkout de Reveniu (registro de tarjeta una
+// sola vez; luego el cobro mensual es automático).
 function SuscribirseButton() {
+  const { toast } = useToast();
+  const start = useStartSubscription({
+    mutation: {
+      onSuccess: (data) => {
+        redirectToReveniu(data.completionUrl, data.securityToken);
+      },
+      onError: (err: unknown) => {
+        const msg =
+          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+          "No se pudo iniciar la suscripción. Intenta nuevamente.";
+        toast({ title: "Error", description: msg, variant: "destructive" });
+      },
+    },
+  });
   return (
     <div className="space-y-1.5">
-      <Button disabled className="w-full sm:w-auto">Suscribirse</Button>
-      <p className="text-xs text-muted-foreground">Disponible próximamente.</p>
+      <Button
+        className="w-full sm:w-auto"
+        disabled={start.isPending}
+        onClick={() => start.mutate()}
+        data-testid="button-suscribirse"
+      >
+        {start.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+        Suscribirse
+      </Button>
+      <p className="text-xs text-muted-foreground">
+        Registras tu tarjeta una sola vez (Transbank) y el cobro mensual es automático.
+      </p>
+    </div>
+  );
+}
+
+// Acciones de una suscripción activa: cancelar (con confirmación) y actualizar
+// el método de pago (link hospedado por Reveniu).
+function SuscripcionActivaAcciones() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const cancelar = useCancelSubscription({
+    mutation: {
+      onSuccess: (data) => {
+        setConfirmOpen(false);
+        queryClient.invalidateQueries({ queryKey: getGetSubscriptionStatusQueryKey() });
+        toast({
+          title: "Suscripción cancelada",
+          description: data.accesoHasta
+            ? `Mantendrás el acceso hasta el ${formatFecha(data.accesoHasta)}. No se harán más cobros.`
+            : "No se harán más cobros.",
+        });
+      },
+      onError: (err: unknown) => {
+        const msg =
+          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+          "No se pudo cancelar la suscripción.";
+        toast({ title: "Error", description: msg, variant: "destructive" });
+      },
+    },
+  });
+
+  const metodoPago = useGetPaymentMethodUrl({
+    mutation: {
+      onSuccess: (data) => {
+        window.open(data.url, "_blank", "noopener");
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "No se pudo obtener el enlace para actualizar el método de pago.",
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={metodoPago.isPending}
+        onClick={() => metodoPago.mutate()}
+        data-testid="button-actualizar-metodo-pago"
+      >
+        {metodoPago.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+        Actualizar método de pago
+      </Button>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:text-destructive"
+          onClick={() => setConfirmOpen(true)}
+          data-testid="button-cancelar-suscripcion"
+        >
+          Cancelar suscripción
+        </Button>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Cancelar tu suscripción?</DialogTitle>
+            <DialogDescription>
+              No se harán más cobros automáticos. Mantendrás el acceso hasta el final del
+              período que ya pagaste; después tu cuenta quedará suspendida.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Volver
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={cancelar.isPending}
+              onClick={() => cancelar.mutate()}
+              data-testid="button-confirmar-cancelacion"
+            >
+              {cancelar.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Sí, cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -854,12 +990,33 @@ function ProfileSettings() {
                   <p className="text-sm font-medium text-green-800 dark:text-green-300">Suscripción activa</p>
                   <p className="text-xs text-green-600 dark:text-green-400">
                     {subStatus.periodEnd
-                      ? `Vigente hasta: ${formatFecha(subStatus.periodEnd)}`
+                      ? `Próximo cobro: ${formatFecha(subStatus.periodEnd)}`
                       : `Plan mensual ${formatCLP(subStatus.precioNeto)} + IVA/mes`}
                   </p>
                 </div>
               </div>
               <DesgloseMensual subStatus={subStatus} />
+              {subStatus.tieneSuscripcion ? (
+                <SuscripcionActivaAcciones />
+              ) : (
+                <SuscribirseButton />
+              )}
+            </>
+          ) : subStatus?.status === "cancelada" ? (
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                <CreditCard className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Suscripción cancelada</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {subStatus.periodEnd
+                      ? `Mantienes el acceso hasta el ${formatFecha(subStatus.periodEnd)}. No se harán más cobros.`
+                      : "No se harán más cobros automáticos."}
+                  </p>
+                </div>
+              </div>
+              <DesgloseMensual subStatus={subStatus} />
+              <SuscribirseButton />
             </>
           ) : subStatus?.status === "prueba" ? (
             <>

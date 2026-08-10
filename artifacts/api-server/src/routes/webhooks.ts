@@ -15,6 +15,14 @@ import {
 } from "../lib/flow-subscriptions";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { emitirComprobante } from "../lib/comprobante-service";
+import { reveniuWebhookSecret, reveniuConfigured, getReveniuSubscription } from "../lib/reveniu";
+
+// Comparación en tiempo constante entre strings de largo posiblemente distinto.
+function safeEquals(a: string, b: string): boolean {
+  const ha = createHmac("sha256", "cmp").update(a).digest();
+  const hb = createHmac("sha256", "cmp").update(b).digest();
+  return timingSafeEqual(ha, hb);
+}
 
 const webhooksRouter = Router();
 
@@ -838,6 +846,289 @@ webhooksRouter.post("/webhooks/flow-subscription", async (req, res) => {
     req.log.error({ err }, "Error processing subscription webhook");
     await logEvento({
       evento: "suscripcion.webhook",
+      exitoso: false,
+      ipOrigen: ip,
+      detalle: err instanceof Error ? err.message : "Error desconocido",
+    });
+    res.json({ ok: true });
+  }
+});
+
+// ── Reveniu (suscripción de la plataforma) ───────────────────────────────────
+// Reveniu autentica sus webhooks reenviando el secret en el header
+// Reveniu-Secret-Key. Payload: { event, data: { subscription_id,
+// subscription_external_id, ... } }. external_id = users.id (lo enviamos al
+// crear la suscripción). Siempre respondemos 200 para casos irrecuperables,
+// pero 401 si el header no coincide (origen no confiable).
+webhooksRouter.post("/webhooks/reveniu", async (req, res) => {
+  const ip = getClientIp(req as Parameters<typeof getClientIp>[0]);
+  const secret = reveniuWebhookSecret();
+  const header = req.headers["reveniu-secret-key"];
+  const provided = Array.isArray(header) ? header[0] : header;
+
+  if (!secret || !provided || !safeEquals(provided, secret)) {
+    await logEvento({
+      evento: "reveniu.webhook",
+      exitoso: false,
+      ipOrigen: ip,
+      detalle: "Header Reveniu-Secret-Key inválido o ausente",
+    });
+    res.status(401).json({ error: "No autorizado" });
+    return;
+  }
+
+  const event = String(req.body?.event ?? req.body?.type ?? "");
+  const data = (req.body?.data ?? req.body ?? {}) as Record<string, unknown>;
+  const subscriptionId = Number(data.subscription_id ?? data.id ?? NaN);
+  const externalId =
+    typeof data.subscription_external_id === "string" && data.subscription_external_id
+      ? data.subscription_external_id
+      : typeof data.external_id === "string" && data.external_id
+        ? data.external_id
+        : null;
+
+  req.log.info({ event, subscriptionId, externalId }, "Reveniu webhook received");
+
+  try {
+    // Localiza al usuario: por external_id (users.id), por suscripción activa o
+    // por la suscripción pendiente creada en el checkout.
+    let user = null as typeof usersTable.$inferSelect | null;
+    if (externalId) {
+      const [byExternal] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, externalId));
+      user = byExternal ?? null;
+    }
+    if (!user && Number.isFinite(subscriptionId)) {
+      const [bySub] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.reveniuSubscriptionId, subscriptionId));
+      user = bySub ?? null;
+      if (!user) {
+        const [byPending] = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.reveniuPendingSubscriptionId, subscriptionId));
+        user = byPending ?? null;
+      }
+    }
+
+    if (!user) {
+      await logEvento({
+        evento: "reveniu.webhook",
+        exitoso: false,
+        ipOrigen: ip,
+        detalle: `Sin usuario para evento ${event} (sub ${subscriptionId})`,
+      });
+      res.json({ ok: true });
+      return;
+    }
+
+    // Anti-spoofing: si el evento trae un subscription_id que no corresponde al
+    // usuario resuelto por external_id, lo ignoramos.
+    if (
+      Number.isFinite(subscriptionId) &&
+      user.reveniuSubscriptionId != null &&
+      user.reveniuSubscriptionId !== subscriptionId &&
+      user.reveniuPendingSubscriptionId !== subscriptionId
+    ) {
+      await logEvento({
+        evento: "reveniu.webhook",
+        exitoso: false,
+        ipOrigen: ip,
+        detalle: `subscription_id ${subscriptionId} no coincide con el usuario ${user.id}`,
+      });
+      res.json({ ok: true });
+      return;
+    }
+
+    const ahora = new Date();
+    // Fin de período autoritativo: next_due desde la API de Reveniu. Es estable
+    // frente a reintentos del webhook, así el UNIQUE (user_id, periodo_hasta)
+    // del libro de ingresos deduplica de verdad y el período nunca se
+    // sobre-extiende por replays.
+    const resolvedSubId = Number.isFinite(subscriptionId)
+      ? subscriptionId
+      : (user.reveniuSubscriptionId ?? user.reveniuPendingSubscriptionId);
+    async function fetchNextDue(): Promise<Date | null> {
+      if (!reveniuConfigured() || resolvedSubId == null) return null;
+      try {
+        const detail = await getReveniuSubscription(resolvedSubId);
+        return detail.nextDue;
+      } catch (err) {
+        req.log.error({ err, subscriptionId: resolvedSubId }, "No se pudo consultar la suscripción en Reveniu");
+        return null;
+      }
+    }
+
+    switch (event) {
+      case "subscription_activated": {
+        // Tarjeta registrada y suscripción activa en Reveniu. Promueve la
+        // suscripción pendiente y activa el acceso. El período viene del
+        // next_due autoritativo; si no está disponible, solo se activa el
+        // acceso y subscription_payment_succeeded fijará el período.
+        const nextDue = await fetchNextDue();
+        await db
+          .update(usersTable)
+          .set({
+            reveniuSubscriptionId: resolvedSubId,
+            reveniuPendingSubscriptionId: null,
+            // Una suscripción cancelada no se reactiva por eventos rezagados.
+            subscriptionStatus: sql`case when ${usersTable.subscriptionStatus} = 'cancelada' then ${usersTable.subscriptionStatus} else 'activa'::subscription_status end`,
+            ...(nextDue
+              ? {
+                  subscriptionPeriodEnd: sql`greatest(coalesce(${usersTable.subscriptionPeriodEnd}, ${nextDue}), ${nextDue})`,
+                }
+              : {}),
+            avisoPagoFallidoEn: null,
+          })
+          .where(eq(usersTable.id, user.id));
+        await logEvento({
+          evento: "reveniu.suscripcion.activada",
+          exitoso: true,
+          ipOrigen: ip,
+          detalle: `Usuario ${user.id} → activa (sub ${resolvedSubId})`,
+        });
+        break;
+      }
+
+      case "subscription_payment_succeeded": {
+        // Cobro mensual exitoso. El período se extiende hasta el next_due
+        // autoritativo (nunca se acorta: greatest en SQL). Una suscripción
+        // cancelada NO vuelve a 'activa' (puede ser el último cargo del
+        // período), pero su período sí se registra/extiende. trial_ends_at se
+        // empuja también para que lógica legada de trial no interfiera.
+        const nextDue = await fetchNextDue();
+        await db
+          .update(usersTable)
+          .set({
+            reveniuSubscriptionId: resolvedSubId,
+            reveniuPendingSubscriptionId: null,
+            subscriptionStatus: sql`case when ${usersTable.subscriptionStatus} = 'cancelada' then ${usersTable.subscriptionStatus} else 'activa'::subscription_status end`,
+            ...(nextDue
+              ? {
+                  subscriptionPeriodEnd: sql`greatest(coalesce(${usersTable.subscriptionPeriodEnd}, ${nextDue}), ${nextDue})`,
+                  trialEndsAt: sql`greatest(${usersTable.trialEndsAt}, ${nextDue})`,
+                }
+              : {}),
+            avisoPagoFallidoEn: null,
+          })
+          .where(eq(usersTable.id, user.id));
+
+        // Libro de ingresos: una fila por usuario+período. periodoHasta =
+        // next_due (estable), así los reintentos del webhook chocan con el
+        // UNIQUE y no duplican ingresos. Sin next_due no se registra (mejor
+        // omitir que duplicar; el superadmin puede conciliar con Reveniu).
+        if (nextDue) {
+          try {
+            let miembrosActivos = 1;
+            if (user.organizationId != null) {
+              const [cnt] = await db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(usersTable)
+                .where(
+                  and(
+                    eq(usersTable.organizationId, user.organizationId),
+                    eq(usersTable.activo, true),
+                  ),
+                );
+              miembrosActivos = cnt?.count ?? 1;
+            }
+            const pricing = computePricing(miembrosActivos);
+            const neto =
+              pricing.planBaseNeto +
+              pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalNeto;
+            const iva =
+              pricing.planBaseIva +
+              pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalIva;
+            await db
+              .insert(pagosSuscripcionTable)
+              .values({
+                userId: user.id,
+                fecha: ahora,
+                usuariosAdicionales: pricing.usuariosAdicionales,
+                montoNeto: neto,
+                montoIva: iva,
+                montoTotal: neto + iva,
+                estado: "pagado",
+                metodo: "reveniu",
+                periodoHasta: nextDue,
+              })
+              .onConflictDoNothing({
+                target: [pagosSuscripcionTable.userId, pagosSuscripcionTable.periodoHasta],
+              });
+          } catch (err) {
+            req.log.error({ err }, "No se pudo registrar el pago de suscripción Reveniu");
+          }
+        } else {
+          req.log.warn(
+            { userId: user.id, subscriptionId: resolvedSubId },
+            "Pago Reveniu sin next_due: no se registró en el libro de ingresos",
+          );
+        }
+
+        await logEvento({
+          evento: "reveniu.pago.exitoso",
+          exitoso: true,
+          ipOrigen: ip,
+          detalle: `Usuario ${user.id}: pago mensual OK${nextDue ? `, período hasta ${nextDue.toISOString()}` : " (sin next_due)"}`,
+        });
+        break;
+      }
+
+      case "subscription_renewal_cancelled": {
+        // Cancelación de la renovación (por el cliente o el comercio): conserva
+        // el acceso hasta el fin del período pagado; no degrada 'vencida'.
+        await db
+          .update(usersTable)
+          .set({ subscriptionStatus: "cancelada" })
+          .where(
+            and(eq(usersTable.id, user.id), eq(usersTable.subscriptionStatus, "activa")),
+          );
+        await logEvento({
+          evento: "reveniu.suscripcion.cancelada",
+          exitoso: true,
+          ipOrigen: ip,
+          detalle: `Usuario ${user.id} → cancelada (${String(data.cancel_reason ?? "")})`,
+        });
+        break;
+      }
+
+      case "subscription_deactivated": {
+        // Baja definitiva en Reveniu (p. ej. tras agotar reintentos de cobro):
+        // suspende el acceso salvo que el período pagado siga vigente. La
+        // decisión se toma en SQL sobre el estado actual de la fila (no sobre
+        // una lectura potencialmente obsoleta) para no pisar un webhook de
+        // pago concurrente.
+        const [updated] = await db
+          .update(usersTable)
+          .set({
+            subscriptionStatus: sql`case when ${usersTable.subscriptionPeriodEnd} is not null and ${usersTable.subscriptionPeriodEnd} > now() then 'cancelada'::subscription_status else 'vencida'::subscription_status end`,
+          })
+          .where(eq(usersTable.id, user.id))
+          .returning({ subscriptionStatus: usersTable.subscriptionStatus });
+        await logEvento({
+          evento: "reveniu.suscripcion.desactivada",
+          exitoso: true,
+          ipOrigen: ip,
+          detalle: `Usuario ${user.id} → ${updated?.subscriptionStatus ?? "?"}`,
+        });
+        break;
+      }
+
+      default: {
+        req.log.info({ event }, "Reveniu webhook: evento no manejado");
+        break;
+      }
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error processing Reveniu webhook");
+    await logEvento({
+      evento: "reveniu.webhook",
       exitoso: false,
       ipOrigen: ip,
       detalle: err instanceof Error ? err.message : "Error desconocido",

@@ -5,27 +5,25 @@ import { z } from "zod";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import {
   getFlowAdminCreds,
-  flowAdminConfigured,
-  ensurePlan,
-  createCustomer,
-  registerCard,
   getRegisterStatus,
   createSubscription,
   mapSubscription,
 } from "../lib/flow-subscriptions";
-import { getSubscriptionState } from "../lib/subscription";
+import { getSubscriptionState, contarUsuariosAdicionales } from "../lib/subscription";
 import { PLAN_NETO, PLAN_IVA } from "../lib/flow-subscriptions";
 import {
   COSTO_USUARIO_ADICIONAL_NETO,
   COSTO_USUARIO_ADICIONAL_IVA,
+  computePricing,
 } from "../lib/org";
+import {
+  reveniuConfigured,
+  createReveniuCheckout,
+  disableReveniuRenewal,
+  reveniuPaymentMethodUrl,
+} from "../lib/reveniu";
 
 const subscriptionRouter = Router();
-
-// Where Flow returns the browser after the hosted card-registration page.
-function registerReturnUrl(): string {
-  return `${getPublicBaseUrl()}/api/subscription/register-return`;
-}
 
 // Where to send the user (frontend) once registration finishes.
 function profileUrl(result: "exito" | "error"): string {
@@ -114,10 +112,14 @@ subscriptionRouter.get("/subscription/status", async (req, res) => {
   }
 });
 
+// Inicia el checkout de suscripción en Reveniu. Devuelve la completion_url y el
+// security_token: el frontend hace un POST de formulario a completion_url con
+// el input oculto TBK_TOKEN=<security_token> (Transbank OneClick) para que el
+// cliente registre su tarjeta una sola vez.
 subscriptionRouter.post("/subscription/subscribe", async (req, res) => {
   const userId = req.user!.id;
 
-  if (!flowAdminConfigured()) {
+  if (!reveniuConfigured()) {
     res.status(503).json({
       error: "La suscripción no está disponible en este momento. Intenta más tarde.",
     });
@@ -130,45 +132,107 @@ subscriptionRouter.post("/subscription/subscribe", async (req, res) => {
       res.status(404).json({ error: "Usuario no encontrado" });
       return;
     }
-    if (user.subscriptionStatus === "activa") {
+    if (user.subscriptionStatus === "activa" && user.reveniuSubscriptionId) {
       res.status(400).json({ error: "Ya tienes una suscripción activa." });
       return;
     }
-
-    const creds = getFlowAdminCreds();
-    await ensurePlan(creds);
-
-    // Ensure a Flow customer exists for this user.
-    let customerId = user.flowCustomerId;
-    if (!customerId) {
-      const nombre =
-        [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
-        user.email ||
-        "Cliente NextCob";
-      const email = user.email ?? `${userId}@cobrosimple.app`;
-      const customer = await createCustomer(creds, { name: nombre, email, externalId: userId });
-      customerId = customer.customerId;
-      await db
-        .update(usersTable)
-        .set({ flowCustomerId: customerId })
-        .where(eq(usersTable.id, userId));
+    if (!user.email) {
+      res.status(400).json({ error: "Tu cuenta no tiene un email configurado." });
+      return;
     }
 
-    // Start hosted card registration.
-    const register = await registerCard(creds, {
-      customerId,
-      urlReturn: registerReturnUrl(),
+    const usuariosAdicionales = await contarUsuariosAdicionales(user.organizationId);
+    const pricing = computePricing(usuariosAdicionales + 1);
+
+    const nombre =
+      [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
+      user.email;
+
+    const checkout = await createReveniuCheckout({
+      userId,
+      email: user.email,
+      nombre,
+      rut: user.rut,
+      amount: pricing.totalMensual,
     });
 
     await db
       .update(usersTable)
-      .set({ flowRegisterToken: register.token })
+      .set({
+        reveniuPendingSubscriptionId: checkout.subscriptionId,
+        reveniuMontoSync: pricing.totalMensual,
+      })
       .where(eq(usersTable.id, userId));
 
-    res.json({ url: register.url });
+    res.json({
+      completionUrl: checkout.completionUrl,
+      securityToken: checkout.securityToken,
+    });
   } catch (err) {
-    req.log.error({ err }, "Error starting subscription");
+    req.log.error({ err }, "Error starting Reveniu subscription");
     res.status(500).json({ error: "No se pudo iniciar la suscripción. Intenta nuevamente." });
+  }
+});
+
+// Cancela la renovación de la suscripción: Reveniu deja de cobrar y el cliente
+// conserva el acceso hasta el fin del período ya pagado.
+subscriptionRouter.post("/subscription/cancel", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    if (!user) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+    if (!user.reveniuSubscriptionId) {
+      res.status(400).json({ error: "No tienes una suscripción activa que cancelar." });
+      return;
+    }
+    if (user.subscriptionStatus === "cancelada") {
+      res.status(400).json({ error: "Tu suscripción ya está cancelada." });
+      return;
+    }
+    if (!reveniuConfigured()) {
+      res.status(503).json({ error: "El servicio de suscripciones no está disponible." });
+      return;
+    }
+
+    await disableReveniuRenewal(user.reveniuSubscriptionId);
+    await db
+      .update(usersTable)
+      .set({ subscriptionStatus: "cancelada" })
+      .where(eq(usersTable.id, userId));
+
+    req.log.info({ userId }, "Suscripción Reveniu cancelada por el usuario");
+    res.json({
+      ok: true,
+      accesoHasta: user.subscriptionPeriodEnd
+        ? user.subscriptionPeriodEnd.toISOString()
+        : null,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error cancelling Reveniu subscription");
+    res.status(500).json({ error: "No se pudo cancelar la suscripción. Intenta nuevamente." });
+  }
+});
+
+// Devuelve el link hospedado por Reveniu para actualizar el método de pago.
+subscriptionRouter.post("/subscription/payment-method", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    if (!user) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+    if (!user.reveniuSubscriptionId) {
+      res.status(400).json({ error: "No tienes una suscripción con método de pago registrado." });
+      return;
+    }
+    res.json({ url: reveniuPaymentMethodUrl(user.reveniuSubscriptionId) });
+  } catch (err) {
+    req.log.error({ err }, "Error getting payment-method URL");
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 

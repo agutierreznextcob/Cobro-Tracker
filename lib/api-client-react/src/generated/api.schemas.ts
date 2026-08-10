@@ -409,6 +409,7 @@ export const AdminUsuarioSubscriptionStatus = {
   prueba: 'prueba',
   activa: 'activa',
   vencida: 'vencida',
+  cancelada: 'cancelada',
 } as const;
 
 export interface AdminUsuario {
@@ -448,6 +449,21 @@ export interface AdminUsuario {
   montoMensual: number;
   /** Total collected (paid cobros) for the user's organization. */
   totalRecaudado: number;
+  /**
+     * Date of the last successful subscription payment.
+     * @nullable
+     */
+  ultimoPagoEn: string | null;
+  /**
+     * Amount (CLP, IVA incl.) of the last subscription payment.
+     * @nullable
+     */
+  ultimoPagoMonto: number | null;
+  /**
+     * Next scheduled subscription charge date (active subs only).
+     * @nullable
+     */
+  proximoCobroEn: string | null;
 }
 
 export interface AdminMetricas {
@@ -494,6 +510,7 @@ export const SubscriptionStatusStatus = {
   prueba: 'prueba',
   activa: 'activa',
   vencida: 'vencida',
+  cancelada: 'cancelada',
 } as const;
 
 export interface SubscriptionStatus {
@@ -546,7 +563,10 @@ export interface ImportarClientesResult {
 }
 
 export interface SubscribeResponse {
-  url: string;
+  /** Reveniu completion URL to POST the TBK_TOKEN form to */
+  completionUrl: string;
+  /** Value for the hidden TBK_TOKEN input */
+  securityToken: string;
 }
 
 export interface HealthStatus {
@@ -2249,6 +2269,15 @@ export const ListWebhookEventosResultado = {
   exitoso: 'exitoso',
   fallido: 'fallido',
 } as const;
+
+export type CancelSubscription200 = {
+  ok: boolean;
+  accesoHasta?: string | null;
+};
+
+export type GetPaymentMethodUrl200 = {
+  url: string;
+};
 
 export type ListAdminUsuariosParams = {
 /**

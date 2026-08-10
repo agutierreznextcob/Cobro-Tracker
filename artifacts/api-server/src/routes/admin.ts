@@ -30,11 +30,13 @@ function nombreDe(u: { firstName: string | null; lastName: string | null }): str
 
 // Vencimiento (expiry) is the period end for active subs, otherwise the trial end.
 function vencimientoDe(state: {
-  status: "prueba" | "activa" | "vencida";
+  status: "prueba" | "activa" | "vencida" | "cancelada";
   periodEnd: string | null;
   trialEndsAt: string | null;
 }): string | null {
-  return state.status === "activa" ? state.periodEnd : state.trialEndsAt;
+  return state.status === "activa" || state.status === "cancelada"
+    ? state.periodEnd
+    : state.trialEndsAt;
 }
 
 // Builds per-organization aggregates in two grouped queries (active member
@@ -79,7 +81,7 @@ interface EnrichedUsuario {
   nombre: string | null;
   email: string | null;
   role: "user" | "admin";
-  subscriptionStatus: "prueba" | "activa" | "vencida";
+  subscriptionStatus: "prueba" | "activa" | "vencida" | "cancelada";
   hasAccess: boolean;
   isAdmin: boolean;
   tieneSuscripcion: boolean;
@@ -95,6 +97,10 @@ interface EnrichedUsuario {
   usuariosExtra: number;
   montoMensual: number;
   totalRecaudado: number;
+  // Suscripción Reveniu: último pago registrado y próximo cobro estimado.
+  ultimoPagoEn: string | null;
+  ultimoPagoMonto: number | null;
+  proximoCobroEn: string | null;
 }
 
 // Optional server-side search: case-insensitive substring match over account ID
@@ -119,6 +125,19 @@ async function buildUsuarios(q?: string): Promise<EnrichedUsuario[]> {
     : await query;
   const { miembros, recaudado } = await buildOrgAggregates();
 
+  // Último pago de suscripción registrado por usuario (una consulta agrupada;
+  // DISTINCT ON toma la fila más reciente por user_id).
+  const ultimoPagoRows = await db
+    .selectDistinctOn([pagosSuscripcionTable.userId], {
+      userId: pagosSuscripcionTable.userId,
+      fecha: pagosSuscripcionTable.fecha,
+      montoTotal: pagosSuscripcionTable.montoTotal,
+    })
+    .from(pagosSuscripcionTable)
+    .where(eq(pagosSuscripcionTable.estado, "pagado"))
+    .orderBy(pagosSuscripcionTable.userId, desc(pagosSuscripcionTable.fecha));
+  const ultimoPago = new Map(ultimoPagoRows.map((r) => [r.userId, r]));
+
   return rows
     .map((u): EnrichedUsuario => {
       const state = computeSubscriptionState({
@@ -126,6 +145,7 @@ async function buildUsuarios(q?: string): Promise<EnrichedUsuario[]> {
         trialEndsAt: u.trialEndsAt,
         subscriptionPeriodEnd: u.subscriptionPeriodEnd,
         flowSubscriptionId: u.flowSubscriptionId,
+        reveniuSubscriptionId: u.reveniuSubscriptionId,
         role: u.role,
         activo: u.activo,
         esDemo: u.esDemo,
@@ -172,6 +192,10 @@ async function buildUsuarios(q?: string): Promise<EnrichedUsuario[]> {
         usuariosExtra: pricing.usuariosAdicionales,
         montoMensual: pricing.totalMensual,
         totalRecaudado,
+        ultimoPagoEn: ultimoPago.get(u.id)?.fecha?.toISOString() ?? null,
+        ultimoPagoMonto: ultimoPago.get(u.id)?.montoTotal ?? null,
+        proximoCobroEn:
+          (state.status === "activa" && state.tieneSuscripcion) ? state.periodEnd : null,
       };
     })
     .sort((a, b) => {
@@ -480,6 +504,7 @@ adminRouter.post("/admin/usuarios/:id/recordatorio-email", async (req, res) => {
       trialEndsAt: u.trialEndsAt,
       subscriptionPeriodEnd: u.subscriptionPeriodEnd,
       flowSubscriptionId: u.flowSubscriptionId,
+      reveniuSubscriptionId: u.reveniuSubscriptionId,
       role: u.role,
       activo: u.activo,
       esDemo: u.esDemo,

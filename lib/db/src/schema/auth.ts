@@ -19,10 +19,13 @@ export const sessionsTable = pgTable(
 // - prueba: within the 14-day free trial
 // - activa: paid subscription is active
 // - vencida: trial ended without subscription, or a recurring charge failed
+// - cancelada: the user cancelled the renewal; access continues until
+//   subscription_period_end and then no further charges occur.
 export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "prueba",
   "activa",
   "vencida",
+  "cancelada",
 ]);
 
 // Platform role. "admin" users have permanent access (no trial/subscription
@@ -103,6 +106,18 @@ export const usersTable = pgTable("users", {
   flowCustomerId: varchar("flow_customer_id"),
   flowSubscriptionId: varchar("flow_subscription_id"),
   flowRegisterToken: varchar("flow_register_token"),
+  // Reveniu (cobro recurrente de la suscripción de la plataforma).
+  // reveniuPendingSubscriptionId: id devuelto al iniciar el checkout; se
+  // promueve a reveniuSubscriptionId cuando llega subscription_activated.
+  reveniuSubscriptionId: integer("reveniu_subscription_id"),
+  reveniuPendingSubscriptionId: integer("reveniu_pending_subscription_id"),
+  // Último monto mensual (CLP, IVA incl.) sincronizado con Reveniu. Cuando el
+  // total calculado (base + usuarios extra activos) difiere, el scheduler
+  // llama a /subscriptions/{id}/amount/ y actualiza este snapshot.
+  reveniuMontoSync: integer("reveniu_monto_sync"),
+  // Gracia por pago fallido: timestamp del aviso por email. Tras 3 días sin
+  // pago exitoso, el scheduler marca la suscripción como vencida.
+  avisoPagoFallidoEn: timestamp("aviso_pago_fallido_en", { withTimezone: true }),
   subscriptionPeriodEnd: timestamp("subscription_period_end", { withTimezone: true }),
   // Renewal reminder bookkeeping: the periodEnd for which a 7-days-before
   // renewal notice was already emailed (prevents duplicate notices per period).

@@ -1272,7 +1272,7 @@ export const ListWebhookEventosResponse = zod.object({
  * @summary Get the current user's platform subscription status
  */
 export const GetSubscriptionStatusResponse = zod.object({
-  "status": zod.enum(['prueba', 'activa', 'vencida']),
+  "status": zod.enum(['prueba', 'activa', 'vencida', 'cancelada']),
   "hasAccess": zod.boolean(),
   "isAdmin": zod.boolean(),
   "diasRestantes": zod.number().nullish(),
@@ -1293,9 +1293,29 @@ export const GetSubscriptionStatusResponse = zod.object({
 
 
 /**
- * @summary Start the platform subscription (returns Flow card-registration URL)
+ * Returns the Reveniu completion URL and security token. The client must submit a form POST to completionUrl with a hidden TBK_TOKEN input set to securityToken (Transbank OneClick card enrollment).
+
+ * @summary Start the platform subscription via Reveniu checkout
  */
 export const StartSubscriptionResponse = zod.object({
+  "completionUrl": zod.string().describe('Reveniu completion URL to POST the TBK_TOKEN form to'),
+  "securityToken": zod.string().describe('Value for the hidden TBK_TOKEN input')
+})
+
+
+/**
+ * @summary Cancel the subscription renewal (access continues until period end)
+ */
+export const CancelSubscriptionResponse = zod.object({
+  "ok": zod.boolean(),
+  "accesoHasta": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get the hosted URL to update the subscription payment method
+ */
+export const GetPaymentMethodUrlResponse = zod.object({
   "url": zod.string()
 })
 
@@ -1334,7 +1354,7 @@ export const ListAdminUsuariosResponseItem = zod.object({
   "nombre": zod.string().nullable(),
   "email": zod.string().email().nullable(),
   "role": zod.enum(['user', 'admin']),
-  "subscriptionStatus": zod.enum(['prueba', 'activa', 'vencida']),
+  "subscriptionStatus": zod.enum(['prueba', 'activa', 'vencida', 'cancelada']),
   "hasAccess": zod.boolean(),
   "isAdmin": zod.boolean(),
   "tieneSuscripcion": zod.boolean(),
@@ -1349,7 +1369,10 @@ export const ListAdminUsuariosResponseItem = zod.object({
   "activo": zod.boolean(),
   "usuariosExtra": zod.number().describe('Active org members beyond the owner.'),
   "montoMensual": zod.number().describe('Monthly amount (base plan + extra seats), IVA included.'),
-  "totalRecaudado": zod.number().describe('Total collected (paid cobros) for the user\'s organization.')
+  "totalRecaudado": zod.number().describe('Total collected (paid cobros) for the user\'s organization.'),
+  "ultimoPagoEn": zod.string().nullable().describe('Date of the last successful subscription payment.'),
+  "ultimoPagoMonto": zod.number().nullable().describe('Amount (CLP, IVA incl.) of the last subscription payment.'),
+  "proximoCobroEn": zod.string().nullable().describe('Next scheduled subscription charge date (active subs only).')
 })
 export const ListAdminUsuariosResponse = zod.array(ListAdminUsuariosResponseItem)
 

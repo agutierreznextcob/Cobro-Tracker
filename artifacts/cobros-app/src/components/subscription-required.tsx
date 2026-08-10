@@ -23,10 +23,21 @@ export function SubscriptionRequired() {
   const precioNeto = status?.precioNeto ?? 24990;
   const precioIva = status?.precioIva ?? 4748;
 
+  // Redirige al checkout de Reveniu vía form POST con el input oculto
+  // TBK_TOKEN (Transbank OneClick).
   const handleSubscribe = () => {
     startSubscription.mutate(undefined, {
       onSuccess: (data) => {
-        window.location.href = data.url;
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = data.completionUrl;
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "TBK_TOKEN";
+        input.value = data.securityToken;
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
       },
       onError: (err: unknown) => {
         const msg = err instanceof Error ? err.message : "No se pudo iniciar la suscripción.";

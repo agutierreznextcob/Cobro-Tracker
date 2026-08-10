@@ -1572,10 +1572,14 @@ paths:
     post:
       operationId: startSubscription
       tags: [subscription]
-      summary: Start the platform subscription (returns Flow card-registration URL)
+      summary: Start the platform subscription via Reveniu checkout
+      description: >
+        Returns the Reveniu completion URL and security token. The client must
+        submit a form POST to completionUrl with a hidden TBK_TOKEN input set to
+        securityToken (Transbank OneClick card enrollment).
       responses:
         "200":
-          description: Registration URL to redirect the user to
+          description: Reveniu checkout data
           content:
             application/json:
               schema:
@@ -1594,6 +1598,59 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /subscription/cancel:
+    post:
+      operationId: cancelSubscription
+      tags: [subscription]
+      summary: Cancel the subscription renewal (access continues until period end)
+      responses:
+        "200":
+          description: Renewal cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                  accesoHasta:
+                    type: string
+                    nullable: true
+        "400":
+          description: No active subscription to cancel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+
+  /subscription/payment-method:
+    post:
+      operationId: getPaymentMethodUrl
+      tags: [subscription]
+      summary: Get the hosted URL to update the subscription payment method
+      responses:
+        "200":
+          description: Hosted payment-method update URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url:
+                    type: string
+        "400":
+          description: No subscription with a registered payment method
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
 
   /admin/cobros-eliminados:
     get:
@@ -3491,6 +3548,9 @@ components:
           usuariosExtra,
           montoMensual,
           totalRecaudado,
+          ultimoPagoEn,
+          ultimoPagoMonto,
+          proximoCobroEn,
         ]
       properties:
         id:
@@ -3508,7 +3568,7 @@ components:
           enum: [user, admin]
         subscriptionStatus:
           type: string
-          enum: [prueba, activa, vencida]
+          enum: [prueba, activa, vencida, cancelada]
         hasAccess:
           type: boolean
         isAdmin:
@@ -3542,6 +3602,15 @@ components:
         totalRecaudado:
           type: integer
           description: Total collected (paid cobros) for the user's organization.
+        ultimoPagoEn:
+          type: [string, 'null']
+          description: Date of the last successful subscription payment.
+        ultimoPagoMonto:
+          type: [integer, 'null']
+          description: Amount (CLP, IVA incl.) of the last subscription payment.
+        proximoCobroEn:
+          type: [string, 'null']
+          description: Next scheduled subscription charge date (active subs only).
 
     AdminMetricas:
       type: object
@@ -3613,7 +3682,7 @@ components:
       properties:
         status:
           type: string
-          enum: [prueba, activa, vencida]
+          enum: [prueba, activa, vencida, cancelada]
         hasAccess:
           type: boolean
         isAdmin:
@@ -3697,10 +3766,14 @@ components:
 
     SubscribeResponse:
       type: object
-      required: [url]
+      required: [completionUrl, securityToken]
       properties:
-        url:
+        completionUrl:
           type: string
+          description: Reveniu completion URL to POST the TBK_TOKEN form to
+        securityToken:
+          type: string
+          description: Value for the hidden TBK_TOKEN input
 
     HealthStatus:
       type: object

@@ -13,4 +13,5 @@ export const AdminUsuarioSubscriptionStatus = {
   prueba: 'prueba',
   activa: 'activa',
   vencida: 'vencida',
+  cancelada: 'cancelada',
 } as const;

@@ -39,6 +39,7 @@ import type {
   AuthUserEnvelope,
   AvisarClienteInput,
   AvisarClienteResult,
+  CancelSubscription200,
   ChangePasswordInput,
   Cliente,
   ClienteConHistorial,
@@ -77,6 +78,7 @@ import type {
   GestionInput,
   GestionMetricaEjecutivo,
   GetDashboardMetricsParams,
+  GetPaymentMethodUrl200,
   GetRendimientoEquipoParams,
   GetSugerenciaWorkflowParams,
   HealthStatus,
@@ -4559,7 +4561,9 @@ export const getStartSubscriptionUrl = () => {
 }
 
 /**
- * @summary Start the platform subscription (returns Flow card-registration URL)
+ * Returns the Reveniu completion URL and security token. The client must submit a form POST to completionUrl with a hidden TBK_TOKEN input set to securityToken (Transbank OneClick card enrollment).
+
+ * @summary Start the platform subscription via Reveniu checkout
  */
 export const startSubscription = async ( options?: RequestInit): Promise<SubscribeResponse> => {
 
@@ -4607,7 +4611,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type StartSubscriptionMutationError = ErrorType<ErrorResponse | void>
 
     /**
- * @summary Start the platform subscription (returns Flow card-registration URL)
+ * @summary Start the platform subscription via Reveniu checkout
  */
 export const useStartSubscription = <TError = ErrorType<ErrorResponse | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSubscription>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -4618,6 +4622,146 @@ export const useStartSubscription = <TError = ErrorType<ErrorResponse | void>,
         TContext
       > => {
       return useMutation(getStartSubscriptionMutationOptions(options));
+    }
+
+export const getCancelSubscriptionUrl = () => {
+
+
+
+
+  return `/api/subscription/cancel`
+}
+
+/**
+ * @summary Cancel the subscription renewal (access continues until period end)
+ */
+export const cancelSubscription = async ( options?: RequestInit): Promise<CancelSubscription200> => {
+
+  return customFetch<CancelSubscription200>(getCancelSubscriptionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCancelSubscriptionMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelSubscription>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelSubscription>>, TError,void, TContext> => {
+
+const mutationKey = ['cancelSubscription'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelSubscription>>, void> = () => {
+
+
+          return  cancelSubscription(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof cancelSubscription>>>
+
+    export type CancelSubscriptionMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Cancel the subscription renewal (access continues until period end)
+ */
+export const useCancelSubscription = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelSubscription>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelSubscription>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCancelSubscriptionMutationOptions(options));
+    }
+
+export const getGetPaymentMethodUrlUrl = () => {
+
+
+
+
+  return `/api/subscription/payment-method`
+}
+
+/**
+ * @summary Get the hosted URL to update the subscription payment method
+ */
+export const getPaymentMethodUrl = async ( options?: RequestInit): Promise<GetPaymentMethodUrl200> => {
+
+  return customFetch<GetPaymentMethodUrl200>(getGetPaymentMethodUrlUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getGetPaymentMethodUrlMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getPaymentMethodUrl>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof getPaymentMethodUrl>>, TError,void, TContext> => {
+
+const mutationKey = ['getPaymentMethodUrl'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getPaymentMethodUrl>>, void> = () => {
+
+
+          return  getPaymentMethodUrl(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetPaymentMethodUrlMutationResult = NonNullable<Awaited<ReturnType<typeof getPaymentMethodUrl>>>
+
+    export type GetPaymentMethodUrlMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Get the hosted URL to update the subscription payment method
+ */
+export const useGetPaymentMethodUrl = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getPaymentMethodUrl>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof getPaymentMethodUrl>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getGetPaymentMethodUrlMutationOptions(options));
     }
 
 export const getListAdminCobrosEliminadosUrl = () => {

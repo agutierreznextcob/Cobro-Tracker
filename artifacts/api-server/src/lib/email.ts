@@ -262,7 +262,7 @@ export async function sendAvisoManualEmail(
 export interface RenovacionEmailData {
   email: string;
   nombre: string | null;
-  estado: "prueba" | "activa" | "vencida";
+  estado: "prueba" | "activa" | "vencida" | "cancelada";
   vencido: boolean;
   vencimiento: string | null;
   precioMensual: number;
@@ -331,6 +331,55 @@ export async function sendRenovacionEmail(
   if (error) {
     const msg = `Resend error: ${error.name} — ${error.message}`;
     log?.warn({ resendError: error }, "Error sending renewal reminder email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
+// Aviso de pago de suscripción fallido: Reveniu no pudo cobrar la tarjeta. El
+// cliente tiene 3 días de gracia para regularizar antes de la suspensión.
+export async function sendPagoFallidoEmail(
+  data: {
+    email: string;
+    nombre?: string | null;
+    montoMensual: number;
+    graciaHasta: Date;
+    actualizarMetodoUrl?: string | null;
+  },
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping failed-payment email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const saludo = data.nombre ? `Hola ${escapeHtml(data.nombre)}` : "Hola";
+  const fechaGracia = formatFecha(data.graciaHasta.toISOString());
+
+  const { error } = await client.emails.send({
+    ...buildRemitente(),
+    to: [data.email],
+    subject: "No pudimos procesar el pago de tu suscripción a NextCob",
+    html: buildEmailHtml({
+      title: "Pago de suscripción fallido",
+      previewText: "No pudimos cobrar tu suscripción. Tienes 3 días para regularizar.",
+      heading: `${saludo}, no pudimos procesar tu pago ⚠️`,
+      bodyLines: [
+        `Intentamos cobrar tu suscripción mensual de <strong>${formatCLP(data.montoMensual)}</strong> pero el cargo fue rechazado.`,
+        `Tu cuenta seguirá activa hasta el <strong>${fechaGracia}</strong>. Si no recibimos el pago antes de esa fecha, tu acceso quedará suspendido.`,
+        `Revisa que tu tarjeta tenga fondos disponibles o actualiza tu método de pago para que el próximo intento sea exitoso.`,
+      ],
+      ...(data.actualizarMetodoUrl
+        ? { ctaText: "Actualizar método de pago", ctaUrl: data.actualizarMetodoUrl }
+        : {}),
+      footerNote: "Si ya regularizaste el pago, ignora este mensaje.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending failed-payment email via Resend");
     return { ok: false, error: msg };
   }
   return { ok: true };

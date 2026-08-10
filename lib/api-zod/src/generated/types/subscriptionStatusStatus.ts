@@ -13,4 +13,5 @@ export const SubscriptionStatusStatus = {
   prueba: 'prueba',
   activa: 'activa',
   vencida: 'vencida',
+  cancelada: 'cancelada',
 } as const;
