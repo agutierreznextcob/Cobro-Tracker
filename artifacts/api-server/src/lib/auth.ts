@@ -13,6 +13,17 @@ export const SESSION_TTL_LARGO = 30 * 24 * 60 * 60 * 1000;
 // stored; the live role/profile is always re-read from the DB in /auth/user.
 export interface SessionData {
   user: AuthUser;
+  // Presente solo en sesiones de consultores de soporte NextCob que ingresan
+  // por /consultor sobre la cuenta de un cliente (auditoría Ley 21.719).
+  consultor?: ConsultorSessionInfo;
+}
+
+export interface ConsultorSessionInfo {
+  sesionId: number;
+  consultorId: number;
+  nombre: string;
+  tipo: "soporte" | "admin";
+  inicioEn: string; // ISO
 }
 
 export async function createSession(

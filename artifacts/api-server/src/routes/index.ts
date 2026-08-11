@@ -19,6 +19,7 @@ import { profileRouter } from "./profile";
 import { subscriptionRouter } from "./subscription";
 import { adminRouter } from "./admin";
 import { organizationRouter } from "./organization";
+import consultorRouter from "./consultor";
 
 // ORDEN DE MONTAJE: los routers con rutas públicas (portal, leads, chat,
 // webhooks, encuestas) deben ir ANTES de cualquier router con auth "en blanco"
@@ -34,6 +35,9 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+// consultorRouter tiene un POST público (/consultor/login) y el resto de sus
+// rutas se auto-protegen; debe ir antes de los routers con blanket auth.
+router.use(consultorRouter);
 // publicChatRouter is unauthenticated (landing-page sales assistant); mount it
 // before aiRouter, which gates every route behind auth + subscription.
 router.use(publicChatRouter);

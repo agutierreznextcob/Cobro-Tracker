@@ -18,6 +18,47 @@ function NotificacionesPoller() {
   return null;
 }
 
+// Barra fija roja mostrada durante una sesión de consultor de soporte NextCob
+// (Ley 21.719: el acceso es visible y auditado).
+function ConsultorBar() {
+  const { user } = useAuth();
+  if (!user?.esConsultor) return null;
+  const cuentaNombre =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    user.companyName ||
+    user.email ||
+    "";
+  const hora = user.consultorInicioEn
+    ? new Date(user.consultorInicioEn).toLocaleString("es-CL", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
+    : "";
+  const cerrarSesion = () => {
+    const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "";
+    fetch("/api/consultor/logout", { method: "POST", credentials: "include" })
+      .catch(() => {})
+      .finally(() => {
+        window.location.href = `${base}/consultor`;
+      });
+  };
+  return (
+    <div className="fixed top-0 inset-x-0 z-[60] h-10 bg-red-600 text-white flex items-center justify-between gap-2 px-3 text-xs sm:text-sm shadow-md">
+      <div className="truncate font-medium">
+        ⚠️ MODO CONSULTOR — Cuenta: {cuentaNombre} ({user.accountId ?? "—"})
+        {hora ? ` | Ingreso: ${hora}` : ""}
+        {user.consultorNombre ? ` | ${user.consultorNombre}` : ""}
+      </div>
+      <button
+        onClick={cerrarSesion}
+        className="shrink-0 rounded bg-white/15 hover:bg-white/25 px-2.5 py-1 font-medium transition-colors"
+      >
+        Cerrar sesión consultor
+      </button>
+    </div>
+  );
+}
+
 function LeadsNavItem({
   location,
   onNavigate,
@@ -147,8 +188,13 @@ export function Layout({ children }: { children: ReactNode }) {
     };
   }, [mobileOpen]);
 
+  const esConsultor = !!user?.esConsultor;
+
   return (
-    <div className="min-h-[100dvh] flex bg-background text-foreground">
+    <div
+      className={`min-h-[100dvh] flex bg-background text-foreground ${esConsultor ? "pt-10" : ""}`}
+    >
+      <ConsultorBar />
       <WebhookPoller />
       <NotificacionesPoller />
 

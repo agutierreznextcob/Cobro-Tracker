@@ -42,4 +42,10 @@ export interface AuthUser {
   address?: string | null;
   /** @nullable */
   companyName?: string | null;
+  /** True cuando la sesión es de un consultor de soporte NextCob actuando sobre esta cuenta. */
+  esConsultor?: boolean;
+  /** @nullable */
+  consultorNombre?: string | null;
+  /** @nullable */
+  consultorInicioEn?: Date | null;
 }

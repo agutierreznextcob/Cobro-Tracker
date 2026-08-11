@@ -16,7 +16,7 @@ import {
 } from "@workspace/api-client-react";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,8 @@ import {
   DollarSign,
   Wallet,
   Trash2,
+  Headset,
+  Copy,
 } from "lucide-react";
 
 function formatFecha(iso: string | null): string {
@@ -699,6 +701,292 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConsultoresSection />
+    </div>
+  );
+}
+
+// ---- Consultores de soporte (acceso vía /consultor, Ley 21.719) -------------
+
+type Consultor = { id: number; nombre: string; tipo: string; activo: boolean; creadoEn: string };
+type SesionConsultor = {
+  id: number;
+  consultorNombre: string;
+  userId: string;
+  accountId: string | null;
+  clienteNombre: string | null;
+  inicioEn: string;
+  finEn: string | null;
+  acciones: number;
+};
+type AccionConsultor = { id: number; metodo: string; ruta: string; detalle: string | null; fecha: string };
+
+async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { credentials: "include", ...init });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { message?: string })?.message || "Error de servidor");
+  return data as T;
+}
+
+function duracion(inicioEn: string, finEn: string | null): string {
+  if (!finEn) return "en curso";
+  const ms = new Date(finEn).getTime() - new Date(inicioEn).getTime();
+  if (ms < 0) return "—";
+  const min = Math.round(ms / 60000);
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)} h ${min % 60} min`;
+}
+
+function formatFechaHora(iso: string): string {
+  return new Date(iso).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" });
+}
+
+function ConsultoresSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [nombre, setNombre] = useState("");
+  const [nuevaPassword, setNuevaPassword] = useState<{ nombre: string; password: string } | null>(null);
+  const [sesionDetalle, setSesionDetalle] = useState<number | null>(null);
+
+  const { data: consultores, isLoading: loadingConsultores } = useQuery({
+    queryKey: ["admin-consultores"],
+    queryFn: () => apiJson<{ consultores: Consultor[] }>("/api/consultor/consultores"),
+  });
+  const { data: sesiones, isLoading: loadingSesiones } = useQuery({
+    queryKey: ["admin-consultor-sesiones"],
+    queryFn: () => apiJson<{ sesiones: SesionConsultor[] }>("/api/consultor/sesiones"),
+  });
+  const { data: acciones } = useQuery({
+    queryKey: ["admin-consultor-acciones", sesionDetalle],
+    enabled: sesionDetalle != null,
+    queryFn: () =>
+      apiJson<{ acciones: AccionConsultor[] }>(`/api/consultor/sesiones/${sesionDetalle}/acciones`),
+  });
+
+  const crear = useMutation({
+    mutationFn: () =>
+      apiJson<{ id: number; nombre: string; password: string }>("/api/consultor/consultores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre }),
+      }),
+    onSuccess: (data) => {
+      setNuevaPassword({ nombre: data.nombre, password: data.password });
+      setNombre("");
+      queryClient.invalidateQueries({ queryKey: ["admin-consultores"] });
+    },
+    onError: (err: unknown) =>
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo crear el consultor.",
+        variant: "destructive",
+      }),
+  });
+
+  const toggleActivo = useMutation({
+    mutationFn: ({ id, activo }: { id: number; activo: boolean }) =>
+      apiJson(`/api/consultor/consultores/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activo }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-consultores"] }),
+    onError: () =>
+      toast({ title: "Error", description: "No se pudo actualizar el consultor.", variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Headset className="h-5 w-5 text-primary" />
+        <h2 className="text-xl font-bold tracking-tight">Consultores de soporte</h2>
+      </div>
+      <p className="text-sm text-muted-foreground -mt-2">
+        Acceden por <span className="font-mono">/consultor</span> con el ID de cuenta del cliente. Cada
+        sesión y acción queda auditada (Ley 21.719) y el cliente la ve en su perfil.
+      </p>
+
+      <Card className="shadow-sm">
+        <CardContent className="p-4 sm:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              placeholder="Nombre del consultor (ej: Juan Soto — Soporte)"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              className="sm:max-w-sm"
+            />
+            <Button
+              onClick={() => crear.mutate()}
+              disabled={crear.isPending || !nombre.trim()}
+            >
+              {crear.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creando...</>
+              ) : (
+                "Crear consultor"
+              )}
+            </Button>
+          </div>
+
+          {nuevaPassword ? (
+            <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-2">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                Contraseña de {nuevaPassword.nombre} — se muestra UNA sola vez, cópiala ahora:
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="font-mono text-sm bg-background border rounded px-2 py-1 select-all">
+                  {nuevaPassword.password}
+                </code>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(nuevaPassword.password);
+                    toast({ title: "Copiada", description: "Contraseña copiada al portapapeles." });
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copiar
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setNuevaPassword(null)}>
+                  Listo
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {loadingConsultores ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
+              <Loader2 className="h-4 w-4 animate-spin" /> Cargando consultores...
+            </div>
+          ) : (consultores?.consultores ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">
+              Aún no hay consultores. Crea el primero para habilitar el acceso de soporte.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Creado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(consultores?.consultores ?? []).map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">{c.nombre}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {c.tipo === "soporte" ? "Consultor de soporte" : "Administrador"}
+                      </TableCell>
+                      <TableCell>
+                        {c.activo ? (
+                          <Badge variant="default">Activo</Badge>
+                        ) : (
+                          <Badge variant="outline">Desactivado</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {formatFecha(c.creadoEn)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={toggleActivo.isPending}
+                          onClick={() => toggleActivo.mutate({ id: c.id, activo: !c.activo })}
+                        >
+                          {c.activo ? "Desactivar" : "Reactivar"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <h3 className="text-base font-semibold tracking-tight pt-2">Registro de accesos</h3>
+      <Card className="shadow-sm">
+        <CardContent className="p-0">
+          {loadingSesiones ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Cargando accesos...
+            </div>
+          ) : (sesiones?.sesiones ?? []).length === 0 ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">
+              No hay sesiones de consultor registradas.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Consultor</TableHead>
+                    <TableHead>Cuenta visitada</TableHead>
+                    <TableHead>Ingreso</TableHead>
+                    <TableHead>Salida</TableHead>
+                    <TableHead>Duración</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(sesiones?.sesiones ?? []).map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium whitespace-nowrap">{s.consultorNombre}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <span className="text-sm">{s.clienteNombre || "—"}</span>{" "}
+                        <span className="font-mono text-xs text-muted-foreground">{s.accountId || ""}</span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">{formatFechaHora(s.inicioEn)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {s.finEn ? formatFechaHora(s.finEn) : <Badge variant="secondary">Abierta</Badge>}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {duracion(s.inicioEn, s.finEn)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setSesionDetalle(sesionDetalle === s.id ? null : s.id)}
+                        >
+                          {s.acciones} {s.acciones === 1 ? "acción" : "acciones"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {sesionDetalle != null ? (
+                <div className="border-t px-4 py-3 bg-muted/30">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">
+                    Acciones de la sesión #{sesionDetalle}
+                  </p>
+                  {(acciones?.acciones ?? []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sin acciones registradas.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {(acciones?.acciones ?? []).map((a) => (
+                        <li key={a.id} className="text-sm flex flex-wrap gap-2 items-baseline">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatFechaHora(a.fecha)}
+                          </span>
+                          <span>{a.detalle || `${a.metodo} ${a.ruta}`}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

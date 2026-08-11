@@ -1,0 +1,79 @@
+Agregar acceso independiente para consultores 
+de soporte técnico de NextCob, completamente 
+separado del login normal de clientes:
+
+1. PÁGINA DE ACCESO CONSULTOR:
+Crear una URL separada y discreta:
+nextcob.com/consultor
+
+Esta página debe verse sobria y diferente 
+al login normal — fondo oscuro, sin 
+información de marketing, solo el 
+formulario de acceso con:
+- Logo NextCob pequeño
+- Título: "Acceso Consultor"
+- Campo: ID de cuenta cliente (NCB-XXXXXXXXXX)
+- Campo: Tipo de acceso (selector):
+  * Consultor de soporte
+  * Administrador NextCob (reservado)
+- Campo: Contraseña de consultor
+- Botón: "Ingresar"
+
+La URL no debe aparecer en ningún menú 
+público ni en la landing page — solo 
+la conoce el equipo interno de NextCob.
+
+2. CREDENCIALES DE CONSULTOR:
+Crear credenciales independientes del 
+superadmin:
+- Contraseña consultor: generar una 
+  contraseña segura y mostrarla una 
+  sola vez en pantalla
+- En el futuro se pueden crear múltiples 
+  consultores con distintas contraseñas 
+  (uno por ejecutivo de soporte)
+
+3. FUNCIONAMIENTO AL INGRESAR:
+Al autenticarse correctamente con el 
+ID del cliente y la contraseña de consultor:
+- El consultor ve la plataforma exactamente 
+  como la ve ese cliente
+- Barra superior fija en color rojo que dice:
+  "⚠️ MODO CONSULTOR — Cuenta: [Nombre] 
+  (NCB-XXXXXXXXXX) | [Hora de ingreso]"
+  con botón "Cerrar sesión consultor"
+- El consultor PUEDE:
+  * Ver todos los datos del cliente
+  * Crear, editar cobros para ayudar
+  * Configurar recordatorios y workflows
+  * Ver informes y diagnósticos
+- El consultor NO PUEDE:
+  * Ver ni modificar contraseña del cliente
+  * Ver credenciales de Flow/MercadoPago
+  * Eliminar la cuenta del cliente
+  * Acceder a datos bancarios del cliente
+
+4. LINK DISCRETO EN LOGIN:
+En la página de login normal 
+(nextcob.com/login), agregar un link 
+muy discreto en la esquina inferior 
+derecha con texto pequeño en gris:
+"Acceso consultor"
+que redirija a nextcob.com/consultor
+
+5. REGISTRO DE AUDITORÍA (Ley 21.719):
+Cada sesión de consultor debe quedar 
+registrada automáticamente:
+- Fecha y hora de ingreso y salida
+- ID cuenta visitada
+- Nombre del consultor
+- Duración de la sesión
+- Acciones realizadas (cobros vistos, 
+  editados, etc.)
+
+Este log debe ser visible para el 
+superadmin en su panel y también 
+para el cliente en su sección 
+"Mis datos y privacidad" — el cliente 
+tiene derecho a saber que su cuenta 
+fue accedida por soporte (Ley 21.719).

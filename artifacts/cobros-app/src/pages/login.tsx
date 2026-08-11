@@ -130,6 +130,15 @@ export default function LoginPage() {
         <Button type="submit" className="w-full" disabled={login.isPending}>
           {login.isPending ? "Ingresando..." : "Iniciar sesión"}
         </Button>
+
+        <div className="flex justify-end">
+          <Link
+            href="/consultor"
+            className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground"
+          >
+            Acceso consultor
+          </Link>
+        </div>
       </form>
     </AuthLayout>
   );

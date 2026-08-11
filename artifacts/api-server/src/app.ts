@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { consultorGuard } from "./middlewares/consultorGuard";
 
 const app: Express = express();
 
@@ -45,6 +46,9 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
+// Restricciones y auditoría de sesiones de consultor de soporte (Ley 21.719).
+// Debe correr después de authMiddleware (necesita req.consultor).
+app.use(consultorGuard);
 
 app.use("/api", router);
 

@@ -31,6 +31,7 @@ import WorkflowDetail from "@/pages/workflow-detail";
 import TareasPage from "@/pages/tareas";
 import EncuestasPage from "@/pages/encuestas";
 import EncuestaPublicaPage from "@/pages/encuesta-publica";
+import ConsultorLoginPage from "@/pages/consultor-login";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -136,6 +137,7 @@ function AppRouter() {
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/consultor" component={ConsultorLoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />

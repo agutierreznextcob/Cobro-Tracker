@@ -20,8 +20,9 @@ import {
   usersTable,
   invitacionesTable,
   trialRutsTable,
+  consultorSesionesTable,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import {
   createSoloOrganization,
   backfillUserOrgRecords,
@@ -255,6 +256,11 @@ router.get("/auth/user", async (req: Request, res: Response) => {
         companyName,
         orgRole,
         organizationId,
+        // Sesión de consultor de soporte: el frontend muestra la barra roja
+        // "MODO CONSULTOR" y oculta secciones restringidas.
+        esConsultor: req.consultor != null,
+        consultorNombre: req.consultor?.nombre ?? null,
+        consultorInicioEn: req.consultor?.inicioEn ?? null,
       },
     }),
   );
@@ -552,6 +558,19 @@ router.post("/auth/login", async (req: Request, res: Response) => {
 
 router.post("/auth/logout", async (req: Request, res: Response) => {
   const sid = getSessionId(req);
+  // Si era una sesión de consultor, cerrar también el registro de auditoría.
+  if (req.consultor) {
+    await db
+      .update(consultorSesionesTable)
+      .set({ finEn: new Date() })
+      .where(
+        and(
+          eq(consultorSesionesTable.id, req.consultor.sesionId),
+          isNull(consultorSesionesTable.finEn),
+        ),
+      )
+      .catch((err) => req.log.error({ err }, "No se pudo cerrar sesión de consultor"));
+  }
   if (sid) {
     await deleteSession(sid);
   }

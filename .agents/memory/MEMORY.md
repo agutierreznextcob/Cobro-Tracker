@@ -34,4 +34,5 @@
 - [Cobro edit/delete money-safety](cobro-edit-delete-money-safety.md) — money-received cobros can't be freely edited/deleted; DELETE+ajustar-monto validate under FOR UPDATE row lock; block estado→pendiente when abonos>0.
 - [Datos bancarios + comprobantes transferencia](datos-bancarios-comprobantes.md) — confirmar = transacción con FOR UPDATE + claim; express.json limit 4mb para base64; rate limit por req.ip (trust proxy) + por token, sin cupo global.
 - [Reveniu suscripciones](reveniu-suscripciones.md) — webhook validado por header (timing-safe); período autoritativo = next_due de la API (idempotencia); transiciones de estado en SQL CASE; sin evento de pago fallido → gracia por período vencido.
+- [Acceso consultor de soporte](consultor-access.md) — impersonación auditada por sesión; deny-list de rutas sensibles debe matchear path canonicalizado (case/encoding) o es bypasseable; finEn vía logout+barrido 8h.
 - [Superadmin = libro de ingresos](superadmin-ledger.md) — módulo Cobros del superadmin muestra pagos de suscripción; seed borra sus cobros; pagos_suscripcion con UNIQUE user+período (idempotencia obligatoria).

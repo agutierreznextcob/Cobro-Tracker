@@ -5232,6 +5232,14 @@ components:
           type: [string, 'null']
         companyName:
           type: [string, 'null']
+        esConsultor:
+          type: boolean
+          description: True cuando la sesión es de un consultor de soporte NextCob actuando sobre esta cuenta.
+        consultorNombre:
+          type: [string, 'null']
+        consultorInicioEn:
+          type: [string, 'null']
+          format: date-time
     CompletarPerfilInput:
       type: object
       required: [firstName, lastName, rut, phone, address]

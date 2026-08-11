@@ -18,7 +18,7 @@ import {
   useEliminarCuenta,
   useChangePassword,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth, type AuthUser } from "@workspace/replit-auth-web";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -758,6 +758,7 @@ function PerfilSeccion({
   title,
   description,
   iconClassName,
+  oculta,
   children,
 }: {
   value: string;
@@ -765,8 +766,13 @@ function PerfilSeccion({
   title: React.ReactNode;
   description?: React.ReactNode;
   iconClassName?: string;
+  // En modo consultor las secciones sensibles (contraseña, credenciales de
+  // pago, datos bancarios, privacidad) se ocultan; el servidor las bloquea
+  // igualmente con 403.
+  oculta?: boolean;
   children: React.ReactNode;
 }) {
+  if (oculta) return null;
   return (
     <AccordionItem
       value={value}
@@ -971,7 +977,7 @@ function ProfileSettings() {
           </dl>
       </PerfilSeccion>
 
-      <PerfilSeccion value="password" icon={KeyRound} title="Cambiar contraseña" description="Mínimo 8 caracteres, con al menos una mayúscula y un número.">
+      <PerfilSeccion value="password" oculta={!!user?.esConsultor} icon={KeyRound} title="Cambiar contraseña" description="Mínimo 8 caracteres, con al menos una mayúscula y un número.">
         <ChangePasswordForm />
       </PerfilSeccion>
 
@@ -1058,7 +1064,7 @@ function ProfileSettings() {
         </PerfilSeccion>
       )}
 
-      <PerfilSeccion value="flow" icon={KeyRound} title="Conectar Flow" description="Ingresa tus credenciales de Flow para generar links de pago reales. Se guardan encriptadas con AES-256.">
+      <PerfilSeccion value="flow" oculta={!!user?.esConsultor} icon={KeyRound} title="Conectar Flow" description="Ingresa tus credenciales de Flow para generar links de pago reales. Se guardan encriptadas con AES-256.">
         <div className="space-y-4">
           {credLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -1171,7 +1177,7 @@ function ProfileSettings() {
         </div>
       </PerfilSeccion>
 
-      <PerfilSeccion value="mercadopago" icon={KeyRound} iconClassName="text-[#009ee3]" title="Conectar MercadoPago" description="Ingresa tu Access Token de producción de MercadoPago para generar links de pago. Se guarda encriptado con AES-256.">
+      <PerfilSeccion value="mercadopago" oculta={!!user?.esConsultor} icon={KeyRound} iconClassName="text-[#009ee3]" title="Conectar MercadoPago" description="Ingresa tu Access Token de producción de MercadoPago para generar links de pago. Se guarda encriptado con AES-256.">
         <div className="space-y-4">
           {mpLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -1262,15 +1268,73 @@ function ProfileSettings() {
         </div>
       </PerfilSeccion>
 
-      <PerfilSeccion value="banco" icon={Landmark} title="Datos bancarios para transferencias" description="Cuenta a la que tus clientes transfieren en cobros manuales. Se incluye en emails y WhatsApp cuando el cobro no tiene link de pago.">
+      <PerfilSeccion value="banco" oculta={!!user?.esConsultor} icon={Landmark} title="Datos bancarios para transferencias" description="Cuenta a la que tus clientes transfieren en cobros manuales. Se incluye en emails y WhatsApp cuando el cobro no tiene link de pago.">
         <DatosBancariosSection />
       </PerfilSeccion>
 
-      <PerfilSeccion value="privacidad" icon={ShieldCheck} title="Mis datos y privacidad" description="Descarga una copia de tus datos o elimina tu cuenta de forma permanente, según la Ley N° 21.719.">
+      <PerfilSeccion value="privacidad" oculta={!!user?.esConsultor} icon={ShieldCheck} title="Mis datos y privacidad" description="Descarga una copia de tus datos o elimina tu cuenta de forma permanente, según la Ley N° 21.719.">
         <PrivacySection />
       </PerfilSeccion>
 
       </Accordion>
+    </div>
+  );
+}
+
+// Ley 21.719: el cliente tiene derecho a saber cuándo soporte NextCob accedió
+// a su cuenta. Lista las sesiones de consultor sobre esta cuenta.
+function AccesosSoporte() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["consultor-mis-accesos"],
+    queryFn: async () => {
+      const res = await fetch("/api/consultor/mis-accesos", { credentials: "include" });
+      if (!res.ok) throw new Error("No se pudieron cargar los accesos");
+      return (await res.json()) as {
+        sesiones: Array<{
+          id: number;
+          consultorNombre: string;
+          inicioEn: string;
+          finEn: string | null;
+          acciones: number;
+        }>;
+      };
+    },
+  });
+
+  return (
+    <div className="border-t border-border/60 pt-6">
+      <p className="text-sm font-medium text-foreground">Accesos de soporte NextCob</p>
+      <p className="text-sm text-muted-foreground mb-3">
+        Registro de las veces que un consultor de soporte accedió a tu cuenta.
+      </p>
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" /> Cargando...
+        </div>
+      ) : !data || data.sesiones.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Ningún consultor ha accedido a tu cuenta.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {data.sesiones.map((s) => (
+            <li
+              key={s.id}
+              className="text-sm rounded-md border border-border/50 px-3 py-2 flex flex-wrap items-center justify-between gap-2"
+            >
+              <span className="font-medium">{s.consultorNombre}</span>
+              <span className="text-muted-foreground text-xs">
+                {new Date(s.inicioEn).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}
+                {s.finEn
+                  ? ` → ${new Date(s.finEn).toLocaleString("es-CL", { timeStyle: "short" })}`
+                  : " (sesión abierta)"}
+                {" · "}
+                {s.acciones} {s.acciones === 1 ? "acción" : "acciones"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -1362,6 +1426,8 @@ function PrivacySection() {
             )}
           </Button>
         </div>
+
+        <AccesosSoporte />
 
         <div className="border-t border-border/60 pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>

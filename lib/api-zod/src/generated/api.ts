@@ -32,7 +32,10 @@ export const GetCurrentAuthUserResponse = zod.object({
   "rut": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "address": zod.string().nullish(),
-  "companyName": zod.string().nullish()
+  "companyName": zod.string().nullish(),
+  "esConsultor": zod.boolean().optional().describe('True cuando la sesión es de un consultor de soporte NextCob actuando sobre esta cuenta.'),
+  "consultorNombre": zod.string().nullish(),
+  "consultorInicioEn": zod.coerce.date().nullish()
 }),zod.null()])
 })
 
@@ -840,7 +843,10 @@ export const CompletarPerfilResponse = zod.object({
   "rut": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "address": zod.string().nullish(),
-  "companyName": zod.string().nullish()
+  "companyName": zod.string().nullish(),
+  "esConsultor": zod.boolean().optional().describe('True cuando la sesión es de un consultor de soporte NextCob actuando sobre esta cuenta.'),
+  "consultorNombre": zod.string().nullish(),
+  "consultorInicioEn": zod.coerce.date().nullish()
 })
 
 
