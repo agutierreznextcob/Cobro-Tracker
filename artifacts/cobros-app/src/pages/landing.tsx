@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { LandingChat } from "@/components/landing-chat";
 import { DemoRequestModal } from "@/components/demo-request-modal";
 import { HeroParticles } from "@/components/hero-particles";
-import { Reveal, CountUp } from "@/components/reveal";
+import { Reveal } from "@/components/reveal";
 import {
   ArrowRight,
   BarChart3,
@@ -239,24 +239,6 @@ function HeroSection() {
           <p className="text-sm text-white/60 mt-5">
             14 días de prueba gratis · Luego $24.990 + IVA ($29.738 total) CLP/mes
           </p>
-        </Reveal>
-
-        {/* Animated real metrics */}
-        <Reveal variant="up" delayMs={400}>
-          <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-2xl mx-auto">
-            {[
-              { valor: "14 días", label: "Prueba gratuita" },
-              { valor: "$0", label: "Sin tarjeta de crédito" },
-              { valor: "5 min", label: "Para tu primer cobro" },
-            ].map((m) => (
-              <div key={m.label} className="text-center">
-                <p className="text-3xl font-black text-[#F4A800] font-mono">
-                  <CountUp value={m.valor} />
-                </p>
-                <p className="text-sm text-white/70 mt-1">{m.label}</p>
-              </div>
-            ))}
-          </div>
         </Reveal>
 
         {/* App preview mockup */}
