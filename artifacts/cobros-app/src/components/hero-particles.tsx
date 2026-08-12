@@ -35,8 +35,8 @@ export function HeroParticles() {
     const isMobile = () => window.innerWidth < 768;
     // Density scales with area; mobile gets half the particles.
     const particleCount = () => {
-      const base = Math.round((width * height) / 22000);
-      const capped = Math.max(18, Math.min(base, 90));
+      const base = Math.round((width * height) / 18000);
+      const capped = Math.max(22, Math.min(base, 110));
       return isMobile() ? Math.round(capped / 2) : capped;
     };
 

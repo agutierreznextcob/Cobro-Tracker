@@ -318,3 +318,108 @@
     animation: none;
   }
 }
+
+/* Landing — scroll reveal animations */
+.reveal {
+  opacity: 0;
+  transition:
+    opacity 0.7s ease-out,
+    transform 0.7s ease-out;
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.reveal-up {
+  transform: translateY(28px);
+}
+.reveal-left {
+  transform: translateX(-32px);
+}
+.reveal-right {
+  transform: translateX(32px);
+}
+.reveal-zoom {
+  transform: scale(0.92);
+}
+.reveal.reveal-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Landing — card hover lift with soft gold shadow */
+.card-lift {
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.card-lift:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 28px -8px rgba(244, 168, 0, 0.28);
+}
+
+/* Landing — shimmer sweep on primary CTA (every 3s) */
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -75%;
+  width: 50%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  animation: btnShimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes btnShimmer {
+  0% {
+    left: -75%;
+  }
+  40% {
+    left: 125%;
+  }
+  100% {
+    left: 125%;
+  }
+}
+
+/* Landing — soft pulse on the final CTA button */
+@keyframes ctaPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 168, 0, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(244, 168, 0, 0);
+  }
+}
+.btn-pulse {
+  animation: ctaPulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .card-lift,
+  .card-lift:hover {
+    transform: none;
+    transition: none;
+  }
+  .btn-shimmer::after {
+    animation: none;
+    display: none;
+  }
+  .btn-pulse {
+    animation: none;
+  }
+}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { LandingChat } from "@/components/landing-chat";
 import { DemoRequestModal } from "@/components/demo-request-modal";
 import { HeroParticles } from "@/components/hero-particles";
+import { Reveal, CountUp } from "@/components/reveal";
 import {
   ArrowRight,
   BarChart3,
@@ -201,38 +202,62 @@ function HeroSection() {
       />
 
       <div className="relative z-10 max-w-4xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 bg-white/90 text-gray-900 px-3 py-1.5 rounded-full text-sm font-medium mb-8 border border-white/30 shadow-sm backdrop-blur-sm">
-          <Sparkles className="h-3.5 w-3.5 text-[#F4A800]" />
-          Con asistente IA incluido
-        </div>
-        <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white leading-[1.1] mb-6">
-          Gestiona la cobranza a tus clientes{" "}
-          <span className="text-[#F4A800]">sin complicaciones</span>
-        </h1>
-        <p className="text-xl text-white/80 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Controla la cobranza de tus clientes, comparte links de pago con
-          Webpay y MercadoPago, y automatiza el seguimiento. Con dashboard en
-          tiempo real y asistente IA para analizar tu negocio.
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <button
-            onClick={() => navigate("/register")}
-            className="inline-flex items-center gap-2 bg-[#F4A800] text-black px-6 py-3 rounded-lg text-base font-semibold shadow-lg shadow-[#F4A800]/20 hover:bg-[#ffba1f] transition-colors w-full sm:w-auto justify-center"
-          >
-            Comenzar gratis
-            <ArrowRight className="h-4 w-4" />
-          </button>
-          <DemoRequestModal
-            trigger={
-              <button className="inline-flex items-center gap-2 border border-white/70 text-white px-6 py-3 rounded-lg text-base font-semibold hover:bg-white/10 transition-colors w-full sm:w-auto justify-center">
-                Agenda una presentación
-              </button>
-            }
-          />
-        </div>
-        <p className="text-sm text-white/60 mt-5">
-          14 días de prueba gratis · Luego $24.990 + IVA ($29.738 total) CLP/mes
-        </p>
+        <Reveal variant="up">
+          <div className="inline-flex items-center gap-2 bg-white/90 text-gray-900 px-3 py-1.5 rounded-full text-sm font-medium mb-8 border border-white/30 shadow-sm backdrop-blur-sm">
+            <Sparkles className="h-3.5 w-3.5 text-[#F4A800]" />
+            Con asistente IA incluido
+          </div>
+          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white leading-[1.1] mb-6">
+            Gestiona la cobranza a tus clientes{" "}
+            <span className="text-[#F4A800]">sin complicaciones</span>
+          </h1>
+        </Reveal>
+        <Reveal variant="up" delayMs={150}>
+          <p className="text-xl text-white/80 max-w-2xl mx-auto mb-10 leading-relaxed">
+            Controla la cobranza de tus clientes, comparte links de pago con
+            Webpay y MercadoPago, y automatiza el seguimiento. Con dashboard en
+            tiempo real y asistente IA para analizar tu negocio.
+          </p>
+        </Reveal>
+        <Reveal variant="up" delayMs={300}>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              onClick={() => navigate("/register")}
+              className="btn-shimmer inline-flex items-center gap-2 bg-[#F4A800] text-black px-6 py-3 rounded-lg text-base font-semibold shadow-lg shadow-[#F4A800]/20 hover:bg-[#ffba1f] transition-colors w-full sm:w-auto justify-center"
+            >
+              Comenzar gratis
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <DemoRequestModal
+              trigger={
+                <button className="inline-flex items-center gap-2 border border-white/70 text-white px-6 py-3 rounded-lg text-base font-semibold hover:bg-white/10 transition-colors w-full sm:w-auto justify-center">
+                  Agenda una presentación
+                </button>
+              }
+            />
+          </div>
+          <p className="text-sm text-white/60 mt-5">
+            14 días de prueba gratis · Luego $24.990 + IVA ($29.738 total) CLP/mes
+          </p>
+        </Reveal>
+
+        {/* Animated real metrics */}
+        <Reveal variant="up" delayMs={400}>
+          <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-2xl mx-auto">
+            {[
+              { valor: "14 días", label: "Prueba gratuita" },
+              { valor: "$0", label: "Sin tarjeta de crédito" },
+              { valor: "5 min", label: "Para tu primer cobro" },
+            ].map((m) => (
+              <div key={m.label} className="text-center">
+                <p className="text-3xl font-black text-[#F4A800] font-mono">
+                  <CountUp value={m.valor} />
+                </p>
+                <p className="text-sm text-white/70 mt-1">{m.label}</p>
+              </div>
+            ))}
+          </div>
+        </Reveal>
 
         {/* App preview mockup */}
         <div className="mt-16 rounded-2xl border border-white/10 bg-card shadow-2xl overflow-hidden text-left">
@@ -316,16 +341,24 @@ function ComoFuncionaSection() {
   return (
     <section id="como-funciona" className="py-20 px-6 bg-muted/20 border-y border-border/50">
       <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold tracking-tight mb-3">Cómo funciona</h2>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Cinco pasos para gestionar toda la cobranza de tus clientes en Chile,
-            de principio a fin.
-          </p>
-        </div>
+        <Reveal variant="up">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold tracking-tight mb-3">Cómo funciona</h2>
+            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+              Cinco pasos para gestionar toda la cobranza de tus clientes en Chile,
+              de principio a fin.
+            </p>
+          </div>
+        </Reveal>
         <div className="flex flex-wrap justify-center gap-6">
           {steps.map((step, i) => (
-            <div key={i} className="bg-card border rounded-2xl p-7 shadow-sm w-full sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]">
+            <Reveal
+              key={i}
+              variant="up"
+              delayMs={i * 120}
+              className="w-full sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]"
+            >
+            <div className="card-lift bg-card border rounded-2xl p-7 shadow-sm h-full">
               <div className="flex items-start justify-between mb-5">
                 <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-sm">
                   <step.icon className="h-5 w-5" />
@@ -335,6 +368,7 @@ function ComoFuncionaSection() {
               <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">{step.desc}</p>
             </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -366,16 +400,20 @@ function CaracteristicasSection() {
   return (
     <section id="caracteristicas" className="py-20 px-6">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold tracking-tight mb-3">Todo lo que necesitas para gestionar tu cobranza</h2>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Una plataforma completa para gestionar tus cobros en Chile, sin complicaciones.
-          </p>
-        </div>
+        <Reveal variant="up">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold tracking-tight mb-3">Todo lo que necesitas para gestionar tu cobranza</h2>
+            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+              Una plataforma completa para gestionar tus cobros en Chile, sin complicaciones.
+            </p>
+          </div>
+        </Reveal>
         <div className="rounded-2xl border border-border/60 overflow-hidden shadow-sm">
           {features.map((f, i) => (
-            <div
+            <Reveal
               key={i}
+              variant="up"
+              delayMs={Math.min(i * 40, 400)}
               className={`flex items-center gap-4 px-5 py-3.5 sm:px-6 ${
                 i % 2 === 1 ? "bg-muted/40" : "bg-card"
               }`}
@@ -387,7 +425,7 @@ function CaracteristicasSection() {
                 {f.desc}
               </span>
               <CheckCircle2 className="h-5 w-5 text-[#F4A800] shrink-0" />
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -400,13 +438,15 @@ function PreciosSection() {
   return (
     <section id="precios" className="py-20 px-6 bg-muted/20 border-y border-border/50">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold tracking-tight mb-3">Un precio simple y transparente</h2>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Prueba 14 días gratis. Sin sorpresas ni letras chicas.
-          </p>
-        </div>
-        <div className="max-w-md mx-auto">
+        <Reveal variant="up">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold tracking-tight mb-3">Un precio simple y transparente</h2>
+            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+              Prueba 14 días gratis. Sin sorpresas ni letras chicas.
+            </p>
+          </div>
+        </Reveal>
+        <Reveal variant="zoom" className="max-w-md mx-auto">
           <div className="bg-[#0A0A0A] text-white rounded-2xl p-8 shadow-xl flex flex-col relative overflow-hidden border-2 border-[#F4A800]">
             <div className="absolute top-5 right-5">
               <span className="bg-[#F4A800] text-black text-xs font-bold px-2.5 py-1 rounded-full">14 DÍAS GRATIS</span>
@@ -424,13 +464,18 @@ function PreciosSection() {
             </div>
             <ul className="space-y-3 flex-1 mb-8">
               {[
+                "1 usuario incluido",
                 "Cobros ilimitados",
                 "Links de pago Flow y MercadoPago",
                 "Cobranza manual",
                 "Pagos parciales y abonos",
                 "Recordatorios por email y WhatsApp",
+                "Workflows inteligentes de cobranza",
                 "Asistente IA incluido",
                 "Gestión de clientes",
+                "Scoring automático de clientes",
+                "Portal del deudor incluido",
+                "Informes y exportación Excel",
                 "Dashboard en tiempo real",
               ].map((item) => (
                 <li key={item} className="flex items-center gap-2.5 text-sm">
@@ -439,6 +484,9 @@ function PreciosSection() {
                 </li>
               ))}
             </ul>
+            <p className="text-xs text-white/50 mb-4">
+              Usuarios adicionales: $9.990 + IVA/mes c/u
+            </p>
             <button
               onClick={() => navigate("/register")}
               className="w-full bg-[#F4A800] text-black py-2.5 rounded-lg font-semibold text-sm hover:bg-[#ffba1f] transition-colors"
@@ -446,7 +494,7 @@ function PreciosSection() {
               Comenzar 14 días gratis
             </button>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -457,6 +505,7 @@ function QuienesSomosSection() {
     <section id="nosotros" className="py-20 px-6">
       <div className="max-w-5xl mx-auto">
         <div className="grid md:grid-cols-2 gap-12 items-center">
+          <Reveal variant="left">
           <div>
             <h2 className="text-3xl font-bold tracking-tight mb-5">Quiénes somos</h2>
             <p className="text-primary font-semibold leading-relaxed mb-4">
@@ -472,19 +521,22 @@ function QuienesSomosSection() {
               Nuestra misión: que te paguen a tiempo, siempre.
             </p>
           </div>
+          </Reveal>
           <div className="grid grid-cols-1 gap-4">
             {[
               { icon: CreditCard, label: "Pagos con Webpay y MercadoPago" },
               { icon: Bot, label: "Asistente IA incluido" },
               { icon: Coins, label: "Cobros parciales y seguimiento automático" },
               { icon: Sparkles, label: "14 días de prueba gratis" },
-            ].map((item) => (
-              <div key={item.label} className="bg-card border rounded-2xl p-5 flex items-center gap-4 shadow-sm hover:border-primary/30 transition-colors">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                  <item.icon className="h-5 w-5" />
+            ].map((item, i) => (
+              <Reveal key={item.label} variant="right" delayMs={i * 100}>
+                <div className="card-lift bg-card border rounded-2xl p-5 flex items-center gap-4 shadow-sm hover:border-primary/30 transition-colors">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <item.icon className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">{item.label}</p>
                 </div>
-                <p className="text-sm font-medium text-foreground">{item.label}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -503,17 +555,19 @@ function CtaSection() {
         aria-hidden="true"
       />
       <div className="relative max-w-2xl mx-auto text-center">
-        <h2 className="text-3xl font-bold text-white mb-4">Empieza a gestionar tu cobranza hoy mismo</h2>
-        <p className="text-white/75 text-lg mb-8 leading-relaxed">
-          14 días de prueba gratis. Configura tu primer cobro en menos de 5 minutos.
-        </p>
-        <button
-          onClick={() => navigate("/register")}
-          className="inline-flex items-center gap-2 bg-[#F4A800] text-black px-8 py-3.5 rounded-lg text-base font-bold shadow-lg shadow-[#F4A800]/20 hover:bg-[#ffba1f] transition-colors"
-        >
-          Crear mi cuenta gratis
-          <ChevronRight className="h-5 w-5" />
-        </button>
+        <Reveal variant="up">
+          <h2 className="text-3xl font-bold text-white mb-4">Empieza a gestionar tu cobranza hoy mismo</h2>
+          <p className="text-white/75 text-lg mb-8 leading-relaxed">
+            14 días de prueba gratis. Configura tu primer cobro en menos de 5 minutos.
+          </p>
+          <button
+            onClick={() => navigate("/register")}
+            className="btn-pulse inline-flex items-center gap-2 bg-[#F4A800] text-black px-8 py-3.5 rounded-lg text-base font-bold shadow-lg shadow-[#F4A800]/20 hover:bg-[#ffba1f] transition-colors"
+          >
+            Crear mi cuenta gratis
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </Reveal>
       </div>
     </section>
   );
