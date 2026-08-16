@@ -205,18 +205,18 @@ function HeroSection() {
         <Reveal variant="up">
           <div className="inline-flex items-center gap-2 bg-white/90 text-gray-900 px-3 py-1.5 rounded-full text-sm font-medium mb-8 border border-white/30 shadow-sm backdrop-blur-sm">
             <Sparkles className="h-3.5 w-3.5 text-[#F4A800]" />
-            Con asistente IA incluido
+            Gestión inteligente de cuentas por cobrar
           </div>
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white leading-[1.1] mb-6">
-            Gestiona la cobranza a tus clientes{" "}
-            <span className="text-[#F4A800]">sin complicaciones</span>
+            Controla el dinero que te deben.{" "}
+            <span className="text-[#F4A800]">Predícelo. Recupéralo.</span>
           </h1>
         </Reveal>
         <Reveal variant="up" delayMs={150}>
           <p className="text-xl text-white/80 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Controla la cobranza de tus clientes, comparte links de pago con
-            Webpay y MercadoPago, y automatiza el seguimiento. Con dashboard en
-            tiempo real y asistente IA para analizar tu negocio.
+            NextCob es la plataforma de gestión de cuentas por cobrar para
+            empresas y profesionales que quieren saber exactamente cuándo y
+            cuánto dinero recibirán — y actuar antes de que sea tarde.
           </p>
         </Reveal>
         <Reveal variant="up" delayMs={300}>
@@ -292,7 +292,7 @@ function ComoFuncionaSection() {
     {
       number: "01",
       icon: FileText,
-      title: "Registra y organiza",
+      title: "Registra y organiza tu cartera",
       desc: "Crea cobros con tipo de documento, IVA automático y asígnalos a clientes con su historial completo.",
     },
     {
@@ -310,13 +310,13 @@ function ComoFuncionaSection() {
     {
       number: "04",
       icon: UsersRound,
-      title: "Gestiona tu equipo",
+      title: "Gestiona y mide tu equipo",
       desc: "Asigna cobros a ejecutivos, registra gestiones, mide el rendimiento de cada uno y ve todo consolidado como administrador.",
     },
     {
       number: "05",
       icon: BarChart3,
-      title: "Analiza y decide",
+      title: "Predice tu flujo de caja",
       desc: "Dashboard en tiempo real, scoring de clientes, informes aging, proyección de flujo de caja y asistente IA que responde preguntas sobre tu negocio en lenguaje natural.",
     },
   ];
@@ -325,7 +325,7 @@ function ComoFuncionaSection() {
       <div className="max-w-5xl mx-auto">
         <Reveal variant="up">
           <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold tracking-tight mb-3">Cómo funciona</h2>
+            <h2 className="text-3xl font-bold tracking-tight mb-3">De la cuenta por cobrar al dinero en tu cuenta</h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
               Cinco pasos para gestionar toda la cobranza de tus clientes en Chile,
               de principio a fin.
@@ -384,7 +384,7 @@ function CaracteristicasSection() {
       <div className="max-w-4xl mx-auto">
         <Reveal variant="up">
           <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold tracking-tight mb-3">Todo lo que necesitas para gestionar tu cobranza</h2>
+            <h2 className="text-3xl font-bold tracking-tight mb-3">Todo lo que necesitas para controlar el dinero que te deben</h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
               Una plataforma completa para gestionar tus cobros en Chile, sin complicaciones.
             </p>
@@ -407,6 +407,57 @@ function CaracteristicasSection() {
                 {f.desc}
               </span>
               <CheckCircle2 className="h-5 w-5 text-[#F4A800] shrink-0" />
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SaludCarteraSection() {
+  const niveles = [
+    {
+      color: "bg-green-500",
+      ring: "border-green-200 bg-green-50",
+      titulo: "Cartera sana",
+      desc: "Cobros al día",
+    },
+    {
+      color: "bg-yellow-400",
+      ring: "border-yellow-200 bg-yellow-50",
+      titulo: "Cartera en riesgo",
+      desc: "Próximos a vencer",
+    },
+    {
+      color: "bg-red-500",
+      ring: "border-red-200 bg-red-50",
+      titulo: "Cartera crítica",
+      desc: "Vencidos sin gestionar",
+    },
+  ];
+  return (
+    <section className="py-20 px-6">
+      <div className="max-w-4xl mx-auto">
+        <Reveal variant="up">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tight mb-3">
+              La salud financiera de tu cartera, en tiempo real
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              NextCob clasifica automáticamente tu cartera y te dice exactamente
+              qué hacer primero para maximizar tu recuperación.
+            </p>
+          </div>
+        </Reveal>
+        <div className="grid sm:grid-cols-3 gap-6">
+          {niveles.map((n, i) => (
+            <Reveal key={n.titulo} variant="up" delayMs={i * 120}>
+              <div className={`card-lift rounded-2xl border p-6 text-center shadow-sm h-full ${n.ring}`}>
+                <span className={`inline-block h-5 w-5 rounded-full ${n.color} shadow mb-4`} aria-hidden="true" />
+                <h3 className="font-semibold text-lg mb-1 text-foreground">{n.titulo}</h3>
+                <p className="text-sm text-muted-foreground">{n.desc}</p>
+              </div>
             </Reveal>
           ))}
         </div>
@@ -494,13 +545,13 @@ function QuienesSomosSection() {
               Una plataforma construida por emprendedores, para emprendedores.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              Construimos NextCob porque sabíamos exactamente lo que las pymes y profesionales independientes necesitaban: una forma simple y profesional de gestionar la cobranza, sin depender de programadores ni contadores.
+              Construimos NextCob porque vimos de cerca cómo las empresas pierden control sobre su dinero — no porque no vendan, sino porque no cobran a tiempo.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              Integramos Webpay, MercadoPago y un asistente IA para que tú te enfoques en tu negocio, no en perseguir pagos.
+              NextCob nació para cambiar eso: darte visibilidad total sobre tu cartera, predecir cuándo te pagarán y automatizar la gestión para que tú te enfoques en hacer crecer tu negocio.
             </p>
             <p className="font-medium text-foreground leading-relaxed">
-              Nuestra misión: que te paguen a tiempo, siempre.
+              Nuestra misión: que nunca pierdas el control del dinero que te deben.
             </p>
           </div>
           </Reveal>
@@ -538,9 +589,9 @@ function CtaSection() {
       />
       <div className="relative max-w-2xl mx-auto text-center">
         <Reveal variant="up">
-          <h2 className="text-3xl font-bold text-white mb-4">Empieza a gestionar tu cobranza hoy mismo</h2>
+          <h2 className="text-3xl font-bold text-white mb-4">Toma el control de tus cuentas por cobrar hoy</h2>
           <p className="text-white/75 text-lg mb-8 leading-relaxed">
-            14 días de prueba gratis. Configura tu primer cobro en menos de 5 minutos.
+            14 días gratis. Sin tarjeta de crédito. Tu primer cobro en 5 minutos.
           </p>
           <button
             onClick={() => navigate("/register")}
@@ -613,6 +664,7 @@ export default function LandingPage() {
       <HeroSection />
       <ComoFuncionaSection />
       <CaracteristicasSection />
+      <SaludCarteraSection />
       <PreciosSection />
       <QuienesSomosSection />
       <CtaSection />
