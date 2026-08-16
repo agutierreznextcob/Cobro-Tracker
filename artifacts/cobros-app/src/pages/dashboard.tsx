@@ -163,7 +163,7 @@ function SaludCarteraPanel() {
                     <span className="font-mono font-semibold text-sm">{formatCurrency(a.saldoPendiente)}</span>
                     {a.cobroId != null && (
                       <Link
-                        href={`/cobros/${a.cobroId}`}
+                        href={`/cobros/${a.cobroId}?contactar=1`}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                       >
                         <MessageSquare className="h-3.5 w-3.5" />

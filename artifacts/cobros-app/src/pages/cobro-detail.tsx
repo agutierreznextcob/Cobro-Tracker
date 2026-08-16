@@ -189,6 +189,17 @@ export default function CobroDetail() {
   const isSupervisor = user?.orgRole === "supervisor";
   const puedeAsignar = isOrgAdmin || isSupervisor;
 
+  // Diálogo "Contactar cliente": se abre al llegar con ?contactar=1 (desde Acciones recomendadas)
+  const [showContactarDialog, setShowContactarDialog] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("contactar") === "1") {
+      setShowContactarDialog(true);
+      // Limpia el parámetro para que refrescar/compartir no reabra el diálogo
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
   // Link generation modal state
   const [showFlowConfig, setShowFlowConfig] = useState(false);
   const [showMpConfig, setShowMpConfig] = useState(false);
@@ -2443,6 +2454,66 @@ export default function CobroDetail() {
 
       {/* Historial de gestiones */}
       <GestionesSection cobroId={Number(id)} />
+
+      {/* Dialog: Contactar cliente (llegada desde Acciones recomendadas con ?contactar=1) */}
+      <Dialog open={showContactarDialog} onOpenChange={setShowContactarDialog}>
+        <DialogContent className="max-w-sm" data-testid="dialog-contactar">
+          <DialogHeader>
+            <DialogTitle>Contactar al cliente</DialogTitle>
+            <DialogDescription>
+              {cobro.clienteNombre ? `Envía un recordatorio a ${cobro.clienteNombre}` : "Envía un recordatorio al cliente"} por el saldo pendiente de {formatCurrency(saldoPendiente > 0 ? saldoPendiente : montoACobrar)}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-1">
+            {/* Email: recordatorio (con link Flow) o aviso manual (sin pasarela) */}
+            {hasEmail && (hasFlowLink || noTieneLink) ? (
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                data-testid="contactar-email"
+                disabled={enviarRecordatorio.isPending || avisarCliente.isPending}
+                onClick={() => {
+                  if (hasFlowLink) handleRecordatorioEmail();
+                  else handleAvisarEmail();
+                  setShowContactarDialog(false);
+                }}
+              >
+                {(enviarRecordatorio.isPending || avisarCliente.isPending) ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-2 text-primary" />
+                )}
+                Enviar recordatorio por email
+              </Button>
+            ) : !hasEmail && (hasFlowLink || noTieneLink) ? (
+              <p className="text-xs text-muted-foreground">
+                Este cobro no tiene email del pagador. Agrega uno para enviar recordatorios por email.
+              </p>
+            ) : null}
+
+            {/* WhatsApp: según pasarela configurada */}
+            <Button
+              variant="outline"
+              className="w-full justify-start border-green-600/40 text-green-700 hover:bg-green-50 hover:border-green-600"
+              data-testid="contactar-whatsapp"
+              onClick={() => {
+                if (hasFlowLink) handleWhatsApp();
+                else if (hasMpLink) handleWhatsAppMp();
+                else handleAvisarWhatsApp();
+                setShowContactarDialog(false);
+              }}
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Enviar recordatorio por WhatsApp
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setShowContactarDialog(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: Editar cobro */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
