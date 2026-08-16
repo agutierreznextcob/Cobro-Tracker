@@ -8,6 +8,7 @@ import {
   appConfigTable,
 } from "@workspace/db";
 import { getOrgContext, cobroScopeCondition } from "./org";
+import { sendSweepAlertEmail } from "./email";
 
 // ---------------------------------------------------------------------------
 // Salud de cartera: shared classification helpers + daily per-user snapshots.
@@ -185,6 +186,8 @@ export async function generarSnapshotsSaludCartera(
 // ---------------------------------------------------------------------------
 
 export const SWEEP_ULTIMO_EXITO_KEY = "sweep_salud_cartera_ultima_ejecucion";
+export const SWEEP_ALERTA_ENVIADA_KEY = "sweep_salud_cartera_alerta_enviada_en";
+const ALERT_RATE_LIMIT_HORAS = 12;
 
 /**
  * Upserts the current UTC timestamp into app_config after a successful sweep.
@@ -220,8 +223,75 @@ export async function leerUltimaEjecucionSweep(): Promise<Date | null> {
 }
 
 /**
+ * Sends a one-off stale-sweep alert email to the platform superadmin,
+ * rate-limited to at most one per ALERT_RATE_LIMIT_HORAS. Tracks the last
+ * send time in app_config under SWEEP_ALERTA_ENVIADA_KEY. All failures are
+ * swallowed so this never disrupts the health-check caller.
+ */
+async function enviarAlertaSweepSiNecesario(
+  log: SweepLogger,
+  ultimaEjecucion: Date | null,
+  horasDesde: number | null,
+): Promise<void> {
+  try {
+    // Check last alert timestamp for rate limiting.
+    const [alertaRow] = await db
+      .select({ valor: appConfigTable.valor })
+      .from(appConfigTable)
+      .where(eq(appConfigTable.clave, SWEEP_ALERTA_ENVIADA_KEY));
+
+    if (alertaRow) {
+      const ultimaAlerta = new Date(alertaRow.valor);
+      if (!isNaN(ultimaAlerta.getTime())) {
+        const horasDesdeAlerta = (Date.now() - ultimaAlerta.getTime()) / (1000 * 60 * 60);
+        if (horasDesdeAlerta < ALERT_RATE_LIMIT_HORAS) {
+          log.info(
+            { horasDesdeAlerta: Math.round(horasDesdeAlerta), rateLimitHoras: ALERT_RATE_LIMIT_HORAS },
+            "Alerta de sweep ya enviada recientemente — omitiendo",
+          );
+          return;
+        }
+      }
+    }
+
+    // Fetch superadmin email (reserved accountId NCB-0000000001).
+    const [admin] = await db
+      .select({ email: usersTable.email })
+      .from(usersTable)
+      .where(eq(usersTable.accountId, "NCB-0000000001"));
+
+    const destinatario = admin?.email;
+    if (!destinatario) {
+      log.error({}, "No se encontró el email del superadmin para enviar la alerta del sweep");
+      return;
+    }
+
+    const result = await sendSweepAlertEmail(
+      { destinatario, ultimaEjecucion, horasDesde },
+      { warn: (obj, msg) => log.error(obj, msg) },
+    );
+
+    if (result.ok) {
+      // Record the send time so subsequent ticks respect the rate limit.
+      const ahora = new Date().toISOString();
+      await db
+        .insert(appConfigTable)
+        .values({ clave: SWEEP_ALERTA_ENVIADA_KEY, valor: ahora })
+        .onConflictDoUpdate({
+          target: appConfigTable.clave,
+          set: { valor: ahora },
+        });
+      log.info({ destinatario }, "Alerta de sweep de salud de cartera enviada por email");
+    }
+  } catch (err) {
+    log.error({ err }, "Error enviando alerta de sweep por email");
+  }
+}
+
+/**
  * Checks whether the sweep is overdue (gap > umbralHoras since last success).
- * Returns `{ stale, ultimaEjecucion }`. Logs a warning when stale.
+ * Returns `{ stale, ultimaEjecucion }`. Logs a warning when stale and sends
+ * a rate-limited alert email to the platform superadmin (at most once per 12 h).
  */
 export async function verificarSaludSweep(
   log: SweepLogger,
@@ -233,6 +303,7 @@ export async function verificarSaludSweep(
       { umbralHoras },
       "Sweep de salud de cartera nunca ha registrado una ejecución exitosa",
     );
+    await enviarAlertaSweepSiNecesario(log, null, null);
     return { stale: true, ultimaEjecucion: null };
   }
   const horasDesde = (Date.now() - ultimaEjecucion.getTime()) / (1000 * 60 * 60);
@@ -241,6 +312,7 @@ export async function verificarSaludSweep(
       { ultimaEjecucion: ultimaEjecucion.toISOString(), horasDesde: Math.round(horasDesde), umbralHoras },
       "ALERTA: el sweep de salud de cartera lleva más de 25 horas sin ejecutarse",
     );
+    await enviarAlertaSweepSiNecesario(log, ultimaEjecucion, horasDesde);
     return { stale: true, ultimaEjecucion };
   }
   return { stale: false, ultimaEjecucion };

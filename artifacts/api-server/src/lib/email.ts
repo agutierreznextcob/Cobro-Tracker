@@ -941,6 +941,58 @@ export async function sendWorkflowEmail(
   return { ok: true };
 }
 
+// Alerta interna al superadmin cuando el sweep de salud de cartera lleva
+// demasiado tiempo sin ejecutarse. Es un correo operacional, no de marketing.
+export async function sendSweepAlertEmail(
+  data: {
+    destinatario: string;
+    ultimaEjecucion: Date | null;
+    horasDesde: number | null;
+  },
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping sweep alert email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const detalle = data.ultimaEjecucion
+    ? `La última ejecución exitosa registrada fue el <strong>${new Intl.DateTimeFormat("es-CL", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "America/Santiago",
+      }).format(data.ultimaEjecucion)}</strong> (hace aproximadamente <strong>${Math.round(data.horasDesde ?? 0)} horas</strong>).`
+    : `El sweep <strong>nunca ha registrado una ejecución exitosa</strong> desde el inicio del servidor.`;
+
+  const { error } = await client.emails.send({
+    ...buildRemitente(),
+    to: [data.destinatario],
+    subject: "⚠️ Alerta: el sweep de salud de cartera lleva más de 25 horas sin ejecutarse",
+    html: buildEmailHtml({
+      title: "Alerta de sweep — NextCob",
+      previewText: "El sweep diario de salud de cartera no se ha ejecutado en más de 25 horas.",
+      heading: "⚠️ El sweep de salud de cartera está detenido",
+      bodyLines: [
+        `El proceso de barrido diario que genera los snapshots de <strong>salud de cartera</strong> no se ha ejecutado correctamente en más de 25 horas.`,
+        detalle,
+        `Esto puede significar que el scheduler está detenido, el proceso se cayó, o hay un error recurrente en el sweep. Revisa los logs del servidor para determinar la causa.`,
+      ],
+      footerNote: "Alerta automática de la plataforma NextCob. Se envía como máximo una vez cada 12 horas.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending sweep alert email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
 export interface EncuestaEmailData {
   emailDestino: string;
   clienteNombre: string | null;
