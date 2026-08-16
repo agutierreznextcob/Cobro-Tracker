@@ -237,7 +237,7 @@ function HeroSection() {
             />
           </div>
           <p className="text-sm text-white/60 mt-5">
-            14 días de prueba gratis · Luego $24.990 + IVA ($29.738 total) CLP/mes
+            14 días de prueba gratis con todas las funciones · Planes desde $14.990 + IVA CLP/mes
           </p>
         </Reveal>
 
@@ -470,64 +470,124 @@ function PreciosSection() {
   const [, navigate] = useLocation();
   return (
     <section id="precios" className="py-20 px-6 bg-muted/20 border-y border-border/50">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <Reveal variant="up">
           <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold tracking-tight mb-3">Un precio simple y transparente</h2>
+            <h2 className="text-3xl font-bold tracking-tight mb-3">Planes simples y transparentes</h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-              Prueba 14 días gratis. Sin sorpresas ni letras chicas.
+              Prueba 14 días gratis con todas las funciones. Sin sorpresas ni letras chicas.
             </p>
           </div>
         </Reveal>
-        <Reveal variant="zoom" className="max-w-md mx-auto">
-          <div className="bg-[#0A0A0A] text-white rounded-2xl p-8 shadow-xl flex flex-col relative overflow-hidden border-2 border-[#F4A800]">
-            <div className="absolute top-5 right-5">
-              <span className="bg-[#F4A800] text-black text-xs font-bold px-2.5 py-1 rounded-full">14 DÍAS GRATIS</span>
-            </div>
-            <div className="mb-6">
-              <p className="text-xs font-semibold text-[#F4A800] uppercase tracking-wider mb-2">Plan NextCob</p>
-              <div className="flex items-end gap-1">
-                <span className="text-4xl font-black">$24.990 + IVA</span>
-                <span className="text-white/60 pb-1 text-sm">/mes</span>
+        <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto items-stretch">
+          {/* Plan Starter */}
+          <Reveal variant="up">
+            <div className="h-full bg-card rounded-2xl p-8 shadow-lg flex flex-col border border-border">
+              <div className="mb-6">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Plan Starter</p>
+                <div className="flex items-end gap-1">
+                  <span className="text-4xl font-black">$14.990 + IVA</span>
+                  <span className="text-muted-foreground pb-1 text-sm">/mes</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2 font-medium">
+                  Neto $14.990 + IVA $2.848 = Total $17.838/mes
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">Para quienes empiezan a ordenar su cobranza.</p>
               </div>
-              <p className="text-sm text-white/80 mt-2 font-medium">
-                Neto $24.990 + IVA $4.748 = Total $29.738/mes
-              </p>
-              <p className="text-sm text-white/60 mt-1">CLP · IVA incluido · Después de tu prueba de 14 días. Cancela cuando quieras.</p>
+              <ul className="space-y-3 flex-1 mb-8">
+                {[
+                  "1 usuario",
+                  "Cobros y links de pago ilimitados",
+                  "Links de pago Flow y MercadoPago",
+                  "Pagos parciales y abonos",
+                  "Recordatorios manuales",
+                  "Gestión de clientes",
+                  "Portal del deudor incluido",
+                  "Dashboard y reportes básicos",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2.5 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => navigate("/register")}
+                className="w-full border border-border py-2.5 rounded-lg font-semibold text-sm hover:bg-muted transition-colors"
+              >
+                Comenzar 14 días gratis
+              </button>
             </div>
-            <ul className="space-y-3 flex-1 mb-8">
-              {[
-                "1 usuario incluido",
-                "Cobros ilimitados",
-                "Links de pago Flow y MercadoPago",
-                "Cobranza manual",
-                "Pagos parciales y abonos",
-                "Recordatorios por email y WhatsApp",
-                "Workflows inteligentes de cobranza",
-                "Asistente IA incluido",
-                "Gestión de clientes",
-                "Scoring automático de clientes",
-                "Portal del deudor incluido",
-                "Informes y exportación Excel",
-                "Dashboard en tiempo real",
-              ].map((item) => (
-                <li key={item} className="flex items-center gap-2.5 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-[#F4A800] shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-white/50 mb-4">
-              Usuarios adicionales: $9.990 + IVA/mes c/u
-            </p>
+          </Reveal>
+          {/* Plan NextCob (destacado) */}
+          <Reveal variant="zoom">
+            <div className="h-full bg-[#0A0A0A] text-white rounded-2xl p-8 shadow-xl flex flex-col relative overflow-hidden border-2 border-[#F4A800]">
+              <div className="absolute top-5 right-5">
+                <span className="bg-[#F4A800] text-black text-xs font-bold px-2.5 py-1 rounded-full">RECOMENDADO</span>
+              </div>
+              <div className="mb-6">
+                <p className="text-xs font-semibold text-[#F4A800] uppercase tracking-wider mb-2">Plan NextCob</p>
+                <div className="flex items-end gap-1">
+                  <span className="text-4xl font-black">$24.990 + IVA</span>
+                  <span className="text-white/60 pb-1 text-sm">/mes</span>
+                </div>
+                <p className="text-sm text-white/80 mt-2 font-medium">
+                  Neto $24.990 + IVA $4.748 = Total $29.738/mes
+                </p>
+                <p className="text-sm text-white/60 mt-1">Todo NextCob, sin límites de funciones.</p>
+              </div>
+              <ul className="space-y-3 flex-1 mb-8">
+                {[
+                  "2 usuarios incluidos",
+                  "Todo lo del plan Starter",
+                  "Recordatorios automáticos por email y WhatsApp",
+                  "Workflows inteligentes de cobranza",
+                  "Asistente IA incluido",
+                  "Scoring predictivo de clientes",
+                  "Informes avanzados y exportación Excel",
+                  "Rendimiento de equipo",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2.5 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-[#F4A800] shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-white/50 mb-4">
+                Usuarios adicionales: $9.990 + IVA/mes c/u
+              </p>
+              <button
+                onClick={() => navigate("/register")}
+                className="w-full bg-[#F4A800] text-black py-2.5 rounded-lg font-semibold text-sm hover:bg-[#ffba1f] transition-colors"
+              >
+                Comenzar 14 días gratis
+              </button>
+            </div>
+          </Reveal>
+        </div>
+        {/* Plan Pro: próximamente */}
+        <Reveal variant="up" className="max-w-3xl mx-auto mt-6">
+          <div className="rounded-2xl border border-dashed border-border bg-card/50 px-8 py-6 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold">Plan Pro</p>
+                <span className="bg-primary/10 text-primary text-xs font-bold px-2.5 py-1 rounded-full">PRÓXIMAMENTE</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Para equipos grandes y cobranza a gran escala.
+              </p>
+            </div>
             <button
               onClick={() => navigate("/register")}
-              className="w-full bg-[#F4A800] text-black py-2.5 rounded-lg font-semibold text-sm hover:bg-[#ffba1f] transition-colors"
+              className="text-sm font-semibold text-primary hover:underline underline-offset-4"
             >
-              Comenzar 14 días gratis
+              Crea tu cuenta y únete a la lista de espera →
             </button>
           </div>
         </Reveal>
+        <p className="text-center text-sm text-muted-foreground mt-8">
+          CLP · IVA incluido · La prueba de 14 días incluye todas las funciones del plan NextCob. Cancela cuando quieras.
+        </p>
       </div>
     </section>
   );
