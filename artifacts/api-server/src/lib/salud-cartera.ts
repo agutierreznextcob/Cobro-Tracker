@@ -156,6 +156,55 @@ export async function generarSnapshotsSaludCartera(log: SweepLogger): Promise<vo
   if (creados > 0) {
     log.info({ fecha, creados }, "Snapshots de salud de cartera generados");
   }
+
+  await purgarSnapshotsAntiguos(fecha, log);
+}
+
+/**
+ * Retention policy so salud_cartera_snapshots stays bounded:
+ * - last RETENCION_DIARIA_DIAS days: keep every daily snapshot;
+ * - between that and RETENCION_TOTAL_DIAS: keep only one weekly snapshot
+ *   (Mondays, ISO dow = 1);
+ * - older than RETENCION_TOTAL_DIAS: delete everything (hard cap).
+ * Per user this bounds the table at ~90 daily rows + ~95 weekly rows.
+ * Weekly history/trends survive because a Monday row remains per week within
+ * the horizon, and the week-over-week trend only looks ~7 days back (well
+ * inside the daily window). Runs as part of the daily sweep; failures are
+ * logged, never thrown.
+ */
+export const RETENCION_DIARIA_DIAS = 90;
+export const RETENCION_TOTAL_DIAS = 730; // ~2 años
+
+export async function purgarSnapshotsAntiguos(
+  hoyStr: string,
+  log: SweepLogger,
+): Promise<void> {
+  const corteDiario = sumarDias(hoyStr, -RETENCION_DIARIA_DIAS);
+  const corteTotal = sumarDias(hoyStr, -RETENCION_TOTAL_DIAS);
+  try {
+    const borrados = await db
+      .delete(saludCarteraSnapshotsTable)
+      .where(
+        sql`${lte(saludCarteraSnapshotsTable.fecha, corteTotal)} OR (${and(
+          lte(saludCarteraSnapshotsTable.fecha, corteDiario),
+          // fecha is a YYYY-MM-DD varchar; cast to date for day-of-week.
+          sql`extract(isodow from ${saludCarteraSnapshotsTable.fecha}::date) <> 1`,
+        )})`,
+      )
+      .returning({ id: saludCarteraSnapshotsTable.id });
+    if (borrados.length > 0) {
+      log.info(
+        { corteDiario, corteTotal, borrados: borrados.length },
+        "Snapshots antiguos de salud de cartera purgados (diarios 90 días, semanales hasta 2 años)",
+      );
+    }
+  } catch (err) {
+    // Purge failure must not affect the sweep's snapshot generation.
+    log.error(
+      { err, corteDiario, corteTotal },
+      "Error purgando snapshots antiguos de salud de cartera",
+    );
+  }
 }
 
 /**
