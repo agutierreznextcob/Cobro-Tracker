@@ -40,7 +40,7 @@ import { emitirComprobante } from "../lib/comprobante-service";
 import { getOrgContext, cobroScopeCondition, clienteScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
 import { getDatosBancariosUsuario, buildDatosBancariosHtml } from "../lib/datos-bancarios";
 import { computeClienteScores } from "../lib/scoring";
-import { buscarSnapshotPrevio, hoySantiagoStr, sumarDias as sumarDiasSantiago } from "../lib/salud-cartera";
+import { buscarSnapshotPrevio, calcularBloquesUsuario, hoySantiagoStr, sumarDias as sumarDiasSantiago } from "../lib/salud-cartera";
 
 const cobrosRouter = Router();
 
@@ -1694,19 +1694,37 @@ cobrosRouter.get("/dashboard/salud-cartera/historial", async (req, res) => {
       )
       .orderBy(saludCarteraSnapshotsTable.fecha);
 
+    const puntos = rows.map((r) => ({
+      fecha: r.fecha,
+      sana: Math.round(Number(r.sanaMonto)),
+      riesgo: Math.round(Number(r.riesgoMonto)),
+      critica: Math.round(Number(r.criticaMonto)),
+      sanaCantidad: r.sanaCantidad,
+      riesgoCantidad: r.riesgoCantidad,
+      criticaCantidad: r.criticaCantidad,
+    }));
+
+    // Si el barrido diario aún no generó el snapshot de hoy, agregamos un
+    // punto "en vivo" calculado con la misma lógica del sweep para que el
+    // gráfico siempre termine en el estado actual.
+    if (puntos.length === 0 || puntos[puntos.length - 1].fecha !== hoyStr) {
+      const bloques = await calcularBloquesUsuario(userId, hoyStr);
+      puntos.push({
+        fecha: hoyStr,
+        sana: Math.round(bloques.sana.monto),
+        riesgo: Math.round(bloques.riesgo.monto),
+        critica: Math.round(bloques.critica.monto),
+        sanaCantidad: bloques.sana.cantidad,
+        riesgoCantidad: bloques.riesgo.cantidad,
+        criticaCantidad: bloques.critica.cantidad,
+      });
+    }
+
     res.json({
       dias,
       desde,
       hasta: hoyStr,
-      puntos: rows.map((r) => ({
-        fecha: r.fecha,
-        sana: Math.round(Number(r.sanaMonto)),
-        riesgo: Math.round(Number(r.riesgoMonto)),
-        critica: Math.round(Number(r.criticaMonto)),
-        sanaCantidad: r.sanaCantidad,
-        riesgoCantidad: r.riesgoCantidad,
-        criticaCantidad: r.criticaCantidad,
-      })),
+      puntos,
     });
   } catch (err) {
     req.log.error({ err }, "Error getting historial de salud de cartera");
