@@ -8,8 +8,8 @@
  *
  * Run: pnpm --filter @workspace/api-server exec tsx scripts/e2e-money-flow.ts
  */
-import { db, cobrosTable, pagosParciales, cobroDescuentosTable } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { db, cobrosTable, pagosParciales, cobroDescuentosTable, saludCarteraSnapshotsTable } from "@workspace/db";
+import { eq, inArray, and } from "drizzle-orm";
 
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:80/api";
 const DEMO_EMAIL = "anibal.gutierrezbasoalto@gmail.com";
@@ -18,6 +18,10 @@ const DEMO_PASSWORD = "Demo2024NextCob!";
 let cookie = "";
 let failures = 0;
 const createdCobroIds: number[] = [];
+
+// Salud-cartera historial test state — used by cleanup() for safe restoration.
+let snapshotToRestore: (typeof saludCarteraSnapshotsTable.$inferInsert) | null = null;
+let fixtureSnapshotInserted = false;
 
 function check(name: string, cond: boolean, detail?: unknown) {
   if (cond) {
@@ -177,15 +181,115 @@ async function main() {
     console.log("(rendimiento no disponible para demo — omitido)");
   }
 
+  // =========================================================================
+  // Salud-cartera historial: last point must always be today (America/Santiago)
+  // =========================================================================
+  console.log("== Salud-cartera historial: último punto = hoy ==");
+  const hoyStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date());
+
+  // --- Ensure a snapshot for today exists (deterministic fixture) ---
+  const existingSnap = await db
+    .select()
+    .from(saludCarteraSnapshotsTable)
+    .where(
+      and(
+        eq(saludCarteraSnapshotsTable.usuarioId, myId),
+        eq(saludCarteraSnapshotsTable.fecha, hoyStr),
+      ),
+    )
+    .limit(1);
+
+  if (existingSnap.length === 0) {
+    // Insert a zero-value fixture so the "with snapshot" case is deterministic.
+    await db.insert(saludCarteraSnapshotsTable).values({
+      usuarioId: myId,
+      fecha: hoyStr,
+      sanaMonto: "0",
+      sanaCantidad: 0,
+      riesgoMonto: "0",
+      riesgoCantidad: 0,
+      criticaMonto: "0",
+      criticaCantidad: 0,
+      criticaSumaMora: 0,
+    }).onConflictDoNothing();
+    fixtureSnapshotInserted = true;
+    console.log("  (fixture snapshot insertado para test)");
+  } else {
+    console.log(`  (snapshot real encontrado: id=${existingSnap[0].id})`);
+  }
+
+  // --- Case 1: snapshot exists → historial must end on today ---
+  const hist1 = await api("GET", "/dashboard/salud-cartera/historial");
+  check("historial 200", hist1.status === 200, hist1.status);
+  const puntos1: any[] = hist1.json?.puntos ?? [];
+  check("historial tiene al menos un punto", puntos1.length > 0, puntos1.length);
+  const ultimo1 = puntos1[puntos1.length - 1];
+  check(
+    `historial[con-snapshot]: último punto fecha = hoy (${hoyStr})`,
+    ultimo1?.fecha === hoyStr,
+    { ultimo: ultimo1?.fecha, hoy: hoyStr },
+  );
+
+  // --- Case 2: delete today's snapshot, live-fallback must still return today ---
+  // Save the full row so cleanup() can restore it regardless of subsequent failures.
+  const [deletedSnap] = await db
+    .delete(saludCarteraSnapshotsTable)
+    .where(
+      and(
+        eq(saludCarteraSnapshotsTable.usuarioId, myId),
+        eq(saludCarteraSnapshotsTable.fecha, hoyStr),
+      ),
+    )
+    .returning();
+  if (deletedSnap) {
+    // Keep for restoration in cleanup(); omit auto-generated fields.
+    snapshotToRestore = {
+      usuarioId: deletedSnap.usuarioId,
+      fecha: deletedSnap.fecha,
+      sanaMonto: deletedSnap.sanaMonto,
+      sanaCantidad: deletedSnap.sanaCantidad,
+      riesgoMonto: deletedSnap.riesgoMonto,
+      riesgoCantidad: deletedSnap.riesgoCantidad,
+      criticaMonto: deletedSnap.criticaMonto,
+      criticaCantidad: deletedSnap.criticaCantidad,
+      criticaSumaMora: deletedSnap.criticaSumaMora,
+    };
+  }
+  console.log(`  (snapshot del día borrado para test: ${deletedSnap ? `sí (id=${deletedSnap.id})` : "no había"})`);
+
+  const hist2 = await api("GET", "/dashboard/salud-cartera/historial");
+  check("historial 200 (sin snapshot)", hist2.status === 200, hist2.status);
+  const puntos2: any[] = hist2.json?.puntos ?? [];
+  check("historial tiene al menos un punto (sin snapshot)", puntos2.length > 0, puntos2.length);
+  const ultimo2 = puntos2[puntos2.length - 1];
+  check(
+    `historial[sin-snapshot]: último punto fecha = hoy (${hoyStr})`,
+    ultimo2?.fecha === hoyStr,
+    { ultimo: ultimo2?.fecha, hoy: hoyStr },
+  );
+
   console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECKS FAILED`);
 }
 
 async function cleanup() {
-  if (!createdCobroIds.length) return;
-  await db.delete(pagosParciales).where(inArray(pagosParciales.cobroId, createdCobroIds));
-  await db.delete(cobroDescuentosTable).where(inArray(cobroDescuentosTable.cobroId, createdCobroIds));
-  await db.delete(cobrosTable).where(inArray(cobrosTable.id, createdCobroIds));
-  console.log(`Cleanup: removed cobros ${createdCobroIds.join(", ")}`);
+  if (createdCobroIds.length) {
+    await db.delete(pagosParciales).where(inArray(pagosParciales.cobroId, createdCobroIds));
+    await db.delete(cobroDescuentosTable).where(inArray(cobroDescuentosTable.cobroId, createdCobroIds));
+    await db.delete(cobrosTable).where(inArray(cobrosTable.id, createdCobroIds));
+    console.log(`Cleanup: removed cobros ${createdCobroIds.join(", ")}`);
+  }
+
+  // Restore the snapshot we deleted during the historial test so we leave the
+  // DB in its original state regardless of how the test ended (pass or fail).
+  // If we only inserted a fixture (no pre-existing snapshot), nothing to restore
+  // because the delete already removed it; the sweep will recreate it normally.
+  if (snapshotToRestore && !fixtureSnapshotInserted) {
+    await db
+      .insert(saludCarteraSnapshotsTable)
+      .values(snapshotToRestore)
+      .onConflictDoNothing();
+    console.log(`Cleanup: restored snapshot for ${snapshotToRestore.fecha}`);
+  }
 }
 
 main()
