@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db, usersTable, cobrosTable, organizacionesTable, cobrosEliminadosTable, pagosSuscripcionTable } from "@workspace/db";
+import { leerUltimaEjecucionSweep } from "../lib/salud-cartera";
 import type { CobroEliminado } from "@workspace/db";
 import { eq, sql, isNull, desc, or, ilike } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
@@ -558,6 +559,33 @@ function serializeCobroEliminado(c: CobroEliminado) {
     eliminadoEn: c.eliminadoEn.toISOString(),
   };
 }
+
+// Sweep health: returns the last time the salud-de-cartera daily sweep ran
+// successfully and a `stale` flag (true when the gap exceeds 25 hours).
+// Useful for monitoring dashboards and manual operator checks.
+const SWEEP_ALERTA_HORAS = 24;
+adminRouter.get("/admin/sweep-health", async (req, res) => {
+  try {
+    const ultimaEjecucion = await leerUltimaEjecucionSweep();
+    const horasDesdeUltimaEjecucion = ultimaEjecucion
+      ? (Date.now() - ultimaEjecucion.getTime()) / (1000 * 60 * 60)
+      : null;
+    const stale =
+      ultimaEjecucion === null ||
+      (horasDesdeUltimaEjecucion !== null && horasDesdeUltimaEjecucion > SWEEP_ALERTA_HORAS);
+    res.json({
+      ultimaEjecucion: ultimaEjecucion ? ultimaEjecucion.toISOString() : null,
+      horasDesdeUltimaEjecucion: horasDesdeUltimaEjecucion !== null
+        ? Math.round(horasDesdeUltimaEjecucion * 10) / 10
+        : null,
+      stale,
+      umbralHoras: SWEEP_ALERTA_HORAS,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error checking sweep health");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
 
 // Superadmin audit log of hard-deleted cobros (newest first).
 adminRouter.get("/admin/cobros-eliminados", async (req, res) => {

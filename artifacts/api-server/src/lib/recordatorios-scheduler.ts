@@ -7,7 +7,7 @@ import {
   sincronizarMontosReveniu,
   procesarGraciaPagosFallidos,
 } from "./reveniu";
-import { generarSnapshotsSaludCartera } from "./salud-cartera";
+import { generarSnapshotsSaludCartera, verificarSaludSweep } from "./salud-cartera";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 // Surveys are scheduled ~1h after payment; sweep often so delivery stays close
@@ -25,6 +25,16 @@ const runLogger = {
 
 async function tick(): Promise<void> {
   const hoy = fechaHoySantiago();
+
+  // On every tick (hourly), check whether the sweep has run recently enough.
+  // This fires even on days where the date hasn't changed yet, so a stalled
+  // scheduler (e.g. process restart that drops the interval) is caught quickly.
+  try {
+    await verificarSaludSweep(runLogger);
+  } catch (err) {
+    logger.error({ err }, "Error verificando salud del sweep de salud de cartera");
+  }
+
   if (lastProcessedDate === hoy) return;
   try {
     await procesarRecordatorios(runLogger, hoy);

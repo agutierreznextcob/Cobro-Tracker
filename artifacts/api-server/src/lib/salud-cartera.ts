@@ -5,6 +5,7 @@ import {
   pagosParciales,
   saludCarteraSnapshotsTable,
   usersTable,
+  appConfigTable,
 } from "@workspace/db";
 import { getOrgContext, cobroScopeCondition } from "./org";
 
@@ -175,6 +176,74 @@ export async function generarSnapshotsSaludCartera(
   }
 
   await purgarSnapshotsAntiguos(fecha, log);
+  await registrarUltimaEjecucionSweep(log);
+}
+
+// ---------------------------------------------------------------------------
+// Sweep health tracking: writes/reads a timestamp in app_config so operators
+// (and the admin endpoint) can detect when the sweep has silently stalled.
+// ---------------------------------------------------------------------------
+
+export const SWEEP_ULTIMO_EXITO_KEY = "sweep_salud_cartera_ultima_ejecucion";
+
+/**
+ * Upserts the current UTC timestamp into app_config after a successful sweep.
+ * Failures are logged and swallowed — tracking must never abort the sweep.
+ */
+export async function registrarUltimaEjecucionSweep(log: SweepLogger): Promise<void> {
+  try {
+    const ahora = new Date().toISOString();
+    await db
+      .insert(appConfigTable)
+      .values({ clave: SWEEP_ULTIMO_EXITO_KEY, valor: ahora })
+      .onConflictDoUpdate({
+        target: appConfigTable.clave,
+        set: { valor: ahora },
+      });
+  } catch (err) {
+    log.error({ err }, "Error registrando última ejecución del sweep de salud de cartera");
+  }
+}
+
+/**
+ * Reads the last successful sweep timestamp from app_config.
+ * Returns null if the key has never been written (e.g. fresh deployment).
+ */
+export async function leerUltimaEjecucionSweep(): Promise<Date | null> {
+  const [row] = await db
+    .select({ valor: appConfigTable.valor })
+    .from(appConfigTable)
+    .where(eq(appConfigTable.clave, SWEEP_ULTIMO_EXITO_KEY));
+  if (!row) return null;
+  const d = new Date(row.valor);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Checks whether the sweep is overdue (gap > umbralHoras since last success).
+ * Returns `{ stale, ultimaEjecucion }`. Logs a warning when stale.
+ */
+export async function verificarSaludSweep(
+  log: SweepLogger,
+  umbralHoras = 24,
+): Promise<{ stale: boolean; ultimaEjecucion: Date | null }> {
+  const ultimaEjecucion = await leerUltimaEjecucionSweep();
+  if (!ultimaEjecucion) {
+    log.error(
+      { umbralHoras },
+      "Sweep de salud de cartera nunca ha registrado una ejecución exitosa",
+    );
+    return { stale: true, ultimaEjecucion: null };
+  }
+  const horasDesde = (Date.now() - ultimaEjecucion.getTime()) / (1000 * 60 * 60);
+  if (horasDesde > umbralHoras) {
+    log.error(
+      { ultimaEjecucion: ultimaEjecucion.toISOString(), horasDesde: Math.round(horasDesde), umbralHoras },
+      "ALERTA: el sweep de salud de cartera lleva más de 25 horas sin ejecutarse",
+    );
+    return { stale: true, ultimaEjecucion };
+  }
+  return { stale: false, ultimaEjecucion };
 }
 
 /**
