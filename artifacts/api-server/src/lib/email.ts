@@ -688,7 +688,7 @@ export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn:
       ],
       ctaText: `Pagar ahora ${montoFormato}`,
       ctaUrl: data.linkPago,
-      footerNote: `Si ya realizaste el pago, ignora este mensaje. El link es seguro y procesado por Webpay/Flow.`,
+      footerNote: `Si ya realizaste el pago, ignora este mensaje. El link es seguro y procesado por ${data.linkPago.includes("mercadopago") ? "MercadoPago" : "Webpay/Flow"}.`,
     }),
   });
 

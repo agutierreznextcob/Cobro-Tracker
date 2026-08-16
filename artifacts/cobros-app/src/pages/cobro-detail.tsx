@@ -1608,8 +1608,8 @@ export default function CobroDetail() {
             </CardContent>
           </Card>
 
-          {/* Communication card — only for pending cobros with flow link */}
-          {isPendiente && hasFlowLink && (
+          {/* Communication card — only for pending cobros with payment link (Flow or MercadoPago) */}
+          {isPendiente && (hasFlowLink || hasMpLink) && (
             <Card className="shadow-sm border-border/50">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1641,7 +1641,7 @@ export default function CobroDetail() {
                   variant="outline"
                   size="sm"
                   className="w-full border-green-600/40 text-green-700 hover:bg-green-50 hover:border-green-600"
-                  onClick={handleWhatsApp}
+                  onClick={hasFlowLink ? handleWhatsApp : handleWhatsAppMp}
                 >
                   <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
                   Recordar por WhatsApp
@@ -2465,15 +2465,15 @@ export default function CobroDetail() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 pt-1">
-            {/* Email: recordatorio (con link Flow) o aviso manual (sin pasarela) */}
-            {hasEmail && (hasFlowLink || noTieneLink) ? (
+            {/* Email: recordatorio (con link Flow o MercadoPago) o aviso manual (sin pasarela) */}
+            {hasEmail ? (
               <Button
                 variant="outline"
                 className="w-full justify-start"
                 data-testid="contactar-email"
                 disabled={enviarRecordatorio.isPending || avisarCliente.isPending}
                 onClick={() => {
-                  if (hasFlowLink) handleRecordatorioEmail();
+                  if (hasFlowLink || hasMpLink) handleRecordatorioEmail();
                   else handleAvisarEmail();
                   setShowContactarDialog(false);
                 }}
@@ -2485,11 +2485,11 @@ export default function CobroDetail() {
                 )}
                 Enviar recordatorio por email
               </Button>
-            ) : !hasEmail && (hasFlowLink || noTieneLink) ? (
+            ) : (
               <p className="text-xs text-muted-foreground">
                 Este cobro no tiene email del pagador. Agrega uno para enviar recordatorios por email.
               </p>
-            ) : null}
+            )}
 
             {/* WhatsApp: según pasarela configurada */}
             <Button

@@ -973,8 +973,9 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
       return;
     }
 
-    if (!cobro.flowLinkPago) {
-      res.status(400).json({ error: "El cobro no tiene link de pago generado. Genera el link de Flow primero." });
+    const linkPago = cobro.flowLinkPago ?? cobro.mpPaymentLinkUrl;
+    if (!linkPago) {
+      res.status(400).json({ error: "El cobro no tiene link de pago generado. Genera un link de pago primero." });
       return;
     }
 
@@ -984,7 +985,7 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
       clienteNombre: cobro.clienteNombre,
       descripcion: cobro.descripcion,
       monto: Number(cobro.monto),
-      linkPago: cobro.flowLinkPago,
+      linkPago,
       comercioNombre: cobro.responsableNombre || "NextCob",
       remitenteNombre: remitente.nombre || cobro.responsableNombre,
       remitenteEmail: remitente.email,
