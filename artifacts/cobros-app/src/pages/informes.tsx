@@ -56,6 +56,7 @@ import {
   tipoDocumentoLabel,
   type TipoDocumento,
 } from "@/lib/tipo-documento";
+import { EvolucionCarteraChart } from "@/components/evolucion-cartera-chart";
 import { Download, TrendingUp, Receipt, Percent, ListChecks, TicketPercent, RefreshCcw, Wallet, AlertTriangle, CalendarClock, Star, Loader2, MessageSquare } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
@@ -754,6 +755,9 @@ export default function Informes() {
           </ResponsiveContainer>
         )}
       </Card>
+
+      {/* Portfolio evolution (independent 30/90-day range from the endpoint) */}
+      <EvolucionCarteraChart />
 
       {/* Team performance (admin: all; supervisor: their team) */}
       {veRendimiento && rendimiento && rendimiento.length > 0 && (
