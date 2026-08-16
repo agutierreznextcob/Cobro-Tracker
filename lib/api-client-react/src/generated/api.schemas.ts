@@ -833,6 +833,76 @@ export interface DashboardMetricas {
 }
 
 /**
+ * Week-over-week trend of the block
+ */
+export type SaludCarteraBloqueTendencia = typeof SaludCarteraBloqueTendencia[keyof typeof SaludCarteraBloqueTendencia];
+
+
+export const SaludCarteraBloqueTendencia = {
+  mejor: 'mejor',
+  peor: 'peor',
+  igual: 'igual',
+} as const;
+
+export interface SaludCarteraBloque {
+  monto: number;
+  cantidad: number;
+  /** Only present for the critical block */
+  diasPromedioMora?: number;
+  /** Week-over-week trend of the block */
+  tendencia: SaludCarteraBloqueTendencia;
+}
+
+export type SaludCarteraAccionCategoria = typeof SaludCarteraAccionCategoria[keyof typeof SaludCarteraAccionCategoria];
+
+
+export const SaludCarteraAccionCategoria = {
+  excelente: 'excelente',
+  bueno: 'bueno',
+  regular: 'regular',
+  riesgoso: 'riesgoso',
+  critico: 'critico',
+  sin_datos: 'sin_datos',
+} as const;
+
+export interface SaludCarteraAccion {
+  clienteId: number;
+  clienteNombre: string;
+  /**
+     * Most urgent cobro for this client (target of the Contactar button)
+     * @nullable
+     */
+  cobroId?: number | null;
+  saldoPendiente: number;
+  /** @nullable */
+  diasMora?: number | null;
+  /** @nullable */
+  diasParaVencer?: number | null;
+  /** @nullable */
+  score?: number | null;
+  categoria: SaludCarteraAccionCategoria;
+  /** @nullable */
+  ultimoContactoEn?: string | null;
+}
+
+export type SaludCarteraSemaforo = {
+  sana: SaludCarteraBloque;
+  riesgo: SaludCarteraBloque;
+  critica: SaludCarteraBloque;
+};
+
+export type SaludCarteraResumen = {
+  montoRecuperable: number;
+  clientes: number;
+};
+
+export interface SaludCartera {
+  semaforo: SaludCarteraSemaforo;
+  acciones: SaludCarteraAccion[];
+  resumen: SaludCarteraResumen;
+}
+
+/**
  * Chilean electronic tax document type (DTE). Only "afecta" types may carry IVA. Defaults to sin_documento.
  */
 export type CobroInputTipoDocumento = typeof CobroInputTipoDocumento[keyof typeof CobroInputTipoDocumento];

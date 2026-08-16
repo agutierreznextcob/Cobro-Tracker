@@ -775,6 +775,49 @@ export const GetDashboardMetricsResponse = zod.object({
 
 
 /**
+ * Traffic-light classification of outstanding cobros, prioritized action list, and week-over-week trend, scoped to the current user
+ * @summary Portfolio health panel for the dashboard
+ */
+export const GetSaludCarteraResponse = zod.object({
+  "semaforo": zod.object({
+  "sana": zod.object({
+  "monto": zod.number(),
+  "cantidad": zod.number(),
+  "diasPromedioMora": zod.number().optional().describe('Only present for the critical block'),
+  "tendencia": zod.enum(['mejor', 'peor', 'igual']).describe('Week-over-week trend of the block')
+}),
+  "riesgo": zod.object({
+  "monto": zod.number(),
+  "cantidad": zod.number(),
+  "diasPromedioMora": zod.number().optional().describe('Only present for the critical block'),
+  "tendencia": zod.enum(['mejor', 'peor', 'igual']).describe('Week-over-week trend of the block')
+}),
+  "critica": zod.object({
+  "monto": zod.number(),
+  "cantidad": zod.number(),
+  "diasPromedioMora": zod.number().optional().describe('Only present for the critical block'),
+  "tendencia": zod.enum(['mejor', 'peor', 'igual']).describe('Week-over-week trend of the block')
+})
+}),
+  "acciones": zod.array(zod.object({
+  "clienteId": zod.number(),
+  "clienteNombre": zod.string(),
+  "cobroId": zod.number().nullish().describe('Most urgent cobro for this client (target of the Contactar button)'),
+  "saldoPendiente": zod.number(),
+  "diasMora": zod.number().nullish(),
+  "diasParaVencer": zod.number().nullish(),
+  "score": zod.number().nullish(),
+  "categoria": zod.enum(['excelente', 'bueno', 'regular', 'riesgoso', 'critico', 'sin_datos']),
+  "ultimoContactoEn": zod.coerce.date().nullish()
+})),
+  "resumen": zod.object({
+  "montoRecuperable": zod.number(),
+  "clientes": zod.number()
+})
+})
+
+
+/**
  * @summary Get Flow credentials status for current user
  */
 export const GetFlowCredentialsResponse = zod.object({

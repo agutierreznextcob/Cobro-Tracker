@@ -837,6 +837,22 @@ paths:
         "401":
           description: Unauthorized
 
+  /dashboard/salud-cartera:
+    get:
+      operationId: getSaludCartera
+      tags: [cobros]
+      summary: Portfolio health panel for the dashboard
+      description: Traffic-light classification of outstanding cobros, prioritized action list, and week-over-week trend, scoped to the current user
+      responses:
+        "200":
+          description: Portfolio health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaludCartera"
+        "401":
+          description: Unauthorized
+
   /profile/flow-credentials:
     get:
       operationId: getFlowCredentials
@@ -3981,6 +3997,75 @@ components:
         periodo:
           type: string
           enum: [hoy, semana, mes, total]
+
+    SaludCarteraBloque:
+      type: object
+      required: [monto, cantidad, tendencia]
+      properties:
+        monto:
+          type: number
+        cantidad:
+          type: integer
+        diasPromedioMora:
+          type: integer
+          description: Only present for the critical block
+        tendencia:
+          type: string
+          enum: [mejor, peor, igual]
+          description: Week-over-week trend of the block
+
+    SaludCarteraAccion:
+      type: object
+      required: [clienteId, clienteNombre, saldoPendiente, categoria]
+      properties:
+        clienteId:
+          type: integer
+        clienteNombre:
+          type: string
+        cobroId:
+          type: ["integer", "null"]
+          description: Most urgent cobro for this client (target of the Contactar button)
+        saldoPendiente:
+          type: number
+        diasMora:
+          type: ["integer", "null"]
+        diasParaVencer:
+          type: ["integer", "null"]
+        score:
+          type: ["number", "null"]
+        categoria:
+          type: string
+          enum: [excelente, bueno, regular, riesgoso, critico, sin_datos]
+        ultimoContactoEn:
+          type: ["string", "null"]
+          format: date-time
+
+    SaludCartera:
+      type: object
+      required: [semaforo, acciones, resumen]
+      properties:
+        semaforo:
+          type: object
+          required: [sana, riesgo, critica]
+          properties:
+            sana:
+              $ref: "#/components/schemas/SaludCarteraBloque"
+            riesgo:
+              $ref: "#/components/schemas/SaludCarteraBloque"
+            critica:
+              $ref: "#/components/schemas/SaludCarteraBloque"
+        acciones:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaludCarteraAccion"
+        resumen:
+          type: object
+          required: [montoRecuperable, clientes]
+          properties:
+            montoRecuperable:
+              type: number
+            clientes:
+              type: integer
 
     Cobro:
       type: object

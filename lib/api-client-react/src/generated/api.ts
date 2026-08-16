@@ -127,6 +127,7 @@ import type {
   RegisterResult,
   RendimientoEjecutivo,
   ResetPasswordInput,
+  SaludCartera,
   SeguimientoCobranza,
   SubirComprobanteInput,
   SubscribeResponse,
@@ -2475,6 +2476,84 @@ export function useGetDashboardMetrics<TData = Awaited<ReturnType<typeof getDash
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDashboardMetricsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSaludCarteraUrl = () => {
+
+
+
+
+  return `/api/dashboard/salud-cartera`
+}
+
+/**
+ * Traffic-light classification of outstanding cobros, prioritized action list, and week-over-week trend, scoped to the current user
+ * @summary Portfolio health panel for the dashboard
+ */
+export const getSaludCartera = async ( options?: RequestInit): Promise<SaludCartera> => {
+
+  return customFetch<SaludCartera>(getGetSaludCarteraUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSaludCarteraQueryKey = () => {
+    return [
+    `/api/dashboard/salud-cartera`
+    ] as const;
+    }
+
+
+export const getGetSaludCarteraQueryOptions = <TData = Awaited<ReturnType<typeof getSaludCartera>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSaludCartera>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSaludCarteraQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSaludCartera>>> = ({ signal }) => getSaludCartera({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSaludCartera>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSaludCarteraQueryResult = NonNullable<Awaited<ReturnType<typeof getSaludCartera>>>
+export type GetSaludCarteraQueryError = ErrorType<void>
+
+
+/**
+ * @summary Portfolio health panel for the dashboard
+ */
+
+export function useGetSaludCartera<TData = Awaited<ReturnType<typeof getSaludCartera>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSaludCartera>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSaludCarteraQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

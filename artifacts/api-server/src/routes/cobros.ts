@@ -13,6 +13,7 @@ import {
   recordatoriosEnviadosTable,
   usersTable,
   comprobantesTransferenciaTable,
+  gestionesCobranzaTable,
 } from "@workspace/db";
 import type { Cobro, CobroDescuento, CobroAjuste } from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
@@ -35,8 +36,9 @@ import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } fro
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro } from "../lib/recordatorios";
 import { emitirComprobante } from "../lib/comprobante-service";
-import { getOrgContext, cobroScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
+import { getOrgContext, cobroScopeCondition, clienteScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
 import { getDatosBancariosUsuario, buildDatosBancariosHtml } from "../lib/datos-bancarios";
+import { computeClienteScores } from "../lib/scoring";
 
 const cobrosRouter = Router();
 
@@ -1378,6 +1380,275 @@ cobrosRouter.get("/dashboard/metrics", async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Error getting dashboard metrics");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Portfolio health panel — traffic-light classification of outstanding cobros,
+// prioritized action list, and week-over-week trend. Scoped like the rest of
+// the dashboard (admin=org, supervisor=team, ejecutivo=own).
+cobrosRouter.get("/dashboard/salud-cartera", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const ctx = await getOrgContext(userId);
+    const scope = cobroScopeCondition(ctx, userId, undefined);
+
+    // Business-day boundaries in Chile time (fechaVencimiento is a date-only
+    // string; classifying with server-local/UTC midnight would roll the day at
+    // the wrong hour). en-CA yields YYYY-MM-DD directly.
+    const hoy = new Date();
+    const hoyStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(hoy);
+    // Day arithmetic on a UTC-noon anchor is DST-safe.
+    const sumarDias = (ymd: string, dias: number): string =>
+      new Date(new Date(`${ymd}T12:00:00Z`).getTime() + dias * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+    const en7Str = sumarDias(hoyStr, 7);
+    const hace7Str = sumarDias(hoyStr, -7);
+    const hace7 = new Date(hoy.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Outstanding cobros now, plus cobros that reached a terminal state during
+    // the last 7 days (they were outstanding a week ago — needed for the trend).
+    const rows = await db
+      .select({
+        id: cobrosTable.id,
+        clienteId: cobrosTable.clienteId,
+        estado: cobrosTable.estado,
+        monto: cobrosTable.monto,
+        montoDescuento: cobrosTable.montoDescuento,
+        fechaVencimiento: cobrosTable.fechaVencimiento,
+        pagadoEn: cobrosTable.pagadoEn,
+        actualizadoEn: cobrosTable.actualizadoEn,
+        creadoEn: cobrosTable.creadoEn,
+      })
+      .from(cobrosTable)
+      .where(
+        and(
+          scope,
+          or(
+            inArray(cobrosTable.estado, ["pendiente", "parcial"]),
+            and(
+              inArray(cobrosTable.estado, ["pagado", "cancelado", "fallido"]),
+              gte(cobrosTable.actualizadoEn, hace7),
+            ),
+          ),
+        ),
+      );
+
+    const abiertos = rows.filter((r) => r.estado === "pendiente" || r.estado === "parcial");
+    const abonado = await abonadoPorCobro(abiertos.map((r) => r.id));
+    const saldoDe = (r: (typeof abiertos)[number]) =>
+      Math.max(Number(r.monto) - Number(r.montoDescuento ?? 0) - (abonado.get(r.id) ?? 0), 0);
+
+    // Abonos confirmed during the last 7 days, for every fetched cobro — used
+    // to reconstruct each cobro's outstanding balance as of the prior cutoff.
+    const abonadoReciente = new Map<number, number>();
+    if (rows.length > 0) {
+      const recientes = await db
+        .select({
+          cobroId: pagosParciales.cobroId,
+          total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)`,
+        })
+        .from(pagosParciales)
+        .where(
+          and(
+            eq(pagosParciales.estado, "confirmado"),
+            inArray(pagosParciales.cobroId, rows.map((r) => r.id)),
+            gte(pagosParciales.confirmadoEn, hace7),
+          ),
+        )
+        .groupBy(pagosParciales.cobroId);
+      for (const s of recientes) abonadoReciente.set(s.cobroId, s.total);
+    }
+
+    type Bloque = "sana" | "riesgo" | "critica";
+    const clasificar = (venc: string | null, refHoy: string, ref7: string): Bloque => {
+      if (!venc) return "sana";
+      if (venc < refHoy) return "critica";
+      if (venc <= ref7) return "riesgo";
+      return "sana";
+    };
+
+    // Current snapshot.
+    const actual: Record<Bloque, { monto: number; cantidad: number; sumaMora: number }> = {
+      sana: { monto: 0, cantidad: 0, sumaMora: 0 },
+      riesgo: { monto: 0, cantidad: 0, sumaMora: 0 },
+      critica: { monto: 0, cantidad: 0, sumaMora: 0 },
+    };
+    const msDia = 24 * 60 * 60 * 1000;
+    const diasMoraDe = (venc: string) =>
+      Math.max(Math.round((new Date(`${hoyStr}T00:00:00`).getTime() - new Date(`${venc}T00:00:00`).getTime()) / msDia), 0);
+    for (const r of abiertos) {
+      const bloque = clasificar(r.fechaVencimiento, hoyStr, en7Str);
+      const saldo = saldoDe(r);
+      actual[bloque].monto += saldo;
+      actual[bloque].cantidad += 1;
+      if (bloque === "critica" && r.fechaVencimiento) actual[bloque].sumaMora += diasMoraDe(r.fechaVencimiento);
+    }
+
+    // Approximate snapshot as of 7 days ago. Rules:
+    // - cobros created after the cutoff did not exist then → excluded;
+    // - open cobros are valued at today's saldo PLUS abonos confirmed during
+    //   the week (those payments had not happened yet at the cutoff);
+    // - terminal cobros only count if they closed after the cutoff (pagadoEn
+    //   for pagado, actualizadoEn otherwise), valued the same way.
+    const previo: Record<Bloque, { monto: number }> = {
+      sana: { monto: 0 },
+      riesgo: { monto: 0 },
+      critica: { monto: 0 },
+    };
+    for (const r of rows) {
+      if (r.creadoEn > hace7) continue; // did not exist a week ago
+      const esAbierto = r.estado === "pendiente" || r.estado === "parcial";
+      if (!esAbierto) {
+        const cierre = r.estado === "pagado" && r.pagadoEn ? r.pagadoEn : r.actualizadoEn;
+        if (cierre < hace7) continue; // already closed a week ago
+      }
+      const neto = Math.max(Number(r.monto) - Number(r.montoDescuento ?? 0), 0);
+      const abonadoTotal = esAbierto ? (abonado.get(r.id) ?? 0) : neto;
+      const saldoPrevio = Math.max(
+        neto - Math.max(abonadoTotal - (abonadoReciente.get(r.id) ?? 0), 0),
+        0,
+      );
+      const bloque = clasificar(r.fechaVencimiento, hace7Str, sumarDias(hace7Str, 7));
+      previo[bloque].monto += saldoPrevio;
+    }
+
+    // A block "improves" when money moves out of risk/critical or into healthy.
+    const tendenciaDe = (bloque: Bloque): "mejor" | "peor" | "igual" => {
+      const ahora = actual[bloque].monto;
+      const antes = previo[bloque].monto;
+      const umbral = Math.max(antes * 0.05, 1000);
+      if (Math.abs(ahora - antes) <= umbral) return "igual";
+      const subio = ahora > antes;
+      if (bloque === "sana") return subio ? "mejor" : "peor";
+      return subio ? "peor" : "mejor";
+    };
+
+    // Prioritized actions: group open cobros by cliente.
+    type Grupo = {
+      clienteId: number;
+      saldo: number;
+      peorMora: number;
+      minDiasParaVencer: number | null;
+      cobroUrgente: { id: number; orden: number } | null;
+    };
+    const grupos = new Map<number, Grupo>();
+    for (const r of abiertos) {
+      if (r.clienteId == null) continue;
+      const saldo = saldoDe(r);
+      if (saldo <= 0) continue;
+      let g = grupos.get(r.clienteId);
+      if (!g) {
+        g = { clienteId: r.clienteId, saldo: 0, peorMora: 0, minDiasParaVencer: null, cobroUrgente: null };
+        grupos.set(r.clienteId, g);
+      }
+      g.saldo += saldo;
+      let orden = 0; // higher = more urgent
+      if (r.fechaVencimiento) {
+        if (r.fechaVencimiento < hoyStr) {
+          const mora = diasMoraDe(r.fechaVencimiento);
+          g.peorMora = Math.max(g.peorMora, mora);
+          orden = 100000 + mora;
+        } else {
+          const dias = Math.round(
+            (new Date(`${r.fechaVencimiento}T00:00:00`).getTime() - new Date(`${hoyStr}T00:00:00`).getTime()) / msDia,
+          );
+          g.minDiasParaVencer = g.minDiasParaVencer == null ? dias : Math.min(g.minDiasParaVencer, dias);
+          orden = 1000 - dias;
+        }
+      }
+      if (!g.cobroUrgente || orden > g.cobroUrgente.orden) g.cobroUrgente = { id: r.id, orden };
+    }
+
+    const clienteIds = Array.from(grupos.keys());
+    const [scores, nombres, contactos] = await Promise.all([
+      computeClienteScores(clienteIds, scope),
+      clienteIds.length
+        ? db
+            .select({ id: clientesTable.id, nombre: clientesTable.nombre })
+            .from(clientesTable)
+            .where(and(clienteScopeCondition(ctx, userId), inArray(clientesTable.id, clienteIds)))
+        : Promise.resolve([] as { id: number; nombre: string }[]),
+      clienteIds.length
+        ? db
+            .select({
+              clienteId: cobrosTable.clienteId,
+              ultimo: sql<string | null>`max(${gestionesCobranzaTable.creadoEn})`,
+            })
+            .from(gestionesCobranzaTable)
+            .innerJoin(cobrosTable, eq(gestionesCobranzaTable.cobroId, cobrosTable.id))
+            .where(and(scope, inArray(cobrosTable.clienteId, clienteIds)))
+            .groupBy(cobrosTable.clienteId)
+        : Promise.resolve([] as { clienteId: number | null; ultimo: string | null }[]),
+    ]);
+    const nombrePorId = new Map(nombres.map((n) => [n.id, n.nombre]));
+    const ultimoContacto = new Map<number, Date>();
+    for (const c of contactos) {
+      if (c.clienteId != null && c.ultimo) ultimoContacto.set(c.clienteId, new Date(c.ultimo));
+    }
+
+    const maxSaldo = Math.max(...Array.from(grupos.values(), (g) => g.saldo), 1);
+    const prioridadDe = (g: Grupo): number => {
+      const s = scores.get(g.clienteId);
+      const scoreRiesgo = s?.score == null ? 50 : 100 - s.score;
+      const mora = Math.min(g.peorMora, 90) / 90;
+      const monto = g.saldo / maxSaldo;
+      const contacto = ultimoContacto.get(g.clienteId);
+      const diasSinContacto = contacto
+        ? Math.min(Math.round((hoy.getTime() - contacto.getTime()) / msDia), 60)
+        : 60;
+      const urgenciaVence =
+        g.peorMora === 0 && g.minDiasParaVencer != null ? Math.max(1 - g.minDiasParaVencer / 30, 0) : 0;
+      return monto * 0.35 + Math.max(mora, urgenciaVence * 0.8) * 0.3 + (scoreRiesgo / 100) * 0.2 + (diasSinContacto / 60) * 0.15;
+    };
+
+    const acciones = Array.from(grupos.values())
+      .sort((a, b) => prioridadDe(b) - prioridadDe(a))
+      .slice(0, 5)
+      .map((g) => {
+        const s = scores.get(g.clienteId);
+        return {
+          clienteId: g.clienteId,
+          clienteNombre: nombrePorId.get(g.clienteId) ?? "Cliente",
+          cobroId: g.cobroUrgente?.id ?? null,
+          saldoPendiente: Math.round(g.saldo),
+          diasMora: g.peorMora > 0 ? g.peorMora : null,
+          diasParaVencer: g.peorMora === 0 ? g.minDiasParaVencer : null,
+          score: s?.score ?? null,
+          categoria: s?.categoria ?? "sin_datos",
+          ultimoContactoEn: ultimoContacto.get(g.clienteId)?.toISOString() ?? null,
+        };
+      });
+
+    res.json({
+      semaforo: {
+        sana: {
+          monto: Math.round(actual.sana.monto),
+          cantidad: actual.sana.cantidad,
+          tendencia: tendenciaDe("sana"),
+        },
+        riesgo: {
+          monto: Math.round(actual.riesgo.monto),
+          cantidad: actual.riesgo.cantidad,
+          tendencia: tendenciaDe("riesgo"),
+        },
+        critica: {
+          monto: Math.round(actual.critica.monto),
+          cantidad: actual.critica.cantidad,
+          diasPromedioMora:
+            actual.critica.cantidad > 0 ? Math.round(actual.critica.sumaMora / actual.critica.cantidad) : 0,
+          tendencia: tendenciaDe("critica"),
+        },
+      },
+      acciones,
+      resumen: {
+        montoRecuperable: Math.round(acciones.reduce((sum, a) => sum + a.saldoPendiente, 0)),
+        clientes: acciones.length,
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error getting salud de cartera");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });
