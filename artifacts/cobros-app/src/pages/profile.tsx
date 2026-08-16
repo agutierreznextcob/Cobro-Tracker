@@ -10,7 +10,6 @@ import {
   getGetMpCredentialsQueryKey,
   useGetSubscriptionStatus,
   getGetSubscriptionStatusQueryKey,
-  useStartSubscription,
   useCancelSubscription,
   useGetPaymentMethodUrl,
   useCompletarPerfil,
@@ -39,6 +38,7 @@ import { isValidRut, formatRut } from "@/lib/rut";
 import { TeamSection } from "@/components/team-section";
 import { DatosBancariosSection } from "@/components/datos-bancarios-section";
 import { OrgRoleBadge } from "@/components/org-role-badge";
+import { PlanSelector } from "@/components/plan-selector";
 import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera, ShieldCheck, Download, Landmark } from "lucide-react";
 
 // Desglose mensual en tiempo real: plan base + usuarios extra = total mensual.
@@ -74,53 +74,30 @@ type SubStatusDesglose = {
   totalMensual?: number;
 };
 
-// Redirige al checkout de Reveniu vía form POST con el input oculto TBK_TOKEN
-// (Transbank OneClick). El backend crea la suscripción y devuelve
-// completionUrl + securityToken.
-function redirectToReveniu(completionUrl: string, securityToken: string) {
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = completionUrl;
-  const input = document.createElement("input");
-  input.type = "hidden";
-  input.name = "TBK_TOKEN";
-  input.value = securityToken;
-  form.appendChild(input);
-  document.body.appendChild(form);
-  form.submit();
-}
-
-// Botón de suscripción: inicia el checkout de Reveniu (registro de tarjeta una
-// sola vez; luego el cobro mensual es automático).
-function SuscribirseButton() {
-  const { toast } = useToast();
-  const start = useStartSubscription({
-    mutation: {
-      onSuccess: (data) => {
-        redirectToReveniu(data.completionUrl, data.securityToken);
-      },
-      onError: (err: unknown) => {
-        const msg =
-          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-          "No se pudo iniciar la suscripción. Intenta nuevamente.";
-        toast({ title: "Error", description: msg, variant: "destructive" });
-      },
-    },
-  });
+// Botón "Ver planes": abre el selector de planes (Starter / NextCob / Pro).
+// Desde ahí el usuario contrata su suscripción o cambia de plan.
+function SuscribirseButton({ label = "Ver planes y suscribirme" }: { label?: string }) {
+  const [open, setOpen] = useState(false);
   return (
     <div className="space-y-1.5">
       <Button
         className="w-full sm:w-auto"
-        disabled={start.isPending}
-        onClick={() => start.mutate()}
+        onClick={() => setOpen(true)}
         data-testid="button-suscribirse"
       >
-        {start.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-        Suscribirse
+        {label}
       </Button>
-      <p className="text-xs text-muted-foreground">
-        Registras tu tarjeta una sola vez (Transbank) y el cobro mensual es automático.
-      </p>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Elige tu plan</DialogTitle>
+            <DialogDescription>
+              Puedes cambiar de plan cuando quieras.
+            </DialogDescription>
+          </DialogHeader>
+          <PlanSelector onPlanCambiado={() => setOpen(false)} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -993,7 +970,9 @@ function ProfileSettings() {
               <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
                 <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-green-800 dark:text-green-300">Suscripción activa</p>
+                  <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                    Suscripción activa · Plan {subStatus.planNombre ?? "NextCob"}
+                  </p>
                   <p className="text-xs text-green-600 dark:text-green-400">
                     {subStatus.periodEnd
                       ? `Próximo cobro: ${formatFecha(subStatus.periodEnd)}`
@@ -1003,7 +982,10 @@ function ProfileSettings() {
               </div>
               <DesgloseMensual subStatus={subStatus} />
               {subStatus.tieneSuscripcion ? (
-                <SuscripcionActivaAcciones />
+                <>
+                  <SuscribirseButton label="Ver planes / cambiar de plan" />
+                  <SuscripcionActivaAcciones />
+                </>
               ) : (
                 <SuscribirseButton />
               )}

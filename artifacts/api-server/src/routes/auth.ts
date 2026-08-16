@@ -45,6 +45,7 @@ import { createAuthToken, consumeAuthToken } from "../lib/tokens";
 import { sendVerificacionEmail, sendResetPasswordEmail, sendWelcomeEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import { normalizeRut } from "../lib/rut";
+import { orgPuedeActivarMiembro } from "../middlewares/requirePlanFeature";
 
 const router: IRouter = Router();
 
@@ -110,6 +111,17 @@ async function assignOrganization(user: {
       const expirada =
         inv?.expiraEn != null && inv.expiraEn.getTime() < Date.now();
       if (inv && !expirada) {
+        // Cupo del plan al momento de ACEPTAR (no solo al invitar): el dueño
+        // pudo haber bajado a Starter (1 usuario) después de enviar la
+        // invitación. Si no hay cupo, el usuario queda en su propia org solo.
+        if (!(await orgPuedeActivarMiembro(inv.organizationId))) {
+          await db
+            .update(invitacionesTable)
+            .set({ estado: "expirada" })
+            .where(eq(invitacionesTable.id, inv.id));
+          await createSoloOrganization(user);
+          return;
+        }
         // Revalidar el supervisor al momento de aceptar: pudo haber sido
         // degradado o desactivado entre la invitación y la aceptación.
         let supervisorId: string | null = null;

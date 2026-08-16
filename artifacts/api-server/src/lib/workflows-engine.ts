@@ -20,6 +20,8 @@ import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "./what
 import { computeClienteScores } from "./scoring";
 import { emitirComprobante } from "./comprobante-service";
 import { crearYEnviarEncuesta } from "./encuestas-service";
+import { userTieneFeature, getPlanEfectivoDeOrg } from "../middlewares/requirePlanFeature";
+import { planIncluye } from "./plans";
 
 interface RunLogger {
   info: (obj: object, msg: string) => void;
@@ -515,8 +517,31 @@ export async function procesarWorkflows(log: RunLogger): Promise<WorkflowsRunRes
     return entry;
   }
 
+  // Workflows: solo plan NextCob. Cache por responsable (el plan lo fija el
+  // dueño de la org del responsable).
+  const featureCache = new Map<string, boolean>();
+  const orgPlanCache = new Map<number, boolean>();
+  async function workflowsPermitidos(cobro: { responsableId: string | null; organizationId: number | null }): Promise<boolean> {
+    if (cobro.responsableId) {
+      if (!featureCache.has(cobro.responsableId)) {
+        featureCache.set(cobro.responsableId, await userTieneFeature(cobro.responsableId, "workflows"));
+      }
+      return featureCache.get(cobro.responsableId) ?? false;
+    }
+    // Sin responsable: el plan lo decide el dueño de la org del cobro.
+    if (cobro.organizationId != null) {
+      if (!orgPlanCache.has(cobro.organizationId)) {
+        const plan = await getPlanEfectivoDeOrg(cobro.organizationId);
+        orgPlanCache.set(cobro.organizationId, plan != null && planIncluye(plan, "workflows"));
+      }
+      return orgPlanCache.get(cobro.organizationId) ?? false;
+    }
+    return true; // cobro legado sin org ni responsable
+  }
+
   for (const cobro of cobros) {
     if (cobro.workflowId == null) continue;
+    if (!(await workflowsPermitidos(cobro))) continue;
     const entry = await loadWorkflow(cobro.workflowId);
     if (!entry || !entry.workflow.activo) continue;
     const { workflow, steps } = entry;

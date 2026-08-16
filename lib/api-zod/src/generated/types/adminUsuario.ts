@@ -5,6 +5,7 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminUsuarioPlan } from './adminUsuarioPlan';
 import type { AdminUsuarioRole } from './adminUsuarioRole';
 import type { AdminUsuarioSubscriptionStatus } from './adminUsuarioSubscriptionStatus';
 
@@ -39,7 +40,18 @@ export interface AdminUsuario {
   rut: string | null;
   esDemo: boolean;
   activo: boolean;
-  /** Active org members beyond the owner. */
+  /**
+     * Plan contratado (null = aún no elige; se muestra como NextCob).
+     * @nullable
+     */
+  plan?: AdminUsuarioPlan;
+  planNombre?: string;
+  /**
+     * Fecha del primer/último pago registrado (inicio del plan vigente).
+     * @nullable
+     */
+  planInicioEn?: string | null;
+  /** Active org members beyond the plan's included seats. */
   usuariosExtra: number;
   /** Monthly amount (base plan + extra seats), IVA included. */
   montoMensual: number;

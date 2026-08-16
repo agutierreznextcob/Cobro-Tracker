@@ -1,11 +1,17 @@
 import { db, usersTable } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
-import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA } from "./flow-subscriptions";
+import { PLANES, planEfectivo, type PlanId } from "./plans";
 
 export interface SubscriptionState {
   status: "prueba" | "activa" | "vencida" | "cancelada";
   hasAccess: boolean;
   isAdmin: boolean;
+  // Plan elegido por el usuario (null = aún no elige) y plan efectivo con el
+  // que opera hoy (trial/admin/demo = nextcob completo).
+  plan: PlanId | null;
+  planEfectivo: PlanId;
+  planNombre: string;
+  usuariosIncluidos: number;
   trialEndsAt: string | null;
   diasRestantes: number | null;
   periodEnd: string | null;
@@ -33,6 +39,7 @@ export interface UserSubscriptionRow {
   role: "user" | "admin";
   activo: boolean;
   esDemo?: boolean;
+  plan?: PlanId | null;
 }
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -81,25 +88,40 @@ export function computeSubscriptionState(
     hasAccess = false;
   }
 
+  const efectivo = planEfectivo({
+    subscriptionStatus: row.subscriptionStatus,
+    plan: row.plan ?? null,
+    role: row.role,
+    esDemo: row.esDemo,
+  });
+  const planDef = PLANES[efectivo];
+  // Asientos extra por sobre los incluidos en el plan (solo si el plan los permite).
+  const extras = planDef.permiteUsuariosExtra
+    ? Math.max(0, usuariosAdicionales + 1 - planDef.usuariosIncluidos)
+    : 0;
+
   return {
     status: row.subscriptionStatus,
     hasAccess,
     isAdmin,
+    plan: row.plan ?? null,
+    planEfectivo: efectivo,
+    planNombre: planDef.nombre,
+    usuariosIncluidos: planDef.usuariosIncluidos,
     trialEndsAt: trialEndsAt ? trialEndsAt.toISOString() : null,
     diasRestantes,
     periodEnd: periodEnd ? periodEnd.toISOString() : null,
     tieneSuscripcion: Boolean(row.flowSubscriptionId || row.reveniuSubscriptionId),
-    precioMensual: PLAN_AMOUNT,
-    precioNeto: PLAN_NETO,
-    precioIva: PLAN_IVA,
-    usuariosAdicionales,
+    precioMensual: planDef.total,
+    precioNeto: planDef.neto,
+    precioIva: planDef.iva,
+    usuariosAdicionales: extras,
     costoUsuarioAdicionalNeto: COSTO_ADICIONAL_NETO,
     costoUsuarioAdicionalIva: COSTO_ADICIONAL_IVA,
     costoUsuarioAdicional: COSTO_ADICIONAL_NETO + COSTO_ADICIONAL_IVA,
-    totalNetoMensual: PLAN_NETO + usuariosAdicionales * COSTO_ADICIONAL_NETO,
-    totalIvaMensual: PLAN_IVA + usuariosAdicionales * COSTO_ADICIONAL_IVA,
-    totalMensual:
-      PLAN_AMOUNT + usuariosAdicionales * (COSTO_ADICIONAL_NETO + COSTO_ADICIONAL_IVA),
+    totalNetoMensual: planDef.neto + extras * COSTO_ADICIONAL_NETO,
+    totalIvaMensual: planDef.iva + extras * COSTO_ADICIONAL_IVA,
+    totalMensual: planDef.total + extras * (COSTO_ADICIONAL_NETO + COSTO_ADICIONAL_IVA),
   };
 }
 
@@ -131,6 +153,7 @@ export async function getSubscriptionState(userId: string): Promise<Subscription
       role: usersTable.role,
       activo: usersTable.activo,
       esDemo: usersTable.esDemo,
+      plan: usersTable.plan,
       organizationId: usersTable.organizationId,
     })
     .from(usersTable)

@@ -540,6 +540,7 @@ export default function AdminPage() {
                     <TableHead>Cuenta</TableHead>
                     <TableHead>RUT</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead>Plan</TableHead>
                     <TableHead>Vencimiento</TableHead>
                     <TableHead>Último pago</TableHead>
                     <TableHead>Próximo cobro</TableHead>
@@ -579,6 +580,18 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell>
                         <EstadoBadge u={u} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {u.isAdmin ? (
+                          "—"
+                        ) : (
+                          <>
+                            {u.planNombre ?? "NextCob"}
+                            {u.plan == null && !u.esDemo && (
+                              <span className="text-xs text-muted-foreground"> (sin elegir)</span>
+                            )}
+                          </>
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm">
                         <VencimientoCell u={u} />

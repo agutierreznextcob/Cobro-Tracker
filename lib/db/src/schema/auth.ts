@@ -28,6 +28,12 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "cancelada",
 ]);
 
+// Plan de suscripción contratado/elegido por el usuario.
+// - starter: funciones esenciales, 1 usuario, sin workflows/IA/scoring predictivo.
+// - nextcob: plan completo, 2 usuarios incluidos + asientos extra.
+// NULL = aún no elige plan (durante el trial todos operan con nivel NextCob).
+export const planSuscripcionEnum = pgEnum("plan_suscripcion", ["starter", "nextcob"]);
+
 // Platform role. "admin" users have permanent access (no trial/subscription
 // gating) and can see platform-wide admin views. Assigned manually in the DB.
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
@@ -82,6 +88,8 @@ export const usersTable = pgTable("users", {
   subscriptionStatus: subscriptionStatusEnum("subscription_status")
     .notNull()
     .default("prueba"),
+  // Plan elegido/contratado. NULL mientras no elige (trial = nivel NextCob).
+  plan: planSuscripcionEnum("plan"),
   role: userRoleEnum("role").notNull().default("user"),
   // Multi-tenant organization fields. organizationId links the user to their
   // organization; orgRole is their role within it (admin_org sees everything,

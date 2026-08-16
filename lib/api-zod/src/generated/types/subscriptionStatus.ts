@@ -5,6 +5,8 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+import type { SubscriptionStatusPlan } from './subscriptionStatusPlan';
+import type { SubscriptionStatusPlanEfectivo } from './subscriptionStatusPlanEfectivo';
 import type { SubscriptionStatusStatus } from './subscriptionStatusStatus';
 
 export interface SubscriptionStatus {
@@ -15,6 +17,12 @@ export interface SubscriptionStatus {
   trialEndsAt?: string | null;
   periodEnd?: string | null;
   tieneSuscripcion: boolean;
+  /** Plan elegido/contratado (null = aún no elige) */
+  plan?: SubscriptionStatusPlan;
+  /** Plan con el que opera hoy (trial/admin/demo = nextcob) */
+  planEfectivo?: SubscriptionStatusPlanEfectivo;
+  planNombre?: string;
+  usuariosIncluidos?: number;
   /** Monthly charged total in CLP, IVA included (neto + IVA) */
   precioMensual: number;
   /** Monthly net price in CLP, before IVA */

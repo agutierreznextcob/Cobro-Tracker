@@ -40,6 +40,7 @@ import { emitirComprobante } from "../lib/comprobante-service";
 import { getOrgContext, cobroScopeCondition, clienteScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
 import { getDatosBancariosUsuario, buildDatosBancariosHtml } from "../lib/datos-bancarios";
 import { computeClienteScores } from "../lib/scoring";
+import { userTieneFeature } from "../middlewares/requirePlanFeature";
 import { buscarSnapshotPrevio, calcularBloquesUsuario, hoySantiagoStr, sumarDias as sumarDiasSantiago } from "../lib/salud-cartera";
 
 const cobrosRouter = Router();
@@ -1575,7 +1576,7 @@ cobrosRouter.get("/dashboard/salud-cartera", async (req, res) => {
     }
 
     const clienteIds = Array.from(grupos.keys());
-    const [scores, nombres, contactos] = await Promise.all([
+    const [scores, nombres, contactos, tienePredictivo] = await Promise.all([
       computeClienteScores(clienteIds, scope),
       clienteIds.length
         ? db
@@ -1594,6 +1595,7 @@ cobrosRouter.get("/dashboard/salud-cartera", async (req, res) => {
             .where(and(scope, inArray(cobrosTable.clienteId, clienteIds)))
             .groupBy(cobrosTable.clienteId)
         : Promise.resolve([] as { clienteId: number | null; ultimo: string | null }[]),
+      userTieneFeature(userId, "scoring_predictivo"),
     ]);
     const nombrePorId = new Map(nombres.map((n) => [n.id, n.nombre]));
     const ultimoContacto = new Map<number, Date>();
@@ -1630,7 +1632,8 @@ cobrosRouter.get("/dashboard/salud-cartera", async (req, res) => {
           diasParaVencer: g.peorMora === 0 ? g.minDiasParaVencer : null,
           score: s?.score ?? null,
           categoria: s?.categoria ?? "sin_datos",
-          probabilidadPago: s?.probabilidadPago ?? null,
+          // Scoring predictivo: solo plan NextCob.
+          probabilidadPago: tienePredictivo ? (s?.probabilidadPago ?? null) : null,
           ultimoContactoEn: ultimoContacto.get(g.clienteId)?.toISOString() ?? null,
         };
       });

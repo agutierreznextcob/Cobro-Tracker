@@ -12,6 +12,7 @@ import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import { InvitarUsuarioBody, UpdateMiembroBody } from "@workspace/api-zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { requireOrgAdmin } from "../middlewares/requireOrgAdmin";
+import { requirePlanFeature, orgPuedeActivarMiembro } from "../middlewares/requirePlanFeature";
 import { getOrgContext, computePricing } from "../lib/org";
 import { sendInvitacionEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
@@ -84,7 +85,14 @@ organizationRouter.get("/organization", async (req, res) => {
         ),
       );
 
-    const pricing = computePricing(miembrosActivos);
+    // El plan que fija los precios es el del dueño de la organización (quien paga).
+    const [owner] = await db
+      .select({ plan: usersTable.plan, subscriptionStatus: usersTable.subscriptionStatus })
+      .from(usersTable)
+      .where(eq(usersTable.id, org.ownerId));
+    const ownerPlan =
+      owner?.subscriptionStatus === "prueba" ? "nextcob" : (owner?.plan ?? "nextcob");
+    const pricing = computePricing(miembrosActivos, ownerPlan);
 
     res.json({
       id: org.id,
@@ -219,6 +227,21 @@ organizationRouter.patch(
       const updates: Record<string, unknown> = {};
       if (nuevoRol !== undefined) updates.orgRole = nuevoRol;
       if (nuevoActivo !== undefined) updates.activo = nuevoActivo;
+
+      // Cupo del plan al REACTIVAR un miembro (el plan Starter incluye 1
+      // usuario): sin este check se puede eludir el límite desactivando y
+      // reactivando gente después de un downgrade.
+      if (nuevoActivo === true && !target.activo) {
+        if (!(await orgPuedeActivarMiembro(ctx.organizationId))) {
+          res.status(403).json({
+            error:
+              "Tu plan actual no permite más usuarios activos. Mejora al plan NextCob para reactivar miembros.",
+            code: "plan_upgrade",
+            feature: "equipo",
+          });
+          return;
+        }
+      }
 
       const rolFinal = nuevoRol ?? target.orgRole;
 
@@ -406,6 +429,7 @@ organizationRouter.get(
 organizationRouter.post(
   "/organization/invitaciones",
   requireOrgAdmin,
+  requirePlanFeature("equipo"),
   async (req, res) => {
     const userId = req.user!.id;
     const parsed = InvitarUsuarioBody.safeParse(req.body);
@@ -562,6 +586,7 @@ organizationRouter.delete(
 // --- Team performance (admin: all members; supervisor: their team) ---
 organizationRouter.get(
   "/organization/rendimiento",
+  requirePlanFeature("informes_avanzados"),
   async (req, res) => {
     const userId = req.user!.id;
     const supervisorFiltro =

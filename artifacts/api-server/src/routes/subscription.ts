@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, proWaitlistTable, organizacionesTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import { PLANES } from "../lib/plans";
 import { z } from "zod";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import {
@@ -21,6 +22,7 @@ import {
   createReveniuCheckout,
   disableReveniuRenewal,
   reveniuPaymentMethodUrl,
+  setReveniuAmount,
 } from "../lib/reveniu";
 
 const subscriptionRouter = Router();
@@ -97,6 +99,17 @@ subscriptionRouter.use((req, res, next) => {
   next();
 });
 
+// La suscripción la administra el DUEÑO de la organización (quien paga). Un
+// miembro invitado no debe crear ni cambiar su propia suscripción Reveniu.
+async function esOwnerDeSuOrg(userId: string, organizationId: number | null): Promise<boolean> {
+  if (organizationId == null) return true;
+  const [org] = await db
+    .select({ ownerId: organizacionesTable.ownerId })
+    .from(organizacionesTable)
+    .where(eq(organizacionesTable.id, organizationId));
+  return !org || org.ownerId === userId;
+}
+
 subscriptionRouter.get("/subscription/status", async (req, res) => {
   const userId = req.user!.id;
   try {
@@ -132,6 +145,12 @@ subscriptionRouter.post("/subscription/subscribe", async (req, res) => {
       res.status(404).json({ error: "Usuario no encontrado" });
       return;
     }
+    if (!(await esOwnerDeSuOrg(userId, user.organizationId))) {
+      res.status(403).json({
+        error: "Solo el dueño de la organización puede administrar la suscripción.",
+      });
+      return;
+    }
     if (user.subscriptionStatus === "activa" && user.reveniuSubscriptionId) {
       res.status(400).json({ error: "Ya tienes una suscripción activa." });
       return;
@@ -141,8 +160,24 @@ subscriptionRouter.post("/subscription/subscribe", async (req, res) => {
       return;
     }
 
-    const usuariosAdicionales = await contarUsuariosAdicionales(user.organizationId);
-    const pricing = computePricing(usuariosAdicionales + 1);
+    // Plan elegido en la pantalla de selección (default: NextCob).
+    const parsedPlan = z.enum(["starter", "nextcob"]).safeParse(req.body?.plan ?? "nextcob");
+    if (!parsedPlan.success) {
+      res.status(400).json({ error: "Plan inválido." });
+      return;
+    }
+    const plan = parsedPlan.data;
+
+    const miembrosActivos = (await contarUsuariosAdicionales(user.organizationId)) + 1;
+    if (plan === "starter" && miembrosActivos > PLANES.starter.usuariosIncluidos) {
+      res.status(400).json({
+        error:
+          "El plan Starter incluye 1 usuario y tu equipo tiene más miembros activos. Desactiva a los demás miembros o elige el plan NextCob.",
+      });
+      return;
+    }
+
+    const pricing = computePricing(miembrosActivos, plan);
 
     const nombre =
       [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
@@ -159,6 +194,7 @@ subscriptionRouter.post("/subscription/subscribe", async (req, res) => {
     await db
       .update(usersTable)
       .set({
+        plan,
         reveniuPendingSubscriptionId: checkout.subscriptionId,
         reveniuMontoSync: pricing.totalMensual,
       })
@@ -171,6 +207,96 @@ subscriptionRouter.post("/subscription/subscribe", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error starting Reveniu subscription");
     res.status(500).json({ error: "No se pudo iniciar la suscripción. Intenta nuevamente." });
+  }
+});
+
+// Cambia el plan de una suscripción ya activa (upgrade Starter → NextCob o
+// downgrade). El nuevo monto se empuja a Reveniu de inmediato; el próximo
+// cobro usará el monto del nuevo plan.
+subscriptionRouter.post("/subscription/cambiar-plan", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const parsedPlan = z.enum(["starter", "nextcob"]).safeParse(req.body?.plan);
+    if (!parsedPlan.success) {
+      res.status(400).json({ error: "Plan inválido." });
+      return;
+    }
+    const plan = parsedPlan.data;
+
+    // Transacción con lock de la fila del usuario: evita que dos cambios de
+    // plan concurrentes empujen montos distintos a Reveniu y dejen la BD
+    // divergente del cobro real.
+    const result = await db.transaction(async (tx) => {
+      const [user] = await tx
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .for("update");
+      if (!user) return { status: 404 as const, error: "Usuario no encontrado" };
+      if (!(await esOwnerDeSuOrg(userId, user.organizationId))) {
+        return {
+          status: 403 as const,
+          error: "Solo el dueño de la organización puede administrar la suscripción.",
+        };
+      }
+      if (user.subscriptionStatus !== "activa" || !user.reveniuSubscriptionId) {
+        return { status: 400 as const, error: "Necesitas una suscripción activa para cambiar de plan." };
+      }
+      if (user.plan === plan) {
+        return { status: 400 as const, error: "Ya estás en ese plan." };
+      }
+
+      const miembrosActivos = (await contarUsuariosAdicionales(user.organizationId)) + 1;
+      if (plan === "starter" && miembrosActivos > PLANES.starter.usuariosIncluidos) {
+        return {
+          status: 400 as const,
+          error:
+            "El plan Starter incluye 1 usuario y tu equipo tiene más miembros activos. Desactiva a los demás miembros primero.",
+        };
+      }
+
+      const pricing = computePricing(miembrosActivos, plan);
+      // Llamada externa dentro del lock: si Reveniu falla, la transacción se
+      // revierte y el plan en BD no cambia (billing y entitlements coherentes).
+      await setReveniuAmount(user.reveniuSubscriptionId, pricing.totalMensual);
+      await tx
+        .update(usersTable)
+        .set({ plan, reveniuMontoSync: pricing.totalMensual })
+        .where(eq(usersTable.id, userId));
+      return { status: 200 as const, plan, totalMensual: pricing.totalMensual };
+    });
+
+    if (result.status !== 200) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    req.log.info({ userId, plan, total: result.totalMensual }, "Plan de suscripción cambiado");
+    res.json({ ok: true, plan: result.plan, totalMensual: result.totalMensual });
+  } catch (err) {
+    req.log.error({ err }, "Error changing subscription plan");
+    res.status(500).json({ error: "No se pudo cambiar el plan. Intenta nuevamente." });
+  }
+});
+
+// Lista de espera del plan Pro ("Próximamente"). Idempotente por email.
+subscriptionRouter.post("/subscription/pro-waitlist", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const parsed = z.string().trim().email().max(320).safeParse(
+      req.body?.email ?? req.user!.email ?? "",
+    );
+    if (!parsed.success) {
+      res.status(400).json({ error: "Email inválido." });
+      return;
+    }
+    await db
+      .insert(proWaitlistTable)
+      .values({ email: parsed.data.toLowerCase(), userId })
+      .onConflictDoNothing({ target: proWaitlistTable.email });
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error joining Pro waitlist");
+    res.status(500).json({ error: "No se pudo guardar tu email. Intenta nuevamente." });
   }
 });
 

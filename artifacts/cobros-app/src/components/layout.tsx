@@ -1,8 +1,10 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Webhook, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare } from "lucide-react";
+import { Home, Plus, Search, Users, Webhook, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
-import { useListNotificaciones, getListNotificacionesQueryKey } from "@workspace/api-client-react";
+import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus } from "@workspace/api-client-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
 import { useLeadsCountPolling } from "@/hooks/use-leads-count-polling";
@@ -141,10 +143,54 @@ function NotificacionesNavItem({
   );
 }
 
+// Aviso de fin de prueba: visible desde 7 días antes; urgente desde 2 días.
+function TrialBanner() {
+  const { data: sub } = useGetSubscriptionStatus();
+  const [, navigate] = useLocation();
+  if (!sub || sub.status !== "prueba" || sub.isAdmin) return null;
+  const dias = sub.diasRestantes;
+  if (dias == null || dias > 7) return null;
+  const urgente = dias <= 2;
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm ${
+        urgente
+          ? "bg-red-600 text-white"
+          : "bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+      }`}
+      data-testid="banner-trial"
+    >
+      <div className="flex items-center gap-2">
+        <Clock className="h-4 w-4 shrink-0" />
+        <span>
+          {urgente
+            ? dias <= 0
+              ? "Tu prueba gratuita termina hoy. Elige un plan para no perder acceso."
+              : `Tu prueba gratuita termina en ${dias} día${dias === 1 ? "" : "s"}. Elige un plan para no perder acceso.`
+            : `Te quedan ${dias} días de prueba gratuita. Elige tu plan para continuar sin interrupciones.`}
+        </span>
+      </div>
+      <Button
+        size="sm"
+        variant={urgente ? "secondary" : "default"}
+        className="h-7"
+        onClick={() => navigate("/perfil")}
+        data-testid="button-banner-ver-planes"
+      >
+        Ver planes
+      </Button>
+    </div>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: subStatus } = useGetSubscriptionStatus();
+  // Candados del plan Starter (el trial y las cuentas demo operan como NextCob).
+  const esStarter = subStatus?.planEfectivo === "starter";
+  const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
 
   const isAdmin = user?.role === "admin";
 
@@ -155,13 +201,13 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
     { href: "/cobros/informes", label: "Informes", icon: BarChart3 },
     { href: "/clientes", label: "Clientes", icon: Users },
-    { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock },
-    { href: "/workflows", label: "Automatización", icon: Workflow },
+    { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock, feature: "Recordatorios automáticos" },
+    { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes" },
     { href: "/tareas", label: "Tareas", icon: CheckSquare },
-    { href: "/encuestas", label: "Satisfacción", icon: MessageSquare },
+    { href: "/encuestas", label: "Satisfacción", icon: MessageSquare, feature: "Encuestas de satisfacción" },
     { href: "/webhooks/log", label: "Log webhooks", icon: Webhook },
     { href: "/perfil", label: "Perfil", icon: UserCircle },
-  ];
+  ] as Array<{ href: string; label: string; icon: typeof Home; feature?: string }>;
 
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Usuario"
@@ -234,8 +280,21 @@ export function Layout({ children }: { children: ReactNode }) {
         <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = location === item.href;
+            const bloqueado = esStarter && !!item.feature;
             return (
               <div key={item.href} className="space-y-0.5">
+              {bloqueado ? (
+                <button
+                  type="button"
+                  onClick={() => setUpgradeFeature(item.feature!)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group text-muted-foreground/70 hover:bg-secondary/60"
+                  data-testid={`nav-locked-${item.href.replace(/\//g, "")}`}
+                >
+                  <item.icon className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                  <span>{item.label}</span>
+                  <Lock className="h-3.5 w-3.5 ml-auto shrink-0 text-muted-foreground/60" />
+                </button>
+              ) : (
               <Link
                 href={item.href}
                 onClick={closeMobile}
@@ -252,6 +311,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 />
                 <span>{item.label}</span>
               </Link>
+              )}
               {item.href === "/clientes" && (
                 <NotificacionesNavItem location={location} onNavigate={closeMobile} />
               )}
@@ -339,12 +399,44 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
+        <TrialBanner />
         <main className="flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-8 overflow-y-auto">
           {children}
         </main>
       </div>
 
-      <AiChat />
+      {/* Asistente IA: solo plan NextCob (trial/demo incluidos). */}
+      {!esStarter && <AiChat />}
+
+      {/* Mensaje al intentar usar una función bloqueada en Starter. */}
+      <Dialog open={upgradeFeature != null} onOpenChange={(o) => !o && setUpgradeFeature(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-4 w-4" /> Función del plan NextCob
+            </DialogTitle>
+            <DialogDescription>
+              {upgradeFeature} está disponible en el plan NextCob. Mejora tu plan para
+              desbloquear esta y todas las funciones avanzadas.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpgradeFeature(null)}>
+              Ahora no
+            </Button>
+            <Button
+              onClick={() => {
+                setUpgradeFeature(null);
+                closeMobile();
+                navigate("/perfil");
+              }}
+              data-testid="button-upgrade-ver-planes"
+            >
+              Ver planes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

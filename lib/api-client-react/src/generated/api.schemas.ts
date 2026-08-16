@@ -412,6 +412,18 @@ export const AdminUsuarioSubscriptionStatus = {
   cancelada: 'cancelada',
 } as const;
 
+/**
+ * Plan contratado (null = aún no elige; se muestra como NextCob).
+ * @nullable
+ */
+export type AdminUsuarioPlan = typeof AdminUsuarioPlan[keyof typeof AdminUsuarioPlan] | null;
+
+
+export const AdminUsuarioPlan = {
+  starter: 'starter',
+  nextcob: 'nextcob',
+} as const;
+
 export interface AdminUsuario {
   id: string;
   /**
@@ -443,7 +455,18 @@ export interface AdminUsuario {
   rut: string | null;
   esDemo: boolean;
   activo: boolean;
-  /** Active org members beyond the owner. */
+  /**
+     * Plan contratado (null = aún no elige; se muestra como NextCob).
+     * @nullable
+     */
+  plan?: AdminUsuarioPlan;
+  planNombre?: string;
+  /**
+     * Fecha del primer/último pago registrado (inicio del plan vigente).
+     * @nullable
+     */
+  planInicioEn?: string | null;
+  /** Active org members beyond the plan's included seats. */
   usuariosExtra: number;
   /** Monthly amount (base plan + extra seats), IVA included. */
   montoMensual: number;
@@ -503,6 +526,39 @@ export interface AdminRecordatorioResult {
   message?: string | null;
 }
 
+/**
+ * Plan elegido (default nextcob)
+ */
+export type StartSubscriptionInputPlan = typeof StartSubscriptionInputPlan[keyof typeof StartSubscriptionInputPlan];
+
+
+export const StartSubscriptionInputPlan = {
+  starter: 'starter',
+  nextcob: 'nextcob',
+} as const;
+
+export interface StartSubscriptionInput {
+  /** Plan elegido (default nextcob) */
+  plan?: StartSubscriptionInputPlan;
+}
+
+export type CambiarPlanInputPlan = typeof CambiarPlanInputPlan[keyof typeof CambiarPlanInputPlan];
+
+
+export const CambiarPlanInputPlan = {
+  starter: 'starter',
+  nextcob: 'nextcob',
+} as const;
+
+export interface CambiarPlanInput {
+  plan: CambiarPlanInputPlan;
+}
+
+export interface ProWaitlistInput {
+  /** Defaults to the authenticated user's email */
+  email?: string;
+}
+
 export type SubscriptionStatusStatus = typeof SubscriptionStatusStatus[keyof typeof SubscriptionStatusStatus];
 
 
@@ -513,6 +569,28 @@ export const SubscriptionStatusStatus = {
   cancelada: 'cancelada',
 } as const;
 
+/**
+ * Plan elegido/contratado (null = aún no elige)
+ */
+export type SubscriptionStatusPlan = typeof SubscriptionStatusPlan[keyof typeof SubscriptionStatusPlan] | null;
+
+
+export const SubscriptionStatusPlan = {
+  starter: 'starter',
+  nextcob: 'nextcob',
+} as const;
+
+/**
+ * Plan con el que opera hoy (trial/admin/demo = nextcob)
+ */
+export type SubscriptionStatusPlanEfectivo = typeof SubscriptionStatusPlanEfectivo[keyof typeof SubscriptionStatusPlanEfectivo];
+
+
+export const SubscriptionStatusPlanEfectivo = {
+  starter: 'starter',
+  nextcob: 'nextcob',
+} as const;
+
 export interface SubscriptionStatus {
   status: SubscriptionStatusStatus;
   hasAccess: boolean;
@@ -521,6 +599,12 @@ export interface SubscriptionStatus {
   trialEndsAt?: string | null;
   periodEnd?: string | null;
   tieneSuscripcion: boolean;
+  /** Plan elegido/contratado (null = aún no elige) */
+  plan?: SubscriptionStatusPlan;
+  /** Plan con el que opera hoy (trial/admin/demo = nextcob) */
+  planEfectivo?: SubscriptionStatusPlanEfectivo;
+  planNombre?: string;
+  usuariosIncluidos?: number;
   /** Monthly charged total in CLP, IVA included (neto + IVA) */
   precioMensual: number;
   /** Monthly net price in CLP, before IVA */
@@ -2408,6 +2492,24 @@ export const ListWebhookEventosResultado = {
   exitoso: 'exitoso',
   fallido: 'fallido',
 } as const;
+
+export type CambiarPlanSubscription200Plan = typeof CambiarPlanSubscription200Plan[keyof typeof CambiarPlanSubscription200Plan];
+
+
+export const CambiarPlanSubscription200Plan = {
+  starter: 'starter',
+  nextcob: 'nextcob',
+} as const;
+
+export type CambiarPlanSubscription200 = {
+  ok: boolean;
+  plan: CambiarPlanSubscription200Plan;
+  totalMensual: number;
+};
+
+export type JoinProWaitlist200 = {
+  ok: boolean;
+};
 
 export type CancelSubscription200 = {
   ok: boolean;

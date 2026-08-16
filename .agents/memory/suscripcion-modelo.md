@@ -1,10 +1,10 @@
 ---
 name: Modelo de suscripción de la plataforma
-description: Decisión del usuario sobre cómo se cobra la suscripción NextCob y qué NO reintroducir.
+description: Cómo se cobra la suscripción NextCob (Reveniu mensual) y qué NO reintroducir.
 ---
 
-- **Decisión (ago 2026):** la suscripción será exclusivamente mensual automática vía **Fintoc** (integración pendiente). El pago anticipado de N meses (prepago vía Flow one-off) fue implementado y luego **revertido a pedido explícito del usuario** — no reintroducirlo.
-- **Why:** el usuario quiere un único modelo de cobro simple; Fintoc reemplazará a Flow para la suscripción de la plataforma.
-- **How to apply:** en Perfil>Suscripción solo debe haber: plan actual, desglose en tiempo real (Plan base 24.990+4.748=29.738; +N usuarios extra 9.990+1.898=11.888 c/u; Total mensual) y un botón "Suscribirse" **deshabilitado** hasta integrar Fintoc. El desglose viene de `/subscription/status` (totalMensual, usuariosAdicionales, costoUsuarioAdicional*) y se refresca porque team-section invalida esa query al cambiar asientos.
-- Los precios per-seat siguen duplicados en `lib/org.ts` ↔ `lib/subscription.ts` (import circular) — mantener en sync.
-- El backend de la suscripción recurrente Flow existente (subscribe/webhook flow-subscription) sigue vivo pero sin entrada desde la UI; se eliminará al integrar Fintoc.
+- **Estado actual (ago 2026):** suscripción mensual automática vía **Reveniu** (Transbank OneClick), ACTIVA con checkout desde la UI (form POST TBK_TOKEN a completionUrl). La mención anterior a "botón deshabilitado hasta Fintoc" quedó obsoleta: Reveniu reemplazó ese plan.
+- El pago anticipado de N meses (prepago vía Flow one-off) fue implementado y luego **revertido a pedido explícito del usuario** — no reintroducirlo. Un único modelo de cobro mensual.
+- Perfil>Suscripción muestra: plan actual (ver [planes-suscripcion.md](planes-suscripcion.md)), desglose en tiempo real desde `/subscription/status` (plan base + usuarios extra 9.990+1.898=11.888 c/u + total mensual) y botón "Ver planes" (selector Starter/NextCob/Pro-waitlist). team-section invalida esa query al cambiar asientos.
+- Los precios per-seat siguen duplicados en `lib/org.ts` ↔ `lib/subscription.ts` (import circular) — mantener en sync. Los precios base ahora dependen del plan (PLANES en lib/plans.ts).
+- Reveniu es custom-amount: NO se crean planes en Reveniu; upgrade/downgrade = `setReveniuAmount` + `reveniuMontoSync` (transaccional, ver planes-suscripcion.md).

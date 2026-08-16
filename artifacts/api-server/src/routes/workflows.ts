@@ -29,6 +29,7 @@ import {
   plantillaKeyForScore,
 } from "../lib/workflow-templates";
 import { listProximasAcciones } from "../lib/workflows-engine";
+import { requirePlanFeature } from "../middlewares/requirePlanFeature";
 
 const workflowsRouter: IRouter = Router();
 
@@ -39,6 +40,8 @@ workflowsRouter.use((req, res, next) => {
   }
   next();
 });
+// Workflows inteligentes: solo plan NextCob (trial/demo/admin incluidos).
+workflowsRouter.use(requirePlanFeature("workflows"));
 
 // Scope: admin_org sees all workflows in their org; ejecutivo sees only their own.
 function workflowScope(ctx: OrgContext, userId: string): SQL | undefined {

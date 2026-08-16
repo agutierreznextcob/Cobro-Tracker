@@ -3,6 +3,7 @@ import { db, encuestasTable, cobrosTable, type Encuesta } from "@workspace/db";
 import { and, eq, isNull, isNotNull, desc, type SQL } from "drizzle-orm";
 import { ResponderEncuestaBody } from "@workspace/api-zod";
 import { getOrgContext, type OrgContext } from "../lib/org";
+import { userTieneFeature } from "../middlewares/requirePlanFeature";
 
 const encuestasRouter: IRouter = Router();
 
@@ -22,6 +23,15 @@ encuestasRouter.get("/encuestas/stats/resumen", async (req, res) => {
   }
   const userId = req.user!.id;
   try {
+    // Informes avanzados: solo plan NextCob (trial/demo/admin incluidos).
+    if (!(await userTieneFeature(userId, "informes_avanzados"))) {
+      res.status(403).json({
+        error: "Esta función está disponible en el plan NextCob. Mejora tu plan para usarla.",
+        code: "plan_upgrade",
+        feature: "informes_avanzados",
+      });
+      return;
+    }
     const ctx = await getOrgContext(userId);
     const scope = encuestaScope(ctx, userId);
     const rows = await db

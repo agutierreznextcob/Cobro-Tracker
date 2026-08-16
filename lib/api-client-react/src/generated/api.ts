@@ -39,6 +39,8 @@ import type {
   AuthUserEnvelope,
   AvisarClienteInput,
   AvisarClienteResult,
+  CambiarPlanInput,
+  CambiarPlanSubscription200,
   CancelSubscription200,
   ChangePasswordInput,
   Cliente,
@@ -88,6 +90,7 @@ import type {
   Invitacion,
   InvitacionPublica,
   InvitarUsuarioInput,
+  JoinProWaitlist200,
   Lead,
   LeadCreated,
   LeadEstadoInput,
@@ -116,6 +119,7 @@ import type {
   OrganizacionInfo,
   PagoSuscripcion,
   PortalData,
+  ProWaitlistInput,
   Recordatorio,
   RecordatorioDefault,
   RecordatorioEnviado,
@@ -131,6 +135,7 @@ import type {
   SaludCartera,
   SaludCarteraHistorial,
   SeguimientoCobranza,
+  StartSubscriptionInput,
   SubirComprobanteInput,
   SubscribeResponse,
   SubscriptionStatus,
@@ -4731,14 +4736,15 @@ export const getStartSubscriptionUrl = () => {
 
  * @summary Start the platform subscription via Reveniu checkout
  */
-export const startSubscription = async ( options?: RequestInit): Promise<SubscribeResponse> => {
+export const startSubscription = async (startSubscriptionInput?: StartSubscriptionInput, options?: RequestInit): Promise<SubscribeResponse> => {
 
   return customFetch<SubscribeResponse>(getStartSubscriptionUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      startSubscriptionInput,)
   }
 );}
 
@@ -4746,8 +4752,8 @@ export const startSubscription = async ( options?: RequestInit): Promise<Subscri
 
 
 export const getStartSubscriptionMutationOptions = <TError = ErrorType<ErrorResponse | void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSubscription>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof startSubscription>>, TError,void, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSubscription>>, TError,{data?: BodyType<StartSubscriptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startSubscription>>, TError,{data?: BodyType<StartSubscriptionInput>}, TContext> => {
 
 const mutationKey = ['startSubscription'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -4759,10 +4765,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startSubscription>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startSubscription>>, {data?: BodyType<StartSubscriptionInput>}> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  startSubscription(requestOptions)
+          return  startSubscription(data,requestOptions)
         }
 
 
@@ -4773,21 +4779,163 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StartSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof startSubscription>>>
-
+    export type StartSubscriptionMutationBody = BodyType<StartSubscriptionInput> | undefined
     export type StartSubscriptionMutationError = ErrorType<ErrorResponse | void>
 
     /**
  * @summary Start the platform subscription via Reveniu checkout
  */
 export const useStartSubscription = <TError = ErrorType<ErrorResponse | void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSubscription>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSubscription>>, TError,{data?: BodyType<StartSubscriptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof startSubscription>>,
         TError,
-        void,
+        {data?: BodyType<StartSubscriptionInput>},
         TContext
       > => {
       return useMutation(getStartSubscriptionMutationOptions(options));
+    }
+
+export const getCambiarPlanSubscriptionUrl = () => {
+
+
+
+
+  return `/api/subscription/cambiar-plan`
+}
+
+/**
+ * @summary Change the plan of an active subscription (amount pushed to Reveniu immediately)
+ */
+export const cambiarPlanSubscription = async (cambiarPlanInput: CambiarPlanInput, options?: RequestInit): Promise<CambiarPlanSubscription200> => {
+
+  return customFetch<CambiarPlanSubscription200>(getCambiarPlanSubscriptionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cambiarPlanInput,)
+  }
+);}
+
+
+
+
+export const getCambiarPlanSubscriptionMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cambiarPlanSubscription>>, TError,{data: BodyType<CambiarPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cambiarPlanSubscription>>, TError,{data: BodyType<CambiarPlanInput>}, TContext> => {
+
+const mutationKey = ['cambiarPlanSubscription'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cambiarPlanSubscription>>, {data: BodyType<CambiarPlanInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  cambiarPlanSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CambiarPlanSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof cambiarPlanSubscription>>>
+    export type CambiarPlanSubscriptionMutationBody = BodyType<CambiarPlanInput>
+    export type CambiarPlanSubscriptionMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Change the plan of an active subscription (amount pushed to Reveniu immediately)
+ */
+export const useCambiarPlanSubscription = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cambiarPlanSubscription>>, TError,{data: BodyType<CambiarPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cambiarPlanSubscription>>,
+        TError,
+        {data: BodyType<CambiarPlanInput>},
+        TContext
+      > => {
+      return useMutation(getCambiarPlanSubscriptionMutationOptions(options));
+    }
+
+export const getJoinProWaitlistUrl = () => {
+
+
+
+
+  return `/api/subscription/pro-waitlist`
+}
+
+/**
+ * @summary Join the waitlist for the upcoming Pro plan (idempotent by email)
+ */
+export const joinProWaitlist = async (proWaitlistInput?: ProWaitlistInput, options?: RequestInit): Promise<JoinProWaitlist200> => {
+
+  return customFetch<JoinProWaitlist200>(getJoinProWaitlistUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      proWaitlistInput,)
+  }
+);}
+
+
+
+
+export const getJoinProWaitlistMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinProWaitlist>>, TError,{data?: BodyType<ProWaitlistInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinProWaitlist>>, TError,{data?: BodyType<ProWaitlistInput>}, TContext> => {
+
+const mutationKey = ['joinProWaitlist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinProWaitlist>>, {data?: BodyType<ProWaitlistInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  joinProWaitlist(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinProWaitlistMutationResult = NonNullable<Awaited<ReturnType<typeof joinProWaitlist>>>
+    export type JoinProWaitlistMutationBody = BodyType<ProWaitlistInput> | undefined
+    export type JoinProWaitlistMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Join the waitlist for the upcoming Pro plan (idempotent by email)
+ */
+export const useJoinProWaitlist = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinProWaitlist>>, TError,{data?: BodyType<ProWaitlistInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinProWaitlist>>,
+        TError,
+        {data?: BodyType<ProWaitlistInput>},
+        TContext
+      > => {
+      return useMutation(getJoinProWaitlistMutationOptions(options));
     }
 
 export const getCancelSubscriptionUrl = () => {

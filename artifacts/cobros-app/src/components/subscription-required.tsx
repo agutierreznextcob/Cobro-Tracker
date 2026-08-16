@@ -1,108 +1,41 @@
-import {
-  useGetSubscriptionStatus,
-  useStartSubscription,
-} from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Lock, Loader2, Sparkles } from "lucide-react";
+import { useGetSubscriptionStatus } from "@workspace/api-client-react";
+import { Lock } from "lucide-react";
+import { PlanSelector } from "@/components/plan-selector";
 
-function formatCLP(value: number): string {
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
+// Pantalla de bloqueo al terminar la prueba (o con la suscripción vencida):
+// el usuario debe elegir un plan para continuar.
 export function SubscriptionRequired() {
-  const { toast } = useToast();
   const { data: status } = useGetSubscriptionStatus();
-  const startSubscription = useStartSubscription();
-
-  const precio = status?.precioMensual ?? 29738;
-  const precioNeto = status?.precioNeto ?? 24990;
-  const precioIva = status?.precioIva ?? 4748;
-
-  // Redirige al checkout de Reveniu vía form POST con el input oculto
-  // TBK_TOKEN (Transbank OneClick).
-  const handleSubscribe = () => {
-    startSubscription.mutate(undefined, {
-      onSuccess: (data) => {
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = data.completionUrl;
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = "TBK_TOKEN";
-        input.value = data.securityToken;
-        form.appendChild(input);
-        document.body.appendChild(form);
-        form.submit();
-      },
-      onError: (err: unknown) => {
-        const msg = err instanceof Error ? err.message : "No se pudo iniciar la suscripción.";
-        toast({ title: "Error", description: msg, variant: "destructive" });
-      },
-    });
-  };
+  const vencida = status?.status === "vencida" && status?.tieneSuscripcion;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md text-center">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-          <Lock className="h-8 w-8 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight">Tu prueba terminó</h1>
-        <p className="mt-3 text-muted-foreground">
-          Suscríbete para seguir creando cobros, enviando links de pago y usando todas las
-          funciones de NextCob.
-        </p>
-
-        <div className="mt-8 rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
-          <div className="flex items-baseline justify-center gap-1">
-            <span className="text-4xl font-bold tracking-tight">{formatCLP(precioNeto)} + IVA</span>
-            <span className="text-muted-foreground">/mes</span>
+      <div className="w-full max-w-3xl">
+        <div className="text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+            <Lock className="h-8 w-8 text-primary" />
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Neto {formatCLP(precioNeto)} + IVA {formatCLP(precioIva)} = Total {formatCLP(precio)}/mes (IVA incluido)
+          <h1 className="text-2xl font-bold tracking-tight">
+            {vencida ? "Tu suscripción está vencida" : "Tu prueba terminó"}
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-muted-foreground">
+            Elige un plan para seguir creando cobros, enviando links de pago y haciendo
+            seguimiento de tus clientes.
           </p>
-          <ul className="mt-5 space-y-2 text-left text-sm text-muted-foreground">
-            <li className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary shrink-0" />
-              Cobros y links de pago ilimitados
-            </li>
-            <li className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary shrink-0" />
-              Dashboard en tiempo real y asistente IA
-            </li>
-            <li className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary shrink-0" />
-              Cancela cuando quieras
-            </li>
-          </ul>
-          <Button
-            className="mt-6 w-full"
-            size="lg"
-            onClick={handleSubscribe}
-            disabled={startSubscription.isPending}
-          >
-            {startSubscription.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Redirigiendo...
-              </>
-            ) : (
-              `Suscribirme - ${formatCLP(precioNeto)} + IVA/mes`
-            )}
-          </Button>
         </div>
 
-        <a
-          href="/api/logout"
-          className="mt-6 inline-block text-sm text-muted-foreground underline-offset-4 hover:underline"
-        >
-          Cerrar sesión
-        </a>
+        <div className="mt-8">
+          <PlanSelector />
+        </div>
+
+        <div className="mt-6 text-center">
+          <a
+            href="/api/logout"
+            className="inline-block text-sm text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Cerrar sesión
+          </a>
+        </div>
       </div>
     </div>
   );

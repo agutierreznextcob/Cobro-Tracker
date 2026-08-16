@@ -7,6 +7,7 @@ import { EnviarPortalClienteBody } from "@workspace/api-zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { getOrgContext, userCanAccessCliente, getRemitenteContacto, cobroScopeCondition, clienteScopeCondition } from "../lib/org";
 import { computeClienteScores } from "../lib/scoring";
+import { userTieneFeature } from "../middlewares/requirePlanFeature";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import { sendPortalEmail } from "../lib/email";
 import { isWhatsAppConfigured, sendWhatsAppMensaje } from "../lib/whatsapp";
@@ -56,10 +57,13 @@ clientesRouter.get("/clientes", async (req, res) => {
       .orderBy(desc(clientesTable.creadoEn));
 
     const scopeCobros = cobroScopeCondition(ctx, userId);
-    const scores = await computeClienteScores(
-      rows.map((r) => r.id),
-      scopeCobros,
-    );
+    const [scores, tienePredictivo] = await Promise.all([
+      computeClienteScores(
+        rows.map((r) => r.id),
+        scopeCobros,
+      ),
+      userTieneFeature(userId, "scoring_predictivo"),
+    ]);
 
     const conScore = rows.map((r) => {
       const s = scores.get(r.id);
@@ -72,7 +76,8 @@ clientesRouter.get("/clientes", async (req, res) => {
         totalPendiente: s?.totalPendiente ?? 0,
         promedioDiasAtraso: s?.promedioDiasAtraso ?? 0,
         cobrosVencidos: s?.cobrosVencidos ?? 0,
-        probabilidadPago: s?.probabilidadPago ?? null,
+        // Scoring predictivo: solo plan NextCob.
+        probabilidadPago: tienePredictivo ? (s?.probabilidadPago ?? null) : null,
       };
     });
 
@@ -234,7 +239,10 @@ clientesRouter.get("/clientes/:id", async (req, res) => {
       .where(and(eq(cobrosTable.clienteId, id), scopeCobros))
       .orderBy(desc(cobrosTable.creadoEn));
 
-    const scores = await computeClienteScores([id], scopeCobros);
+    const [scores, tienePredictivo] = await Promise.all([
+      computeClienteScores([id], scopeCobros),
+      userTieneFeature(userId, "scoring_predictivo"),
+    ]);
     const s = scores.get(id);
     const scoreDetalle = {
       score: s?.score ?? null,
@@ -245,11 +253,12 @@ clientesRouter.get("/clientes/:id", async (req, res) => {
       promedioDiasAtraso: s?.promedioDiasAtraso ?? 0,
       cobrosVencidos: s?.cobrosVencidos ?? 0,
       factores: s?.factores ?? [],
-      probabilidadPago: s?.probabilidadPago ?? null,
-      fechaEstimadaPago: s?.fechaEstimadaPago ?? null,
-      promesasIncumplidas: s?.promesasIncumplidas ?? 0,
-      ultimoContactoEn: s?.ultimoContactoEn ?? null,
-      recomendacion: s?.recomendacion ?? null,
+      // Scoring predictivo: solo plan NextCob.
+      probabilidadPago: tienePredictivo ? (s?.probabilidadPago ?? null) : null,
+      fechaEstimadaPago: tienePredictivo ? (s?.fechaEstimadaPago ?? null) : null,
+      promesasIncumplidas: tienePredictivo ? (s?.promesasIncumplidas ?? 0) : 0,
+      ultimoContactoEn: tienePredictivo ? (s?.ultimoContactoEn ?? null) : null,
+      recomendacion: tienePredictivo ? (s?.recomendacion ?? null) : null,
     };
 
     res.json({ ...cliente, cobros, scoreDetalle });

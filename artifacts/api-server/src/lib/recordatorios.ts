@@ -18,6 +18,8 @@ import {
   type DatosBancariosDecrypted,
 } from "./datos-bancarios";
 import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "./whatsapp";
+import { userTieneFeature, getPlanEfectivoDeOrg } from "../middlewares/requirePlanFeature";
+import { planIncluye } from "./plans";
 
 type Canal = "email" | "whatsapp" | "ambos";
 type Momento = "antes" | "dia" | "despues" | "recurrente";
@@ -243,9 +245,38 @@ export async function procesarRecordatorios(
     return datosBancariosCache.get(responsableId) ?? null;
   }
 
+  // Recordatorios automáticos: solo plan NextCob. Cache por responsable para
+  // no repetir la consulta de plan en cada cobro.
+  const featureCache = new Map<string, boolean>();
+  const orgPlanCache = new Map<number, boolean>();
+  async function autoPermitido(cobro: { responsableId: string | null; organizationId: number | null }): Promise<boolean> {
+    if (cobro.responsableId) {
+      if (!featureCache.has(cobro.responsableId)) {
+        featureCache.set(
+          cobro.responsableId,
+          await userTieneFeature(cobro.responsableId, "recordatorios_automaticos"),
+        );
+      }
+      return featureCache.get(cobro.responsableId) ?? false;
+    }
+    // Sin responsable: el plan lo decide el dueño de la org del cobro.
+    if (cobro.organizationId != null) {
+      if (!orgPlanCache.has(cobro.organizationId)) {
+        const plan = await getPlanEfectivoDeOrg(cobro.organizationId);
+        orgPlanCache.set(
+          cobro.organizationId,
+          plan != null && planIncluye(plan, "recordatorios_automaticos"),
+        );
+      }
+      return orgPlanCache.get(cobro.organizationId) ?? false;
+    }
+    return true; // cobro legado sin org ni responsable
+  }
+
   for (const cobro of cobros) {
     const vencimiento = cobro.fechaVencimiento;
     if (!vencimiento) continue;
+    if (!(await autoPermitido(cobro))) continue;
 
     const reglas = await db
       .select()

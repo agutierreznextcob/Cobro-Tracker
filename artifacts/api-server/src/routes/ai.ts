@@ -4,6 +4,7 @@ import { db, conversationsTable, messagesTable, cobrosTable, clientesTable, user
 import { eq, and, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
+import { requirePlanFeature } from "../middlewares/requirePlanFeature";
 import { computeClienteScores, type ScoreCategoria } from "../lib/scoring";
 import { plantillaKeyForScore, getPlantilla } from "../lib/workflow-templates";
 import { getOrgContext } from "../lib/org";
@@ -18,6 +19,8 @@ aiRouter.use((req, res, next) => {
   next();
 });
 aiRouter.use(requireSubscription);
+// Asistente IA: solo plan NextCob (trial/demo/admin incluidos).
+aiRouter.use(requirePlanFeature("asistente_ia"));
 
 function getGroqClient(): Groq {
   const apiKey = process.env.GROQ_API_KEY;

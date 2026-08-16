@@ -30,4 +30,5 @@ export * from "./datos-bancarios";
 export * from "./app-config";
 export * from "./comprobantes-transferencia";
 export * from "./consultores";
+export * from "./pro-waitlist";
 export * from "./salud-cartera-snapshots";

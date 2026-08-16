@@ -2,6 +2,7 @@ import { db, usersTable, organizacionesTable } from "@workspace/db";
 import { eq, and, isNull, inArray, type SQL } from "drizzle-orm";
 import { cobrosTable, clientesTable } from "@workspace/db";
 import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA, IVA_RATE } from "./flow-subscriptions";
+import { PLANES, type PlanId } from "./plans";
 
 // Per-seat pricing (structure only — no real billing yet). Amounts are
 // IVA-inclusive (Chilean VAT 19%): *Neto + *Iva = the charged total. The base
@@ -193,17 +194,26 @@ export function canAssignTo(ctx: OrgContext, userId: string, targetId: string): 
   return targetId === userId;
 }
 
-export function computePricing(miembrosActivos: number) {
-  const usuariosAdicionales = Math.max(0, miembrosActivos - 1);
+// Plan-aware pricing. The base plan covers PLANES[plan].usuariosIncluidos
+// active members; each member beyond that adds the per-seat total (only on
+// plans that allow extra seats — Starter is hard-capped at 1 user elsewhere).
+export function computePricing(miembrosActivos: number, planId: PlanId = "nextcob") {
+  const plan = PLANES[planId];
+  const usuariosAdicionales = plan.permiteUsuariosExtra
+    ? Math.max(0, miembrosActivos - plan.usuariosIncluidos)
+    : 0;
   return {
-    planBaseNeto: PLAN_BASE_NETO,
-    planBaseIva: PLAN_BASE_IVA,
-    planBase: PLAN_BASE,
+    plan: plan.id,
+    planNombre: plan.nombre,
+    usuariosIncluidos: plan.usuariosIncluidos,
+    planBaseNeto: plan.neto,
+    planBaseIva: plan.iva,
+    planBase: plan.total,
     costoUsuarioAdicionalNeto: COSTO_USUARIO_ADICIONAL_NETO,
     costoUsuarioAdicionalIva: COSTO_USUARIO_ADICIONAL_IVA,
     costoUsuarioAdicional: COSTO_USUARIO_ADICIONAL,
     usuariosAdicionales,
-    totalMensual: PLAN_BASE + usuariosAdicionales * COSTO_USUARIO_ADICIONAL,
+    totalMensual: plan.total + usuariosAdicionales * COSTO_USUARIO_ADICIONAL,
   };
 }
 

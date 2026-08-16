@@ -810,7 +810,7 @@ webhooksRouter.post("/webhooks/flow-subscription", async (req, res) => {
             );
           miembrosActivos = cnt?.count ?? 1;
         }
-        const pricing = computePricing(miembrosActivos);
+        const pricing = computePricing(miembrosActivos, user.plan ?? "nextcob");
         const neto =
           pricing.planBaseNeto +
           pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalNeto;
@@ -1036,7 +1036,7 @@ webhooksRouter.post("/webhooks/reveniu", async (req, res) => {
                 );
               miembrosActivos = cnt?.count ?? 1;
             }
-            const pricing = computePricing(miembrosActivos);
+            const pricing = computePricing(miembrosActivos, user.plan ?? "nextcob");
             const neto =
               pricing.planBaseNeto +
               pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalNeto;

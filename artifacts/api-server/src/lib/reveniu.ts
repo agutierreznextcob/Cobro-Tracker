@@ -199,6 +199,7 @@ export async function sincronizarMontosReveniu(log = logger): Promise<void> {
       reveniuSubscriptionId: usersTable.reveniuSubscriptionId,
       reveniuMontoSync: usersTable.reveniuMontoSync,
       organizationId: usersTable.organizationId,
+      plan: usersTable.plan,
     })
     .from(usersTable)
     .where(
@@ -226,7 +227,7 @@ export async function sincronizarMontosReveniu(log = logger): Promise<void> {
           );
         miembrosActivos = cnt?.count ?? 1;
       }
-      const total = computePricing(miembrosActivos).totalMensual;
+      const total = computePricing(miembrosActivos, row.plan ?? "nextcob").totalMensual;
       if (row.reveniuMontoSync === total) continue;
       await setReveniuAmount(row.reveniuSubscriptionId!, total);
       await db
@@ -290,7 +291,7 @@ export async function procesarGraciaPagosFallidos(log = logger): Promise<void> {
             {
               email: user.email,
               nombre: [user.firstName, user.lastName].filter(Boolean).join(" ") || null,
-              montoMensual: user.reveniuMontoSync ?? computePricing(1).totalMensual,
+              montoMensual: user.reveniuMontoSync ?? computePricing(1, user.plan ?? "nextcob").totalMensual,
               graciaHasta: new Date(now.getTime() + GRACIA_MS),
               actualizarMetodoUrl: user.reveniuSubscriptionId
                 ? reveniuPaymentMethodUrl(user.reveniuSubscriptionId)

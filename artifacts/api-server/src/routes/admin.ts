@@ -95,6 +95,9 @@ interface EnrichedUsuario {
   rut: string | null;
   esDemo: boolean;
   activo: boolean;
+  plan: "starter" | "nextcob" | null;
+  planNombre: string;
+  planInicioEn: string | null;
   usuariosExtra: number;
   montoMensual: number;
   totalRecaudado: number;
@@ -167,7 +170,7 @@ async function buildUsuarios(q?: string): Promise<EnrichedUsuario[]> {
 
       const miembrosActivos =
         u.organizationId != null ? (miembros.get(u.organizationId) ?? 1) : 1;
-      const pricing = computePricing(miembrosActivos);
+      const pricing = computePricing(miembrosActivos, u.plan ?? "nextcob");
       const totalRecaudado =
         u.organizationId != null ? (recaudado.get(u.organizationId) ?? 0) : 0;
 
@@ -190,6 +193,9 @@ async function buildUsuarios(q?: string): Promise<EnrichedUsuario[]> {
         rut: u.rut,
         esDemo: u.esDemo,
         activo: u.activo,
+        plan: u.plan ?? null,
+        planNombre: pricing.planNombre,
+        planInicioEn: ultimoPago.get(u.id)?.fecha?.toISOString() ?? null,
         usuariosExtra: pricing.usuariosAdicionales,
         montoMensual: pricing.totalMensual,
         totalRecaudado,
@@ -325,6 +331,7 @@ adminRouter.get("/admin/metricas", async (req, res) => {
       .select({
         id: organizacionesTable.id,
         ownerStatus: usersTable.subscriptionStatus,
+        ownerPlan: usersTable.plan,
       })
       .from(organizacionesTable)
       .leftJoin(usersTable, eq(usersTable.id, organizacionesTable.ownerId));
@@ -333,7 +340,7 @@ adminRouter.get("/admin/metricas", async (req, res) => {
     for (const org of orgs) {
       if (org.ownerStatus !== "activa") continue;
       const memberCount = miembros.get(org.id) ?? 1;
-      revenueMensual += computePricing(memberCount).totalMensual;
+      revenueMensual += computePricing(memberCount, org.ownerPlan ?? "nextcob").totalMensual;
     }
 
     res.json({

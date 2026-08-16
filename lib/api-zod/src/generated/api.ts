@@ -1364,6 +1364,10 @@ export const GetSubscriptionStatusResponse = zod.object({
   "trialEndsAt": zod.string().nullish(),
   "periodEnd": zod.string().nullish(),
   "tieneSuscripcion": zod.boolean(),
+  "plan": zod.union([zod.literal('starter'),zod.literal('nextcob'),zod.literal(null)]).nullish().describe('Plan elegido\/contratado (null = aún no elige)'),
+  "planEfectivo": zod.enum(['starter', 'nextcob']).optional().describe('Plan con el que opera hoy (trial\/admin\/demo = nextcob)'),
+  "planNombre": zod.string().optional(),
+  "usuariosIncluidos": zod.number().optional(),
   "precioMensual": zod.number().describe('Monthly charged total in CLP, IVA included (neto + IVA)'),
   "precioNeto": zod.number().describe('Monthly net price in CLP, before IVA'),
   "precioIva": zod.number().describe('Monthly IVA (19%) amount in CLP'),
@@ -1382,9 +1386,39 @@ export const GetSubscriptionStatusResponse = zod.object({
 
  * @summary Start the platform subscription via Reveniu checkout
  */
+export const StartSubscriptionBody = zod.object({
+  "plan": zod.enum(['starter', 'nextcob']).optional().describe('Plan elegido (default nextcob)')
+})
+
 export const StartSubscriptionResponse = zod.object({
   "completionUrl": zod.string().describe('Reveniu completion URL to POST the TBK_TOKEN form to'),
   "securityToken": zod.string().describe('Value for the hidden TBK_TOKEN input')
+})
+
+
+/**
+ * @summary Change the plan of an active subscription (amount pushed to Reveniu immediately)
+ */
+export const CambiarPlanSubscriptionBody = zod.object({
+  "plan": zod.enum(['starter', 'nextcob'])
+})
+
+export const CambiarPlanSubscriptionResponse = zod.object({
+  "ok": zod.boolean(),
+  "plan": zod.enum(['starter', 'nextcob']),
+  "totalMensual": zod.number()
+})
+
+
+/**
+ * @summary Join the waitlist for the upcoming Pro plan (idempotent by email)
+ */
+export const JoinProWaitlistBody = zod.object({
+  "email": zod.string().optional().describe('Defaults to the authenticated user\'s email')
+})
+
+export const JoinProWaitlistResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 
@@ -1452,7 +1486,10 @@ export const ListAdminUsuariosResponseItem = zod.object({
   "rut": zod.string().nullable(),
   "esDemo": zod.boolean(),
   "activo": zod.boolean(),
-  "usuariosExtra": zod.number().describe('Active org members beyond the owner.'),
+  "plan": zod.union([zod.literal('starter'),zod.literal('nextcob'),zod.literal(null)]).nullish().describe('Plan contratado (null = aún no elige; se muestra como NextCob).'),
+  "planNombre": zod.string().optional(),
+  "planInicioEn": zod.string().nullish().describe('Fecha del primer\/último pago registrado (inicio del plan vigente).'),
+  "usuariosExtra": zod.number().describe('Active org members beyond the plan\'s included seats.'),
   "montoMensual": zod.number().describe('Monthly amount (base plan + extra seats), IVA included.'),
   "totalRecaudado": zod.number().describe('Total collected (paid cobros) for the user\'s organization.'),
   "ultimoPagoEn": zod.string().nullable().describe('Date of the last successful subscription payment.'),

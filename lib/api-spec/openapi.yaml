@@ -1617,6 +1617,12 @@ paths:
         Returns the Reveniu completion URL and security token. The client must
         submit a form POST to completionUrl with a hidden TBK_TOKEN input set to
         securityToken (Transbank OneClick card enrollment).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartSubscriptionInput"
       responses:
         "200":
           description: Reveniu checkout data
@@ -1638,6 +1644,73 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /subscription/cambiar-plan:
+    post:
+      operationId: cambiarPlanSubscription
+      tags: [subscription]
+      summary: Change the plan of an active subscription (amount pushed to Reveniu immediately)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CambiarPlanInput"
+      responses:
+        "200":
+          description: Plan changed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, plan, totalMensual]
+                properties:
+                  ok:
+                    type: boolean
+                  plan:
+                    type: string
+                    enum: [starter, nextcob]
+                  totalMensual:
+                    type: integer
+        "400":
+          description: Invalid plan, no active subscription, or team too large for Starter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+
+  /subscription/pro-waitlist:
+    post:
+      operationId: joinProWaitlist
+      tags: [subscription]
+      summary: Join the waitlist for the upcoming Pro plan (idempotent by email)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProWaitlistInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
 
   /subscription/cancel:
     post:
@@ -3633,9 +3706,18 @@ components:
           type: boolean
         activo:
           type: boolean
+        plan:
+          type: [string, 'null']
+          enum: [starter, nextcob, null]
+          description: Plan contratado (null = aún no elige; se muestra como NextCob).
+        planNombre:
+          type: string
+        planInicioEn:
+          type: [string, 'null']
+          description: Fecha del primer/último pago registrado (inicio del plan vigente).
         usuariosExtra:
           type: integer
-          description: Active org members beyond the owner.
+          description: Active org members beyond the plan's included seats.
         montoMensual:
           type: integer
           description: Monthly amount (base plan + extra seats), IVA included.
@@ -3716,6 +3798,29 @@ components:
         message:
           type: [string, 'null']
 
+    StartSubscriptionInput:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [starter, nextcob]
+          description: Plan elegido (default nextcob)
+
+    CambiarPlanInput:
+      type: object
+      required: [plan]
+      properties:
+        plan:
+          type: string
+          enum: [starter, nextcob]
+
+    ProWaitlistInput:
+      type: object
+      properties:
+        email:
+          type: string
+          description: Defaults to the authenticated user's email
+
     SubscriptionStatus:
       type: object
       required: [status, hasAccess, isAdmin, tieneSuscripcion, precioMensual, precioNeto, precioIva]
@@ -3738,6 +3843,19 @@ components:
           nullable: true
         tieneSuscripcion:
           type: boolean
+        plan:
+          type: string
+          nullable: true
+          enum: [starter, nextcob, null]
+          description: Plan elegido/contratado (null = aún no elige)
+        planEfectivo:
+          type: string
+          enum: [starter, nextcob]
+          description: Plan con el que opera hoy (trial/admin/demo = nextcob)
+        planNombre:
+          type: string
+        usuariosIncluidos:
+          type: integer
         precioMensual:
           type: integer
           description: Monthly charged total in CLP, IVA included (neto + IVA)

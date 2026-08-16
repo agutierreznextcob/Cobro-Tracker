@@ -16,6 +16,7 @@ import {
   userCanAccessCobro,
 } from "../lib/org";
 import { requireSubscription } from "../middlewares/requireSubscription";
+import { requirePlanFeature } from "../middlewares/requirePlanFeature";
 
 const gestionesRouter = Router();
 
@@ -314,7 +315,7 @@ gestionesRouter.get("/gestiones/agenda", async (req, res) => {
 });
 
 // GET /gestiones/metricas — per-ejecutivo management metrics within the user's scope.
-gestionesRouter.get("/gestiones/metricas", async (req, res) => {
+gestionesRouter.get("/gestiones/metricas", requirePlanFeature("informes_avanzados"), async (req, res) => {
   const userId = req.user!.id;
   const ctx = await getOrgContext(userId);
   const scope = cobroScopeCondition(ctx, userId);
