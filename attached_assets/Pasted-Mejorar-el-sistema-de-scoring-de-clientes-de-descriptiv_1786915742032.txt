@@ -1,0 +1,92 @@
+Mejorar el sistema de scoring de clientes 
+de descriptivo a predictivo:
+
+1. NUEVO SCORING PREDICTIVO:
+Actualizar el algoritmo de scoring para 
+que además de clasificar al cliente 
+(Excelente/Bueno/Regular/Riesgoso/Crítico) 
+calcule y muestre:
+
+A) PROBABILIDAD DE PAGO:
+Porcentaje de probabilidad de que el 
+cliente pague en los próximos 7 días, 
+basado en:
+- Historial de pagos anteriores (peso 40%)
+- Días de mora actual (peso 25%)
+- Promesas de pago cumplidas vs incumplidas 
+  en notas de gestión (peso 20%)
+- Monto del cobro vs montos pagados 
+  históricamente (peso 15%)
+
+Mostrar como: "Probabilidad de pago: 73%"
+
+B) FECHA ESTIMADA DE PAGO:
+Basada en el comportamiento histórico 
+del cliente:
+"Paga en promedio 8 días después del 
+vencimiento"
+"Fecha estimada de pago: 15 ago 2026"
+
+C) DÍAS PROMEDIO DE MORA:
+"Este cliente paga en promedio con 
+12 días de retraso"
+
+D) PROMESAS INCUMPLIDAS:
+Contador de veces que el cliente prometió 
+pagar y no lo hizo (extraído de las 
+notas de gestión)
+"2 promesas incumplidas en los últimos 
+6 meses"
+
+2. VISTA EN DETALLE DEL CLIENTE:
+En la ficha de cada cliente mostrar 
+un panel de "Perfil de riesgo" con:
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 PERFIL DE RIESGO
+━━━━━━━━━━━━━━━━━━━━━━━━
+Score: 🔴 Riesgoso (32/100)
+Probabilidad de pago 7 días: 28%
+Fecha estimada de pago: ~18 ago 2026
+Días promedio de mora: 15 días
+Promesas incumplidas: 2
+Último contacto: hace 8 días
+━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ IA recomienda: Contactar hoy
+"Este cliente tiene historial de pagar 
+cuando se le contacta directamente. 
+Última vez que se llamó pagó en 3 días."
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. EN LA BANDEJA "QUÉ HACER HOY":
+Actualizar cada cliente de la bandeja 
+para mostrar la probabilidad de pago:
+"Juan Pérez · $850.000 · Prob. pago: 28% 
+· Contactar hoy"
+
+4. EN INFORMES:
+Agregar nueva métrica:
+"Probabilidad de recuperación de cartera"
+Suma ponderada de todos los cobros 
+pendientes por su probabilidad de pago:
+"De tus $15.230.000 pendientes, 
+se estima recuperar $11.420.000 
+este mes (75%)"
+
+5. RECOMENDACIÓN IA POR CLIENTE:
+En cada ficha de cliente, el asistente 
+IA debe generar automáticamente una 
+recomendación de acción basada en 
+el perfil de riesgo:
+- Score Excelente: "Cliente confiable. 
+  Un recordatorio amable es suficiente."
+- Score Bueno: "Enviar recordatorio 
+  3 días antes del vencimiento."
+- Score Regular: "Contactar por WhatsApp 
+  y email simultáneamente."
+- Score Riesgoso: "Llamada directa 
+  recomendada. Considerar descuento 
+  de negociación."
+- Score Crítico: "Escalar a administrador. 
+  Evaluar acción legal o derivación 
+  a cobranza extrajudicial."

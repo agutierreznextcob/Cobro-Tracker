@@ -23,6 +23,11 @@ export interface SaludCarteraAccion {
   /** @nullable */
   score?: number | null;
   categoria: SaludCarteraAccionCategoria;
+  /**
+     * Probability (0-100) of payment within the next 7 days
+     * @nullable
+     */
+  probabilidadPago?: number | null;
   /** @nullable */
   ultimoContactoEn?: Date | null;
 }

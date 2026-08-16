@@ -18,7 +18,20 @@ import { ScoreBadge, SCORE_META } from "@/components/score-badge";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, Send, Link2, Copy, Check, Gauge, TrendingUp, Minus, TrendingDown, RefreshCw } from "lucide-react";
+import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, Send, Link2, Copy, Check, Gauge, TrendingUp, Minus, TrendingDown, RefreshCw, ShieldAlert, Zap, CalendarClock, Percent, PhoneCall } from "lucide-react";
+
+function formatFechaCorta(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ymd;
+  return new Date(y, m - 1, d).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function haceDias(iso: string): string {
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (dias <= 0) return "hoy";
+  if (dias === 1) return "hace 1 día";
+  return `hace ${dias} días`;
+}
 
 const editSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio").max(200),
@@ -494,6 +507,88 @@ export default function ClienteDetailPage() {
                 })}
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.scoreDetalle && data.scoreDetalle.categoria !== "sin_datos" && (
+        <Card className="shadow-sm border-primary/20">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <ShieldAlert className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold tracking-tight">Perfil de riesgo</h2>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                  <Percent className="h-3.5 w-3.5" /> Probabilidad de pago (7 días)
+                </div>
+                {data.scoreDetalle.probabilidadPago != null ? (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-xl font-bold tabular-nums ${
+                        data.scoreDetalle.probabilidadPago >= 60
+                          ? "text-emerald-600"
+                          : data.scoreDetalle.probabilidadPago >= 35
+                            ? "text-amber-600"
+                            : "text-red-600"
+                      }`}
+                    >
+                      {data.scoreDetalle.probabilidadPago}%
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Sin cobros pendientes</span>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                  <CalendarClock className="h-3.5 w-3.5" /> Fecha estimada de pago
+                </div>
+                {data.scoreDetalle.fechaEstimadaPago ? (
+                  <span className="text-sm font-semibold">~{formatFechaCorta(data.scoreDetalle.fechaEstimadaPago)}</span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                  <Clock className="h-3.5 w-3.5" /> Días promedio de mora
+                </div>
+                <span className="text-sm font-semibold">
+                  {data.scoreDetalle.promedioDiasAtraso > 0
+                    ? `${Math.round(data.scoreDetalle.promedioDiasAtraso)} día${Math.round(data.scoreDetalle.promedioDiasAtraso) !== 1 ? "s" : ""} de retraso`
+                    : "Paga a tiempo"}
+                </span>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                  <TrendingDown className="h-3.5 w-3.5" /> Promesas incumplidas
+                </div>
+                <span className={`text-sm font-semibold ${(data.scoreDetalle.promesasIncumplidas ?? 0) > 0 ? "text-red-600" : ""}`}>
+                  {(data.scoreDetalle.promesasIncumplidas ?? 0) > 0
+                    ? `${data.scoreDetalle.promesasIncumplidas} en los últimos 6 meses`
+                    : "Ninguna registrada"}
+                </span>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                  <PhoneCall className="h-3.5 w-3.5" /> Último contacto
+                </div>
+                <span className="text-sm font-semibold">
+                  {data.scoreDetalle.ultimoContactoEn ? haceDias(data.scoreDetalle.ultimoContactoEn) : "Sin contacto registrado"}
+                </span>
+              </div>
+            </div>
+            {data.scoreDetalle.recomendacion && (
+              <div className="mt-5 rounded-lg border border-primary/25 bg-primary/5 p-4 flex items-start gap-3">
+                <Zap className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold">IA recomienda: {data.scoreDetalle.recomendacion.titulo}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{data.scoreDetalle.recomendacion.detalle}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

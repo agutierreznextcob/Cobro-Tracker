@@ -44,6 +44,7 @@ function razonDe(a: SaludCarteraAccion): string {
     riesgoso: "Score Riesgoso",
     critico: "Score Crítico",
   };
+  if (a.probabilidadPago != null) partes.push(`Prob. pago: ${a.probabilidadPago}%`);
   if (catLabel[a.categoria]) partes.push(catLabel[a.categoria]);
   if (!a.ultimoContactoEn) partes.push("sin contacto registrado");
   return partes.join(" · ");

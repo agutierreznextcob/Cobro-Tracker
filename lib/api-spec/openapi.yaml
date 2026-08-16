@@ -3914,6 +3914,18 @@ components:
           type: number
         cobrosVencidos:
           type: integer
+        probabilidadPago:
+          type: ["integer", "null"]
+          description: Probability (0-100) that the client pays within the next 7 days
+
+    ScoreRecomendacion:
+      type: object
+      required: [titulo, detalle]
+      properties:
+        titulo:
+          type: string
+        detalle:
+          type: string
 
     ScoreDetalle:
       type: object
@@ -3947,6 +3959,23 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ScoreFactor"
+        probabilidadPago:
+          type: ["integer", "null"]
+          description: Probability (0-100) of payment within the next 7 days; null when nothing is outstanding
+        fechaEstimadaPago:
+          type: ["string", "null"]
+          description: Estimated payment date (YYYY-MM-DD) for the earliest open cobro
+        promesasIncumplidas:
+          type: integer
+          description: Broken payment promises in the last 6 months (from gestión results)
+        ultimoContactoEn:
+          type: ["string", "null"]
+          format: date-time
+          description: Latest gestión registered for this client
+        recomendacion:
+          oneOf:
+            - $ref: "#/components/schemas/ScoreRecomendacion"
+            - type: "null"
 
     ClienteInput:
       type: object
@@ -4060,6 +4089,9 @@ components:
         categoria:
           type: string
           enum: [excelente, bueno, regular, riesgoso, critico, sin_datos]
+        probabilidadPago:
+          type: ["integer", "null"]
+          description: Probability (0-100) of payment within the next 7 days
         ultimoContactoEn:
           type: ["string", "null"]
           format: date-time

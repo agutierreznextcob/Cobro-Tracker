@@ -209,7 +209,8 @@ export const ListClientesResponseItem = zod.object({
   "totalCobrado": zod.number(),
   "totalPendiente": zod.number(),
   "promedioDiasAtraso": zod.number(),
-  "cobrosVencidos": zod.number()
+  "cobrosVencidos": zod.number(),
+  "probabilidadPago": zod.number().nullish().describe('Probability (0-100) that the client pays within the next 7 days')
 })
 export const ListClientesResponse = zod.array(ListClientesResponseItem)
 
@@ -319,7 +320,15 @@ export const GetClienteResponse = zod.object({
   "factores": zod.array(zod.object({
   "texto": zod.string(),
   "tipo": zod.enum(['positivo', 'neutral', 'negativo'])
-}))
+})),
+  "probabilidadPago": zod.number().nullish().describe('Probability (0-100) of payment within the next 7 days; null when nothing is outstanding'),
+  "fechaEstimadaPago": zod.string().nullish().describe('Estimated payment date (YYYY-MM-DD) for the earliest open cobro'),
+  "promesasIncumplidas": zod.number().optional().describe('Broken payment promises in the last 6 months (from gestión results)'),
+  "ultimoContactoEn": zod.coerce.date().nullish().describe('Latest gestión registered for this client'),
+  "recomendacion": zod.union([zod.object({
+  "titulo": zod.string(),
+  "detalle": zod.string()
+}),zod.null()]).optional()
 })
 })
 
@@ -808,6 +817,7 @@ export const GetSaludCarteraResponse = zod.object({
   "diasParaVencer": zod.number().nullish(),
   "score": zod.number().nullish(),
   "categoria": zod.enum(['excelente', 'bueno', 'regular', 'riesgoso', 'critico', 'sin_datos']),
+  "probabilidadPago": zod.number().nullish().describe('Probability (0-100) of payment within the next 7 days'),
   "ultimoContactoEn": zod.coerce.date().nullish()
 })),
   "resumen": zod.object({

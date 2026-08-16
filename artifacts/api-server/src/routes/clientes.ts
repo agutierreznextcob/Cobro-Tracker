@@ -72,6 +72,7 @@ clientesRouter.get("/clientes", async (req, res) => {
         totalPendiente: s?.totalPendiente ?? 0,
         promedioDiasAtraso: s?.promedioDiasAtraso ?? 0,
         cobrosVencidos: s?.cobrosVencidos ?? 0,
+        probabilidadPago: s?.probabilidadPago ?? null,
       };
     });
 
@@ -244,6 +245,11 @@ clientesRouter.get("/clientes/:id", async (req, res) => {
       promedioDiasAtraso: s?.promedioDiasAtraso ?? 0,
       cobrosVencidos: s?.cobrosVencidos ?? 0,
       factores: s?.factores ?? [],
+      probabilidadPago: s?.probabilidadPago ?? null,
+      fechaEstimadaPago: s?.fechaEstimadaPago ?? null,
+      promesasIncumplidas: s?.promesasIncumplidas ?? 0,
+      ultimoContactoEn: s?.ultimoContactoEn ?? null,
+      recomendacion: s?.recomendacion ?? null,
     };
 
     res.json({ ...cliente, cobros, scoreDetalle });

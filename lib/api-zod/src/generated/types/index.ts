@@ -195,6 +195,7 @@ export * from './scoreCategoria';
 export * from './scoreDetalle';
 export * from './scoreFactor';
 export * from './scoreFactorTipo';
+export * from './scoreRecomendacion';
 export * from './seguimientoCobranza';
 export * from './seguimientoCobranzaTipo';
 export * from './subirComprobanteInput';

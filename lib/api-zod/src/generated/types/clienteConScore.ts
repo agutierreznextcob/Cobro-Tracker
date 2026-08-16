@@ -29,4 +29,9 @@ export interface ClienteConScore {
   totalPendiente: number;
   promedioDiasAtraso: number;
   cobrosVencidos: number;
+  /**
+     * Probability (0-100) that the client pays within the next 7 days
+     * @nullable
+     */
+  probabilidadPago?: number | null;
 }

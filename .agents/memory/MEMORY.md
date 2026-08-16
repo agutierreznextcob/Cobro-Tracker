@@ -36,4 +36,5 @@
 - [Reveniu suscripciones](reveniu-suscripciones.md) — webhook validado por header (timing-safe); período autoritativo = next_due de la API (idempotencia); transiciones de estado en SQL CASE; sin evento de pago fallido → gracia por período vencido.
 - [Acceso consultor de soporte](consultor-access.md) — impersonación auditada por sesión; deny-list de rutas sensibles debe matchear path canonicalizado (case/encoding) o es bypasseable; finEn vía logout+barrido 8h.
 - [Salud de cartera dashboard](salud-cartera-dashboard.md) — semáforo por fechaVencimiento con día en America/Santiago; tendencia semanal reconstruida (excluir creados post-corte, sumar abonos de la semana); nombres de cliente siempre con clienteScopeCondition.
+- [Scoring predictivo](scoring-predictivo.md) — prob. pago 7d/fecha estimada/promesas incumplidas on-the-fly en scoring; promesas se evalúan por timestamps de pago vs deadline, nunca por estado actual del cobro.
 - [Superadmin = libro de ingresos](superadmin-ledger.md) — módulo Cobros del superadmin muestra pagos de suscripción; seed borra sus cobros; pagos_suscripcion con UNIQUE user+período (idempotencia obligatoria).

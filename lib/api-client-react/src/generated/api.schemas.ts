@@ -637,6 +637,16 @@ export interface ClienteConScore {
   totalPendiente: number;
   promedioDiasAtraso: number;
   cobrosVencidos: number;
+  /**
+     * Probability (0-100) that the client pays within the next 7 days
+     * @nullable
+     */
+  probabilidadPago?: number | null;
+}
+
+export interface ScoreRecomendacion {
+  titulo: string;
+  detalle: string;
 }
 
 export interface ScoreDetalle {
@@ -649,6 +659,24 @@ export interface ScoreDetalle {
   promedioDiasAtraso: number;
   cobrosVencidos: number;
   factores: ScoreFactor[];
+  /**
+     * Probability (0-100) of payment within the next 7 days; null when nothing is outstanding
+     * @nullable
+     */
+  probabilidadPago?: number | null;
+  /**
+     * Estimated payment date (YYYY-MM-DD) for the earliest open cobro
+     * @nullable
+     */
+  fechaEstimadaPago?: string | null;
+  /** Broken payment promises in the last 6 months (from gestión results) */
+  promesasIncumplidas?: number;
+  /**
+     * Latest gestión registered for this client
+     * @nullable
+     */
+  ultimoContactoEn?: string | null;
+  recomendacion?: ScoreRecomendacion | null;
 }
 
 export interface ClienteInput {
@@ -881,6 +909,11 @@ export interface SaludCarteraAccion {
   /** @nullable */
   score?: number | null;
   categoria: SaludCarteraAccionCategoria;
+  /**
+     * Probability (0-100) of payment within the next 7 days
+     * @nullable
+     */
+  probabilidadPago?: number | null;
   /** @nullable */
   ultimoContactoEn?: string | null;
 }

@@ -57,7 +57,7 @@ import {
   type TipoDocumento,
 } from "@/lib/tipo-documento";
 import { EvolucionCarteraChart } from "@/components/evolucion-cartera-chart";
-import { Download, TrendingUp, Receipt, Percent, ListChecks, TicketPercent, RefreshCcw, Wallet, AlertTriangle, CalendarClock, Star, Loader2, MessageSquare } from "lucide-react";
+import { Download, TrendingUp, Receipt, Percent, ListChecks, TicketPercent, RefreshCcw, Wallet, AlertTriangle, CalendarClock, Star, Loader2, MessageSquare, Gauge } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
 type Estado = "pendiente" | "pagado" | "parcial" | "fallido" | "cancelado";
@@ -144,6 +144,32 @@ export default function Informes() {
   const { data: rendimiento } = useGetRendimientoEquipo(undefined, {
     query: { enabled: veRendimiento, queryKey: getGetRendimientoEquipoQueryKey() },
   });
+
+  const { data: clientesConScore } = useListClientes();
+
+  // Estimated recovery: every open cobro weighted by its client's payment
+  // probability (fallback 50% for clientes sin probabilidad calculada).
+  const recuperacionEstimada = useMemo(() => {
+    if (!cobros) return null;
+    const probPorCliente = new Map<number, number | null>();
+    for (const cl of clientesConScore ?? []) probPorCliente.set(cl.id, cl.probabilidadPago ?? null);
+    let pendienteTotal = 0;
+    let esperado = 0;
+    for (const c of cobros) {
+      if (c.estado !== "pendiente" && c.estado !== "parcial") continue;
+      const saldo = c.saldo ?? (c.montoACobrar ?? c.monto - (c.montoDescuento ?? 0));
+      if (saldo <= 0) continue;
+      const prob = c.clienteId != null ? (probPorCliente.get(c.clienteId) ?? 50) : 50;
+      pendienteTotal += saldo;
+      esperado += saldo * ((prob ?? 50) / 100);
+    }
+    if (pendienteTotal <= 0) return null;
+    return {
+      pendienteTotal,
+      esperado,
+      pct: Math.round((esperado / pendienteTotal) * 100),
+    };
+  }, [cobros, clientesConScore]);
 
   const minDate = useMemo(() => {
     if (!cobros || cobros.length === 0) return null;
@@ -563,6 +589,15 @@ export default function Informes() {
           label="Total de cobros"
           value={String(summary.totalCobros)}
         />
+        {recuperacionEstimada && (
+          <SummaryCard
+            icon={<Gauge className="h-4 w-4" />}
+            label="Probabilidad de recuperación de cartera"
+            value={`${formatCurrency(recuperacionEstimada.esperado)} (${recuperacionEstimada.pct}%)`}
+            sub={`De ${formatCurrency(recuperacionEstimada.pendienteTotal)} pendientes, según probabilidad de pago por cliente`}
+            accent="text-primary"
+          />
+        )}
       </div>
 
       {/* Counts by estado chips */}

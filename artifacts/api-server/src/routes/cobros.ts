@@ -1630,6 +1630,7 @@ cobrosRouter.get("/dashboard/salud-cartera", async (req, res) => {
           diasParaVencer: g.peorMora === 0 ? g.minDiasParaVencer : null,
           score: s?.score ?? null,
           categoria: s?.categoria ?? "sin_datos",
+          probabilidadPago: s?.probabilidadPago ?? null,
           ultimoContactoEn: ultimoContacto.get(g.clienteId)?.toISOString() ?? null,
         };
       });

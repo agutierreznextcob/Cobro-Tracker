@@ -1,4 +1,4 @@
-import { db, cobrosTable, pagosParciales } from "@workspace/db";
+import { db, cobrosTable, pagosParciales, gestionesCobranzaTable } from "@workspace/db";
 import { and, eq, inArray, type SQL } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +32,11 @@ export interface ScoreFactor {
   tipo: FactorTipo;
 }
 
+export interface ScoreRecomendacion {
+  titulo: string;
+  detalle: string;
+}
+
 export interface ClienteScore {
   clienteId: number;
   score: number | null; // null when there is no history (sin_datos)
@@ -42,6 +47,48 @@ export interface ClienteScore {
   promedioDiasAtraso: number;
   cobrosVencidos: number;
   factores: ScoreFactor[];
+  // --- Predictive layer ---
+  // Probability (0-100) that the client pays within the next 7 days.
+  // null when there is nothing outstanding or no history to predict from.
+  probabilidadPago: number | null;
+  // Estimated payment date (YYYY-MM-DD) for the earliest open cobro, based on
+  // the client's average lateness. null when nothing is outstanding.
+  fechaEstimadaPago: string | null;
+  // Payment promises (gestiones with a "will pay" result) whose deadline
+  // passed with the cobro still unpaid, in the last 6 months.
+  promesasIncumplidas: number;
+  // Latest gestión of any kind for this client (ISO timestamp) or null.
+  ultimoContactoEn: string | null;
+  // Rule-based recommended action derived from the risk profile.
+  recomendacion: ScoreRecomendacion | null;
+}
+
+// Gestión results that constitute a payment promise.
+const RESULTADOS_PROMESA = new Set(["contactado_pagara", "acordo_fecha_pago", "acordo_pago_parcial"]);
+
+// Fixed action guidance per score category (spec-defined).
+function recomendacionPara(
+  categoria: ScoreCategoria,
+  opts: { cobrosVencidos: number; promesasIncumplidas: number },
+): ScoreRecomendacion | null {
+  const extra =
+    opts.promesasIncumplidas > 0
+      ? ` Registra un compromiso concreto: acumula ${opts.promesasIncumplidas} promesa${opts.promesasIncumplidas !== 1 ? "s" : ""} de pago incumplida${opts.promesasIncumplidas !== 1 ? "s" : ""}.`
+      : "";
+  switch (categoria) {
+    case "excelente":
+      return { titulo: "Recordatorio amable", detalle: "Cliente confiable. Un recordatorio amable es suficiente." + extra };
+    case "bueno":
+      return { titulo: "Recordatorio anticipado", detalle: "Enviar recordatorio 3 días antes del vencimiento." + extra };
+    case "regular":
+      return { titulo: opts.cobrosVencidos > 0 ? "Contactar hoy" : "Contactar esta semana", detalle: "Contactar por WhatsApp y email simultáneamente." + extra };
+    case "riesgoso":
+      return { titulo: "Contactar hoy", detalle: "Llamada directa recomendada. Considerar descuento de negociación." + extra };
+    case "critico":
+      return { titulo: "Escalar hoy", detalle: "Escalar a administrador. Evaluar acción legal o derivación a cobranza extrajudicial." + extra };
+    default:
+      return null;
+  }
 }
 
 const MS_DAY = 86_400_000;
@@ -85,6 +132,7 @@ interface CobroRow {
   montoDescuento: string | null;
   fechaVencimiento: string | null;
   creadoEn: Date;
+  pagadoEn: Date | null;
 }
 
 // Computes scores for the given clientes. `cobroScope` is the same WHERE clause
@@ -109,6 +157,7 @@ export async function computeClienteScores(
       montoDescuento: cobrosTable.montoDescuento,
       fechaVencimiento: cobrosTable.fechaVencimiento,
       creadoEn: cobrosTable.creadoEn,
+      pagadoEn: cobrosTable.pagadoEn,
     })
     .from(cobrosTable)
     .where(and(...cobroConds));
@@ -140,9 +189,77 @@ export async function computeClienteScores(
     }
   }
 
+  // Gestiones for these cobros: last contact per client + payment promises.
+  interface GestionRow {
+    cobroId: number;
+    resultado: string;
+    proximaGestionEn: Date | null;
+    creadoEn: Date;
+  }
+  let gestiones: GestionRow[] = [];
+  if (cobroIds.length > 0) {
+    gestiones = await db
+      .select({
+        cobroId: gestionesCobranzaTable.cobroId,
+        resultado: gestionesCobranzaTable.resultado,
+        proximaGestionEn: gestionesCobranzaTable.proximaGestionEn,
+        creadoEn: gestionesCobranzaTable.creadoEn,
+      })
+      .from(gestionesCobranzaTable)
+      .where(inArray(gestionesCobranzaTable.cobroId, cobroIds));
+  }
+
   const hoy = toDateOnly(new Date());
   const now = new Date();
   const corteReciente = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+  const corte6Meses = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+
+  const clientePorCobro = new Map<number, number>();
+  for (const c of cobros) if (c.clienteId != null) clientePorCobro.set(c.id, c.clienteId);
+  const cobroPorId = new Map<number, CobroRow>();
+  for (const c of cobros) cobroPorId.set(c.id, c);
+
+  // Per-client: latest contact, and promise outcomes over the last 6 months.
+  //
+  // Promise model (product rule): a gestión whose resultado is a "will pay"
+  // commitment carries a deadline = proximaGestionEn if set, else 7 days after
+  // the gestión (plus 1 day of grace either way). It is evaluated against the
+  // confirmed payment timestamp of ITS cobro (latest confirmed abono, or
+  // pagadoEn for cobros closed without abono records):
+  //   - kept:   a payment landed after the promise and within the deadline.
+  //   - broken: the cobro is fallido; or the deadline passed with no payment
+  //             after the promise (including cobros later paid late).
+  //   - open:   deadline still in the future and no payment yet — not counted.
+  const ultimoContactoPorCliente = new Map<number, Date>();
+  const promesasIncumplidasPorCliente = new Map<number, number>();
+  const promesasCumplidasPorCliente = new Map<number, number>();
+  const GRACIA = 1 * MS_DAY;
+  for (const g of gestiones) {
+    const clienteId = clientePorCobro.get(g.cobroId);
+    if (clienteId == null) continue;
+    const prev = ultimoContactoPorCliente.get(clienteId);
+    if (!prev || g.creadoEn > prev) ultimoContactoPorCliente.set(clienteId, g.creadoEn);
+
+    if (!RESULTADOS_PROMESA.has(g.resultado) || g.creadoEn < corte6Meses) continue;
+    const cobro = cobroPorId.get(g.cobroId);
+    if (!cobro || cobro.estado === "cancelado") continue;
+
+    const limite = new Date((g.proximaGestionEn ?? new Date(g.creadoEn.getTime() + 7 * MS_DAY)).getTime() + GRACIA);
+    // Payment timestamp for this cobro, if any.
+    const abonoEn = ultimoPagoPorCobro.get(g.cobroId) ?? null;
+    const pagoEn =
+      cobro.estado === "pagado"
+        ? (abonoEn && cobro.pagadoEn ? (abonoEn > cobro.pagadoEn ? abonoEn : cobro.pagadoEn) : (abonoEn ?? cobro.pagadoEn))
+        : abonoEn;
+    const pagoTrasPromesa = pagoEn != null && pagoEn >= g.creadoEn;
+
+    const incr = (m: Map<number, number>) => m.set(clienteId, (m.get(clienteId) ?? 0) + 1);
+    if (pagoTrasPromesa && pagoEn! <= limite) {
+      incr(promesasCumplidasPorCliente);
+    } else if (cobro.estado === "fallido" || (limite < now && (!pagoTrasPromesa || pagoEn! > limite))) {
+      incr(promesasIncumplidasPorCliente);
+    }
+  }
 
   const porCliente = new Map<number, CobroRow[]>();
   for (const c of cobros) {
@@ -167,6 +284,11 @@ export async function computeClienteScores(
         promedioDiasAtraso: 0,
         cobrosVencidos: 0,
         factores: [{ texto: "Sin historial de cobros aún", tipo: "neutral" }],
+        probabilidadPago: null,
+        fechaEstimadaPago: null,
+        promesasIncumplidas: 0,
+        ultimoContactoEn: null,
+        recomendacion: null,
       });
       continue;
     }
@@ -271,16 +393,81 @@ export async function computeClienteScores(
       factores.push({ texto: "Su comportamiento de pago ha empeorado recientemente", tipo: "negativo" });
     }
 
+    // ---------------- Predictive layer ----------------
+    const abiertos = emitidos.filter((c) => c.estado === "pendiente" || c.estado === "parcial");
+    const promesasIncumplidas = promesasIncumplidasPorCliente.get(clienteId) ?? 0;
+    const promesasCumplidas = promesasCumplidasPorCliente.get(clienteId) ?? 0;
+    const ultimoContacto = ultimoContactoPorCliente.get(clienteId) ?? null;
+
+    let probabilidadPago: number | null = null;
+    let fechaEstimadaPago: string | null = null;
+
+    if (abiertos.length > 0) {
+      // p1 (40%) — payment history: share of emitted cobros actually paid.
+      const p1 = tasaPago * 100;
+
+      // p2 (25%) — current lateness: worst mora among open cobros; 0 días → 100, 45+ → 0.
+      let peorMora = 0;
+      for (const c of abiertos) {
+        const venc = c.fechaVencimiento ? parseDateOnly(c.fechaVencimiento) : null;
+        if (venc) peorMora = Math.max(peorMora, Math.max(diasEntre(hoy, venc), 0));
+      }
+      const p2 = clamp(100 - peorMora * (100 / 45));
+
+      // p3 (20%) — promises kept vs broken in the last 6 months; neutral 60 with no promises.
+      const totalPromesas = promesasCumplidas + promesasIncumplidas;
+      const p3 = totalPromesas > 0 ? (promesasCumplidas / totalPromesas) * 100 : 60;
+
+      // p4 (15%) — outstanding amount vs the largest cobro historically paid:
+      // amounts within the client's usual range are more likely to be paid.
+      const montosPagados = pagados.map((c) => montoACobrar(c)).filter((m) => m > 0);
+      const maxPagado = montosPagados.length > 0 ? Math.max(...montosPagados) : 0;
+      const p4 =
+        maxPagado <= 0
+          ? 50
+          : totalPendiente <= maxPagado
+            ? 100
+            : clamp(100 - (totalPendiente / maxPagado - 1) * 50);
+
+      probabilidadPago = Math.round(clamp(0.4 * p1 + 0.25 * p2 + 0.2 * p3 + 0.15 * p4, 3, 97));
+
+      // Estimated payment date: earliest open due date (or today if already
+      // past) plus the client's average lateness.
+      let vencMasProximo: Date | null = null;
+      for (const c of abiertos) {
+        const venc = c.fechaVencimiento ? parseDateOnly(c.fechaVencimiento) : null;
+        if (venc && (!vencMasProximo || venc < vencMasProximo)) vencMasProximo = venc;
+      }
+      if (vencMasProximo) {
+        const base = vencMasProximo < hoy ? hoy : vencMasProximo;
+        const estimada = new Date(base.getTime() + Math.round(promedioDiasAtraso) * MS_DAY);
+        fechaEstimadaPago = estimada.toISOString().slice(0, 10);
+      }
+    }
+
+    if (promesasIncumplidas > 0) {
+      factores.push({
+        texto: `${promesasIncumplidas} promesa${promesasIncumplidas !== 1 ? "s" : ""} de pago incumplida${promesasIncumplidas !== 1 ? "s" : ""} en los últimos 6 meses`,
+        tipo: "negativo",
+      });
+    }
+
+    const categoria = categoriaFromScore(score);
     result.set(clienteId, {
       clienteId,
       score,
-      categoria: categoriaFromScore(score),
+      categoria,
       totalCobros: emitidos.length,
       totalCobrado,
       totalPendiente,
       promedioDiasAtraso: Math.round(promedioDiasAtraso * 10) / 10,
       cobrosVencidos,
       factores,
+      probabilidadPago,
+      fechaEstimadaPago,
+      promesasIncumplidas,
+      ultimoContactoEn: ultimoContacto ? ultimoContacto.toISOString() : null,
+      recomendacion: recomendacionPara(categoria, { cobrosVencidos, promesasIncumplidas }),
     });
   }
 

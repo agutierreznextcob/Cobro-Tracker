@@ -7,6 +7,7 @@
  */
 import type { ScoreCategoria } from './scoreCategoria';
 import type { ScoreFactor } from './scoreFactor';
+import type { ScoreRecomendacion } from './scoreRecomendacion';
 
 export interface ScoreDetalle {
   /** @nullable */
@@ -18,4 +19,22 @@ export interface ScoreDetalle {
   promedioDiasAtraso: number;
   cobrosVencidos: number;
   factores: ScoreFactor[];
+  /**
+     * Probability (0-100) of payment within the next 7 days; null when nothing is outstanding
+     * @nullable
+     */
+  probabilidadPago?: number | null;
+  /**
+     * Estimated payment date (YYYY-MM-DD) for the earliest open cobro
+     * @nullable
+     */
+  fechaEstimadaPago?: string | null;
+  /** Broken payment promises in the last 6 months (from gestión results) */
+  promesasIncumplidas?: number;
+  /**
+     * Latest gestión registered for this client
+     * @nullable
+     */
+  ultimoContactoEn?: Date | null;
+  recomendacion?: ScoreRecomendacion | null;
 }
