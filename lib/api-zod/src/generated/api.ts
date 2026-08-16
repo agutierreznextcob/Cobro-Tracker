@@ -818,6 +818,32 @@ export const GetSaludCarteraResponse = zod.object({
 
 
 /**
+ * Daily salud-de-cartera snapshots for the current user over a 30 or 90 day range. Days without a snapshot are absent from the list.
+ * @summary Historical evolution of the portfolio health blocks
+ */
+export const getSaludCarteraHistorialQueryDiasDefault = 30;
+
+export const GetSaludCarteraHistorialQueryParams = zod.object({
+  "dias": zod.union([zod.literal(30),zod.literal(90)]).default(getSaludCarteraHistorialQueryDiasDefault)
+})
+
+export const GetSaludCarteraHistorialResponse = zod.object({
+  "dias": zod.number(),
+  "desde": zod.string(),
+  "hasta": zod.string(),
+  "puntos": zod.array(zod.object({
+  "fecha": zod.string().describe('Santiago-local day (YYYY-MM-DD) of the snapshot'),
+  "sana": zod.number(),
+  "riesgo": zod.number(),
+  "critica": zod.number(),
+  "sanaCantidad": zod.number(),
+  "riesgoCantidad": zod.number(),
+  "criticaCantidad": zod.number()
+}))
+})
+
+
+/**
  * @summary Get Flow credentials status for current user
  */
 export const GetFlowCredentialsResponse = zod.object({

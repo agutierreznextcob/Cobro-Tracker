@@ -853,6 +853,30 @@ paths:
         "401":
           description: Unauthorized
 
+  /dashboard/salud-cartera/historial:
+    get:
+      operationId: getSaludCarteraHistorial
+      tags: [cobros]
+      summary: Historical evolution of the portfolio health blocks
+      description: Daily salud-de-cartera snapshots for the current user over a 30 or 90 day range. Days without a snapshot are absent from the list.
+      parameters:
+        - name: dias
+          in: query
+          required: false
+          schema:
+            type: integer
+            enum: [30, 90]
+            default: 30
+      responses:
+        "200":
+          description: Snapshot history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaludCarteraHistorial"
+        "401":
+          description: Unauthorized
+
   /profile/flow-credentials:
     get:
       operationId: getFlowCredentials
@@ -4066,6 +4090,41 @@ components:
               type: number
             clientes:
               type: integer
+
+    SaludCarteraHistorialPunto:
+      type: object
+      required: [fecha, sana, riesgo, critica, sanaCantidad, riesgoCantidad, criticaCantidad]
+      properties:
+        fecha:
+          type: string
+          description: Santiago-local day (YYYY-MM-DD) of the snapshot
+        sana:
+          type: number
+        riesgo:
+          type: number
+        critica:
+          type: number
+        sanaCantidad:
+          type: integer
+        riesgoCantidad:
+          type: integer
+        criticaCantidad:
+          type: integer
+
+    SaludCarteraHistorial:
+      type: object
+      required: [dias, desde, hasta, puntos]
+      properties:
+        dias:
+          type: integer
+        desde:
+          type: string
+        hasta:
+          type: string
+        puntos:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaludCarteraHistorialPunto"
 
     Cobro:
       type: object

@@ -80,6 +80,7 @@ import type {
   GetDashboardMetricsParams,
   GetPaymentMethodUrl200,
   GetRendimientoEquipoParams,
+  GetSaludCarteraHistorialParams,
   GetSugerenciaWorkflowParams,
   HealthStatus,
   ImportarClientesInput,
@@ -128,6 +129,7 @@ import type {
   RendimientoEjecutivo,
   ResetPasswordInput,
   SaludCartera,
+  SaludCarteraHistorial,
   SeguimientoCobranza,
   SubirComprobanteInput,
   SubscribeResponse,
@@ -2554,6 +2556,91 @@ export function useGetSaludCartera<TData = Awaited<ReturnType<typeof getSaludCar
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetSaludCarteraQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSaludCarteraHistorialUrl = (params?: GetSaludCarteraHistorialParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/salud-cartera/historial?${stringifiedParams}` : `/api/dashboard/salud-cartera/historial`
+}
+
+/**
+ * Daily salud-de-cartera snapshots for the current user over a 30 or 90 day range. Days without a snapshot are absent from the list.
+ * @summary Historical evolution of the portfolio health blocks
+ */
+export const getSaludCarteraHistorial = async (params?: GetSaludCarteraHistorialParams, options?: RequestInit): Promise<SaludCarteraHistorial> => {
+
+  return customFetch<SaludCarteraHistorial>(getGetSaludCarteraHistorialUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSaludCarteraHistorialQueryKey = (params?: GetSaludCarteraHistorialParams,) => {
+    return [
+    `/api/dashboard/salud-cartera/historial`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSaludCarteraHistorialQueryOptions = <TData = Awaited<ReturnType<typeof getSaludCarteraHistorial>>, TError = ErrorType<void>>(params?: GetSaludCarteraHistorialParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSaludCarteraHistorial>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSaludCarteraHistorialQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSaludCarteraHistorial>>> = ({ signal }) => getSaludCarteraHistorial(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSaludCarteraHistorial>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSaludCarteraHistorialQueryResult = NonNullable<Awaited<ReturnType<typeof getSaludCarteraHistorial>>>
+export type GetSaludCarteraHistorialQueryError = ErrorType<void>
+
+
+/**
+ * @summary Historical evolution of the portfolio health blocks
+ */
+
+export function useGetSaludCarteraHistorial<TData = Awaited<ReturnType<typeof getSaludCarteraHistorial>>, TError = ErrorType<void>>(
+ params?: GetSaludCarteraHistorialParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSaludCarteraHistorial>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSaludCarteraHistorialQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

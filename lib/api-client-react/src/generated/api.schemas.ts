@@ -902,6 +902,24 @@ export interface SaludCartera {
   resumen: SaludCarteraResumen;
 }
 
+export interface SaludCarteraHistorialPunto {
+  /** Santiago-local day (YYYY-MM-DD) of the snapshot */
+  fecha: string;
+  sana: number;
+  riesgo: number;
+  critica: number;
+  sanaCantidad: number;
+  riesgoCantidad: number;
+  criticaCantidad: number;
+}
+
+export interface SaludCarteraHistorial {
+  dias: number;
+  desde: string;
+  hasta: string;
+  puntos: SaludCarteraHistorialPunto[];
+}
+
 /**
  * Chilean electronic tax document type (DTE). Only "afecta" types may carry IVA. Defaults to sin_documento.
  */
@@ -2323,6 +2341,18 @@ export const GetDashboardMetricsPeriodo = {
   semana: 'semana',
   mes: 'mes',
   total: 'total',
+} as const;
+
+export type GetSaludCarteraHistorialParams = {
+dias?: GetSaludCarteraHistorialDias;
+};
+
+export type GetSaludCarteraHistorialDias = typeof GetSaludCarteraHistorialDias[keyof typeof GetSaludCarteraHistorialDias];
+
+
+export const GetSaludCarteraHistorialDias = {
+  NUMBER_30: 30,
+  NUMBER_90: 90,
 } as const;
 
 export type ListWebhookEventosParams = {

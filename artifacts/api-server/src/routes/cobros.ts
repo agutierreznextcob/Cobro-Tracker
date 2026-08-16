@@ -14,6 +14,7 @@ import {
   usersTable,
   comprobantesTransferenciaTable,
   gestionesCobranzaTable,
+  saludCarteraSnapshotsTable,
 } from "@workspace/db";
 import type { Cobro, CobroDescuento, CobroAjuste } from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
@@ -39,7 +40,7 @@ import { emitirComprobante } from "../lib/comprobante-service";
 import { getOrgContext, cobroScopeCondition, clienteScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
 import { getDatosBancariosUsuario, buildDatosBancariosHtml } from "../lib/datos-bancarios";
 import { computeClienteScores } from "../lib/scoring";
-import { buscarSnapshotPrevio } from "../lib/salud-cartera";
+import { buscarSnapshotPrevio, hoySantiagoStr, sumarDias as sumarDiasSantiago } from "../lib/salud-cartera";
 
 const cobrosRouter = Router();
 
@@ -1661,6 +1662,54 @@ cobrosRouter.get("/dashboard/salud-cartera", async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Error getting salud de cartera");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Historical evolution of the salud-de-cartera blocks, from the stored daily
+// snapshots (one per Santiago day). Days without a snapshot are simply absent
+// from the response — the frontend chart bridges those gaps.
+cobrosRouter.get("/dashboard/salud-cartera/historial", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const dias = req.query.dias === "90" ? 90 : 30;
+    const hoyStr = hoySantiagoStr();
+    const desde = sumarDiasSantiago(hoyStr, -(dias - 1));
+    const rows = await db
+      .select({
+        fecha: saludCarteraSnapshotsTable.fecha,
+        sanaMonto: saludCarteraSnapshotsTable.sanaMonto,
+        sanaCantidad: saludCarteraSnapshotsTable.sanaCantidad,
+        riesgoMonto: saludCarteraSnapshotsTable.riesgoMonto,
+        riesgoCantidad: saludCarteraSnapshotsTable.riesgoCantidad,
+        criticaMonto: saludCarteraSnapshotsTable.criticaMonto,
+        criticaCantidad: saludCarteraSnapshotsTable.criticaCantidad,
+      })
+      .from(saludCarteraSnapshotsTable)
+      .where(
+        and(
+          eq(saludCarteraSnapshotsTable.usuarioId, userId),
+          gte(saludCarteraSnapshotsTable.fecha, desde),
+        ),
+      )
+      .orderBy(saludCarteraSnapshotsTable.fecha);
+
+    res.json({
+      dias,
+      desde,
+      hasta: hoyStr,
+      puntos: rows.map((r) => ({
+        fecha: r.fecha,
+        sana: Math.round(Number(r.sanaMonto)),
+        riesgo: Math.round(Number(r.riesgoMonto)),
+        critica: Math.round(Number(r.criticaMonto)),
+        sanaCantidad: r.sanaCantidad,
+        riesgoCantidad: r.riesgoCantidad,
+        criticaCantidad: r.criticaCantidad,
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error getting historial de salud de cartera");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });
