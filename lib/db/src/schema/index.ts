@@ -30,3 +30,4 @@ export * from "./datos-bancarios";
 export * from "./app-config";
 export * from "./comprobantes-transferencia";
 export * from "./consultores";
+export * from "./salud-cartera-snapshots";

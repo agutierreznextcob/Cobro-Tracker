@@ -7,6 +7,7 @@ import {
   sincronizarMontosReveniu,
   procesarGraciaPagosFallidos,
 } from "./reveniu";
+import { generarSnapshotsSaludCartera } from "./salud-cartera";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 // Surveys are scheduled ~1h after payment; sweep often so delivery stays close
@@ -37,6 +38,9 @@ async function tick(): Promise<void> {
       await sincronizarMontosReveniu(logger);
       await procesarGraciaPagosFallidos(logger);
     }
+    // Snapshot diario de salud de cartera por usuario (tendencias exactas del
+    // dashboard). Idempotente por (usuario, fecha), seguro re-ejecutar.
+    await generarSnapshotsSaludCartera(runLogger);
     lastProcessedDate = hoy;
   } catch (err) {
     logger.error({ err }, "Error en el scheduler de recordatorios");

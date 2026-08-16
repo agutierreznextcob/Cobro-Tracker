@@ -39,6 +39,7 @@ import { emitirComprobante } from "../lib/comprobante-service";
 import { getOrgContext, cobroScopeCondition, clienteScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
 import { getDatosBancariosUsuario, buildDatosBancariosHtml } from "../lib/datos-bancarios";
 import { computeClienteScores } from "../lib/scoring";
+import { buscarSnapshotPrevio } from "../lib/salud-cartera";
 
 const cobrosRouter = Router();
 
@@ -1512,6 +1513,16 @@ cobrosRouter.get("/dashboard/salud-cartera", async (req, res) => {
       );
       const bloque = clasificar(r.fechaVencimiento, hace7Str, sumarDias(hace7Str, 7));
       previo[bloque].monto += saldoPrevio;
+    }
+
+    // Exact trend when a stored snapshot exists (~7 days ago, ±2-day window):
+    // it recorded what this user's dashboard actually showed then, so it wins
+    // over the reconstruction above.
+    const snapshotPrevio = await buscarSnapshotPrevio(userId, hace7Str);
+    if (snapshotPrevio) {
+      previo.sana.monto = snapshotPrevio.sana;
+      previo.riesgo.monto = snapshotPrevio.riesgo;
+      previo.critica.monto = snapshotPrevio.critica;
     }
 
     // A block "improves" when money moves out of risk/critical or into healthy.
