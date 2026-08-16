@@ -120,18 +120,35 @@ type SweepLogger = {
  * Daily sweep: stores one salud-de-cartera snapshot per active user for the
  * current Santiago day. Idempotent via the (usuarioId, fecha) unique index +
  * ON CONFLICT DO NOTHING, so overlapping or repeated runs are safe.
+ *
+ * `options` is intentionally exposed for testing:
+ *   - `calcularFn`: replaces `calcularBloquesUsuario` (inject deterministic
+ *     failures to verify the per-user try/catch without real DB side-effects).
+ *   - `users`: provides an explicit ordered user list instead of querying all
+ *     active users. Iteration order is exactly the array order — no DB query is
+ *     issued — so tests can guarantee which user is processed first and thereby
+ *     prove that a failure on user N does not abort processing of user N+1.
  */
-export async function generarSnapshotsSaludCartera(log: SweepLogger): Promise<void> {
+export async function generarSnapshotsSaludCartera(
+  log: SweepLogger,
+  options?: {
+    calcularFn?: (userId: string, fecha: string) => Promise<BloquesSaludCartera>;
+    users?: Array<{ id: string }>;
+  },
+): Promise<void> {
   const fecha = hoySantiagoStr();
-  const usuarios = await db
-    .select({ id: usersTable.id })
-    .from(usersTable)
-    .where(eq(usersTable.activo, true));
+  const calcular = options?.calcularFn ?? calcularBloquesUsuario;
+  const usuarios = options?.users
+    ? options.users
+    : await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.activo, true));
 
   let creados = 0;
   for (const u of usuarios) {
     try {
-      const b = await calcularBloquesUsuario(u.id, fecha);
+      const b = await calcular(u.id, fecha);
       const inserted = await db
         .insert(saludCarteraSnapshotsTable)
         .values({

@@ -6,10 +6,14 @@
  * expected accounting (montoACobrar, saldo, pagadoEn, informes aggregation),
  * then cleans up the created rows directly in the DB.
  *
+ * Also verifies the salud-cartera daily sweep is resilient: it must not skip
+ * users on error, and it must handle users with 0 active cobros cleanly.
+ *
  * Run: pnpm --filter @workspace/api-server exec tsx scripts/e2e-money-flow.ts
  */
-import { db, cobrosTable, pagosParciales, cobroDescuentosTable, saludCarteraSnapshotsTable } from "@workspace/db";
+import { db, cobrosTable, pagosParciales, cobroDescuentosTable, saludCarteraSnapshotsTable, usersTable } from "@workspace/db";
 import { eq, inArray, and } from "drizzle-orm";
+import { generarSnapshotsSaludCartera, calcularBloquesUsuario, hoySantiagoStr } from "../src/lib/salud-cartera";
 
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:80/api";
 const DEMO_EMAIL = "anibal.gutierrezbasoalto@gmail.com";
@@ -22,6 +26,16 @@ const createdCobroIds: number[] = [];
 // Salud-cartera historial test state — used by cleanup() for safe restoration.
 let snapshotToRestore: (typeof saludCarteraSnapshotsTable.$inferInsert) | null = null;
 let fixtureSnapshotInserted = false;
+
+// Sweep resilience test state — used by cleanup() to remove test artifacts.
+// sweepDemoSnapshotId: ID of the snapshot the demo-only sweep created; must be
+// explicitly deleted before restoring snapshotToRestore (else onConflictDoNothing
+// would silently leave the sweep-generated row with test-cobro numbers).
+let sweepDemoSnapshotId: number | null = null;
+let sweepFaultyUserId: string | null = null;
+let sweepFaultyUserCreated = false; // only delete in cleanup if we inserted it
+let sweepGoodUserId: string | null = null;
+let sweepGoodUserCreated = false;   // only delete in cleanup if we inserted it
 
 function check(name: string, cond: boolean, detail?: unknown) {
   if (cond) {
@@ -268,6 +282,171 @@ async function main() {
     { ultimo: ultimo2?.fecha, hoy: hoyStr },
   );
 
+  // =========================================================================
+  // Sweep resilience: invokes generarSnapshotsSaludCartera directly to verify:
+  //   (a) the sweep creates a snapshot for the demo user today,
+  //   (b) the sweep survives a simulated per-user failure (fault injection),
+  //   (c) a user after the failing one still receives its snapshot,
+  //   (d) a user with 0 active cobros produces a zero-value snapshot cleanly.
+  //
+  // All tests use isolated fixture users and scoped userIds so no E2E cobros
+  // contaminate snapshots, and no demo production data is touched.
+  // =========================================================================
+  console.log("== Sweep resilience: barrido salud-cartera ==");
+  const sweepHoy = hoySantiagoStr();
+  const silentLog = { info: (_o: object, _m: string) => {}, error: (_o: object, _m: string) => {} };
+
+  // --- Step 1: Verify the sweep creates a snapshot for demo user ---
+  // Demo's today snapshot was already deleted in the historial test above, so
+  // the sweep will create a fresh one.  We pass users:[{id:myId}] (not userIds)
+  // so the sweep iterates exactly the one user without issuing a full-table query.
+  let demoSweepThrew = false;
+  try {
+    await generarSnapshotsSaludCartera(silentLog, { users: [{ id: myId }] });
+  } catch {
+    demoSweepThrew = true;
+  }
+  check("sweep no lanzó excepción fatal (demo)", !demoSweepThrew);
+
+  const demoSnap = await db
+    .select()
+    .from(saludCarteraSnapshotsTable)
+    .where(and(
+      eq(saludCarteraSnapshotsTable.usuarioId, myId),
+      eq(saludCarteraSnapshotsTable.fecha, sweepHoy),
+    ))
+    .limit(1);
+  check(`sweep crea snapshot para demo user (fecha=${sweepHoy})`, demoSnap.length === 1, demoSnap.length);
+  // Track so cleanup can explicitly delete it before restoring snapshotToRestore.
+  if (demoSnap.length > 0) sweepDemoSnapshotId = demoSnap[0].id;
+
+  // --- Step 2: Create two isolated test users ---
+  // sweepFaultyUser: will have calcularFn throw deterministically.
+  // sweepGoodUser:   zero cobros; should succeed cleanly and come after the fault.
+  // Only delete users in cleanup if we created them here (idempotent re-runs).
+  const FAULTY_EMAIL = "e2e-sweep-faulty@test.invalid";
+  const GOOD_EMAIL   = "e2e-sweep-zero-cobros@test.invalid";
+
+  async function upsertTestUser(email: string): Promise<{ id: string; created: boolean }> {
+    const existing = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, email))
+      .limit(1);
+    if (existing.length > 0) return { id: existing[0].id, created: false };
+    const [row] = await db
+      .insert(usersTable)
+      .values({ email, activo: true })
+      .returning({ id: usersTable.id });
+    return { id: row.id, created: true };
+  }
+
+  const faultyResult = await upsertTestUser(FAULTY_EMAIL);
+  sweepFaultyUserId      = faultyResult.id;
+  sweepFaultyUserCreated = faultyResult.created;
+
+  const goodResult = await upsertTestUser(GOOD_EMAIL);
+  sweepGoodUserId      = goodResult.id;
+  sweepGoodUserCreated = goodResult.created;
+
+  console.log(`  (faulty user: ${sweepFaultyUserId} created=${sweepFaultyUserCreated}, good user: ${sweepGoodUserId} created=${sweepGoodUserCreated})`);
+
+  // Ensure clean slate for today's snapshots for both test users.
+  await db.delete(saludCarteraSnapshotsTable).where(
+    and(
+      eq(saludCarteraSnapshotsTable.usuarioId, sweepFaultyUserId),
+      eq(saludCarteraSnapshotsTable.fecha, sweepHoy),
+    ),
+  );
+  await db.delete(saludCarteraSnapshotsTable).where(
+    and(
+      eq(saludCarteraSnapshotsTable.usuarioId, sweepGoodUserId),
+      eq(saludCarteraSnapshotsTable.fecha, sweepHoy),
+    ),
+  );
+
+  // --- Step 3: Fault injection sweep ---
+  // calcularFn throws deterministically for faultyUser; returns zeros for goodUser.
+  // The per-user try/catch in the production sweep must catch the error, log it,
+  // and continue to process goodUser — which must receive its snapshot.
+  const faultErrors: Array<{ userId: string }> = [];
+  const faultLog = {
+    info: (_o: object, _m: string) => {},
+    error: (obj: { userId?: string }, _m: string) => {
+      faultErrors.push({ userId: obj.userId ?? "unknown" });
+    },
+  };
+
+  // `users` is provided as an explicit ordered array — no DB query is issued —
+  // so faultyUser is guaranteed to be processed BEFORE goodUser regardless of
+  // how Postgres would order an IN(...) query.  This makes it contractually
+  // provable that the sweep continued past the failure, not that it happened to
+  // process goodUser first by chance.
+  //
+  // calcularFn only overrides the faulty user; for goodUser it delegates to the
+  // real calcularBloquesUsuario so the zero-cobros path exercises the actual
+  // production code (not an injected zero stub).
+  const capturedFaultyId = sweepFaultyUserId;
+  let faultSweepThrew = false;
+  try {
+    await generarSnapshotsSaludCartera(faultLog, {
+      users: [{ id: sweepFaultyUserId }, { id: sweepGoodUserId }],
+      calcularFn: async (userId, fecha) => {
+        if (userId === capturedFaultyId) {
+          throw new Error("E2E simulated calcular failure");
+        }
+        // Real calculation for the zero-cobros user — exercises the production
+        // code path for a user with no open cobros.
+        return calcularBloquesUsuario(userId, fecha);
+      },
+    });
+  } catch {
+    faultSweepThrew = true;
+  }
+  check("sweep no lanzó excepción fatal (fault injection)", !faultSweepThrew);
+  check(
+    "sweep registró error para usuario con falla simulada",
+    faultErrors.some((e) => e.userId === sweepFaultyUserId),
+    faultErrors,
+  );
+
+  // goodUser comes after faultyUser in the loop; its snapshot proves the sweep
+  // did not abort when faultyUser threw.
+  const goodSnap = await db
+    .select()
+    .from(saludCarteraSnapshotsTable)
+    .where(and(
+      eq(saludCarteraSnapshotsTable.usuarioId, sweepGoodUserId),
+      eq(saludCarteraSnapshotsTable.fecha, sweepHoy),
+    ))
+    .limit(1);
+  check("sweep continuó tras la falla (goodUser tiene snapshot)", goodSnap.length === 1, goodSnap.length);
+
+  const faultySnap = await db
+    .select()
+    .from(saludCarteraSnapshotsTable)
+    .where(and(
+      eq(saludCarteraSnapshotsTable.usuarioId, sweepFaultyUserId),
+      eq(saludCarteraSnapshotsTable.fecha, sweepHoy),
+    ))
+    .limit(1);
+  check("usuario con falla NO tiene snapshot (error fue capturado, no ignorado)", faultySnap.length === 0, faultySnap.length);
+
+  // Verify the zero-cobros snapshot values are all zeros (edge case handled cleanly).
+  if (goodSnap.length === 1) {
+    const s = goodSnap[0];
+    check(
+      "snapshot de usuario con 0 cobros tiene valores cero",
+      Number(s.sanaMonto) === 0 &&
+        s.sanaCantidad === 0 &&
+        Number(s.riesgoMonto) === 0 &&
+        s.riesgoCantidad === 0 &&
+        Number(s.criticaMonto) === 0 &&
+        s.criticaCantidad === 0,
+      { sanaMonto: s.sanaMonto, riesgoMonto: s.riesgoMonto, criticaMonto: s.criticaMonto },
+    );
+  }
+
   console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECKS FAILED`);
 }
 
@@ -277,6 +456,17 @@ async function cleanup() {
     await db.delete(cobroDescuentosTable).where(inArray(cobroDescuentosTable.cobroId, createdCobroIds));
     await db.delete(cobrosTable).where(inArray(cobrosTable.id, createdCobroIds));
     console.log(`Cleanup: removed cobros ${createdCobroIds.join(", ")}`);
+  }
+
+  // The sweep resilience test runs a scoped sweep for the demo user while the
+  // E2E cobros still exist, creating a snapshot with test-inflated numbers.
+  // Delete that sweep-generated snapshot first so the onConflictDoNothing
+  // restore below can write the original row back without a conflict.
+  if (sweepDemoSnapshotId !== null) {
+    await db
+      .delete(saludCarteraSnapshotsTable)
+      .where(eq(saludCarteraSnapshotsTable.id, sweepDemoSnapshotId));
+    console.log(`Cleanup: deleted sweep-generated demo snapshot id=${sweepDemoSnapshotId}`);
   }
 
   // Restore the snapshot we deleted during the historial test so we leave the
@@ -289,6 +479,27 @@ async function cleanup() {
       .values(snapshotToRestore)
       .onConflictDoNothing();
     console.log(`Cleanup: restored snapshot for ${snapshotToRestore.fecha}`);
+  }
+
+  // Remove isolated test users and their snapshots — but only if we inserted
+  // them in this run.  If the user row pre-existed (a leftover from a previous
+  // interrupted run), we still delete their today-snapshots (safe: they're test
+  // artifacts) but leave the user row itself alone to avoid clobbering data from
+  // whatever created it.
+  for (const [uid, created] of [
+    [sweepFaultyUserId, sweepFaultyUserCreated] as const,
+    [sweepGoodUserId,   sweepGoodUserCreated]   as const,
+  ]) {
+    if (!uid) continue;
+    await db
+      .delete(saludCarteraSnapshotsTable)
+      .where(eq(saludCarteraSnapshotsTable.usuarioId, uid));
+    if (created) {
+      await db.delete(usersTable).where(eq(usersTable.id, uid));
+      console.log(`Cleanup: removed sweep test user ${uid}`);
+    } else {
+      console.log(`Cleanup: cleared snapshots for pre-existing test user ${uid} (user row preserved)`);
+    }
   }
 }
 
