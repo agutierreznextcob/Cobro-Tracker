@@ -12,4 +12,5 @@ export interface InvitacionPublica {
   email: string;
   orgRole: InvitacionPublicaOrgRole;
   organizacionNombre: string;
+  emailRegistrado: boolean;
 }

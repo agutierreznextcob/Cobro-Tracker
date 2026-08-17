@@ -2268,6 +2268,45 @@ paths:
         "404":
           description: Invitation not found or no longer valid
 
+  /invitaciones/{token}/aceptar:
+    post:
+      operationId: aceptarInvitacion
+      tags: [organization]
+      summary: Accept an invitation (requires an authenticated session whose email matches)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Joined the organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AceptarInvitacionResult"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Email mismatch or no seat available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Invitation not found or no longer valid
+        "409":
+          description: Account already belongs to another organization with a team
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /cobros/{id}/recordatorios:
     get:
       operationId: listRecordatorios
@@ -5678,6 +5717,12 @@ components:
           description: >-
             Ley 21.719 consent. Must be true: the user accepted the Privacy
             Policy and Terms of Use. Recorded with a timestamp server-side.
+        invitacionToken:
+          type: string
+          description: >-
+            Optional invitation token (/invitacion/:token flow). When present,
+            org assignment prefers exactly this invitation (email must match);
+            otherwise falls back to any pending invitation for the email.
     EliminarCuentaInput:
       type: object
       required: [confirmacion]
@@ -5931,7 +5976,7 @@ components:
 
     InvitacionPublica:
       type: object
-      required: [valida, email, orgRole, organizacionNombre]
+      required: [valida, email, orgRole, organizacionNombre, emailRegistrado]
       properties:
         valida:
           type: boolean
@@ -5942,6 +5987,17 @@ components:
           type: string
           enum: [admin_org, supervisor, ejecutivo]
         organizacionNombre:
+          type: string
+        emailRegistrado:
+          type: boolean
+
+    AceptarInvitacionResult:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        mensaje:
           type: string
 
     RendimientoEjecutivo:

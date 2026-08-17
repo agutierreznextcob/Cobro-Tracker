@@ -11,6 +11,7 @@ export * from './abonoEstado';
 export * from './abonoInput';
 export * from './abonoInputMetodo';
 export * from './abonoMetodo';
+export * from './aceptarInvitacionResult';
 export * from './actualizarMiembroInput';
 export * from './actualizarMiembroInputOrgRole';
 export * from './adminAccionResult';

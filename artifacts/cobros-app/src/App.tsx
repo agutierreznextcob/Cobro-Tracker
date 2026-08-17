@@ -32,6 +32,7 @@ import TareasPage from "@/pages/tareas";
 import EncuestasPage from "@/pages/encuestas";
 import EncuestaPublicaPage from "@/pages/encuesta-publica";
 import ConsultorLoginPage from "@/pages/consultor-login";
+import InvitacionPage from "@/pages/invitacion";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -146,6 +147,7 @@ function AppRouter() {
       <Route path="/terminos" component={TerminosPage} />
       <Route path="/portal/:token" component={PortalPage} />
       <Route path="/encuesta/:token" component={EncuestaPublicaPage} />
+      <Route path="/invitacion/:token" component={InvitacionPage} />
       <Route path="/dashboard">
         <AuthGate>
           <Layout>

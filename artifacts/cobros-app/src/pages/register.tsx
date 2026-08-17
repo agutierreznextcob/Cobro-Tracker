@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useRegisterUser } from "@workspace/api-client-react";
 import { AuthLayout } from "@/components/auth-layout";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,16 @@ function isStrongPassword(pw: string): boolean {
 }
 
 export default function RegisterPage() {
+  const search = useSearch();
+  // Registro por invitación (/register?invitacion=TOKEN&email=...): el correo
+  // viene fijado por la invitación (el registro auto-acepta por email match).
+  const params = new URLSearchParams(search);
+  const invitacionToken = params.get("invitacion");
+  const invitedEmail = invitacionToken ? (params.get("email") ?? "") : "";
+
   const [nombre, setNombre] = useState("");
   const [rut, setRut] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(invitedEmail);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
@@ -65,6 +72,7 @@ export default function RegisterPage() {
           password,
           confirmPassword,
           aceptaPolitica,
+          ...(invitacionToken ? { invitacionToken } : {}),
         },
       });
       if (res.ok) {
@@ -99,7 +107,11 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       title="Crear cuenta"
-      subtitle="Comienza tu prueba gratis de 14 días"
+      subtitle={
+        invitacionToken
+          ? "Crea tu cuenta para unirte a la organización que te invitó"
+          : "Comienza tu prueba gratis de 14 días"
+      }
       footer={
         <>
           ¿Ya tienes cuenta?{" "}
@@ -138,7 +150,13 @@ export default function RegisterPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="tu@empresa.cl"
+            disabled={Boolean(invitacionToken && invitedEmail)}
           />
+          {invitacionToken && invitedEmail && (
+            <p className="text-xs text-muted-foreground">
+              Este correo viene fijado por tu invitación.
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Contraseña</Label>

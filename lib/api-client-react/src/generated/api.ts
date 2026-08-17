@@ -22,6 +22,7 @@ import type {
 import type {
   Abono,
   AbonoInput,
+  AceptarInvitacionResult,
   ActualizarMiembroInput,
   AdminAccionResult,
   AdminMetricas,
@@ -6571,6 +6572,76 @@ export function useGetInvitacionPublica<TData = Awaited<ReturnType<typeof getInv
 
 
 
+
+export const getAceptarInvitacionUrl = (token: string,) => {
+
+
+
+
+  return `/api/invitaciones/${token}/aceptar`
+}
+
+/**
+ * @summary Accept an invitation (requires an authenticated session whose email matches)
+ */
+export const aceptarInvitacion = async (token: string, options?: RequestInit): Promise<AceptarInvitacionResult> => {
+
+  return customFetch<AceptarInvitacionResult>(getAceptarInvitacionUrl(token),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAceptarInvitacionMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aceptarInvitacion>>, TError,{token: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof aceptarInvitacion>>, TError,{token: string}, TContext> => {
+
+const mutationKey = ['aceptarInvitacion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof aceptarInvitacion>>, {token: string}> = (props) => {
+          const {token} = props ?? {};
+
+          return  aceptarInvitacion(token,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AceptarInvitacionMutationResult = NonNullable<Awaited<ReturnType<typeof aceptarInvitacion>>>
+
+    export type AceptarInvitacionMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Accept an invitation (requires an authenticated session whose email matches)
+ */
+export const useAceptarInvitacion = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aceptarInvitacion>>, TError,{token: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof aceptarInvitacion>>,
+        TError,
+        {token: string},
+        TContext
+      > => {
+      return useMutation(getAceptarInvitacionMutationOptions(options));
+    }
 
 export const getListRecordatoriosUrl = (id: number,) => {
 

@@ -57,7 +57,8 @@ export const RegisterUserBody = zod.object({
   "email": zod.string().email(),
   "password": zod.string().min(registerUserBodyPasswordMin),
   "confirmPassword": zod.string().min(registerUserBodyConfirmPasswordMin),
-  "aceptaPolitica": zod.boolean().describe('Ley 21.719 consent. Must be true: the user accepted the Privacy Policy and Terms of Use. Recorded with a timestamp server-side.')
+  "aceptaPolitica": zod.boolean().describe('Ley 21.719 consent. Must be true: the user accepted the Privacy Policy and Terms of Use. Recorded with a timestamp server-side.'),
+  "invitacionToken": zod.string().optional().describe('Optional invitation token (\/invitacion\/:token flow). When present, org assignment prefers exactly this invitation (email must match); otherwise falls back to any pending invitation for the email.')
 })
 
 export const RegisterUserResponse = zod.object({
@@ -1819,7 +1820,21 @@ export const GetInvitacionPublicaResponse = zod.object({
   "valida": zod.boolean(),
   "email": zod.string().email(),
   "orgRole": zod.enum(['admin_org', 'supervisor', 'ejecutivo']),
-  "organizacionNombre": zod.string()
+  "organizacionNombre": zod.string(),
+  "emailRegistrado": zod.boolean()
+})
+
+
+/**
+ * @summary Accept an invitation (requires an authenticated session whose email matches)
+ */
+export const AceptarInvitacionParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const AceptarInvitacionResponse = zod.object({
+  "ok": zod.boolean(),
+  "mensaje": zod.string().optional()
 })
 
 

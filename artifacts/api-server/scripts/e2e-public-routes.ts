@@ -80,6 +80,12 @@ const cases: Array<{
     expect: [404],
   },
   {
+    name: "GET /invitaciones/:token inválido → 404 (aceptación de invitación)",
+    method: "GET",
+    path: "/invitaciones/token-invalido-e2e",
+    expect: [404],
+  },
+  {
     name: "POST /webhooks/flow sin token → 200 (contrato Flow: siempre 200)",
     method: "POST",
     path: "/webhooks/flow",

@@ -48,6 +48,35 @@ function nombreDe(u: { firstName: string | null; lastName: string | null }): str
   return n || null;
 }
 
+// Drizzle transaction type (inferred so it stays in sync with the driver).
+type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// ¿Puede este usuario abandonar su organización actual para unirse a otra?
+// Solo si es el DUEÑO de su propia organización y es su único miembro activo
+// (una "solo org" recién creada). Nunca si pertenece a la org de un tercero
+// o si su org tiene más miembros (dejaría un equipo sin dueño).
+async function usuarioPuedeCambiarDeOrgTx(
+  tx: DbTx,
+  userId: string,
+  organizationId: number,
+): Promise<boolean> {
+  const [org] = await tx
+    .select({ ownerId: organizacionesTable.ownerId })
+    .from(organizacionesTable)
+    .where(eq(organizacionesTable.id, organizationId));
+  if (!org || org.ownerId !== userId) return false;
+  const [row] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.organizationId, organizationId),
+        eq(usersTable.activo, true),
+      ),
+    );
+  return (row?.count ?? 0) <= 1;
+}
+
 organizationRouter.use("/organization", (req, res, next) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autorizado" });
@@ -546,13 +575,24 @@ organizationRouter.post(
         if (!(await orgPuedeActivarMiembroTx(tx, ctx.organizationId, { contarPendientes: true }))) {
           return { sinCupo: true };
         }
-        // Reject if a user with this email already belongs to an organization.
+        // Reject if a user with this email already belongs to an organization
+        // OTHER than their own empty solo org. Existing accounts that are the
+        // sole member of their own organization CAN be invited (they accept
+        // via /invitacion/:token and are moved into the inviting org).
         const [existingUser] = await tx
-          .select({ organizationId: usersTable.organizationId })
+          .select({
+            id: usersTable.id,
+            organizationId: usersTable.organizationId,
+          })
           .from(usersTable)
           .where(eq(usersTable.email, email));
         if (existingUser?.organizationId != null) {
-          return { yaEnOrg: true };
+          const elegible = await usuarioPuedeCambiarDeOrgTx(
+            tx,
+            existingUser.id,
+            existingUser.organizationId,
+          );
+          if (!elegible) return { yaEnOrg: true };
         }
         // Reuse any existing pending invitation for this email in this org.
         const [existingInv] = await tx
@@ -621,7 +661,7 @@ organizationRouter.post(
           invitadoPorNombre,
           invitadoPorEmail: req.user!.email ?? null,
           orgRole,
-          ctaUrl: `${getPublicBaseUrl()}/api/login?returnTo=${encodeURIComponent("/perfil")}`,
+          ctaUrl: `${getPublicBaseUrl()}/invitacion/${token}`,
         },
         req.log,
       ).catch((err) => {
@@ -825,14 +865,159 @@ organizationRouter.get("/invitaciones/:token", async (req, res) => {
       .from(organizacionesTable)
       .where(eq(organizacionesTable.id, inv.organizationId));
 
+    // Whether an account already exists for the invited email, so the frontend
+    // can steer to "log in" vs "create account". The email itself already comes
+    // from the invitation, so this does not enable account enumeration beyond
+    // what the invitee (holder of the token) legitimately needs.
+    const [cuenta] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, inv.email));
+
     res.json({
       valida: true,
       email: inv.email,
       orgRole: inv.orgRole,
       organizacionNombre: org?.nombre ?? "",
+      emailRegistrado: Boolean(cuenta),
     });
   } catch (err) {
     req.log.error({ err }, "Error getting invitacion publica");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// --- Accept an invitation (authenticated; the invitee already has an account) ---
+// Public path prefix (/invitaciones) so it is NOT behind the /organization
+// blanket auth/subscription guards, but it still requires a session: the
+// invitee logs in first and then accepts. New accounts instead auto-accept
+// during registration (assignOrganization in routes/auth.ts).
+organizationRouter.post("/invitaciones/:token/aceptar", async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    res.status(401).json({
+      error: "Debes iniciar sesión para aceptar la invitación.",
+      code: "no_autenticado",
+    });
+    return;
+  }
+  const token = req.params.token;
+  const userId = req.user.id;
+  try {
+    type Resultado =
+      | { ok: true }
+      | { fail: { status: number; error: string; code?: string } };
+    const resultado = await db.transaction(async (tx): Promise<Resultado> => {
+      // Lock the invitation row: prevents double-accept races.
+      const [inv] = await tx
+        .select()
+        .from(invitacionesTable)
+        .where(eq(invitacionesTable.token, token))
+        .for("update");
+      const expirada =
+        inv?.expiraEn != null && inv.expiraEn.getTime() < Date.now();
+      if (!inv || inv.estado !== "pendiente" || expirada) {
+        return {
+          fail: { status: 404, error: "Invitación no válida o expirada" },
+        };
+      }
+
+      const [me] = await tx
+        .select({
+          email: usersTable.email,
+          organizationId: usersTable.organizationId,
+          activo: usersTable.activo,
+        })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId));
+      if (!me) {
+        return { fail: { status: 404, error: "Usuario no encontrado" } };
+      }
+      const myEmail = me.email?.trim().toLowerCase() ?? "";
+      if (myEmail !== inv.email.trim().toLowerCase()) {
+        return {
+          fail: {
+            status: 403,
+            error:
+              "Esta invitación fue enviada a otro correo. Inicia sesión con la cuenta invitada.",
+            code: "email_distinto",
+          },
+        };
+      }
+      // Already a member of the inviting org: mark accepted, nothing to move.
+      if (me.organizationId === inv.organizationId) {
+        await tx
+          .update(invitacionesTable)
+          .set({ estado: "aceptada", aceptadaEn: new Date() })
+          .where(eq(invitacionesTable.id, inv.id));
+        return { ok: true };
+      }
+      // Only users alone in their own solo org (or without org) can move.
+      if (
+        me.organizationId != null &&
+        !(await usuarioPuedeCambiarDeOrgTx(tx, userId, me.organizationId))
+      ) {
+        return {
+          fail: {
+            status: 409,
+            error:
+              "Tu cuenta ya pertenece a una organización con equipo, por lo que no puede unirse a otra.",
+            code: "ya_en_org",
+          },
+        };
+      }
+      // Seat quota at ACCEPT time (owner row locked FOR UPDATE inside).
+      if (!(await orgPuedeActivarMiembroTx(tx, inv.organizationId))) {
+        return {
+          fail: {
+            status: 403,
+            error:
+              "La organización no tiene cupo de usuarios disponible. Pide al administrador que agregue un pack de usuarios.",
+            code: "sin_cupo",
+          },
+        };
+      }
+      // Revalidate the supervisor: may have been demoted/deactivated since.
+      let supervisorId: string | null = null;
+      if (inv.orgRole === "ejecutivo" && inv.supervisorId) {
+        const [sup] = await tx
+          .select({ id: usersTable.id })
+          .from(usersTable)
+          .where(
+            and(
+              eq(usersTable.id, inv.supervisorId),
+              eq(usersTable.organizationId, inv.organizationId),
+              eq(usersTable.orgRole, "supervisor"),
+              eq(usersTable.activo, true),
+            ),
+          );
+        supervisorId = sup ? inv.supervisorId : null;
+      }
+      await tx
+        .update(usersTable)
+        .set({
+          organizationId: inv.organizationId,
+          orgRole: inv.orgRole,
+          supervisorId,
+          activo: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(usersTable.id, userId));
+      await tx
+        .update(invitacionesTable)
+        .set({ estado: "aceptada", aceptadaEn: new Date() })
+        .where(eq(invitacionesTable.id, inv.id));
+      return { ok: true };
+    });
+
+    if ("fail" in resultado) {
+      const { status, error, code } = resultado.fail;
+      res.status(status).json(code ? { error, code } : { error });
+      return;
+    }
+    req.log.info({ userId }, "Invitación aceptada");
+    res.json({ ok: true, mensaje: "Te uniste a la organización." });
+  } catch (err) {
+    req.log.error({ err }, "Error accepting invitacion");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

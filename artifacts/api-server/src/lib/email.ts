@@ -643,7 +643,7 @@ export async function sendInvitacionEmail(
       heading: `Te invitaron a ${data.organizacionNombre} 👋`,
       bodyLines: [
         `<strong>${invitador}</strong> te invitó a unirte a <strong>${data.organizacionNombre}</strong> en NextCob como <strong>${rolTexto}</strong>.`,
-        `Para aceptar la invitación, inicia sesión con este mismo correo (<strong>${data.email}</strong>) haciendo clic en el botón a continuación.`,
+        `Haz clic en el botón para aceptar la invitación. Si ya tienes cuenta con este correo (<strong>${data.email}</strong>), inicia sesión; si no, podrás crearla en el mismo paso.`,
       ],
       ctaText: "Aceptar invitación",
       ctaUrl: data.ctaUrl,

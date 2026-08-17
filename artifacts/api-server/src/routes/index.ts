@@ -60,6 +60,11 @@ router.use(portalRouter);
 // mount before cobrosRouter, whose blanket auth middleware would otherwise
 // intercept the public path. Its /encuestas/stats/resumen route self-guards.
 router.use(encuestasRouter);
+// organizationRouter exposes public/self-guarded invitation routes
+// (/invitaciones/:token lookup + /invitaciones/:token/aceptar); its private
+// routes are prefix-guarded under /organization, so mounting early is safe.
+// Must come before cobrosRouter's blanket auth middleware.
+router.use(organizationRouter);
 router.use(cobrosRouter);
 // workflowsRouter and tareasRouter self-guard with their own auth middleware.
 router.use(workflowsRouter);
@@ -70,6 +75,5 @@ router.use(aiRouter);
 router.use(profileRouter);
 router.use(subscriptionRouter);
 router.use(adminRouter);
-router.use(organizationRouter);
 
 export default router;

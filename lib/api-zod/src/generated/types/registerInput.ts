@@ -24,4 +24,6 @@ export interface RegisterInput {
   confirmPassword: string;
   /** Ley 21.719 consent. Must be true: the user accepted the Privacy Policy and Terms of Use. Recorded with a timestamp server-side. */
   aceptaPolitica: boolean;
+  /** Optional invitation token (/invitacion/:token flow). When present, org assignment prefers exactly this invitation (email must match); otherwise falls back to any pending invitation for the email. */
+  invitacionToken?: string;
 }

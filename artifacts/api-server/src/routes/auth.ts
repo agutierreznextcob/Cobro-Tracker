@@ -95,19 +95,37 @@ async function assignOrganization(user: {
   email: string | null;
   firstName: string | null;
   lastName: string | null;
-}): Promise<void> {
+}, invitacionToken?: string): Promise<void> {
   try {
     const email = user.email?.trim().toLowerCase();
     if (email) {
-      const [inv] = await db
-        .select()
-        .from(invitacionesTable)
-        .where(
-          and(
-            eq(invitacionesTable.email, email),
-            eq(invitacionesTable.estado, "pendiente"),
-          ),
-        );
+      // Si el registro vino desde /invitacion/:token, aceptar EXACTAMENTE esa
+      // invitación (el email igual debe coincidir — nunca aceptar la de otro
+      // correo). Sin token, fallback: cualquier invitación pendiente del email.
+      let inv;
+      if (invitacionToken) {
+        [inv] = await db
+          .select()
+          .from(invitacionesTable)
+          .where(
+            and(
+              eq(invitacionesTable.token, invitacionToken),
+              eq(invitacionesTable.email, email),
+              eq(invitacionesTable.estado, "pendiente"),
+            ),
+          );
+      }
+      if (!inv) {
+        [inv] = await db
+          .select()
+          .from(invitacionesTable)
+          .where(
+            and(
+              eq(invitacionesTable.email, email),
+              eq(invitacionesTable.estado, "pendiente"),
+            ),
+          );
+      }
       const expirada =
         inv?.expiraEn != null && inv.expiraEn.getTime() < Date.now();
       if (inv && !expirada) {
@@ -418,7 +436,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         .onConflictDoNothing();
     }
 
-    await assignOrganization(user);
+    await assignOrganization(user, parsed.data.invitacionToken);
 
     const rawToken = await createAuthToken(user.id, "verificacion");
     const ctaUrl = `${getPublicBaseUrl()}/api/auth/verify-email?token=${rawToken}`;

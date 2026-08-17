@@ -48,7 +48,23 @@ export default function LoginPage() {
       });
       if (res.ok) {
         const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "";
-        window.location.href = `${base}/dashboard`;
+        // returnTo: solo rutas internas (ej. volver a /invitacion/:token tras
+        // iniciar sesión). Se rechaza cualquier URL absoluta o externa.
+        const returnTo = new URLSearchParams(search).get("returnTo");
+        let dest = "/dashboard";
+        if (returnTo && returnTo.startsWith("/") && !returnTo.includes("\\")) {
+          // Anti open-redirect: parsear contra el origin actual y exigir que
+          // el resultado siga siendo mismo-origen (rechaza "//host" y "/\host").
+          try {
+            const url = new URL(returnTo, window.location.origin);
+            if (url.origin === window.location.origin) {
+              dest = url.pathname + url.search;
+            }
+          } catch {
+            /* dest queda en /dashboard */
+          }
+        }
+        window.location.href = `${base}${dest}`;
         return;
       }
       if (res.code === "email_no_verificado") setNoVerificado(true);
