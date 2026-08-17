@@ -12,7 +12,7 @@ import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import { InvitarUsuarioBody, UpdateMiembroBody } from "@workspace/api-zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { requireOrgAdmin } from "../middlewares/requireOrgAdmin";
-import { requirePlanFeature, orgPuedeActivarMiembro } from "../middlewares/requirePlanFeature";
+import { requirePlanFeature, orgPuedeActivarMiembroTx } from "../middlewares/requirePlanFeature";
 import { getOrgContext, computePricing } from "../lib/org";
 import { normalizarPacks } from "../lib/plans";
 import { sendInvitacionEmail } from "../lib/email";
@@ -234,21 +234,6 @@ organizationRouter.patch(
       if (nuevoRol !== undefined) updates.orgRole = nuevoRol;
       if (nuevoActivo !== undefined) updates.activo = nuevoActivo;
 
-      // Cupo del plan al REACTIVAR un miembro (el plan Starter incluye 1
-      // usuario): sin este check se puede eludir el límite desactivando y
-      // reactivando gente después de un downgrade.
-      if (nuevoActivo === true && !target.activo) {
-        if (!(await orgPuedeActivarMiembro(ctx.organizationId))) {
-          res.status(403).json({
-            error:
-              "Tu plan actual no permite más usuarios activos. Mejora al plan NextCob para reactivar miembros.",
-            code: "plan_upgrade",
-            feature: "equipo",
-          });
-          return;
-        }
-      }
-
       const rolFinal = nuevoRol ?? target.orgRole;
 
       if (nuevoSupervisorId !== undefined) {
@@ -281,6 +266,72 @@ organizationRouter.patch(
       }
       updates.updatedAt = new Date();
 
+      // Reactivating a member: check capacity inside a transaction that locks
+      // the owner row so concurrent reactivations / pack removals cannot
+      // double-book the same seat.
+      if (nuevoActivo === true && !target.activo) {
+        type ReactivateResult =
+          | { sinCupo: true }
+          | { updated: typeof usersTable.$inferSelect };
+        const result = await db.transaction(async (tx): Promise<ReactivateResult> => {
+          if (!(await orgPuedeActivarMiembroTx(tx, ctx.organizationId))) {
+            return { sinCupo: true };
+          }
+          const [updated] = await tx
+            .update(usersTable)
+            .set(updates)
+            .where(eq(usersTable.id, targetId))
+            .returning();
+          // If a supervisor stops being supervisor, clear their reports.
+          if (target.orgRole === "supervisor" && updated.orgRole !== "supervisor") {
+            await tx
+              .update(usersTable)
+              .set({ supervisorId: null, updatedAt: new Date() })
+              .where(
+                and(
+                  eq(usersTable.organizationId, ctx.organizationId!),
+                  eq(usersTable.supervisorId, targetId),
+                ),
+              );
+          }
+          return { updated };
+        });
+
+        if ("sinCupo" in result) {
+          res.status(403).json({
+            error:
+              "Tu plan actual no permite más usuarios activos. Mejora al plan NextCob para reactivar miembros.",
+            code: "plan_upgrade",
+            feature: "equipo",
+          });
+          return;
+        }
+
+        const updated = result.updated;
+        let supervisorNombre: string | null = null;
+        if (updated.supervisorId) {
+          const [sup] = await db
+            .select()
+            .from(usersTable)
+            .where(eq(usersTable.id, updated.supervisorId));
+          supervisorNombre = sup ? (nombreDe(sup) ?? sup.email) : null;
+        }
+        res.json({
+          id: updated.id,
+          nombre: nombreDe(updated),
+          email: updated.email,
+          orgRole: updated.orgRole,
+          supervisorId: updated.supervisorId ?? null,
+          supervisorNombre,
+          activo: updated.activo,
+          esOwner: org?.ownerId === updated.id,
+          createdAt: updated.createdAt ? updated.createdAt.toISOString() : null,
+        });
+        return;
+      }
+
+      // Non-seat-affecting update (role change, supervisor assignment, etc.):
+      // no transaction needed.
       const [updated] = await db
         .update(usersTable)
         .set(updates)
@@ -463,10 +514,69 @@ organizationRouter.post(
         }
       }
 
-      // Cupo del plan: los asientos por sobre los incluidos requieren packs de
-      // usuarios contratados. Cuenta miembros activos + invitaciones pendientes
-      // para no sobrevender el cupo con invitaciones simultáneas.
-      if (!(await orgPuedeActivarMiembro(ctx.organizationId, { contarPendientes: true }))) {
+      // Cupo del plan: capacity check + insert inside a transaction that locks
+      // the owner row (FOR UPDATE via orgPuedeActivarMiembroTx) so that two
+      // simultaneous invite requests cannot both observe the same free seat.
+      // contarPendientes=true counts existing pending invitations so we don't
+      // over-sell slots before anyone accepts.
+      const token = crypto.randomBytes(24).toString("hex");
+      const expiraEn = new Date(Date.now() + INVITE_TTL_MS);
+      const invitadoPorNombre = nombreDe(req.user!) || req.user!.email || null;
+
+      type InviteResult =
+        | { sinCupo: true }
+        | { yaEnOrg: true }
+        | { inv: typeof invitacionesTable.$inferSelect };
+      const invResult = await db.transaction(async (tx): Promise<InviteResult> => {
+        if (!(await orgPuedeActivarMiembroTx(tx, ctx.organizationId, { contarPendientes: true }))) {
+          return { sinCupo: true };
+        }
+        // Reject if a user with this email already belongs to an organization.
+        const [existingUser] = await tx
+          .select({ organizationId: usersTable.organizationId })
+          .from(usersTable)
+          .where(eq(usersTable.email, email));
+        if (existingUser?.organizationId != null) {
+          return { yaEnOrg: true };
+        }
+        // Reuse any existing pending invitation for this email in this org.
+        const [existingInv] = await tx
+          .select()
+          .from(invitacionesTable)
+          .where(
+            and(
+              eq(invitacionesTable.organizationId, ctx.organizationId!),
+              eq(invitacionesTable.email, email),
+              eq(invitacionesTable.estado, "pendiente"),
+            ),
+          );
+        let inv: typeof invitacionesTable.$inferSelect;
+        if (existingInv) {
+          [inv] = await tx
+            .update(invitacionesTable)
+            .set({ orgRole, supervisorId, token, expiraEn, invitadoPorId: userId, invitadoPorNombre })
+            .where(eq(invitacionesTable.id, existingInv.id))
+            .returning();
+        } else {
+          [inv] = await tx
+            .insert(invitacionesTable)
+            .values({
+              organizationId: ctx.organizationId!,
+              email,
+              orgRole,
+              supervisorId,
+              token,
+              estado: "pendiente",
+              invitadoPorId: userId,
+              invitadoPorNombre,
+              expiraEn,
+            })
+            .returning();
+        }
+        return { inv };
+      });
+
+      if ("sinCupo" in invResult) {
         res.status(403).json({
           error:
             "Alcanzaste el cupo de usuarios de tu plan. Agrega un pack de usuarios adicionales para invitar a más personas.",
@@ -474,58 +584,14 @@ organizationRouter.post(
         });
         return;
       }
-
-      // Reject if a user with this email already belongs to an organization.
-      const [existingUser] = await db
-        .select({ organizationId: usersTable.organizationId })
-        .from(usersTable)
-        .where(eq(usersTable.email, email));
-      if (existingUser?.organizationId != null) {
+      if ("yaEnOrg" in invResult) {
         res.status(400).json({
           error: "Este usuario ya pertenece a una organización.",
         });
         return;
       }
 
-      // Reuse any existing pending invitation for this email in this org.
-      const [existingInv] = await db
-        .select()
-        .from(invitacionesTable)
-        .where(
-          and(
-            eq(invitacionesTable.organizationId, ctx.organizationId),
-            eq(invitacionesTable.email, email),
-            eq(invitacionesTable.estado, "pendiente"),
-          ),
-        );
-
-      const token = crypto.randomBytes(24).toString("hex");
-      const expiraEn = new Date(Date.now() + INVITE_TTL_MS);
-      const invitadoPorNombre = nombreDe(req.user!) || req.user!.email || null;
-
-      let inv: typeof invitacionesTable.$inferSelect;
-      if (existingInv) {
-        [inv] = await db
-          .update(invitacionesTable)
-          .set({ orgRole, supervisorId, token, expiraEn, invitadoPorId: userId, invitadoPorNombre })
-          .where(eq(invitacionesTable.id, existingInv.id))
-          .returning();
-      } else {
-        [inv] = await db
-          .insert(invitacionesTable)
-          .values({
-            organizationId: ctx.organizationId,
-            email,
-            orgRole,
-            supervisorId,
-            token,
-            estado: "pendiente",
-            invitadoPorId: userId,
-            invitadoPorNombre,
-            expiraEn,
-          })
-          .returning();
-      }
+      const inv = invResult.inv;
 
       const [org] = await db
         .select({ nombre: organizacionesTable.nombre })

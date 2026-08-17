@@ -45,7 +45,7 @@ import { createAuthToken, consumeAuthToken } from "../lib/tokens";
 import { sendVerificacionEmail, sendResetPasswordEmail, sendWelcomeEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import { normalizeRut } from "../lib/rut";
-import { orgPuedeActivarMiembro } from "../middlewares/requirePlanFeature";
+import { orgPuedeActivarMiembroTx } from "../middlewares/requirePlanFeature";
 
 const router: IRouter = Router();
 
@@ -111,47 +111,66 @@ async function assignOrganization(user: {
       const expirada =
         inv?.expiraEn != null && inv.expiraEn.getTime() < Date.now();
       if (inv && !expirada) {
-        // Cupo del plan al momento de ACEPTAR (no solo al invitar): el dueño
-        // pudo haber bajado a Starter (1 usuario) después de enviar la
-        // invitación. Si no hay cupo, el usuario queda en su propia org solo.
-        if (!(await orgPuedeActivarMiembro(inv.organizationId))) {
-          await db
+        // Transactional acceptance: re-fetch the invitation under a row lock
+        // (prevents double-accept), then lock the owner row via
+        // orgPuedeActivarMiembroTx (serializes concurrent seat allocation).
+        // createSoloOrganization is called OUTSIDE the transaction because it
+        // uses `db` directly and must not nest inside the tx.
+        let needsSoloOrg = false;
+        await db.transaction(async (tx) => {
+          const [lockedInv] = await tx
+            .select()
+            .from(invitacionesTable)
+            .where(eq(invitacionesTable.id, inv.id))
+            .for("update");
+          if (!lockedInv || lockedInv.estado !== "pendiente") {
+            needsSoloOrg = true;
+            return;
+          }
+          // Cupo del plan al momento de ACEPTAR (no solo al invitar): el dueño
+          // pudo haber bajado de plan o quitado packs después de invitar.
+          if (!(await orgPuedeActivarMiembroTx(tx, lockedInv.organizationId))) {
+            await tx
+              .update(invitacionesTable)
+              .set({ estado: "expirada" })
+              .where(eq(invitacionesTable.id, lockedInv.id));
+            needsSoloOrg = true;
+            return;
+          }
+          // Revalidar el supervisor al momento de aceptar: pudo haber sido
+          // degradado o desactivado entre la invitación y la aceptación.
+          let supervisorId: string | null = null;
+          if (lockedInv.orgRole === "ejecutivo" && lockedInv.supervisorId) {
+            const [sup] = await tx
+              .select({ id: usersTable.id })
+              .from(usersTable)
+              .where(
+                and(
+                  eq(usersTable.id, lockedInv.supervisorId),
+                  eq(usersTable.organizationId, lockedInv.organizationId),
+                  eq(usersTable.orgRole, "supervisor"),
+                  eq(usersTable.activo, true),
+                ),
+              );
+            supervisorId = sup ? lockedInv.supervisorId : null;
+          }
+          await tx
+            .update(usersTable)
+            .set({
+              organizationId: lockedInv.organizationId,
+              orgRole: lockedInv.orgRole,
+              supervisorId,
+              activo: true,
+            })
+            .where(eq(usersTable.id, user.id));
+          await tx
             .update(invitacionesTable)
-            .set({ estado: "expirada" })
-            .where(eq(invitacionesTable.id, inv.id));
+            .set({ estado: "aceptada", aceptadaEn: new Date() })
+            .where(eq(invitacionesTable.id, lockedInv.id));
+        });
+        if (needsSoloOrg) {
           await createSoloOrganization(user);
-          return;
         }
-        // Revalidar el supervisor al momento de aceptar: pudo haber sido
-        // degradado o desactivado entre la invitación y la aceptación.
-        let supervisorId: string | null = null;
-        if (inv.orgRole === "ejecutivo" && inv.supervisorId) {
-          const [sup] = await db
-            .select({ id: usersTable.id })
-            .from(usersTable)
-            .where(
-              and(
-                eq(usersTable.id, inv.supervisorId),
-                eq(usersTable.organizationId, inv.organizationId),
-                eq(usersTable.orgRole, "supervisor"),
-                eq(usersTable.activo, true),
-              ),
-            );
-          supervisorId = sup ? inv.supervisorId : null;
-        }
-        await db
-          .update(usersTable)
-          .set({
-            organizationId: inv.organizationId,
-            orgRole: inv.orgRole,
-            supervisorId,
-            activo: true,
-          })
-          .where(eq(usersTable.id, user.id));
-        await db
-          .update(invitacionesTable)
-          .set({ estado: "aceptada", aceptadaEn: new Date() })
-          .where(eq(invitacionesTable.id, inv.id));
         return;
       }
     }

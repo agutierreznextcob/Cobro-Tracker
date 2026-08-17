@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
 import { db, usersTable, organizacionesTable, invitacionesTable } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
+
+// Drizzle transaction type (inferred so it stays in sync with the driver).
+type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 import {
   PLANES,
   cupoDePacks,
@@ -100,6 +103,59 @@ export async function orgPuedeActivarMiembro(
   let ocupados = row?.count ?? 0;
   if (opts.contarPendientes) {
     const [pend] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(invitacionesTable)
+      .where(
+        and(
+          eq(invitacionesTable.organizationId, organizationId),
+          eq(invitacionesTable.estado, "pendiente"),
+          sql`(${invitacionesTable.expiraEn} is null or ${invitacionesTable.expiraEn} > now())`,
+        ),
+      );
+    ocupados += pend?.count ?? 0;
+  }
+  return ocupados + 1 <= cupo;
+}
+
+// Transactional version of orgPuedeActivarMiembro. Must be called inside a
+// db.transaction() block. Acquires a FOR UPDATE lock on the owner's row so that
+// concurrent accept-invitation / reactivate-member / remove-pack operations
+// are serialized and cannot double-book the same seat.
+export async function orgPuedeActivarMiembroTx(
+  tx: DbTx,
+  organizationId: number | null,
+  opts: { contarPendientes?: boolean } = {},
+): Promise<boolean> {
+  if (organizationId == null) return true;
+  const [org] = await tx
+    .select({ ownerId: organizacionesTable.ownerId })
+    .from(organizacionesTable)
+    .where(eq(organizacionesTable.id, organizationId));
+  if (!org) return true;
+  // Lock the owner row — this is the serialization point.
+  const [owner] = await tx
+    .select({
+      subscriptionStatus: usersTable.subscriptionStatus,
+      plan: usersTable.plan,
+      role: usersTable.role,
+      esDemo: usersTable.esDemo,
+      packsUsuarios: usersTable.packsUsuarios,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, org.ownerId))
+    .for("update");
+  if (!owner) return true;
+  const plan = planEfectivo(owner);
+  const cupo = PLANES[plan].usuariosIncluidos + cupoDePacks(normalizarPacks(owner.packsUsuarios));
+  const [row] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(usersTable)
+    .where(
+      and(eq(usersTable.organizationId, organizationId), eq(usersTable.activo, true)),
+    );
+  let ocupados = row?.count ?? 0;
+  if (opts.contarPendientes) {
+    const [pend] = await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(invitacionesTable)
       .where(
