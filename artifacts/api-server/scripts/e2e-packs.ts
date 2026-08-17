@@ -423,6 +423,184 @@ async function main() {
     check(`quitar último pack5 → 200`, removeLastPack5.status === 200, removeLastPack5.json);
     check(`totalMensual vuelve a ${NEXTCOB_TOTAL}`, removeLastPack5.json?.totalMensual === NEXTCOB_TOTAL, removeLastPack5.json?.totalMensual);
 
+    // ── Packs heterogéneos: individual + pack5 + pack10 simultáneos ───────
+    // Verifica que normalizarPacks / costoDePacks / cupoDePacks manejan
+    // correctamente una mezcla de tipos distintos de pack sin overcharge.
+    //
+    // Precio unitario de cada pack (IVA incluido):
+    //   individual: neto=9990 + IVA=1898 = total 11888; 1 asiento extra
+    //   pack5:      neto=39990 + IVA=7598 = total 47588; 5 asientos extra
+    //   pack10:     neto=69990 + IVA=13298 = total 83288; 10 asientos extra
+    //
+    // Expectativas acumuladas paso a paso:
+    //   paso 1 (+ individual):        total = 29738 + 11888 = 41626  cupo = 2+1 = 3
+    //   paso 2 (+ individual + pack5): total = 41626 + 47588 = 89214  cupo = 3+5 = 8
+    //   paso 3 (+ todo):              total = 89214 + 83288 = 172502 cupo = 8+10 = 18
+    const INDIVIDUAL_TOTAL = 11_888;
+    const TOTAL_WITH_INDIVIDUAL              = NEXTCOB_TOTAL + INDIVIDUAL_TOTAL;               // 41_626
+    const TOTAL_WITH_INDIVIDUAL_PACK5        = TOTAL_WITH_INDIVIDUAL + PACK5_TOTAL;            // 89_214
+    const TOTAL_WITH_INDIVIDUAL_PACK5_PACK10 = TOTAL_WITH_INDIVIDUAL_PACK5 + PACK10_TOTAL;    // 172_502
+
+    console.log("== Packs mixtos: agregar pack individual ==");
+    await reloadOwner();
+    const callsBeforeIndividual = amountCalls.length;
+    const addIndividual = await call("POST", "/subscription/packs", { pack: "individual", accion: "agregar" });
+    check("agregar individual → 200", addIndividual.status === 200, addIndividual.json);
+    check(
+      `totalMensual = ${TOTAL_WITH_INDIVIDUAL} tras individual`,
+      addIndividual.json?.totalMensual === TOTAL_WITH_INDIVIDUAL,
+      addIndividual.json?.totalMensual,
+    );
+    const callsIndividual = amountCalls.slice(callsBeforeIndividual);
+    check("setReveniuAmount llamado 1 vez al agregar individual", callsIndividual.length === 1, callsIndividual);
+    check(
+      `setReveniuAmount recibió amount=${TOTAL_WITH_INDIVIDUAL}`,
+      callsIndividual.some((c) => c.amount === TOTAL_WITH_INDIVIDUAL),
+      callsIndividual,
+    );
+
+    // /subscription/status tras individual: cupo=3, packs[individual].cantidad=1
+    await reloadOwner();
+    const statusWithIndividual = await call("GET", "/subscription/status");
+    check("status 200", statusWithIndividual.status === 200, statusWithIndividual.status);
+    check(
+      "cupoUsuarios = 3 (2+1) tras agregar individual",
+      statusWithIndividual.json?.cupoUsuarios === 3,
+      statusWithIndividual.json?.cupoUsuarios,
+    );
+    check(
+      `totalMensual = ${TOTAL_WITH_INDIVIDUAL} en status tras individual`,
+      statusWithIndividual.json?.totalMensual === TOTAL_WITH_INDIVIDUAL,
+      statusWithIndividual.json?.totalMensual,
+    );
+    const packsArrInd: any[] = statusWithIndividual.json?.packs ?? [];
+    check(
+      "packs[] incluye individual con cantidad=1",
+      packsArrInd.some((p: any) => (p.id ?? p.pack) === "individual" && p.cantidad === 1),
+      packsArrInd,
+    );
+
+    console.log("== Packs mixtos: agregar pack5 (individual ya presente) ==");
+    await reloadOwner();
+    const callsBeforeMixedPack5 = amountCalls.length;
+    const addMixedPack5 = await call("POST", "/subscription/packs", { pack: "pack5", accion: "agregar" });
+    check("agregar pack5 (junto a individual) → 200", addMixedPack5.status === 200, addMixedPack5.json);
+    check(
+      `totalMensual = ${TOTAL_WITH_INDIVIDUAL_PACK5} tras individual+pack5`,
+      addMixedPack5.json?.totalMensual === TOTAL_WITH_INDIVIDUAL_PACK5,
+      addMixedPack5.json?.totalMensual,
+    );
+    const callsMixedPack5 = amountCalls.slice(callsBeforeMixedPack5);
+    check("setReveniuAmount llamado 1 vez al agregar pack5 mixto", callsMixedPack5.length === 1, callsMixedPack5);
+    check(
+      `setReveniuAmount recibió amount=${TOTAL_WITH_INDIVIDUAL_PACK5}`,
+      callsMixedPack5.some((c) => c.amount === TOTAL_WITH_INDIVIDUAL_PACK5),
+      callsMixedPack5,
+    );
+
+    // /subscription/status: cupo=8, ambos packs con cantidad=1
+    await reloadOwner();
+    const statusIndPack5 = await call("GET", "/subscription/status");
+    check(
+      "cupoUsuarios = 8 (2+1+5) tras individual+pack5",
+      statusIndPack5.json?.cupoUsuarios === 8,
+      statusIndPack5.json?.cupoUsuarios,
+    );
+    check(
+      `totalMensual = ${TOTAL_WITH_INDIVIDUAL_PACK5} en status`,
+      statusIndPack5.json?.totalMensual === TOTAL_WITH_INDIVIDUAL_PACK5,
+      statusIndPack5.json?.totalMensual,
+    );
+    const packsArrIndP5: any[] = statusIndPack5.json?.packs ?? [];
+    check(
+      "packs[] incluye individual con cantidad=1",
+      packsArrIndP5.some((p: any) => (p.id ?? p.pack) === "individual" && p.cantidad === 1),
+      packsArrIndP5,
+    );
+    check(
+      "packs[] incluye pack5 con cantidad=1",
+      packsArrIndP5.some((p: any) => (p.id ?? p.pack) === "pack5" && p.cantidad === 1),
+      packsArrIndP5,
+    );
+
+    console.log("== Packs mixtos: agregar pack10 (individual+pack5 ya presentes) ==");
+    await reloadOwner();
+    const callsBeforeMixedPack10 = amountCalls.length;
+    const addMixedPack10 = await call("POST", "/subscription/packs", { pack: "pack10", accion: "agregar" });
+    check("agregar pack10 (junto a individual+pack5) → 200", addMixedPack10.status === 200, addMixedPack10.json);
+    check(
+      `totalMensual = ${TOTAL_WITH_INDIVIDUAL_PACK5_PACK10} tras los tres packs`,
+      addMixedPack10.json?.totalMensual === TOTAL_WITH_INDIVIDUAL_PACK5_PACK10,
+      addMixedPack10.json?.totalMensual,
+    );
+    const callsMixedPack10 = amountCalls.slice(callsBeforeMixedPack10);
+    check("setReveniuAmount llamado 1 vez al agregar pack10 mixto", callsMixedPack10.length === 1, callsMixedPack10);
+    check(
+      `setReveniuAmount recibió amount=${TOTAL_WITH_INDIVIDUAL_PACK5_PACK10}`,
+      callsMixedPack10.some((c) => c.amount === TOTAL_WITH_INDIVIDUAL_PACK5_PACK10),
+      callsMixedPack10,
+    );
+
+    // DB: packsUsuarios debe tener individual:1, pack5:1, pack10:1
+    const [afterMixedAll] = await db
+      .select({ reveniuMontoSync: usersTable.reveniuMontoSync, packsUsuarios: usersTable.packsUsuarios })
+      .from(usersTable)
+      .where(eq(usersTable.id, owner.id));
+    check(
+      `reveniuMontoSync = ${TOTAL_WITH_INDIVIDUAL_PACK5_PACK10} en DB`,
+      afterMixedAll?.reveniuMontoSync === TOTAL_WITH_INDIVIDUAL_PACK5_PACK10,
+      afterMixedAll?.reveniuMontoSync,
+    );
+    check("packsUsuarios DB: individual:1", (afterMixedAll?.packsUsuarios as any)?.individual === 1, afterMixedAll?.packsUsuarios);
+    check("packsUsuarios DB: pack5:1", (afterMixedAll?.packsUsuarios as any)?.pack5 === 1, afterMixedAll?.packsUsuarios);
+    check("packsUsuarios DB: pack10:1", (afterMixedAll?.packsUsuarios as any)?.pack10 === 1, afterMixedAll?.packsUsuarios);
+
+    // /subscription/status: cupo=18 (2+1+5+10), packs[] todos con cantidad=1
+    console.log("== /subscription/status con los tres packs mixtos: cupo=18 ==");
+    await reloadOwner();
+    const statusMixedAll = await call("GET", "/subscription/status");
+    check("status 200", statusMixedAll.status === 200, statusMixedAll.status);
+    check(
+      "cupoUsuarios = 18 (2+1+5+10) con los tres packs",
+      statusMixedAll.json?.cupoUsuarios === 18,
+      statusMixedAll.json?.cupoUsuarios,
+    );
+    check(
+      `totalMensual = ${TOTAL_WITH_INDIVIDUAL_PACK5_PACK10} en status con tres packs`,
+      statusMixedAll.json?.totalMensual === TOTAL_WITH_INDIVIDUAL_PACK5_PACK10,
+      statusMixedAll.json?.totalMensual,
+    );
+    const packsArrMixedAll: any[] = statusMixedAll.json?.packs ?? [];
+    check(
+      "packs[] incluye individual con cantidad=1",
+      packsArrMixedAll.some((p: any) => (p.id ?? p.pack) === "individual" && p.cantidad === 1),
+      packsArrMixedAll,
+    );
+    check(
+      "packs[] incluye pack5 con cantidad=1",
+      packsArrMixedAll.some((p: any) => (p.id ?? p.pack) === "pack5" && p.cantidad === 1),
+      packsArrMixedAll,
+    );
+    check(
+      "packs[] incluye pack10 con cantidad=1",
+      packsArrMixedAll.some((p: any) => (p.id ?? p.pack) === "pack10" && p.cantidad === 1),
+      packsArrMixedAll,
+    );
+
+    // Limpiar los tres packs mixtos antes de continuar con otros tests.
+    for (const pack of ["individual", "pack5", "pack10"] as const) {
+      await reloadOwner();
+      const r = await call("POST", "/subscription/packs", { pack, accion: "quitar" });
+      check(`quitar ${pack} mixto → 200`, r.status === 200, r.json);
+    }
+    await reloadOwner();
+    const statusClean = await call("GET", "/subscription/status");
+    check(
+      `totalMensual = ${NEXTCOB_TOTAL} tras limpiar packs mixtos`,
+      statusClean.json?.totalMensual === NEXTCOB_TOTAL,
+      statusClean.json?.totalMensual,
+    );
+
     // ── 403 sin_cupo al invitar con org al límite de capacidad ────────────
     // Reactivate both members → 3 activos > cupoBase=2 → cupo lleno (sin pack).
     console.log("== 403 sin_cupo al invitar con cupo lleno ==");
