@@ -117,6 +117,7 @@ import type {
   Notificacion,
   OkResponse,
   OrganizacionInfo,
+  PackUsuariosInput,
   PagoSuscripcion,
   PortalData,
   ProWaitlistInput,
@@ -141,6 +142,7 @@ import type {
   SubscriptionStatus,
   SugerenciaWorkflow,
   Tarea,
+  UpdateUserPacks200,
   VerifyEmailParams,
   WebhookEventosPage,
   WebhookPayload,
@@ -4865,6 +4867,77 @@ export const useCambiarPlanSubscription = <TError = ErrorType<ErrorResponse | vo
         TContext
       > => {
       return useMutation(getCambiarPlanSubscriptionMutationOptions(options));
+    }
+
+export const getUpdateUserPacksUrl = () => {
+
+
+
+
+  return `/api/subscription/packs`
+}
+
+/**
+ * @summary Add or remove a pack of additional users (owner only, cumulative)
+ */
+export const updateUserPacks = async (packUsuariosInput: PackUsuariosInput, options?: RequestInit): Promise<UpdateUserPacks200> => {
+
+  return customFetch<UpdateUserPacks200>(getUpdateUserPacksUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      packUsuariosInput,)
+  }
+);}
+
+
+
+
+export const getUpdateUserPacksMutationOptions = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUserPacks>>, TError,{data: BodyType<PackUsuariosInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateUserPacks>>, TError,{data: BodyType<PackUsuariosInput>}, TContext> => {
+
+const mutationKey = ['updateUserPacks'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateUserPacks>>, {data: BodyType<PackUsuariosInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateUserPacks(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateUserPacksMutationResult = NonNullable<Awaited<ReturnType<typeof updateUserPacks>>>
+    export type UpdateUserPacksMutationBody = BodyType<PackUsuariosInput>
+    export type UpdateUserPacksMutationError = ErrorType<ErrorResponse | void>
+
+    /**
+ * @summary Add or remove a pack of additional users (owner only, cumulative)
+ */
+export const useUpdateUserPacks = <TError = ErrorType<ErrorResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUserPacks>>, TError,{data: BodyType<PackUsuariosInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateUserPacks>>,
+        TError,
+        {data: BodyType<PackUsuariosInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateUserPacksMutationOptions(options));
     }
 
 export const getJoinProWaitlistUrl = () => {

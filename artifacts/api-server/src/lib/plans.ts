@@ -70,6 +70,77 @@ export const PLANES: Record<PlanId, PlanDef> = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Packs de usuarios adicionales.
+//
+// Los asientos extra se contratan por PACKS con descuento por volumen (ya no
+// se cobra por asiento individual automáticamente). Los packs se ACUMULAN
+// (p. ej. 2× pack5 = 10 usuarios extra) y se suman al cobro mensual base.
+// Solo disponibles en planes con permiteUsuariosExtra (NextCob).
+// ---------------------------------------------------------------------------
+
+export type PackId = "individual" | "pack5" | "pack10" | "pack20";
+
+export interface PackDef {
+  id: PackId;
+  nombre: string;
+  usuarios: number;
+  neto: number;
+  iva: number;
+  total: number;
+  // Precio unitario por usuario (total IVA incl. / usuarios), redondeado.
+  porUsuario: number;
+  // % de ahorro vs comprar el mismo número de packs individuales.
+  ahorroPct: number;
+  etiqueta: string | null;
+}
+
+function mkPack(id: PackId, nombre: string, usuarios: number, neto: number, ahorroPct: number, etiqueta: string | null): PackDef {
+  const iva = Math.round(neto * IVA_RATE);
+  const total = neto + iva;
+  return { id, nombre, usuarios, neto, iva, total, porUsuario: Math.round(neto / usuarios), ahorroPct, etiqueta };
+}
+
+export const PACKS_USUARIOS: Record<PackId, PackDef> = {
+  individual: mkPack("individual", "Pack Individual", 1, 9_990, 0, null),
+  pack5: mkPack("pack5", "Pack 5 usuarios", 5, 39_990, 20, "Buen precio"),
+  pack10: mkPack("pack10", "Pack 10 usuarios", 10, 69_990, 30, "⭐ Más popular"),
+  pack20: mkPack("pack20", "Pack 20 usuarios", 20, 119_990, 40, "💎 Mejor valor"),
+};
+
+export const PACK_IDS: readonly PackId[] = ["individual", "pack5", "pack10", "pack20"];
+
+// Cantidades de packs contratados por el dueño de la org: {pack10: 1, ...}.
+export type PacksUsuarios = Partial<Record<PackId, number>>;
+
+export function normalizarPacks(raw: unknown): PacksUsuarios {
+  const out: PacksUsuarios = {};
+  if (raw && typeof raw === "object") {
+    for (const id of PACK_IDS) {
+      const v = (raw as Record<string, unknown>)[id];
+      if (typeof v === "number" && Number.isInteger(v) && v > 0) out[id] = v;
+    }
+  }
+  return out;
+}
+
+// Usuarios extra que aportan los packs contratados.
+export function cupoDePacks(packs: PacksUsuarios): number {
+  return PACK_IDS.reduce((acc, id) => acc + (packs[id] ?? 0) * PACKS_USUARIOS[id].usuarios, 0);
+}
+
+// Costo mensual total de los packs (IVA incluido), y desglose neto/IVA.
+export function costoDePacks(packs: PacksUsuarios): { neto: number; iva: number; total: number } {
+  let neto = 0;
+  let iva = 0;
+  for (const id of PACK_IDS) {
+    const n = packs[id] ?? 0;
+    neto += n * PACKS_USUARIOS[id].neto;
+    iva += n * PACKS_USUARIOS[id].iva;
+  }
+  return { neto, iva, total: neto + iva };
+}
+
 // Plan efectivo de un usuario: durante el trial (y para admins/demo) todos
 // operan con el nivel NextCob completo; con suscripción, el plan contratado
 // (NULL histórico = nextcob, los suscriptores previos a los planes).

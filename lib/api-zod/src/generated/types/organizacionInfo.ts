@@ -19,14 +19,14 @@ export interface OrganizacionInfo {
   planBaseIva: number;
   /** Monthly base plan total (currency units), IVA included (neto + IVA) */
   planBase: number;
-  /** Net price per additional seat (currency units), before IVA */
-  costoUsuarioAdicionalNeto: number;
-  /** IVA (19%) amount per additional seat (currency units) */
-  costoUsuarioAdicionalIva: number;
-  /** Monthly total per additional seat (currency units), IVA included */
-  costoUsuarioAdicional: number;
-  /** Number of seats beyond the first */
-  usuariosAdicionales: number;
-  /** Estimated monthly total, IVA included (planBase + usuariosAdicionales * costoUsuarioAdicional) */
+  /** Total seat capacity (plan included + packs) */
+  cupoUsuarios: number;
+  /** Extra seats provided by purchased packs */
+  cupoPacks: number;
+  packsNeto?: number;
+  packsIva?: number;
+  /** Monthly total of purchased packs (IVA included) */
+  packsTotal: number;
+  /** Estimated monthly total, IVA included (planBase + packsTotal) */
   totalMensual: number;
 }

@@ -14,6 +14,7 @@ import { requireSubscription } from "../middlewares/requireSubscription";
 import { requireOrgAdmin } from "../middlewares/requireOrgAdmin";
 import { requirePlanFeature, orgPuedeActivarMiembro } from "../middlewares/requirePlanFeature";
 import { getOrgContext, computePricing } from "../lib/org";
+import { normalizarPacks } from "../lib/plans";
 import { sendInvitacionEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
 
@@ -87,18 +88,23 @@ organizationRouter.get("/organization", async (req, res) => {
 
     // El plan que fija los precios es el del dueño de la organización (quien paga).
     const [owner] = await db
-      .select({ plan: usersTable.plan, subscriptionStatus: usersTable.subscriptionStatus })
+      .select({
+        plan: usersTable.plan,
+        subscriptionStatus: usersTable.subscriptionStatus,
+        packsUsuarios: usersTable.packsUsuarios,
+      })
       .from(usersTable)
       .where(eq(usersTable.id, org.ownerId));
     const ownerPlan =
       owner?.subscriptionStatus === "prueba" ? "nextcob" : (owner?.plan ?? "nextcob");
-    const pricing = computePricing(miembrosActivos, ownerPlan);
+    const pricing = computePricing(ownerPlan, normalizarPacks(owner?.packsUsuarios));
 
     res.json({
       id: org.id,
       nombre: org.nombre,
       esAdmin: ctx.isOrgAdmin,
       miembrosActivos,
+      cupoUsuarios: pricing.usuariosIncluidos + pricing.cupoPacks,
       ...pricing,
     });
   } catch (err) {
@@ -455,6 +461,18 @@ organizationRouter.post(
           res.status(400).json({ error: errSup });
           return;
         }
+      }
+
+      // Cupo del plan: los asientos por sobre los incluidos requieren packs de
+      // usuarios contratados. Cuenta miembros activos + invitaciones pendientes
+      // para no sobrevender el cupo con invitaciones simultáneas.
+      if (!(await orgPuedeActivarMiembro(ctx.organizationId, { contarPendientes: true }))) {
+        res.status(403).json({
+          error:
+            "Alcanzaste el cupo de usuarios de tu plan. Agrega un pack de usuarios adicionales para invitar a más personas.",
+          code: "sin_cupo",
+        });
+        return;
       }
 
       // Reject if a user with this email already belongs to an organization.

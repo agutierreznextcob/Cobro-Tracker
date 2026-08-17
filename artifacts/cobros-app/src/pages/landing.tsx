@@ -585,6 +585,50 @@ function PreciosSection() {
             </button>
           </div>
         </Reveal>
+        {/* Packs de usuarios adicionales */}
+        <Reveal variant="up" className="max-w-5xl mx-auto mt-14">
+          <div className="text-center mb-8">
+            <h3 className="text-2xl font-bold">¿Necesitas más usuarios?</h3>
+            <p className="text-muted-foreground mt-2">
+              Agrega packs de usuarios a tu plan. Mientras más grande el pack, menor el precio por
+              usuario.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { nombre: "Individual", usuarios: "1 usuario", total: "$11.888", neto: "$9.990 + IVA", porUsuario: "$9.990/usuario", etiqueta: null, ahorro: null },
+              { nombre: "Pack 5", usuarios: "5 usuarios", total: "$47.588", neto: "$39.990 + IVA", porUsuario: "$7.998/usuario", etiqueta: "Buen precio", ahorro: "Ahorras 20%" },
+              { nombre: "Pack 10", usuarios: "10 usuarios", total: "$83.288", neto: "$69.990 + IVA", porUsuario: "$6.999/usuario", etiqueta: "⭐ Más popular", ahorro: "Ahorras 30%" },
+              { nombre: "Pack 20", usuarios: "20 usuarios", total: "$142.788", neto: "$119.990 + IVA", porUsuario: "$5.999/usuario", etiqueta: "💎 Mejor valor", ahorro: "Ahorras 40%" },
+            ].map((pack) => (
+              <div
+                key={pack.nombre}
+                className={`relative rounded-2xl border bg-card p-6 ${pack.etiqueta === "⭐ Más popular" ? "border-primary shadow-lg" : "border-border"}`}
+              >
+                {pack.etiqueta && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                    {pack.etiqueta}
+                  </span>
+                )}
+                <p className="font-semibold">{pack.nombre}</p>
+                <p className="text-sm text-muted-foreground">{pack.usuarios}</p>
+                <p className="text-2xl font-extrabold mt-3">
+                  {pack.total}
+                  <span className="text-sm font-normal text-muted-foreground">/mes</span>
+                </p>
+                <p className="text-xs text-muted-foreground">{pack.neto}</p>
+                <p className="text-sm font-medium mt-2">{pack.porUsuario}</p>
+                {pack.ahorro && (
+                  <p className="text-sm font-semibold text-green-600 mt-0.5">{pack.ahorro}</p>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            Los packs se suman a tu plan mensual y se acumulan. Ejemplo: Plan NextCob $29.738 +
+            Pack 10 $83.288 = <span className="font-semibold text-foreground">$113.026/mes</span> para 12 usuarios.
+          </p>
+        </Reveal>
         <p className="text-center text-sm text-muted-foreground mt-8">
           CLP · IVA incluido · La prueba de 14 días incluye todas las funciones del plan NextCob. Cancela cuando quieras.
         </p>

@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { Router } from "express";
 import { db, cobrosTable, webhookEventosTable, pagosParciales, usersTable, mpCredencialesTable, pagosSuscripcionTable } from "@workspace/db";
 import { computePricing } from "../lib/org";
+import { normalizarPacks } from "../lib/plans";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { ReceiveCobroWebhookBody } from "@workspace/api-zod";
 import { verificarPagoFlow } from "../lib/flow-api";
@@ -797,26 +798,17 @@ webhooksRouter.post("/webhooks/flow-subscription", async (req, res) => {
     // usuario+período; idempotente frente a reintentos del webhook).
     if (mapped.status === "activa" && mapped.periodEnd) {
       try {
-        let miembrosActivos = 1;
-        if (user.organizationId != null) {
-          const [cnt] = await db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(usersTable)
-            .where(
-              and(
-                eq(usersTable.organizationId, user.organizationId),
-                eq(usersTable.activo, true),
-              ),
-            );
-          miembrosActivos = cnt?.count ?? 1;
-        }
-        const pricing = computePricing(miembrosActivos, user.plan ?? "nextcob");
+        const pricing = computePricing(user.plan ?? "nextcob", normalizarPacks(user.packsUsuarios));
+        // Libro de ingresos: el monto autoritativo es el que Reveniu cobra hoy
+        // (reveniuMontoSync); el modelo plan+packs es sólo fallback. Así los
+        // clientes grandfathered (per-seat antiguo) registran lo realmente
+        // cobrado y no el precio del modelo nuevo.
+        const totalCobrado = user.reveniuMontoSync ?? pricing.planBase + pricing.packsTotal;
         const neto =
-          pricing.planBaseNeto +
-          pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalNeto;
-        const iva =
-          pricing.planBaseIva +
-          pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalIva;
+          user.reveniuMontoSync != null
+            ? Math.round(totalCobrado / 1.19)
+            : pricing.planBaseNeto + pricing.packsNeto;
+        const iva = totalCobrado - neto;
         // Idempotente frente a reintentos/concurrencia: la unicidad
         // (user_id, periodo_hasta) vive en la BD; un conflicto es éxito.
         await db
@@ -824,7 +816,7 @@ webhooksRouter.post("/webhooks/flow-subscription", async (req, res) => {
           .values({
             userId: user.id,
             fecha: new Date(),
-            usuariosAdicionales: pricing.usuariosAdicionales,
+            usuariosAdicionales: pricing.cupoPacks,
             montoNeto: neto,
             montoIva: iva,
             montoTotal: neto + iva,
@@ -1023,32 +1015,21 @@ webhooksRouter.post("/webhooks/reveniu", async (req, res) => {
         // omitir que duplicar; el superadmin puede conciliar con Reveniu).
         if (nextDue) {
           try {
-            let miembrosActivos = 1;
-            if (user.organizationId != null) {
-              const [cnt] = await db
-                .select({ count: sql<number>`count(*)::int` })
-                .from(usersTable)
-                .where(
-                  and(
-                    eq(usersTable.organizationId, user.organizationId),
-                    eq(usersTable.activo, true),
-                  ),
-                );
-              miembrosActivos = cnt?.count ?? 1;
-            }
-            const pricing = computePricing(miembrosActivos, user.plan ?? "nextcob");
+            const pricing = computePricing(user.plan ?? "nextcob", normalizarPacks(user.packsUsuarios));
+            // Monto autoritativo = lo sincronizado con el proveedor (ver nota
+            // en el webhook Flow más arriba); el modelo plan+packs es fallback.
+            const totalCobrado = user.reveniuMontoSync ?? pricing.planBase + pricing.packsTotal;
             const neto =
-              pricing.planBaseNeto +
-              pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalNeto;
-            const iva =
-              pricing.planBaseIva +
-              pricing.usuariosAdicionales * pricing.costoUsuarioAdicionalIva;
+              user.reveniuMontoSync != null
+                ? Math.round(totalCobrado / 1.19)
+                : pricing.planBaseNeto + pricing.packsNeto;
+            const iva = totalCobrado - neto;
             await db
               .insert(pagosSuscripcionTable)
               .values({
                 userId: user.id,
                 fecha: ahora,
-                usuariosAdicionales: pricing.usuariosAdicionales,
+                usuariosAdicionales: pricing.cupoPacks,
                 montoNeto: neto,
                 montoIva: iva,
                 montoTotal: neto + iva,

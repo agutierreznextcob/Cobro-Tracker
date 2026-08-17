@@ -5,6 +5,7 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+import type { PackContratado } from './packContratado';
 import type { SubscriptionStatusPlan } from './subscriptionStatusPlan';
 import type { SubscriptionStatusPlanEfectivo } from './subscriptionStatusPlanEfectivo';
 import type { SubscriptionStatusStatus } from './subscriptionStatusStatus';
@@ -29,13 +30,18 @@ export interface SubscriptionStatus {
   precioNeto: number;
   /** Monthly IVA (19%) amount in CLP */
   precioIva: number;
-  /** Extra active seats beyond the base plan (real-time count) */
-  usuariosAdicionales?: number;
-  costoUsuarioAdicionalNeto?: number;
-  costoUsuarioAdicionalIva?: number;
-  costoUsuarioAdicional?: number;
+  /** Packs de usuarios adicionales contratados (del dueño de la org) */
+  packs?: PackContratado[];
+  /** Cupo total de asientos (incluidos en el plan + packs) */
+  cupoUsuarios?: number;
+  /** Miembros activos de la organización (tiempo real) */
+  usuariosActivos?: number;
+  packsNeto?: number;
+  packsIva?: number;
+  /** Costo mensual total de los packs (CLP, IVA incl.) */
+  packsTotal?: number;
   totalNetoMensual?: number;
   totalIvaMensual?: number;
-  /** Total monthly charge in CLP (base + extra seats, IVA incl.) */
+  /** Total monthly charge in CLP (base + packs, IVA incl.) */
   totalMensual?: number;
 }

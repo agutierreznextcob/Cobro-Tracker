@@ -6,6 +6,7 @@ import { eq, sql, isNull, desc, or, ilike } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { computeSubscriptionState } from "../lib/subscription";
 import { computePricing } from "../lib/org";
+import { normalizarPacks } from "../lib/plans";
 import { sendRenovacionEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
 
@@ -168,9 +169,7 @@ async function buildUsuarios(q?: string): Promise<EnrichedUsuario[]> {
         (state.status === "vencida" ||
           (diasParaVencer !== null && diasParaVencer <= 3));
 
-      const miembrosActivos =
-        u.organizationId != null ? (miembros.get(u.organizationId) ?? 1) : 1;
-      const pricing = computePricing(miembrosActivos, u.plan ?? "nextcob");
+      const pricing = computePricing(u.plan ?? "nextcob", normalizarPacks(u.packsUsuarios));
       const totalRecaudado =
         u.organizationId != null ? (recaudado.get(u.organizationId) ?? 0) : 0;
 
@@ -196,7 +195,7 @@ async function buildUsuarios(q?: string): Promise<EnrichedUsuario[]> {
         plan: u.plan ?? null,
         planNombre: pricing.planNombre,
         planInicioEn: ultimoPago.get(u.id)?.fecha?.toISOString() ?? null,
-        usuariosExtra: pricing.usuariosAdicionales,
+        usuariosExtra: pricing.cupoPacks,
         montoMensual: pricing.totalMensual,
         totalRecaudado,
         ultimoPagoEn: ultimoPago.get(u.id)?.fecha?.toISOString() ?? null,
@@ -332,6 +331,7 @@ adminRouter.get("/admin/metricas", async (req, res) => {
         id: organizacionesTable.id,
         ownerStatus: usersTable.subscriptionStatus,
         ownerPlan: usersTable.plan,
+        ownerPacks: usersTable.packsUsuarios,
       })
       .from(organizacionesTable)
       .leftJoin(usersTable, eq(usersTable.id, organizacionesTable.ownerId));
@@ -339,8 +339,10 @@ adminRouter.get("/admin/metricas", async (req, res) => {
     let revenueMensual = 0;
     for (const org of orgs) {
       if (org.ownerStatus !== "activa") continue;
-      const memberCount = miembros.get(org.id) ?? 1;
-      revenueMensual += computePricing(memberCount, org.ownerPlan ?? "nextcob").totalMensual;
+      revenueMensual += computePricing(
+        org.ownerPlan ?? "nextcob",
+        normalizarPacks(org.ownerPacks),
+      ).totalMensual;
     }
 
     res.json({

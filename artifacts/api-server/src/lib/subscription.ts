@@ -1,6 +1,17 @@
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, organizacionesTable } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
-import { PLANES, planEfectivo, type PlanId } from "./plans";
+import {
+  PACKS_USUARIOS,
+  PACK_IDS,
+  PLANES,
+  costoDePacks,
+  cupoDePacks,
+  normalizarPacks,
+  planEfectivo,
+  type PackId,
+  type PacksUsuarios,
+  type PlanId,
+} from "./plans";
 
 export interface SubscriptionState {
   status: "prueba" | "activa" | "vencida" | "cancelada";
@@ -19,12 +30,21 @@ export interface SubscriptionState {
   precioMensual: number;
   precioNeto: number;
   precioIva: number;
-  // Real-time seat breakdown: base plan + extra active members of the org.
-  // Recomputed on every request, so deactivating a member updates it at once.
-  usuariosAdicionales: number;
-  costoUsuarioAdicionalNeto: number;
-  costoUsuarioAdicionalIva: number;
-  costoUsuarioAdicional: number;
+  // Packs de usuarios adicionales contratados (del dueño de la org) y cupo
+  // total de asientos (incluidos + packs). El desglose mensual = plan base +
+  // costo de packs.
+  packs: Array<{
+    pack: PackId;
+    nombre: string;
+    cantidad: number;
+    usuarios: number;
+    total: number;
+  }>;
+  cupoUsuarios: number;
+  usuariosActivos: number;
+  packsNeto: number;
+  packsIva: number;
+  packsTotal: number;
   totalNetoMensual: number;
   totalIvaMensual: number;
   totalMensual: number;
@@ -48,7 +68,8 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 // from a subscription row. Pure function (no DB) so it's easy to reason about.
 export function computeSubscriptionState(
   row: UserSubscriptionRow,
-  usuariosAdicionales = 0,
+  usuariosActivos = 1,
+  packs: PacksUsuarios = {},
 ): SubscriptionState {
   const now = Date.now();
   const trialEndsAt = row.trialEndsAt ?? null;
@@ -95,10 +116,14 @@ export function computeSubscriptionState(
     esDemo: row.esDemo,
   });
   const planDef = PLANES[efectivo];
-  // Asientos extra por sobre los incluidos en el plan (solo si el plan los permite).
-  const extras = planDef.permiteUsuariosExtra
-    ? Math.max(0, usuariosAdicionales + 1 - planDef.usuariosIncluidos)
-    : 0;
+  const costoPacks = costoDePacks(packs);
+  const packsDetalle = PACK_IDS.filter((id) => (packs[id] ?? 0) > 0).map((id) => ({
+    pack: id,
+    nombre: PACKS_USUARIOS[id].nombre,
+    cantidad: packs[id]!,
+    usuarios: packs[id]! * PACKS_USUARIOS[id].usuarios,
+    total: packs[id]! * PACKS_USUARIOS[id].total,
+  }));
 
   return {
     status: row.subscriptionStatus,
@@ -115,21 +140,17 @@ export function computeSubscriptionState(
     precioMensual: planDef.total,
     precioNeto: planDef.neto,
     precioIva: planDef.iva,
-    usuariosAdicionales: extras,
-    costoUsuarioAdicionalNeto: COSTO_ADICIONAL_NETO,
-    costoUsuarioAdicionalIva: COSTO_ADICIONAL_IVA,
-    costoUsuarioAdicional: COSTO_ADICIONAL_NETO + COSTO_ADICIONAL_IVA,
-    totalNetoMensual: planDef.neto + extras * COSTO_ADICIONAL_NETO,
-    totalIvaMensual: planDef.iva + extras * COSTO_ADICIONAL_IVA,
-    totalMensual: planDef.total + extras * (COSTO_ADICIONAL_NETO + COSTO_ADICIONAL_IVA),
+    packs: packsDetalle,
+    cupoUsuarios: planDef.usuariosIncluidos + cupoDePacks(packs),
+    usuariosActivos,
+    packsNeto: costoPacks.neto,
+    packsIva: costoPacks.iva,
+    packsTotal: costoPacks.total,
+    totalNetoMensual: planDef.neto + costoPacks.neto,
+    totalIvaMensual: planDef.iva + costoPacks.iva,
+    totalMensual: planDef.total + costoPacks.total,
   };
 }
-
-// Per-seat pricing constants duplicated from lib/org.ts values to avoid a
-// circular import (org.ts ← subscription.ts). Keep in sync with
-// COSTO_USUARIO_ADICIONAL_* in lib/org.ts.
-const COSTO_ADICIONAL_NETO = 9990;
-const COSTO_ADICIONAL_IVA = Math.round(COSTO_ADICIONAL_NETO * 0.19);
 
 // Counts extra active seats (active org members beyond the first) for a user.
 // Returns 0 for users without an organization.
@@ -154,13 +175,30 @@ export async function getSubscriptionState(userId: string): Promise<Subscription
       activo: usersTable.activo,
       esDemo: usersTable.esDemo,
       plan: usersTable.plan,
+      packsUsuarios: usersTable.packsUsuarios,
       organizationId: usersTable.organizationId,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
   if (!row) return null;
-  const usuariosAdicionales = await contarUsuariosAdicionales(row.organizationId);
-  return computeSubscriptionState(row, usuariosAdicionales);
+  const usuariosActivos = (await contarUsuariosAdicionales(row.organizationId)) + 1;
+  // Los packs viven en la fila del DUEÑO de la org (quien paga): un miembro
+  // invitado ve el cupo/desglose de su organización, no el suyo propio.
+  let packs = normalizarPacks(row.packsUsuarios);
+  if (row.organizationId != null) {
+    const [org] = await db
+      .select({ ownerId: organizacionesTable.ownerId })
+      .from(organizacionesTable)
+      .where(eq(organizacionesTable.id, row.organizationId));
+    if (org && org.ownerId !== userId) {
+      const [owner] = await db
+        .select({ packsUsuarios: usersTable.packsUsuarios })
+        .from(usersTable)
+        .where(eq(usersTable.id, org.ownerId));
+      packs = normalizarPacks(owner?.packsUsuarios);
+    }
+  }
+  return computeSubscriptionState(row, usuariosActivos, packs);
 }
 
 export async function userHasAccess(userId: string): Promise<boolean> {

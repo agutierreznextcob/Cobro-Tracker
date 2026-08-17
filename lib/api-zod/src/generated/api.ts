@@ -1371,13 +1371,21 @@ export const GetSubscriptionStatusResponse = zod.object({
   "precioMensual": zod.number().describe('Monthly charged total in CLP, IVA included (neto + IVA)'),
   "precioNeto": zod.number().describe('Monthly net price in CLP, before IVA'),
   "precioIva": zod.number().describe('Monthly IVA (19%) amount in CLP'),
-  "usuariosAdicionales": zod.number().optional().describe('Extra active seats beyond the base plan (real-time count)'),
-  "costoUsuarioAdicionalNeto": zod.number().optional(),
-  "costoUsuarioAdicionalIva": zod.number().optional(),
-  "costoUsuarioAdicional": zod.number().optional(),
+  "packs": zod.array(zod.object({
+  "pack": zod.enum(['individual', 'pack5', 'pack10', 'pack20']),
+  "nombre": zod.string(),
+  "cantidad": zod.number().describe('Número de packs de este tipo contratados'),
+  "usuarios": zod.number().describe('Usuarios extra que aportan estos packs'),
+  "total": zod.number().describe('Costo mensual de estos packs (CLP, IVA incl.)')
+})).optional().describe('Packs de usuarios adicionales contratados (del dueño de la org)'),
+  "cupoUsuarios": zod.number().optional().describe('Cupo total de asientos (incluidos en el plan + packs)'),
+  "usuariosActivos": zod.number().optional().describe('Miembros activos de la organización (tiempo real)'),
+  "packsNeto": zod.number().optional(),
+  "packsIva": zod.number().optional(),
+  "packsTotal": zod.number().optional().describe('Costo mensual total de los packs (CLP, IVA incl.)'),
   "totalNetoMensual": zod.number().optional(),
   "totalIvaMensual": zod.number().optional(),
-  "totalMensual": zod.number().optional().describe('Total monthly charge in CLP (base + extra seats, IVA incl.)')
+  "totalMensual": zod.number().optional().describe('Total monthly charge in CLP (base + packs, IVA incl.)')
 })
 
 
@@ -1406,6 +1414,21 @@ export const CambiarPlanSubscriptionBody = zod.object({
 export const CambiarPlanSubscriptionResponse = zod.object({
   "ok": zod.boolean(),
   "plan": zod.enum(['starter', 'nextcob']),
+  "totalMensual": zod.number()
+})
+
+
+/**
+ * @summary Add or remove a pack of additional users (owner only, cumulative)
+ */
+export const UpdateUserPacksBody = zod.object({
+  "pack": zod.enum(['individual', 'pack5', 'pack10', 'pack20']),
+  "accion": zod.enum(['agregar', 'quitar'])
+})
+
+export const UpdateUserPacksResponse = zod.object({
+  "ok": zod.boolean(),
+  "packs": zod.record(zod.string(), zod.number()).optional(),
   "totalMensual": zod.number()
 })
 
@@ -1641,11 +1664,12 @@ export const GetOrganizationResponse = zod.object({
   "planBaseNeto": zod.number().describe('Base plan net price (currency units), before IVA, covering the first seat'),
   "planBaseIva": zod.number().describe('Base plan IVA (19%) amount (currency units)'),
   "planBase": zod.number().describe('Monthly base plan total (currency units), IVA included (neto + IVA)'),
-  "costoUsuarioAdicionalNeto": zod.number().describe('Net price per additional seat (currency units), before IVA'),
-  "costoUsuarioAdicionalIva": zod.number().describe('IVA (19%) amount per additional seat (currency units)'),
-  "costoUsuarioAdicional": zod.number().describe('Monthly total per additional seat (currency units), IVA included'),
-  "usuariosAdicionales": zod.number().describe('Number of seats beyond the first'),
-  "totalMensual": zod.number().describe('Estimated monthly total, IVA included (planBase + usuariosAdicionales \* costoUsuarioAdicional)')
+  "cupoUsuarios": zod.number().describe('Total seat capacity (plan included + packs)'),
+  "cupoPacks": zod.number().describe('Extra seats provided by purchased packs'),
+  "packsNeto": zod.number().optional(),
+  "packsIva": zod.number().optional(),
+  "packsTotal": zod.number().describe('Monthly total of purchased packs (IVA included)'),
+  "totalMensual": zod.number().describe('Estimated monthly total, IVA included (planBase + packsTotal)')
 })
 
 

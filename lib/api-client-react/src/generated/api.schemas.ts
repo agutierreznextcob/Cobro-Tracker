@@ -591,6 +591,27 @@ export const SubscriptionStatusPlanEfectivo = {
   nextcob: 'nextcob',
 } as const;
 
+export type PackContratadoPack = typeof PackContratadoPack[keyof typeof PackContratadoPack];
+
+
+export const PackContratadoPack = {
+  individual: 'individual',
+  pack5: 'pack5',
+  pack10: 'pack10',
+  pack20: 'pack20',
+} as const;
+
+export interface PackContratado {
+  pack: PackContratadoPack;
+  nombre: string;
+  /** Número de packs de este tipo contratados */
+  cantidad: number;
+  /** Usuarios extra que aportan estos packs */
+  usuarios: number;
+  /** Costo mensual de estos packs (CLP, IVA incl.) */
+  total: number;
+}
+
 export interface SubscriptionStatus {
   status: SubscriptionStatusStatus;
   hasAccess: boolean;
@@ -611,15 +632,43 @@ export interface SubscriptionStatus {
   precioNeto: number;
   /** Monthly IVA (19%) amount in CLP */
   precioIva: number;
-  /** Extra active seats beyond the base plan (real-time count) */
-  usuariosAdicionales?: number;
-  costoUsuarioAdicionalNeto?: number;
-  costoUsuarioAdicionalIva?: number;
-  costoUsuarioAdicional?: number;
+  /** Packs de usuarios adicionales contratados (del dueño de la org) */
+  packs?: PackContratado[];
+  /** Cupo total de asientos (incluidos en el plan + packs) */
+  cupoUsuarios?: number;
+  /** Miembros activos de la organización (tiempo real) */
+  usuariosActivos?: number;
+  packsNeto?: number;
+  packsIva?: number;
+  /** Costo mensual total de los packs (CLP, IVA incl.) */
+  packsTotal?: number;
   totalNetoMensual?: number;
   totalIvaMensual?: number;
-  /** Total monthly charge in CLP (base + extra seats, IVA incl.) */
+  /** Total monthly charge in CLP (base + packs, IVA incl.) */
   totalMensual?: number;
+}
+
+export type PackUsuariosInputPack = typeof PackUsuariosInputPack[keyof typeof PackUsuariosInputPack];
+
+
+export const PackUsuariosInputPack = {
+  individual: 'individual',
+  pack5: 'pack5',
+  pack10: 'pack10',
+  pack20: 'pack20',
+} as const;
+
+export type PackUsuariosInputAccion = typeof PackUsuariosInputAccion[keyof typeof PackUsuariosInputAccion];
+
+
+export const PackUsuariosInputAccion = {
+  agregar: 'agregar',
+  quitar: 'quitar',
+} as const;
+
+export interface PackUsuariosInput {
+  pack: PackUsuariosInputPack;
+  accion: PackUsuariosInputAccion;
 }
 
 export type ImportarClientesInputClientesItem = {
@@ -2211,15 +2260,15 @@ export interface OrganizacionInfo {
   planBaseIva: number;
   /** Monthly base plan total (currency units), IVA included (neto + IVA) */
   planBase: number;
-  /** Net price per additional seat (currency units), before IVA */
-  costoUsuarioAdicionalNeto: number;
-  /** IVA (19%) amount per additional seat (currency units) */
-  costoUsuarioAdicionalIva: number;
-  /** Monthly total per additional seat (currency units), IVA included */
-  costoUsuarioAdicional: number;
-  /** Number of seats beyond the first */
-  usuariosAdicionales: number;
-  /** Estimated monthly total, IVA included (planBase + usuariosAdicionales * costoUsuarioAdicional) */
+  /** Total seat capacity (plan included + packs) */
+  cupoUsuarios: number;
+  /** Extra seats provided by purchased packs */
+  cupoPacks: number;
+  packsNeto?: number;
+  packsIva?: number;
+  /** Monthly total of purchased packs (IVA included) */
+  packsTotal: number;
+  /** Estimated monthly total, IVA included (planBase + packsTotal) */
   totalMensual: number;
 }
 
@@ -2504,6 +2553,14 @@ export const CambiarPlanSubscription200Plan = {
 export type CambiarPlanSubscription200 = {
   ok: boolean;
   plan: CambiarPlanSubscription200Plan;
+  totalMensual: number;
+};
+
+export type UpdateUserPacks200Packs = {[key: string]: number};
+
+export type UpdateUserPacks200 = {
+  ok: boolean;
+  packs?: UpdateUserPacks200Packs;
   totalMensual: number;
 };
 

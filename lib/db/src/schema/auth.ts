@@ -90,6 +90,10 @@ export const usersTable = pgTable("users", {
     .default("prueba"),
   // Plan elegido/contratado. NULL mientras no elige (trial = nivel NextCob).
   plan: planSuscripcionEnum("plan"),
+  // Packs de usuarios adicionales contratados por el DUEÑO de la org
+  // (cantidades por pack, p. ej. {"pack10": 1, "individual": 2}). Se suman al
+  // cobro mensual base. NULL/{} = sin packs.
+  packsUsuarios: jsonb("packs_usuarios").$type<Partial<Record<"individual" | "pack5" | "pack10" | "pack20", number>>>(),
   role: userRoleEnum("role").notNull().default("user"),
   // Multi-tenant organization fields. organizationId links the user to their
   // organization; orgRole is their role within it (admin_org sees everything,

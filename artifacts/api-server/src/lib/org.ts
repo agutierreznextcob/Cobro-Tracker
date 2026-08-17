@@ -2,7 +2,7 @@ import { db, usersTable, organizacionesTable } from "@workspace/db";
 import { eq, and, isNull, inArray, type SQL } from "drizzle-orm";
 import { cobrosTable, clientesTable } from "@workspace/db";
 import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA, IVA_RATE } from "./flow-subscriptions";
-import { PLANES, type PlanId } from "./plans";
+import { PLANES, costoDePacks, cupoDePacks, type PacksUsuarios, type PlanId } from "./plans";
 
 // Per-seat pricing (structure only — no real billing yet). Amounts are
 // IVA-inclusive (Chilean VAT 19%): *Neto + *Iva = the charged total. The base
@@ -194,14 +194,12 @@ export function canAssignTo(ctx: OrgContext, userId: string, targetId: string): 
   return targetId === userId;
 }
 
-// Plan-aware pricing. The base plan covers PLANES[plan].usuariosIncluidos
-// active members; each member beyond that adds the per-seat total (only on
-// plans that allow extra seats — Starter is hard-capped at 1 user elsewhere).
-export function computePricing(miembrosActivos: number, planId: PlanId = "nextcob") {
+// Plan-aware pricing. El plan base cubre PLANES[plan].usuariosIncluidos; los
+// asientos extra se contratan por PACKS con descuento (ya no per-seat
+// automático). totalMensual = plan base + costo de los packs contratados.
+export function computePricing(planId: PlanId = "nextcob", packs: PacksUsuarios = {}) {
   const plan = PLANES[planId];
-  const usuariosAdicionales = plan.permiteUsuariosExtra
-    ? Math.max(0, miembrosActivos - plan.usuariosIncluidos)
-    : 0;
+  const costoPacks = costoDePacks(packs);
   return {
     plan: plan.id,
     planNombre: plan.nombre,
@@ -209,11 +207,12 @@ export function computePricing(miembrosActivos: number, planId: PlanId = "nextco
     planBaseNeto: plan.neto,
     planBaseIva: plan.iva,
     planBase: plan.total,
-    costoUsuarioAdicionalNeto: COSTO_USUARIO_ADICIONAL_NETO,
-    costoUsuarioAdicionalIva: COSTO_USUARIO_ADICIONAL_IVA,
-    costoUsuarioAdicional: COSTO_USUARIO_ADICIONAL,
-    usuariosAdicionales,
-    totalMensual: plan.total + usuariosAdicionales * COSTO_USUARIO_ADICIONAL,
+    packs,
+    cupoPacks: cupoDePacks(packs),
+    packsNeto: costoPacks.neto,
+    packsIva: costoPacks.iva,
+    packsTotal: costoPacks.total,
+    totalMensual: plan.total + costoPacks.total,
   };
 }
 

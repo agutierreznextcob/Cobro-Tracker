@@ -1,7 +1,15 @@
 import type { Request, Response, NextFunction } from "express";
-import { db, usersTable, organizacionesTable } from "@workspace/db";
+import { db, usersTable, organizacionesTable, invitacionesTable } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
-import { PLANES, planEfectivo, planIncluye, type PlanFeature, type PlanId } from "../lib/plans";
+import {
+  PLANES,
+  cupoDePacks,
+  normalizarPacks,
+  planEfectivo,
+  planIncluye,
+  type PlanFeature,
+  type PlanId,
+} from "../lib/plans";
 
 // Plan efectivo de un usuario. El plan lo fija el DUEÑO de la organización
 // (quien paga la suscripción): un ejecutivo invitado hereda el plan del dueño.
@@ -55,24 +63,55 @@ export async function getPlanEfectivoDeOrg(
   return getPlanEfectivoDeUsuario(org.ownerId);
 }
 
-// ¿La organización puede tener un miembro activo más? El plan Starter incluye
-// 1 usuario y no permite extras; NextCob incluye 2 y permite extras pagados.
-// Se usa al aceptar invitaciones y al reactivar miembros (no solo al invitar).
+// ¿La organización puede tener un miembro activo más? El cupo total es
+// usuariosIncluidos del plan + usuarios de los packs contratados por el dueño.
+// Se usa al invitar, al aceptar invitaciones y al reactivar miembros.
+// `contarPendientes` suma además las invitaciones pendientes no expiradas
+// (para no sobrevender el cupo al INVITAR; al aceptar/reactivar no aplica).
 export async function orgPuedeActivarMiembro(
   organizationId: number | null,
+  opts: { contarPendientes?: boolean } = {},
 ): Promise<boolean> {
   if (organizationId == null) return true;
-  const plan = await getPlanEfectivoDeOrg(organizationId);
-  if (!plan) return true;
-  const def = PLANES[plan];
-  if (def.permiteUsuariosExtra) return true;
+  const [org] = await db
+    .select({ ownerId: organizacionesTable.ownerId })
+    .from(organizacionesTable)
+    .where(eq(organizacionesTable.id, organizationId));
+  if (!org) return true;
+  const [owner] = await db
+    .select({
+      subscriptionStatus: usersTable.subscriptionStatus,
+      plan: usersTable.plan,
+      role: usersTable.role,
+      esDemo: usersTable.esDemo,
+      packsUsuarios: usersTable.packsUsuarios,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, org.ownerId));
+  if (!owner) return true;
+  const plan = planEfectivo(owner);
+  const cupo = PLANES[plan].usuariosIncluidos + cupoDePacks(normalizarPacks(owner.packsUsuarios));
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(usersTable)
     .where(
       and(eq(usersTable.organizationId, organizationId), eq(usersTable.activo, true)),
     );
-  return (row?.count ?? 0) + 1 <= def.usuariosIncluidos;
+  let ocupados = row?.count ?? 0;
+  if (opts.contarPendientes) {
+    const [pend] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(invitacionesTable)
+      .where(
+        and(
+          eq(invitacionesTable.organizationId, organizationId),
+          eq(invitacionesTable.estado, "pendiente"),
+          sql`(${invitacionesTable.expiraEn} is null or ${invitacionesTable.expiraEn} > now())`,
+        ),
+      );
+    ocupados += pend?.count ?? 0;
+  }
+  return ocupados + 1 <= cupo;
 }
 
 export async function userTieneFeature(

@@ -31,6 +31,7 @@
 - [E2E money-flow script](e2e-money-flow-script.md) — rerunnable script verifying cobro→abonos→estado→informes/rendimiento numbers; demo login + descuento enum gotchas inside.
 - [Static auth-guard check](static-auth-guard-check.md) — check-auth-guards script statically fails on pathless auth use() outside whitelist; stale lib/db d.ts fix: tsc -b lib/db.
 - [Suscripción mensual vía Reveniu](suscripcion-modelo.md) — checkout activo (TBK_TOKEN); prepago N meses REVERTIDO, no reintroducir; desglose en vivo desde /subscription/status; per-seat duplicado org.ts↔subscription.ts.
+- [Packs de usuarios](packs-usuarios.md) — packs reemplazan per-seat (total = plan + packs, jsonb en fila del owner); sweep NUNCA pisa reveniuMontoSync no-NULL (grandfathered); precios espejados en frontend.
 - [Planes Starter/NextCob/Pro](planes-suscripcion.md) — plan heredado del OWNER de la org; NULL=nextcob; gating 403 code plan_upgrade; cupo validado al aceptar invitación y reactivar; cambiar-plan transaccional con FOR UPDATE.
 - [Cobro edit/delete money-safety](cobro-edit-delete-money-safety.md) — money-received cobros can't be freely edited/deleted; DELETE+ajustar-monto validate under FOR UPDATE row lock; block estado→pendiente when abonos>0.
 - [Datos bancarios + comprobantes transferencia](datos-bancarios-comprobantes.md) — confirmar = transacción con FOR UPDATE + claim; express.json limit 4mb para base64; rate limit por req.ip (trust proxy) + por token, sin cupo global.

@@ -14,6 +14,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { PacksUsuarios } from "@/components/packs-usuarios";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,6 +92,7 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
   const [deactivateTarget, setDeactivateTarget] = useState<{ id: string; nombre: string } | null>(
     null,
   );
+  const [packsOpen, setPacksOpen] = useState(false);
 
   const invalidateTeam = () => {
     queryClient.invalidateQueries({ queryKey: getGetOrganizationQueryKey() });
@@ -134,7 +136,19 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
           setInviteOpen(false);
         },
         onError: (err: unknown) => {
-          const msg = err instanceof Error ? err.message : "No se pudo enviar la invitación.";
+          // Sin cupo de asientos: se ofrece contratar packs de usuarios antes
+          // de poder invitar (el backend responde 403 code:"sin_cupo").
+          if (err && typeof err === "object" && (err as { code?: string }).code === "sin_cupo") {
+            setInviteOpen(false);
+            setPacksOpen(true);
+            return;
+          }
+          const msg =
+            err && typeof err === "object" && "error" in err
+              ? String((err as { error?: string }).error)
+              : err instanceof Error
+                ? err.message
+                : "No se pudo enviar la invitación.";
           toast({ title: "Error", description: msg, variant: "destructive" });
         },
       },
@@ -245,28 +259,21 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
             <p className="text-[11px] text-muted-foreground -mt-1">
               Neto {formatCLP(org.planBaseNeto)} + IVA {formatCLP(org.planBaseIva)} = Total {formatCLP(org.planBase)}
             </p>
-            {org.usuariosAdicionales > 0 && (
-              <>
-                <div className="flex items-center justify-between text-sm pt-1">
-                  <span className="text-muted-foreground">
-                    Usuarios adicionales ({org.usuariosAdicionales} × {formatCLP(org.costoUsuarioAdicionalNeto)} + IVA)
-                  </span>
-                  <span className="font-medium">
-                    {formatCLP(org.usuariosAdicionales * org.costoUsuarioAdicional)}
-                  </span>
-                </div>
-                <p className="text-[11px] text-muted-foreground -mt-1">
-                  Cada usuario: Neto {formatCLP(org.costoUsuarioAdicionalNeto)} + IVA {formatCLP(org.costoUsuarioAdicionalIva)} = Total {formatCLP(org.costoUsuarioAdicional)}
-                </p>
-              </>
+            {org.packsTotal > 0 && (
+              <div className="flex items-center justify-between text-sm pt-1">
+                <span className="text-muted-foreground">
+                  Packs de usuarios (+{org.cupoPacks} asiento{org.cupoPacks !== 1 ? "s" : ""})
+                </span>
+                <span className="font-medium">{formatCLP(org.packsTotal)}</span>
+              </div>
             )}
             <div className="flex items-center justify-between border-t border-border/50 pt-2 text-sm">
               <span className="font-semibold">Total mensual estimado</span>
               <span className="font-bold">{formatCLP(org.totalMensual)}</span>
             </div>
             <p className="text-[11px] text-muted-foreground pt-1">
-              {org.miembrosActivos} usuario{org.miembrosActivos !== 1 ? "s" : ""} activo
-              {org.miembrosActivos !== 1 ? "s" : ""} en tu organización. Precios con IVA incluido.
+              {org.miembrosActivos} de {org.cupoUsuarios} usuario{org.cupoUsuarios !== 1 ? "s" : ""} en uso.
+              Precios con IVA incluido.
             </p>
           </div>
         )}
@@ -485,7 +492,8 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
             )}
             {org && (
               <p className="text-xs text-muted-foreground rounded-md bg-muted/40 p-3">
-                Agregar un usuario suma {formatCLP(org.costoUsuarioAdicional)}/mes a tu plan (IVA incluido).
+                Tienes {org.miembrosActivos} de {org.cupoUsuarios} asientos en uso. Si necesitas
+                más, puedes agregar packs de usuarios desde Suscripción.
               </p>
             )}
           </div>
@@ -507,6 +515,28 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
         </DialogContent>
       </Dialog>
 
+      {/* Sin cupo: ofrecer packs de usuarios adicionales */}
+      <Dialog open={packsOpen} onOpenChange={setPacksOpen}>
+        <DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Necesitas más asientos</DialogTitle>
+            <DialogDescription>
+              Alcanzaste el cupo de usuarios de tu plan
+              {org ? ` (${org.miembrosActivos} de ${org.cupoUsuarios} en uso)` : ""}. Agrega un
+              pack de usuarios para seguir invitando.
+            </DialogDescription>
+          </DialogHeader>
+          <PacksUsuarios
+            cantidades={{}}
+            onChanged={() => {
+              invalidateTeam();
+              setPacksOpen(false);
+              setInviteOpen(true);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Deactivate confirmation */}
       <AlertDialog
         open={deactivateTarget !== null}
@@ -518,13 +548,7 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
             <AlertDialogDescription>
               ¿Estás seguro que deseas eliminar a {deactivateTarget?.nombre} de tu equipo? Esta
               acción no se puede deshacer.
-              {org && (
-                <>
-                  {" "}
-                  Se liberará su licencia y se descontarán {formatCLP(org.costoUsuarioAdicional)} de
-                  tu próximo cobro.
-                </>
-              )}{" "}
+              {" "}Se liberará su asiento para otro miembro del equipo.{" "}
               El usuario perderá acceso a la plataforma de inmediato.
             </AlertDialogDescription>
           </AlertDialogHeader>

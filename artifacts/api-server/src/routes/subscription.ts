@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, proWaitlistTable, organizacionesTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { PLANES } from "../lib/plans";
+import { PLANES, cupoDePacks, normalizarPacks, planEfectivo } from "../lib/plans";
 import { z } from "zod";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import {
@@ -177,7 +177,9 @@ subscriptionRouter.post("/subscription/subscribe", async (req, res) => {
       return;
     }
 
-    const pricing = computePricing(miembrosActivos, plan);
+    // Starter no admite packs de usuarios: se descartan al contratar Starter.
+    const packs = plan === "starter" ? {} : normalizarPacks(user.packsUsuarios);
+    const pricing = computePricing(plan, packs);
 
     const nombre =
       [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
@@ -195,6 +197,7 @@ subscriptionRouter.post("/subscription/subscribe", async (req, res) => {
       .update(usersTable)
       .set({
         plan,
+        packsUsuarios: packs,
         reveniuPendingSubscriptionId: checkout.subscriptionId,
         reveniuMontoSync: pricing.totalMensual,
       })
@@ -255,13 +258,17 @@ subscriptionRouter.post("/subscription/cambiar-plan", async (req, res) => {
         };
       }
 
-      const pricing = computePricing(miembrosActivos, plan);
+      // Starter no admite packs: al bajar a Starter se eliminan (el próximo
+      // cobro deja de incluirlos). El check de miembros de arriba garantiza
+      // que no queda gente ocupando asientos de packs.
+      const packs = plan === "starter" ? {} : normalizarPacks(user.packsUsuarios);
+      const pricing = computePricing(plan, packs);
       // Llamada externa dentro del lock: si Reveniu falla, la transacción se
       // revierte y el plan en BD no cambia (billing y entitlements coherentes).
       await setReveniuAmount(user.reveniuSubscriptionId, pricing.totalMensual);
       await tx
         .update(usersTable)
-        .set({ plan, reveniuMontoSync: pricing.totalMensual })
+        .set({ plan, packsUsuarios: packs, reveniuMontoSync: pricing.totalMensual })
         .where(eq(usersTable.id, userId));
       return { status: 200 as const, plan, totalMensual: pricing.totalMensual };
     });
@@ -275,6 +282,98 @@ subscriptionRouter.post("/subscription/cambiar-plan", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error changing subscription plan");
     res.status(500).json({ error: "No se pudo cambiar el plan. Intenta nuevamente." });
+  }
+});
+
+// Agrega o quita un pack de usuarios adicionales. Los packs se ACUMULAN
+// (p. ej. 2× pack5) y se suman al cobro mensual base; al quitar uno, el
+// próximo cobro deja de incluirlo. Solo el dueño de la org, transaccional con
+// lock de fila (igual que cambiar-plan) para no divergir de Reveniu.
+subscriptionRouter.post("/subscription/packs", async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const parsed = z
+      .object({
+        pack: z.enum(["individual", "pack5", "pack10", "pack20"]),
+        accion: z.enum(["agregar", "quitar"]),
+      })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "Pack inválido." });
+      return;
+    }
+    const { pack, accion } = parsed.data;
+
+    const result = await db.transaction(async (tx) => {
+      const [user] = await tx
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .for("update");
+      if (!user) return { status: 404 as const, error: "Usuario no encontrado" };
+      if (!(await esOwnerDeSuOrg(userId, user.organizationId))) {
+        return {
+          status: 403 as const,
+          error: "Solo el dueño de la organización puede administrar los packs de usuarios.",
+        };
+      }
+      const plan = planEfectivo(user);
+      if (!PLANES[plan].permiteUsuariosExtra) {
+        return {
+          status: 403 as const,
+          error: "El plan Starter no admite usuarios adicionales. Mejora al plan NextCob.",
+          code: "plan_upgrade",
+        };
+      }
+
+      const packs = normalizarPacks(user.packsUsuarios);
+      if (accion === "agregar") {
+        packs[pack] = (packs[pack] ?? 0) + 1;
+      } else {
+        if ((packs[pack] ?? 0) < 1) {
+          return { status: 400 as const, error: "No tienes ese pack contratado." };
+        }
+        packs[pack] = (packs[pack] ?? 0) - 1;
+        if (packs[pack] === 0) delete packs[pack];
+        // No permitir quitar un pack si dejaría a miembros activos sin asiento.
+        const activos = (await contarUsuariosAdicionales(user.organizationId)) + 1;
+        const cupo = PLANES[plan].usuariosIncluidos + cupoDePacks(packs);
+        if (activos > cupo) {
+          return {
+            status: 400 as const,
+            error:
+              "No puedes quitar este pack: tienes miembros activos ocupando esos asientos. Desactiva miembros primero.",
+          };
+        }
+      }
+
+      const pricing = computePricing(user.plan ?? plan, packs);
+      // Con suscripción activa, el nuevo total se empuja a Reveniu de inmediato
+      // (si falla, rollback). En trial solo se guarda: se cobra al suscribirse.
+      if (user.subscriptionStatus === "activa" && user.reveniuSubscriptionId) {
+        await setReveniuAmount(user.reveniuSubscriptionId, pricing.totalMensual);
+        await tx
+          .update(usersTable)
+          .set({ packsUsuarios: packs, reveniuMontoSync: pricing.totalMensual })
+          .where(eq(usersTable.id, userId));
+      } else {
+        await tx
+          .update(usersTable)
+          .set({ packsUsuarios: packs })
+          .where(eq(usersTable.id, userId));
+      }
+      return { status: 200 as const, packs, totalMensual: pricing.totalMensual };
+    });
+
+    if (result.status !== 200) {
+      res.status(result.status).json({ error: result.error, code: (result as { code?: string }).code });
+      return;
+    }
+    req.log.info({ userId, pack, accion, total: result.totalMensual }, "Packs de usuarios actualizados");
+    res.json({ ok: true, packs: result.packs, totalMensual: result.totalMensual });
+  } catch (err) {
+    req.log.error({ err }, "Error updating user packs");
+    res.status(500).json({ error: "No se pudo actualizar el pack. Intenta nuevamente." });
   }
 });
 

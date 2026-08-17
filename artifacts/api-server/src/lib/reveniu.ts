@@ -1,6 +1,7 @@
 import { db, appConfigTable, usersTable } from "@workspace/db";
 import { and, eq, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import { computePricing } from "./org";
+import { normalizarPacks } from "./plans";
 import { logger } from "./logger";
 import { sendPagoFallidoEmail } from "./email";
 
@@ -200,6 +201,7 @@ export async function sincronizarMontosReveniu(log = logger): Promise<void> {
       reveniuMontoSync: usersTable.reveniuMontoSync,
       organizationId: usersTable.organizationId,
       plan: usersTable.plan,
+      packsUsuarios: usersTable.packsUsuarios,
     })
     .from(usersTable)
     .where(
@@ -214,21 +216,23 @@ export async function sincronizarMontosReveniu(log = logger): Promise<void> {
 
   for (const row of rows) {
     try {
-      let miembrosActivos = 1;
-      if (row.organizationId != null) {
-        const [cnt] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(usersTable)
-          .where(
-            and(
-              eq(usersTable.organizationId, row.organizationId),
-              eq(usersTable.activo, true),
-            ),
-          );
-        miembrosActivos = cnt?.count ?? 1;
-      }
-      const total = computePricing(miembrosActivos, row.plan ?? "nextcob").totalMensual;
+      const total = computePricing(
+        row.plan ?? "nextcob",
+        normalizarPacks(row.packsUsuarios),
+      ).totalMensual;
       if (row.reveniuMontoSync === total) continue;
+      // GRANDFATHERING: si ya hay un monto sincronizado con Reveniu que difiere
+      // del modelo actual (p. ej. clientes antiguos con cobro per-seat), NO se
+      // pisa: reveniuMontoSync es lo que Reveniu cobra hoy y sólo cambia cuando
+      // el cliente modifica su plan o packs (push transaccional en las rutas).
+      // El barrido sólo repara filas nunca sincronizadas (NULL).
+      if (row.reveniuMontoSync != null) {
+        log.warn(
+          { userId: row.id, montoSync: row.reveniuMontoSync, montoModelo: total },
+          "Monto Reveniu difiere del modelo de packs (cliente grandfathered); no se modifica",
+        );
+        continue;
+      }
       await setReveniuAmount(row.reveniuSubscriptionId!, total);
       await db
         .update(usersTable)
@@ -291,7 +295,9 @@ export async function procesarGraciaPagosFallidos(log = logger): Promise<void> {
             {
               email: user.email,
               nombre: [user.firstName, user.lastName].filter(Boolean).join(" ") || null,
-              montoMensual: user.reveniuMontoSync ?? computePricing(1, user.plan ?? "nextcob").totalMensual,
+              montoMensual:
+                user.reveniuMontoSync ??
+                computePricing(user.plan ?? "nextcob", normalizarPacks(user.packsUsuarios)).totalMensual,
               graciaHasta: new Date(now.getTime() + GRACIA_MS),
               actualizarMetodoUrl: user.reveniuSubscriptionId
                 ? reveniuPaymentMethodUrl(user.reveniuSubscriptionId)

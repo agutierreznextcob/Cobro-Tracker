@@ -39,27 +39,41 @@ import { TeamSection } from "@/components/team-section";
 import { DatosBancariosSection } from "@/components/datos-bancarios-section";
 import { OrgRoleBadge } from "@/components/org-role-badge";
 import { PlanSelector } from "@/components/plan-selector";
+import { PacksUsuarios } from "@/components/packs-usuarios";
 import { Loader2, CheckCircle2, Plug2, Trash2, Eye, EyeOff, User, KeyRound, CreditCard, Sparkles, IdCard, Mail, Pencil, Camera, ShieldCheck, Download, Landmark } from "lucide-react";
 
 // Desglose mensual en tiempo real: plan base + usuarios extra = total mensual.
 // Los montos vienen del backend (/subscription/status) y se refrescan cuando el
 // equipo cambia (team-section invalida la query al agregar/desactivar usuarios).
 function DesgloseMensual({ subStatus }: { subStatus: SubStatusDesglose }) {
-  const extras = subStatus.usuariosAdicionales ?? 0;
-  const extraNeto = subStatus.costoUsuarioAdicionalNeto ?? 9990;
-  const extraIva = subStatus.costoUsuarioAdicionalIva ?? 1898;
+  const packs = subStatus.packs ?? [];
+  const packsTotal = subStatus.packsTotal ?? 0;
   const totalMensual = subStatus.totalMensual ?? subStatus.precioMensual;
   return (
     <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
       <p>
-        Plan base: {formatCLP(subStatus.precioNeto)} + IVA {formatCLP(subStatus.precioIva)} = {formatCLP(subStatus.precioMensual)}
+        Plan {subStatus.planNombre ?? "NextCob"}: {formatCLP(subStatus.precioNeto)} + IVA {formatCLP(subStatus.precioIva)} = {formatCLP(subStatus.precioMensual)}
       </p>
-      {extras > 0 && (
-        <p>
-          + {extras} usuario{extras !== 1 ? "s" : ""} extra: {formatCLP(extraNeto)} + IVA {formatCLP(extraIva)} = {formatCLP(extraNeto + extraIva)} c/u
+      {packs.map((p) => (
+        <p key={p.pack}>
+          + {p.nombre}
+          {p.cantidad > 1 ? ` ×${p.cantidad}` : ""} ({p.usuarios} usuario{p.usuarios !== 1 ? "s" : ""}): {formatCLP(p.total)}
+        </p>
+      ))}
+      {packsTotal > 0 && (
+        <p className="font-medium text-foreground">
+          Plan {formatCLP(subStatus.precioMensual)} + Packs {formatCLP(packsTotal)} = Total {formatCLP(totalMensual)}/mes
         </p>
       )}
-      <p className="font-medium text-foreground">Total mensual: {formatCLP(totalMensual)}</p>
+      {packsTotal === 0 && (
+        <p className="font-medium text-foreground">Total mensual: {formatCLP(totalMensual)}</p>
+      )}
+      {subStatus.cupoUsuarios != null && (
+        <p>
+          Cupo: {subStatus.usuariosActivos ?? 1} de {subStatus.cupoUsuarios} usuario
+          {subStatus.cupoUsuarios !== 1 ? "s" : ""} en uso
+        </p>
+      )}
     </div>
   );
 }
@@ -68,9 +82,11 @@ type SubStatusDesglose = {
   precioNeto: number;
   precioIva: number;
   precioMensual: number;
-  usuariosAdicionales?: number;
-  costoUsuarioAdicionalNeto?: number;
-  costoUsuarioAdicionalIva?: number;
+  planNombre?: string;
+  packs?: Array<{ pack: string; nombre: string; cantidad: number; usuarios: number; total: number }>;
+  packsTotal?: number;
+  cupoUsuarios?: number;
+  usuariosActivos?: number;
   totalMensual?: number;
 };
 
@@ -1037,6 +1053,28 @@ function ProfileSettings() {
               <SuscribirseButton />
             </>
           )}
+
+          {/* Packs de usuarios adicionales: solo el dueño de la org (backend
+              exige owner) y solo en planes que los permiten (NextCob). */}
+          {!subLoading &&
+            subStatus &&
+            subStatus.planEfectivo !== "starter" &&
+            user?.orgRole === "admin_org" && (
+              <div className="pt-4 border-t border-border/50 space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Agregar usuarios</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Suma packs de usuarios a tu plan. Mientras más grande el pack, menor el precio
+                    por usuario.
+                  </p>
+                </div>
+                <PacksUsuarios
+                  cantidades={Object.fromEntries(
+                    (subStatus.packs ?? []).map((p) => [p.pack, p.cantidad]),
+                  )}
+                />
+              </div>
+            )}
         </div>
       </PerfilSeccion>
 

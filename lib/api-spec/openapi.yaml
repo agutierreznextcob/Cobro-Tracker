@@ -1681,6 +1681,45 @@ paths:
         "401":
           description: Unauthorized
 
+  /subscription/packs:
+    post:
+      operationId: updateUserPacks
+      tags: [subscription]
+      summary: Add or remove a pack of additional users (owner only, cumulative)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackUsuariosInput"
+      responses:
+        "200":
+          description: Packs updated; new monthly total pushed to Reveniu if active
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, totalMensual]
+                properties:
+                  ok:
+                    type: boolean
+                  packs:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  totalMensual:
+                    type: integer
+        "400":
+          description: Invalid pack or members occupying those seats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not the org owner, or plan does not allow extra users
+
   /subscription/pro-waitlist:
     post:
       operationId: joinProWaitlist
@@ -3865,22 +3904,61 @@ components:
         precioIva:
           type: integer
           description: Monthly IVA (19%) amount in CLP
-        usuariosAdicionales:
+        packs:
+          type: array
+          description: Packs de usuarios adicionales contratados (del dueño de la org)
+          items:
+            $ref: "#/components/schemas/PackContratado"
+        cupoUsuarios:
           type: integer
-          description: Extra active seats beyond the base plan (real-time count)
-        costoUsuarioAdicionalNeto:
+          description: Cupo total de asientos (incluidos en el plan + packs)
+        usuariosActivos:
           type: integer
-        costoUsuarioAdicionalIva:
+          description: Miembros activos de la organización (tiempo real)
+        packsNeto:
           type: integer
-        costoUsuarioAdicional:
+        packsIva:
           type: integer
+        packsTotal:
+          type: integer
+          description: Costo mensual total de los packs (CLP, IVA incl.)
         totalNetoMensual:
           type: integer
         totalIvaMensual:
           type: integer
         totalMensual:
           type: integer
-          description: Total monthly charge in CLP (base + extra seats, IVA incl.)
+          description: Total monthly charge in CLP (base + packs, IVA incl.)
+
+    PackContratado:
+      type: object
+      required: [pack, nombre, cantidad, usuarios, total]
+      properties:
+        pack:
+          type: string
+          enum: [individual, pack5, pack10, pack20]
+        nombre:
+          type: string
+        cantidad:
+          type: integer
+          description: Número de packs de este tipo contratados
+        usuarios:
+          type: integer
+          description: Usuarios extra que aportan estos packs
+        total:
+          type: integer
+          description: Costo mensual de estos packs (CLP, IVA incl.)
+
+    PackUsuariosInput:
+      type: object
+      required: [pack, accion]
+      properties:
+        pack:
+          type: string
+          enum: [individual, pack5, pack10, pack20]
+        accion:
+          type: string
+          enum: [agregar, quitar]
 
     ImportarClientesInput:
       type: object
@@ -5717,10 +5795,9 @@ components:
           planBaseNeto,
           planBaseIva,
           planBase,
-          costoUsuarioAdicionalNeto,
-          costoUsuarioAdicionalIva,
-          costoUsuarioAdicional,
-          usuariosAdicionales,
+          cupoUsuarios,
+          cupoPacks,
+          packsTotal,
           totalMensual,
         ]
       properties:
@@ -5743,21 +5820,22 @@ components:
         planBase:
           type: number
           description: Monthly base plan total (currency units), IVA included (neto + IVA)
-        costoUsuarioAdicionalNeto:
-          type: number
-          description: Net price per additional seat (currency units), before IVA
-        costoUsuarioAdicionalIva:
-          type: number
-          description: IVA (19%) amount per additional seat (currency units)
-        costoUsuarioAdicional:
-          type: number
-          description: Monthly total per additional seat (currency units), IVA included
-        usuariosAdicionales:
+        cupoUsuarios:
           type: integer
-          description: Number of seats beyond the first
+          description: Total seat capacity (plan included + packs)
+        cupoPacks:
+          type: integer
+          description: Extra seats provided by purchased packs
+        packsNeto:
+          type: number
+        packsIva:
+          type: number
+        packsTotal:
+          type: number
+          description: Monthly total of purchased packs (IVA included)
         totalMensual:
           type: number
-          description: Estimated monthly total, IVA included (planBase + usuariosAdicionales * costoUsuarioAdicional)
+          description: Estimated monthly total, IVA included (planBase + packsTotal)
 
     MiembroEquipo:
       type: object
