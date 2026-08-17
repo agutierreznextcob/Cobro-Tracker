@@ -1,5 +1,5 @@
 import { db, appConfigTable, usersTable } from "@workspace/db";
-import { and, eq, isNotNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import { computePricing } from "./org";
 import { normalizarPacks } from "./plans";
 import { logger } from "./logger";
@@ -192,7 +192,10 @@ export function reveniuPaymentMethodUrl(subscriptionId: number): string {
 // del último monto sincronizado, lo actualiza en Reveniu. Así el próximo cobro
 // mensual refleja los usuarios extra activos ese mes. Idempotente y seguro de
 // correr en paralelo (el peor caso es repetir un POST con el mismo monto).
-export async function sincronizarMontosReveniu(log = logger): Promise<void> {
+export async function sincronizarMontosReveniu(
+  log = logger,
+  opts?: { userIds?: string[] },
+): Promise<void> {
   if (!reveniuConfigured()) return;
   const rows = await db
     .select({
@@ -211,6 +214,7 @@ export async function sincronizarMontosReveniu(log = logger): Promise<void> {
           eq(usersTable.subscriptionStatus, "activa"),
           eq(usersTable.subscriptionStatus, "cancelada"),
         ),
+        opts?.userIds?.length ? inArray(usersTable.id, opts.userIds) : undefined,
       ),
     );
 
