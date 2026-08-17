@@ -15,4 +15,6 @@ description: Modelo de packs (individual/5/10/20) que reemplaza el per-seat auto
 
 **Why:** recomputar desde el modelo nuevo en el sweep les bajaría el cobro a los clientes per-seat sin su consentimiento (hallazgo de code review).
 
+**Mensajería de cupos (UI):** los packs sólo se ofrecen cuando los usuarios incluidos del plan están ocupados (o ya hay packs contratados); mientras haya cupo gratis se informa "puedes invitar N sin costo". Los contadores de asientos libres DEBEN descontar invitaciones pendientes no expiradas (el backend las cuenta al invitar): /subscription/status y /organization exponen `invitacionesPendientes` y `esOwner` (solo el owner ve/gestiona packs).
+
 **Limitación conocida:** aceptar invitación / reactivar miembro no comparten lock con /subscription/packs; una carrera podría sobre-ocupar un asiento (ventana pequeña, aceptada).

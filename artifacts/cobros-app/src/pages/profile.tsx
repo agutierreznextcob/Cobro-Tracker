@@ -68,10 +68,17 @@ function DesgloseMensual({ subStatus }: { subStatus: SubStatusDesglose }) {
       {packsTotal === 0 && (
         <p className="font-medium text-foreground">Total mensual: {formatCLP(totalMensual)}</p>
       )}
+      {subStatus.usuariosIncluidos != null && (
+        <p className="font-medium text-foreground">
+          Usuarios incluidos en tu plan:{" "}
+          {Math.min(subStatus.usuariosActivos ?? 1, subStatus.usuariosIncluidos)} de{" "}
+          {subStatus.usuariosIncluidos}
+        </p>
+      )}
       {subStatus.cupoUsuarios != null && (
         <p>
-          Cupo: {subStatus.usuariosActivos ?? 1} de {subStatus.cupoUsuarios} usuario
-          {subStatus.cupoUsuarios !== 1 ? "s" : ""} en uso
+          Cupo total (plan + packs): {subStatus.usuariosActivos ?? 1} de{" "}
+          {subStatus.cupoUsuarios} usuario{subStatus.cupoUsuarios !== 1 ? "s" : ""} en uso
         </p>
       )}
     </div>
@@ -83,6 +90,9 @@ type SubStatusDesglose = {
   precioIva: number;
   precioMensual: number;
   planNombre?: string;
+  usuariosIncluidos?: number;
+  invitacionesPendientes?: number;
+  esOwner?: boolean;
   packs?: Array<{ pack: string; nombre: string; cantidad: number; usuarios: number; total: number }>;
   packsTotal?: number;
   cupoUsuarios?: number;
@@ -1059,22 +1069,50 @@ function ProfileSettings() {
           {!subLoading &&
             subStatus &&
             subStatus.planEfectivo !== "starter" &&
-            user?.orgRole === "admin_org" && (
-              <div className="pt-4 border-t border-border/50 space-y-3">
-                <div>
-                  <h3 className="text-sm font-semibold">Agregar usuarios</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Suma packs de usuarios a tu plan. Mientras más grande el pack, menor el precio
-                    por usuario.
-                  </p>
+            user?.orgRole === "admin_org" &&
+            (subStatus.esOwner ?? true) &&
+            (() => {
+              // Los packs sólo se ofrecen cuando los usuarios incluidos en el
+              // plan ya están ocupados (o si ya hay packs contratados, para
+              // poder administrarlos). Mientras queden cupos gratis, se informa
+              // cuántos usuarios más puede invitar sin costo. Las invitaciones
+              // pendientes reservan cupo, así que también se descuentan.
+              const incluidos = subStatus.usuariosIncluidos ?? 1;
+              const activos =
+                (subStatus.usuariosActivos ?? 1) + (subStatus.invitacionesPendientes ?? 0);
+              const tienePacks = (subStatus.packs ?? []).length > 0;
+              const libresIncluidos = Math.max(0, incluidos - activos);
+              if (!tienePacks && libresIncluidos > 0) {
+                return (
+                  <div className="pt-4 border-t border-border/50">
+                    <h3 className="text-sm font-semibold">Agregar usuarios</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Tu plan incluye {incluidos} usuario{incluidos !== 1 ? "s" : ""} y estás
+                      usando {activos} (incluyendo invitaciones pendientes). Puedes invitar{" "}
+                      {libresIncluidos} usuario{libresIncluidos !== 1 ? "s" : ""} más sin costo
+                      adicional desde Mi Equipo. Cuando ocupes todos los cupos, aquí podrás
+                      agregar packs de usuarios adicionales.
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <div className="pt-4 border-t border-border/50 space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">Agregar usuarios</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Suma packs de usuarios a tu plan. Mientras más grande el pack, menor el
+                      precio por usuario.
+                    </p>
+                  </div>
+                  <PacksUsuarios
+                    cantidades={Object.fromEntries(
+                      (subStatus.packs ?? []).map((p) => [p.pack, p.cantidad]),
+                    )}
+                  />
                 </div>
-                <PacksUsuarios
-                  cantidades={Object.fromEntries(
-                    (subStatus.packs ?? []).map((p) => [p.pack, p.cantidad]),
-                  )}
-                />
-              </div>
-            )}
+              );
+            })()}
         </div>
       </PerfilSeccion>
 

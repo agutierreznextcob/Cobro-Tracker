@@ -11,8 +11,12 @@ export interface OrganizacionInfo {
   nombre: string;
   /** Whether the current user is an admin_org of this organization */
   esAdmin: boolean;
+  /** Whether the current user is the owner of the organization (only the owner can manage packs) */
+  esOwner?: boolean;
   /** Number of active members in the organization */
   miembrosActivos: number;
+  /** Pending (non-expired) invitations; they reserve seats when inviting */
+  invitacionesPendientes?: number;
   /** Base plan net price (currency units), before IVA, covering the first seat */
   planBaseNeto: number;
   /** Base plan IVA (19%) amount (currency units) */

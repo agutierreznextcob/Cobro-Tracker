@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, usersTable, proWaitlistTable, organizacionesTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { db, usersTable, proWaitlistTable, organizacionesTable, invitacionesTable } from "@workspace/db";
+import { and, eq, sql } from "drizzle-orm";
 import { PLANES, cupoDePacks, normalizarPacks, planEfectivo } from "../lib/plans";
 import { z } from "zod";
 import { getPublicBaseUrl } from "../lib/flow-api";
@@ -118,7 +118,33 @@ subscriptionRouter.get("/subscription/status", async (req, res) => {
       res.status(404).json({ error: "Usuario no encontrado" });
       return;
     }
-    res.json(state);
+    // Invitaciones pendientes no expiradas: reservan cupo al invitar, así el
+    // frontend calcula asientos realmente libres (mensajes y gating de packs).
+    const [me] = await db
+      .select({ organizationId: usersTable.organizationId })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    let invitacionesPendientes = 0;
+    let esOwner = true; // sin org, el usuario es dueño de su propia suscripción
+    if (me?.organizationId != null) {
+      const [org] = await db
+        .select({ ownerId: organizacionesTable.ownerId })
+        .from(organizacionesTable)
+        .where(eq(organizacionesTable.id, me.organizationId));
+      esOwner = !org || org.ownerId === userId;
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(invitacionesTable)
+        .where(
+          and(
+            eq(invitacionesTable.organizationId, me.organizationId),
+            eq(invitacionesTable.estado, "pendiente"),
+            sql`(${invitacionesTable.expiraEn} is null or ${invitacionesTable.expiraEn} > now())`,
+          ),
+        );
+      invitacionesPendientes = row?.count ?? 0;
+    }
+    res.json({ ...state, invitacionesPendientes, esOwner });
   } catch (err) {
     req.log.error({ err }, "Error getting subscription status");
     res.status(500).json({ error: "Error interno del servidor" });

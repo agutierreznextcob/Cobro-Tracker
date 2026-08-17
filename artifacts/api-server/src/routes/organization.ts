@@ -86,6 +86,19 @@ organizationRouter.get("/organization", async (req, res) => {
         ),
       );
 
+    // Invitaciones pendientes no expiradas: reservan cupo (el chequeo al
+    // invitar las cuenta), así el frontend informa asientos realmente libres.
+    const [{ count: invitacionesPendientes }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(invitacionesTable)
+      .where(
+        and(
+          eq(invitacionesTable.organizationId, ctx.organizationId),
+          eq(invitacionesTable.estado, "pendiente"),
+          sql`(${invitacionesTable.expiraEn} is null or ${invitacionesTable.expiraEn} > now())`,
+        ),
+      );
+
     // El plan que fija los precios es el del dueño de la organización (quien paga).
     const [owner] = await db
       .select({
@@ -103,7 +116,9 @@ organizationRouter.get("/organization", async (req, res) => {
       id: org.id,
       nombre: org.nombre,
       esAdmin: ctx.isOrgAdmin,
+      esOwner: org.ownerId === userId,
       miembrosActivos,
+      invitacionesPendientes,
       cupoUsuarios: pricing.usuariosIncluidos + pricing.cupoPacks,
       ...pricing,
     });

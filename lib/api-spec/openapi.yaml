@@ -3893,6 +3893,12 @@ components:
           description: Plan con el que opera hoy (trial/admin/demo = nextcob)
         planNombre:
           type: string
+        invitacionesPendientes:
+          type: integer
+          description: Invitaciones pendientes no expiradas de la org (reservan cupo al invitar)
+        esOwner:
+          type: boolean
+          description: Si el usuario es dueño de la org (solo el dueño administra packs)
         usuariosIncluidos:
           type: integer
         precioMensual:
@@ -5808,9 +5814,15 @@ components:
         esAdmin:
           type: boolean
           description: Whether the current user is an admin_org of this organization
+        esOwner:
+          type: boolean
+          description: Whether the current user is the owner of the organization (only the owner can manage packs)
         miembrosActivos:
           type: integer
           description: Number of active members in the organization
+        invitacionesPendientes:
+          type: integer
+          description: Pending (non-expired) invitations; they reserve seats when inviting
         planBaseNeto:
           type: number
           description: Base plan net price (currency units), before IVA, covering the first seat

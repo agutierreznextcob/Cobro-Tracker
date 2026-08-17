@@ -23,6 +23,10 @@ export interface SubscriptionStatus {
   /** Plan con el que opera hoy (trial/admin/demo = nextcob) */
   planEfectivo?: SubscriptionStatusPlanEfectivo;
   planNombre?: string;
+  /** Invitaciones pendientes no expiradas de la org (reservan cupo al invitar) */
+  invitacionesPendientes?: number;
+  /** Si el usuario es dueño de la org (solo el dueño administra packs) */
+  esOwner?: boolean;
   usuariosIncluidos?: number;
   /** Monthly charged total in CLP, IVA included (neto + IVA) */
   precioMensual: number;

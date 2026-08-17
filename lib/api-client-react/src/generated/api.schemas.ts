@@ -625,6 +625,10 @@ export interface SubscriptionStatus {
   /** Plan con el que opera hoy (trial/admin/demo = nextcob) */
   planEfectivo?: SubscriptionStatusPlanEfectivo;
   planNombre?: string;
+  /** Invitaciones pendientes no expiradas de la org (reservan cupo al invitar) */
+  invitacionesPendientes?: number;
+  /** Si el usuario es dueño de la org (solo el dueño administra packs) */
+  esOwner?: boolean;
   usuariosIncluidos?: number;
   /** Monthly charged total in CLP, IVA included (neto + IVA) */
   precioMensual: number;
@@ -2252,8 +2256,12 @@ export interface OrganizacionInfo {
   nombre: string;
   /** Whether the current user is an admin_org of this organization */
   esAdmin: boolean;
+  /** Whether the current user is the owner of the organization (only the owner can manage packs) */
+  esOwner?: boolean;
   /** Number of active members in the organization */
   miembrosActivos: number;
+  /** Pending (non-expired) invitations; they reserve seats when inviting */
+  invitacionesPendientes?: number;
   /** Base plan net price (currency units), before IVA, covering the first seat */
   planBaseNeto: number;
   /** Base plan IVA (19%) amount (currency units) */

@@ -252,7 +252,9 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
           <div className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
-                Plan base (1 usuario)
+                Plan base ({org.cupoUsuarios - org.cupoPacks} usuario
+                {org.cupoUsuarios - org.cupoPacks !== 1 ? "s" : ""} incluido
+                {org.cupoUsuarios - org.cupoPacks !== 1 ? "s" : ""})
               </span>
               <span className="font-medium">{formatCLP(org.planBaseNeto)} + IVA</span>
             </div>
@@ -272,7 +274,22 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
               <span className="font-bold">{formatCLP(org.totalMensual)}</span>
             </div>
             <p className="text-[11px] text-muted-foreground pt-1">
-              {org.miembrosActivos} de {org.cupoUsuarios} usuario{org.cupoUsuarios !== 1 ? "s" : ""} en uso.
+              Tu plan incluye {org.cupoUsuarios - org.cupoPacks} usuario
+              {org.cupoUsuarios - org.cupoPacks !== 1 ? "s" : ""}. Estás usando{" "}
+              {org.miembrosActivos} de {org.cupoUsuarios}
+              {(org.invitacionesPendientes ?? 0) > 0
+                ? ` (más ${org.invitacionesPendientes} invitación${
+                    org.invitacionesPendientes !== 1 ? "es" : ""
+                  } pendiente${org.invitacionesPendientes !== 1 ? "s" : ""})`
+                : ""}
+              .{" "}
+              {(() => {
+                const libres =
+                  org.cupoUsuarios - org.miembrosActivos - (org.invitacionesPendientes ?? 0);
+                return libres > 0
+                  ? `Puedes invitar ${libres} usuario${libres !== 1 ? "s" : ""} más sin costo adicional.`
+                  : "Para invitar más usuarios, agrega un pack adicional.";
+              })()}{" "}
               Precios con IVA incluido.
             </p>
           </div>
