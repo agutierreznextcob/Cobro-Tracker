@@ -12,6 +12,8 @@
  *  - Quitar pack10 bloqueado cuando asientos ocupados exceederían el nuevo cupo (400)
  *  - Invitar bloqueado cuando la org está al límite de capacidad (403, code: sin_cupo)
  *  - sincronizarMontosReveniu (sweep) no pisa reveniuMontoSync ≠ modelo (grandfathering)
+ *  - Acumulación: 2× pack5 → totalMensual = nextcob + 2×pack5, cupoUsuarios = 12, cantidad=2 en packs[]
+ *  - Quitar uno de dos pack5 → delta correcto, cupo restante cubre miembros activos
  *
  * Run: pnpm --filter @workspace/api-server exec tsx scripts/e2e-packs.ts
  */
@@ -112,9 +114,15 @@ async function main() {
   //   NextCob: neto 24_990 + IVA 4_748 = total 29_738; 2 seats included
   //   pack10:  neto 69_990 + IVA 13_298 = total 83_288; 10 extra seats
   //   Total with pack10: 29_738 + 83_288 = 113_026
+  //   pack5:   neto 39_990 + IVA 7_598  = total 47_588;  5 extra seats
+  //   Total with 1× pack5: 29_738 + 47_588 = 77_326
+  //   Total with 2× pack5: 29_738 + 95_176 = 124_914; cupo = 2 + 10 = 12
   const NEXTCOB_TOTAL = 29_738;
   const PACK10_TOTAL = 83_288;
   const TOTAL_WITH_PACK10 = NEXTCOB_TOTAL + PACK10_TOTAL; // 113_026
+  const PACK5_TOTAL = 47_588;
+  const TOTAL_WITH_1x_PACK5 = NEXTCOB_TOTAL + PACK5_TOTAL;       // 77_326
+  const TOTAL_WITH_2x_PACK5 = NEXTCOB_TOTAL + 2 * PACK5_TOTAL;  // 124_914
   const FAKE_SUB_ID = 88_888;
 
   const ts = Date.now();
@@ -289,6 +297,131 @@ async function main() {
       Object.keys(normalizarPacks(afterRemove?.packsUsuarios)).length === 0,
       afterRemove?.packsUsuarios,
     );
+
+    // ── Acumulación: 2× pack5 ─────────────────────────────────────────────
+    // Verifica que agregar el mismo tipo de pack dos veces acumula cantidades
+    // correctamente (totalMensual y cupoUsuarios son proporcionales a 2×).
+    console.log("== Acumulación: agregar 1er pack5 ==");
+    await reloadOwner();
+    const callsBefore1stPack5 = amountCalls.length;
+    const add1stPack5 = await call("POST", "/subscription/packs", { pack: "pack5", accion: "agregar" });
+    check("agregar 1er pack5 → 200", add1stPack5.status === 200, add1stPack5.json);
+    check(
+      `totalMensual = ${TOTAL_WITH_1x_PACK5} tras 1er pack5`,
+      add1stPack5.json?.totalMensual === TOTAL_WITH_1x_PACK5,
+      add1stPack5.json?.totalMensual,
+    );
+    const calls1stPack5 = amountCalls.slice(callsBefore1stPack5);
+    check("setReveniuAmount llamado 1 vez al agregar 1er pack5", calls1stPack5.length === 1, calls1stPack5);
+    check(
+      `setReveniuAmount recibió amount=${TOTAL_WITH_1x_PACK5}`,
+      calls1stPack5.some((c) => c.amount === TOTAL_WITH_1x_PACK5),
+      calls1stPack5,
+    );
+
+    console.log("== Acumulación: agregar 2do pack5 ==");
+    await reloadOwner();
+    const callsBefore2ndPack5 = amountCalls.length;
+    const add2ndPack5 = await call("POST", "/subscription/packs", { pack: "pack5", accion: "agregar" });
+    check("agregar 2do pack5 → 200", add2ndPack5.status === 200, add2ndPack5.json);
+    check(
+      `totalMensual = ${TOTAL_WITH_2x_PACK5} tras 2× pack5`,
+      add2ndPack5.json?.totalMensual === TOTAL_WITH_2x_PACK5,
+      add2ndPack5.json?.totalMensual,
+    );
+    const calls2ndPack5 = amountCalls.slice(callsBefore2ndPack5);
+    check("setReveniuAmount llamado 1 vez al agregar 2do pack5", calls2ndPack5.length === 1, calls2ndPack5);
+    check(
+      `setReveniuAmount recibió amount=${TOTAL_WITH_2x_PACK5}`,
+      calls2ndPack5.some((c) => c.amount === TOTAL_WITH_2x_PACK5),
+      calls2ndPack5,
+    );
+
+    // DB: packsUsuarios debe tener pack5:2.
+    const [after2xPack5] = await db
+      .select({ reveniuMontoSync: usersTable.reveniuMontoSync, packsUsuarios: usersTable.packsUsuarios })
+      .from(usersTable)
+      .where(eq(usersTable.id, owner.id));
+    check(`reveniuMontoSync = ${TOTAL_WITH_2x_PACK5} en DB`, after2xPack5?.reveniuMontoSync === TOTAL_WITH_2x_PACK5, after2xPack5?.reveniuMontoSync);
+    check("packsUsuarios tiene pack5:2 en DB", (after2xPack5?.packsUsuarios as any)?.pack5 === 2, after2xPack5?.packsUsuarios);
+
+    // /subscription/status: packs[] debe exponer cantidad=2 para pack5.
+    console.log("== /subscription/status: packs[] cantidad=2 para pack5 ==");
+    await reloadOwner();
+    const statusWith2xPack5 = await call("GET", "/subscription/status");
+    check("status 200", statusWith2xPack5.status === 200, statusWith2xPack5.status);
+    check(
+      "cupoUsuarios = 12 en /subscription/status con 2× pack5",
+      statusWith2xPack5.json?.cupoUsuarios === 12,
+      statusWith2xPack5.json?.cupoUsuarios,
+    );
+    check(
+      `totalMensual = ${TOTAL_WITH_2x_PACK5} en /subscription/status`,
+      statusWith2xPack5.json?.totalMensual === TOTAL_WITH_2x_PACK5,
+      statusWith2xPack5.json?.totalMensual,
+    );
+    const packsArr2x: any[] = statusWith2xPack5.json?.packs ?? [];
+    check(
+      "packs[] incluye pack5 con cantidad=2",
+      packsArr2x.some((p: any) => (p.id ?? p.pack) === "pack5" && p.cantidad === 2),
+      packsArr2x,
+    );
+
+    // ── Quitar uno de los dos pack5 ────────────────────────────────────────
+    // Owner es el único activo en este momento (member y member2 desactivados
+    // antes del quitar-pack10). Quitar un pack5 deja cupo=7, que cubre al
+    // owner solo → debe ser permitido.
+    console.log(`== Quitar 1 de 2 pack5 → totalMensual=${TOTAL_WITH_1x_PACK5}, cupo=7 ==`);
+    await reloadOwner();
+    const callsBeforeRemovePack5 = amountCalls.length;
+    const remove1Pack5 = await call("POST", "/subscription/packs", { pack: "pack5", accion: "quitar" });
+    check("quitar 1 pack5 → 200", remove1Pack5.status === 200, remove1Pack5.json);
+    check(
+      `totalMensual = ${TOTAL_WITH_1x_PACK5} tras quitar 1 pack5`,
+      remove1Pack5.json?.totalMensual === TOTAL_WITH_1x_PACK5,
+      remove1Pack5.json?.totalMensual,
+    );
+    const callsRemovePack5 = amountCalls.slice(callsBeforeRemovePack5);
+    check("setReveniuAmount llamado 1 vez al quitar 1 pack5", callsRemovePack5.length === 1, callsRemovePack5);
+    check(
+      `setReveniuAmount recibió amount=${TOTAL_WITH_1x_PACK5}`,
+      callsRemovePack5.some((c) => c.amount === TOTAL_WITH_1x_PACK5),
+      callsRemovePack5,
+    );
+
+    // DB: packsUsuarios debe tener pack5:1.
+    const [afterRemove1Pack5] = await db
+      .select({ reveniuMontoSync: usersTable.reveniuMontoSync, packsUsuarios: usersTable.packsUsuarios })
+      .from(usersTable)
+      .where(eq(usersTable.id, owner.id));
+    check(`reveniuMontoSync = ${TOTAL_WITH_1x_PACK5} en DB`, afterRemove1Pack5?.reveniuMontoSync === TOTAL_WITH_1x_PACK5, afterRemove1Pack5?.reveniuMontoSync);
+    check("packsUsuarios tiene pack5:1 en DB tras quitar uno", (afterRemove1Pack5?.packsUsuarios as any)?.pack5 === 1, afterRemove1Pack5?.packsUsuarios);
+
+    // /subscription/status: cupo reducido a 7 y cupo cubre miembros activos actuales (1).
+    await reloadOwner();
+    const statusAfterRemove1Pack5 = await call("GET", "/subscription/status");
+    check(
+      "cupoUsuarios = 7 (2 + 5×1) en /subscription/status tras quitar 1 pack5",
+      statusAfterRemove1Pack5.json?.cupoUsuarios === 7,
+      statusAfterRemove1Pack5.json?.cupoUsuarios,
+    );
+    check(
+      `totalMensual = ${TOTAL_WITH_1x_PACK5} en /subscription/status tras quitar 1 pack5`,
+      statusAfterRemove1Pack5.json?.totalMensual === TOTAL_WITH_1x_PACK5,
+      statusAfterRemove1Pack5.json?.totalMensual,
+    );
+    const packsArrAfterRemove: any[] = statusAfterRemove1Pack5.json?.packs ?? [];
+    check(
+      "packs[] muestra pack5 con cantidad=1 tras quitar uno",
+      packsArrAfterRemove.some((p: any) => (p.id ?? p.pack) === "pack5" && p.cantidad === 1),
+      packsArrAfterRemove,
+    );
+
+    // Quitar el último pack5 para limpiar el estado antes del resto de tests.
+    await reloadOwner();
+    const removeLastPack5 = await call("POST", "/subscription/packs", { pack: "pack5", accion: "quitar" });
+    check(`quitar último pack5 → 200`, removeLastPack5.status === 200, removeLastPack5.json);
+    check(`totalMensual vuelve a ${NEXTCOB_TOTAL}`, removeLastPack5.json?.totalMensual === NEXTCOB_TOTAL, removeLastPack5.json?.totalMensual);
 
     // ── 403 sin_cupo al invitar con org al límite de capacidad ────────────
     // Reactivate both members → 3 activos > cupoBase=2 → cupo lleno (sin pack).
