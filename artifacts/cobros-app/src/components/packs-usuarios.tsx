@@ -146,11 +146,11 @@ export function PacksUsuarios({
                 {pack.nombre}
               </div>
               <p className="text-lg font-bold mt-1">
-                {formatCLPPacks(pack.total)}
-                <span className="text-xs font-normal text-muted-foreground">/mes</span>
+                {formatCLPPacks(pack.neto)}
+                <span className="text-xs font-normal text-muted-foreground"> + IVA/mes</span>
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {formatCLPPacks(pack.neto)} + IVA {formatCLPPacks(pack.iva)}
+                Total {formatCLPPacks(pack.total)}/mes (IVA incluido)
               </p>
               <p className="text-[11px] text-muted-foreground mt-1">
                 {pack.usuarios} usuario{pack.usuarios !== 1 ? "s" : ""} adicional{pack.usuarios !== 1 ? "es" : ""}
