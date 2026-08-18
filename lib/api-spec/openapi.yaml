@@ -1915,7 +1915,7 @@ paths:
           schema:
             type: string
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
@@ -1927,8 +1927,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminAccionResult"
+        "400":
+          description: Invalid date
         "404":
           description: User not found
+  /admin/trial-extensiones:
+    get:
+      operationId: listAdminTrialExtensiones
+      tags: [admin]
+      summary: Audit log of trial extensions (admin only)
+      responses:
+        "200":
+          description: Trial extensions, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrialExtension"
   /admin/usuarios/{id}/activar:
     post:
       operationId: activarCuenta
@@ -3844,11 +3860,47 @@ components:
 
     ExtenderTrialInput:
       type: object
+      required: [nuevaFecha]
       properties:
-        dias:
+        nuevaFecha:
+          type: string
+          format: date
+          description: >-
+            New trial expiration date (YYYY-MM-DD), chosen by the superadmin in
+            a calendar. Must be a future date. The trial ends at the end of
+            that day (Chile time).
+        motivo:
+          type: string
+          maxLength: 500
+          description: Optional reason recorded in the audit log.
+
+    TrialExtension:
+      type: object
+      required: [id, usuarioId, fechaNueva, creadoEn]
+      properties:
+        id:
           type: integer
-          minimum: 1
-          description: Days to extend (default 14).
+        usuarioId:
+          type: string
+        usuarioNombre:
+          type: [string, 'null']
+        usuarioEmail:
+          type: [string, 'null']
+        usuarioAccountId:
+          type: [string, 'null']
+        adminNombre:
+          type: [string, 'null']
+        fechaAnterior:
+          type: [string, 'null']
+          format: date-time
+        fechaNueva:
+          type: string
+          format: date-time
+        motivo:
+          type: [string, 'null']
+        creadoEn:
+          type: string
+          format: date-time
 
     MarcarDemoInput:
       type: object

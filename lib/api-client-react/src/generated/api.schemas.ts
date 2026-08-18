@@ -502,11 +502,32 @@ export interface AdminMetricas {
 }
 
 export interface ExtenderTrialInput {
+  /** New trial expiration date (YYYY-MM-DD), chosen by the superadmin in a calendar. Must be a future date. The trial ends at the end of that day (Chile time). */
+  nuevaFecha: string;
   /**
-     * Days to extend (default 14).
-     * @minimum 1
+     * Optional reason recorded in the audit log.
+     * @maxLength 500
      */
-  dias?: number;
+  motivo?: string;
+}
+
+export interface TrialExtension {
+  id: number;
+  usuarioId: string;
+  /** @nullable */
+  usuarioNombre?: string | null;
+  /** @nullable */
+  usuarioEmail?: string | null;
+  /** @nullable */
+  usuarioAccountId?: string | null;
+  /** @nullable */
+  adminNombre?: string | null;
+  /** @nullable */
+  fechaAnterior?: string | null;
+  fechaNueva: string;
+  /** @nullable */
+  motivo?: string | null;
+  creadoEn: string;
 }
 
 export interface MarcarDemoInput {

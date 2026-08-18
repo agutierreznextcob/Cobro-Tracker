@@ -1574,17 +1574,37 @@ export const ExtenderTrialParams = zod.object({
   "id": zod.coerce.string()
 })
 
+export const extenderTrialBodyMotivoMax = 500;
 
 
 
 export const ExtenderTrialBody = zod.object({
-  "dias": zod.number().min(1).optional().describe('Days to extend (default 14).')
+  "nuevaFecha": zod.coerce.date().describe('New trial expiration date (YYYY-MM-DD), chosen by the superadmin in a calendar. Must be a future date. The trial ends at the end of that day (Chile time).'),
+  "motivo": zod.string().max(extenderTrialBodyMotivoMax).optional().describe('Optional reason recorded in the audit log.')
 })
 
 export const ExtenderTrialResponse = zod.object({
   "ok": zod.boolean(),
   "mensaje": zod.string().nullish()
 })
+
+
+/**
+ * @summary Audit log of trial extensions (admin only)
+ */
+export const ListAdminTrialExtensionesResponseItem = zod.object({
+  "id": zod.number(),
+  "usuarioId": zod.string(),
+  "usuarioNombre": zod.string().nullish(),
+  "usuarioEmail": zod.string().nullish(),
+  "usuarioAccountId": zod.string().nullish(),
+  "adminNombre": zod.string().nullish(),
+  "fechaAnterior": zod.coerce.date().nullish(),
+  "fechaNueva": zod.coerce.date(),
+  "motivo": zod.string().nullish(),
+  "creadoEn": zod.coerce.date()
+})
+export const ListAdminTrialExtensionesResponse = zod.array(ListAdminTrialExtensionesResponseItem)
 
 
 /**

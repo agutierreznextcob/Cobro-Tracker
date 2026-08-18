@@ -143,6 +143,7 @@ import type {
   SubscriptionStatus,
   SugerenciaWorkflow,
   Tarea,
+  TrialExtension,
   UpdateUserPacks200,
   VerifyEmailParams,
   WebhookEventosPage,
@@ -5486,7 +5487,7 @@ export const getExtenderTrialUrl = (id: string,) => {
  * @summary Extend a user's trial (admin only)
  */
 export const extenderTrial = async (id: string,
-    extenderTrialInput?: ExtenderTrialInput, options?: RequestInit): Promise<AdminAccionResult> => {
+    extenderTrialInput: ExtenderTrialInput, options?: RequestInit): Promise<AdminAccionResult> => {
 
   return customFetch<AdminAccionResult>(getExtenderTrialUrl(id),
   {
@@ -5502,8 +5503,8 @@ export const extenderTrial = async (id: string,
 
 
 export const getExtenderTrialMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extenderTrial>>, TError,{id: string;data?: BodyType<ExtenderTrialInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof extenderTrial>>, TError,{id: string;data?: BodyType<ExtenderTrialInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extenderTrial>>, TError,{id: string;data: BodyType<ExtenderTrialInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof extenderTrial>>, TError,{id: string;data: BodyType<ExtenderTrialInput>}, TContext> => {
 
 const mutationKey = ['extenderTrial'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -5515,7 +5516,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof extenderTrial>>, {id: string;data?: BodyType<ExtenderTrialInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof extenderTrial>>, {id: string;data: BodyType<ExtenderTrialInput>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  extenderTrial(id,data,requestOptions)
@@ -5529,22 +5530,99 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ExtenderTrialMutationResult = NonNullable<Awaited<ReturnType<typeof extenderTrial>>>
-    export type ExtenderTrialMutationBody = BodyType<ExtenderTrialInput> | undefined
+    export type ExtenderTrialMutationBody = BodyType<ExtenderTrialInput>
     export type ExtenderTrialMutationError = ErrorType<void>
 
     /**
  * @summary Extend a user's trial (admin only)
  */
 export const useExtenderTrial = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extenderTrial>>, TError,{id: string;data?: BodyType<ExtenderTrialInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extenderTrial>>, TError,{id: string;data: BodyType<ExtenderTrialInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof extenderTrial>>,
         TError,
-        {id: string;data?: BodyType<ExtenderTrialInput>},
+        {id: string;data: BodyType<ExtenderTrialInput>},
         TContext
       > => {
       return useMutation(getExtenderTrialMutationOptions(options));
     }
+
+export const getListAdminTrialExtensionesUrl = () => {
+
+
+
+
+  return `/api/admin/trial-extensiones`
+}
+
+/**
+ * @summary Audit log of trial extensions (admin only)
+ */
+export const listAdminTrialExtensiones = async ( options?: RequestInit): Promise<TrialExtension[]> => {
+
+  return customFetch<TrialExtension[]>(getListAdminTrialExtensionesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminTrialExtensionesQueryKey = () => {
+    return [
+    `/api/admin/trial-extensiones`
+    ] as const;
+    }
+
+
+export const getListAdminTrialExtensionesQueryOptions = <TData = Awaited<ReturnType<typeof listAdminTrialExtensiones>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminTrialExtensiones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminTrialExtensionesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminTrialExtensiones>>> = ({ signal }) => listAdminTrialExtensiones({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminTrialExtensiones>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminTrialExtensionesQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminTrialExtensiones>>>
+export type ListAdminTrialExtensionesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Audit log of trial extensions (admin only)
+ */
+
+export function useListAdminTrialExtensiones<TData = Awaited<ReturnType<typeof listAdminTrialExtensiones>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminTrialExtensiones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminTrialExtensionesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getActivarCuentaUrl = (id: string,) => {
 

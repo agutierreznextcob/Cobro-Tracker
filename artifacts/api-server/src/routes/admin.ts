@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, cobrosTable, organizacionesTable, cobrosEliminadosTable, pagosSuscripcionTable } from "@workspace/db";
+import { db, usersTable, cobrosTable, organizacionesTable, cobrosEliminadosTable, pagosSuscripcionTable, trialExtensionesTable } from "@workspace/db";
 import { leerUltimaEjecucionSweep } from "../lib/salud-cartera";
 import type { CobroEliminado } from "@workspace/db";
 import { eq, sql, isNull, desc, or, ilike } from "drizzle-orm";
@@ -7,7 +7,7 @@ import { requireAdmin } from "../middlewares/requireAdmin";
 import { computeSubscriptionState } from "../lib/subscription";
 import { computePricing } from "../lib/org";
 import { normalizarPacks } from "../lib/plans";
-import { sendRenovacionEmail } from "../lib/email";
+import { sendRenovacionEmail, sendTrialExtendidoEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
 
 const adminRouter = Router();
@@ -360,32 +360,173 @@ adminRouter.get("/admin/metricas", async (req, res) => {
   }
 });
 
+// Convierte YYYY-MM-DD al instante "fin de ese día" (23:59:59) en
+// America/Santiago respetando el horario de verano (UTC-3 en verano, UTC-4 en
+// invierno): parte de un candidato y lo corrige con el offset real que rige en
+// ese instante (dos iteraciones cubren los cambios de DST).
+function finDeDiaSantiago(fecha: string): Date {
+  const [y, m, d] = fecha.split("-").map(Number);
+  const targetUtc = Date.UTC(y, m - 1, d, 23, 59, 59);
+  let candidato = new Date(`${fecha}T23:59:59-03:00`);
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Santiago",
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  for (let i = 0; i < 2; i++) {
+    const p = Object.fromEntries(
+      fmt.formatToParts(candidato).map((x) => [x.type, x.value]),
+    );
+    const localUtc = Date.UTC(
+      Number(p.year),
+      Number(p.month) - 1,
+      Number(p.day),
+      Number(p.hour) % 24,
+      Number(p.minute),
+      Number(p.second),
+    );
+    if (localUtc === targetUtc) break;
+    candidato = new Date(candidato.getTime() + (targetUtc - localUtc));
+  }
+  return candidato;
+}
+
+// Extiende el trial hasta una FECHA elegida por el superadmin (calendario en
+// la UI). Registra la extensión en trial_extensiones (auditoría) y avisa al
+// usuario por email (fire-and-forget con .catch — nunca bloquea la respuesta).
 adminRouter.post("/admin/usuarios/:id/extender-trial", async (req, res) => {
   const { id } = req.params;
-  const dias =
-    typeof req.body?.dias === "number" && req.body.dias > 0
-      ? Math.floor(req.body.dias)
-      : TRIAL_DAYS;
+  const nuevaFechaRaw = req.body?.nuevaFecha;
+  const motivo =
+    typeof req.body?.motivo === "string" && req.body.motivo.trim()
+      ? req.body.motivo.trim().slice(0, 500)
+      : null;
+  if (
+    typeof nuevaFechaRaw !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(nuevaFechaRaw)
+  ) {
+    res.status(400).json({
+      ok: false,
+      mensaje: "Debes indicar la nueva fecha de vencimiento (YYYY-MM-DD).",
+    });
+    return;
+  }
+  // Validación semántica: JS normaliza fechas imposibles (2026-02-30 →
+  // 2026-03-02); exigimos que el calendario la reconozca tal cual.
+  const [y, m, d] = nuevaFechaRaw.split("-").map(Number);
+  const chequeo = new Date(Date.UTC(y, m - 1, d));
+  if (
+    chequeo.getUTCFullYear() !== y ||
+    chequeo.getUTCMonth() !== m - 1 ||
+    chequeo.getUTCDate() !== d
+  ) {
+    res.status(400).json({ ok: false, mensaje: "La fecha no es válida." });
+    return;
+  }
+  const nuevoFin = finDeDiaSantiago(nuevaFechaRaw);
+  if (nuevoFin.getTime() <= Date.now()) {
+    res.status(400).json({
+      ok: false,
+      mensaje: "La nueva fecha debe ser posterior a hoy.",
+    });
+    return;
+  }
   try {
     const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
     if (!u) {
       res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" });
       return;
     }
-    // Extend from the later of now or the current trial end.
-    const base = Math.max(
-      Date.now(),
-      u.trialEndsAt ? u.trialEndsAt.getTime() : Date.now(),
-    );
-    const nuevoFin = new Date(base + dias * MS_PER_DAY);
-    await db
-      .update(usersTable)
-      .set({ subscriptionStatus: "prueba", trialEndsAt: nuevoFin })
-      .where(eq(usersTable.id, id));
-    res.json({ ok: true, mensaje: `Prueba extendida ${dias} día(s).` });
+    if (u.esDemo) {
+      res.json({
+        ok: true,
+        mensaje: "La cuenta demo tiene acceso permanente; no requiere extensión.",
+      });
+      return;
+    }
+    const fechaAnterior = u.trialEndsAt;
+    const admin = req.user!;
+    // Actualización + auditoría en UNA transacción: la extensión nunca queda
+    // aplicada sin su registro de auditoría (ni al revés).
+    await db.transaction(async (tx) => {
+      await tx
+        .update(usersTable)
+        .set({ subscriptionStatus: "prueba", trialEndsAt: nuevoFin })
+        .where(eq(usersTable.id, id));
+      await tx.insert(trialExtensionesTable).values({
+        usuarioId: u.id,
+        usuarioNombre: nombreDe(u),
+        usuarioEmail: u.email,
+        usuarioAccountId: u.accountId,
+        adminId: admin.id,
+        adminNombre: nombreDe(admin),
+        fechaAnterior,
+        fechaNueva: nuevoFin,
+        motivo,
+      });
+    });
+
+    const fechaTexto = nuevoFin.toLocaleDateString("es-CL", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "America/Santiago",
+    });
+    if (u.email) {
+      sendTrialExtendidoEmail(
+        {
+          email: u.email,
+          nombre: nombreDe(u),
+          fechaTexto,
+          ctaUrl: `${getPublicBaseUrl()}/dashboard`,
+        },
+        req.log,
+      ).catch((err) =>
+        req.log.warn({ err }, "Error sending trial-extension email"),
+      );
+    }
+
+    res.json({
+      ok: true,
+      mensaje: `Prueba extendida hasta el ${fechaTexto}.`,
+    });
   } catch (err) {
     req.log.error({ err }, "Error extending trial");
     res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+});
+
+// Historial de extensiones de trial (auditoría del superadmin), más recientes
+// primero.
+adminRouter.get("/admin/trial-extensiones", async (req, res) => {
+  try {
+    const rows = await db
+      .select()
+      .from(trialExtensionesTable)
+      .orderBy(desc(trialExtensionesTable.id))
+      .limit(200);
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        usuarioId: r.usuarioId,
+        usuarioNombre: r.usuarioNombre,
+        usuarioEmail: r.usuarioEmail,
+        usuarioAccountId: r.usuarioAccountId,
+        adminNombre: r.adminNombre,
+        fechaAnterior: r.fechaAnterior?.toISOString() ?? null,
+        fechaNueva: r.fechaNueva.toISOString(),
+        motivo: r.motivo,
+        creadoEn: r.creadoEn.toISOString(),
+      })),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Error listing trial extensions");
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 

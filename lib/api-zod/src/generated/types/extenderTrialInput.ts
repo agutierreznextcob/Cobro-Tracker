@@ -7,9 +7,11 @@
  */
 
 export interface ExtenderTrialInput {
+  /** New trial expiration date (YYYY-MM-DD), chosen by the superadmin in a calendar. Must be a future date. The trial ends at the end of that day (Chile time). */
+  nuevaFecha: Date;
   /**
-     * Days to extend (default 14).
-     * @minimum 1
+     * Optional reason recorded in the audit log.
+     * @maxLength 500
      */
-  dias?: number;
+  motivo?: string;
 }

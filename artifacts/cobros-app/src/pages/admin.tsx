@@ -9,6 +9,8 @@ import {
   useMarcarDemo,
   useReclamarCobrosHuerfanos,
   useListAdminCobrosEliminados,
+  useListAdminTrialExtensiones,
+  getListAdminTrialExtensionesQueryKey,
   getListAdminUsuariosQueryKey,
   getGetAdminMetricasQueryKey,
   getListAdminCobrosEliminadosQueryKey,
@@ -35,6 +37,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Calendar } from "@/components/ui/calendar";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   Shield,
@@ -185,6 +197,9 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: getListAdminUsuariosQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetAdminMetricasQueryKey() });
+    queryClient.invalidateQueries({
+      queryKey: getListAdminTrialExtensionesQueryKey(),
+    });
   };
 
   const handleEmail = () => {
@@ -221,9 +236,31 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
     );
   };
 
+  const [extenderOpen, setExtenderOpen] = useState(false);
+  const [fecha, setFecha] = useState<Date | undefined>(undefined);
+  const [motivo, setMotivo] = useState("");
+
+  const abrirExtender = () => {
+    setFecha(undefined);
+    setMotivo("");
+    setExtenderOpen(true);
+  };
+
   const handleExtender = () => {
+    if (!fecha) return;
+    // YYYY-MM-DD en hora local (no UTC) para que la fecha elegida en el
+    // calendario sea exactamente la que recibe el backend.
+    const y = fecha.getFullYear();
+    const m = String(fecha.getMonth() + 1).padStart(2, "0");
+    const d = String(fecha.getDate()).padStart(2, "0");
     extender.mutate(
-      { id: u.id, data: { dias: 14 } },
+      {
+        id: u.id,
+        data: {
+          nuevaFecha: `${y}-${m}-${d}`,
+          ...(motivo.trim() ? { motivo: motivo.trim() } : {}),
+        },
+      },
       {
         onSuccess: (res) => {
           toast({
@@ -231,6 +268,7 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
             description: res.mensaje ?? undefined,
             variant: res.ok ? undefined : "destructive",
           });
+          if (res.ok) setExtenderOpen(false);
           refresh();
         },
         onError: () =>
@@ -388,9 +426,9 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleExtender}>
+          <DropdownMenuItem onClick={abrirExtender}>
             <CalendarPlus className="h-4 w-4 mr-2" />
-            Extender prueba 14 días
+            Extender trial
           </DropdownMenuItem>
           {u.esDemo ? (
             <DropdownMenuItem onClick={() => handleDemo(false)}>
@@ -420,6 +458,81 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog open={extenderOpen} onOpenChange={setExtenderOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Extender período de prueba</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-1 pt-1">
+                <p>
+                  Usuario:{" "}
+                  <span className="font-medium text-foreground">
+                    {u.nombre || u.email || u.id}
+                  </span>{" "}
+                  {u.accountId ? `(${u.accountId})` : ""}
+                </p>
+                <p>
+                  Trial actual vence:{" "}
+                  <span className="font-medium text-foreground">
+                    {formatFecha(u.trialEndsAt)}
+                  </span>
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-3">
+            <Calendar
+              mode="single"
+              selected={fecha}
+              onSelect={setFecha}
+              disabled={{ before: new Date(Date.now() + 24 * 60 * 60 * 1000) }}
+              className="rounded-md border"
+            />
+            <p className="text-sm w-full">
+              Nueva fecha de vencimiento:{" "}
+              <span className="font-semibold">
+                {fecha
+                  ? fecha.toLocaleDateString("es-CL", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })
+                  : "—"}
+              </span>
+            </p>
+            <Textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Motivo (opcional, queda en el registro de auditoría)"
+              rows={2}
+              maxLength={500}
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setExtenderOpen(false)}
+              disabled={extender.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleExtender}
+              disabled={!fecha || extender.isPending}
+              data-testid="confirmar-extension"
+            >
+              {extender.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CalendarPlus className="h-4 w-4 mr-2" />
+              )}
+              Confirmar extensión
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -715,7 +828,85 @@ export default function AdminPage() {
         </Card>
       </div>
 
+      <TrialExtensionesSection />
+
       <ConsultoresSection />
+    </div>
+  );
+}
+
+// Registro de auditoría de extensiones de trial hechas por el superadmin.
+function TrialExtensionesSection() {
+  const { data: extensiones, isLoading } = useListAdminTrialExtensiones({
+    query: { queryKey: getListAdminTrialExtensionesQueryKey() },
+  });
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <CalendarPlus className="h-5 w-5 text-primary" />
+        <h2 className="text-xl font-bold tracking-tight">Extensiones de trial</h2>
+      </div>
+      <Card className="shadow-sm">
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              Cargando extensiones...
+            </div>
+          ) : (extensiones ?? []).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <CalendarPlus className="h-8 w-8 text-muted-foreground mb-3" />
+              <p className="text-muted-foreground text-sm">
+                Aún no se han registrado extensiones de trial.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Usuario</TableHead>
+                    <TableHead>Vencía</TableHead>
+                    <TableHead>Nuevo vencimiento</TableHead>
+                    <TableHead>Motivo</TableHead>
+                    <TableHead>Extendido por</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(extensiones ?? []).map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {formatDate(e.creadoEn)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{e.usuarioNombre || e.usuarioEmail || e.usuarioId}</div>
+                        {e.usuarioAccountId && (
+                          <div className="font-mono text-xs text-muted-foreground">
+                            {e.usuarioAccountId}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {e.fechaAnterior ? formatDate(e.fechaAnterior) : "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm font-medium">
+                        {formatDate(e.fechaNueva)}
+                      </TableCell>
+                      <TableCell className="max-w-[240px] text-sm text-muted-foreground">
+                        {e.motivo || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {e.adminNombre || "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

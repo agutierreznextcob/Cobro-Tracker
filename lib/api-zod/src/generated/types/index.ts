@@ -223,6 +223,7 @@ export * from './sugerenciaWorkflow';
 export * from './tarea';
 export * from './tareaEstado';
 export * from './tareaOrigen';
+export * from './trialExtension';
 export * from './updateUserPacks200';
 export * from './updateUserPacks200Packs';
 export * from './verifyEmailParams';

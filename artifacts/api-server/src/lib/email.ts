@@ -478,6 +478,48 @@ export async function sendWelcomeEmail(
   return { ok: true };
 }
 
+// Aviso al usuario cuando el superadmin extiende su período de prueba.
+export async function sendTrialExtendidoEmail(
+  data: {
+    email: string;
+    nombre?: string | null;
+    fechaTexto: string; // ej: "18 de septiembre de 2026"
+    ctaUrl: string;
+  },
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping trial-extension email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const saludo = data.nombre ? `Hola ${data.nombre}` : "Hola";
+  const { error } = await client.emails.send({
+    ...buildRemitente(),
+    to: [data.email],
+    subject: `Tu período de prueba fue extendido hasta el ${data.fechaTexto}`,
+    html: buildEmailHtml({
+      title: "Prueba extendida",
+      previewText: `Tu período de prueba en NextCob ha sido extendido hasta el ${data.fechaTexto}.`,
+      heading: `${saludo}, ¡buenas noticias! 🎉`,
+      bodyLines: [
+        `Tu período de prueba en NextCob ha sido extendido hasta el <strong>${data.fechaTexto}</strong>. Sigue explorando todas las funcionalidades sin interrupciones.`,
+        `Si tienes dudas, responde este correo y te ayudaremos.`,
+      ],
+      ctaText: "Ir a mi panel",
+      ctaUrl: data.ctaUrl,
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending trial-extension email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
 export async function sendResetPasswordEmail(
   data: { email: string; nombre?: string | null; ctaUrl: string },
   log?: { warn: (obj: object, msg: string) => void },
