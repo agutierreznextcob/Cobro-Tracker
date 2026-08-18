@@ -104,6 +104,10 @@ async function assignOrganization(user: {
       // correo). Sin token, fallback: cualquier invitación pendiente del email.
       let inv;
       if (invitacionToken) {
+        // Token provided explicitly (registration from /invitacion/:token link):
+        // match ONLY this exact token+email pair. An invalid, expired, or
+        // email-mismatched token must NOT fall through to another org's invitation
+        // — that would silently enroll the user into the wrong organization.
         [inv] = await db
           .select()
           .from(invitacionesTable)
@@ -114,8 +118,9 @@ async function assignOrganization(user: {
               eq(invitacionesTable.estado, "pendiente"),
             ),
           );
-      }
-      if (!inv) {
+      } else {
+        // No token: accept any pending invitation for this email (e.g. admin
+        // invited before the user registered without using the invitation link).
         [inv] = await db
           .select()
           .from(invitacionesTable)

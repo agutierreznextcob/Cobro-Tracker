@@ -32,6 +32,14 @@ args = "e2e-public-routes"
 task = "workflow.run"
 args = "check-auth-guards"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "e2e-invitacion"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "e2e-invitacion-browser"
+
 [[workflows.workflow]]
 name = "typecheck"
 author = "agent"
@@ -76,6 +84,22 @@ args = "pnpm --filter @workspace/api-server run check:auth-guards"
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "e2e-invitacion"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/api-server exec tsx scripts/e2e-invitacion.ts"
+
+[[workflows.workflow]]
+name = "e2e-invitacion-browser"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx playwright test --reporter=list"
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
@@ -98,6 +122,7 @@ externalPort = 3000
 
 [nix]
 channel = "stable-25_05"
+packages = ["glib", "nss", "nspr", "at-spi2-atk", "cups", "dbus", "libdrm", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libxcb", "mesa", "expat", "libxkbcommon", "alsa-lib", "libGL", "libgbm", "xorg.libXau", "xorg.libXdmcp", "xorg.libXi", "xorg.libXinerama", "xorg.libXcursor", "xorg.libXrender", "xorg.libXft", "xorg.libXmu", "wayland"]
 
 [userenv]
 
