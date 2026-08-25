@@ -407,7 +407,7 @@ aiRouter.post("/ai/conversations/:id/messages", async (req, res) => {
     try {
       const groq = getGroqClient();
       const stream = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: "qwen/qwen3.6-27b",
         max_tokens: 2048,
         messages: [{ role: "system", content: systemPrompt }, ...chatMessages],
         stream: true,
@@ -477,7 +477,7 @@ aiRouter.post("/ai/chat", async (req, res) => {
     try {
       const groq = getGroqClient();
       const stream = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: "qwen/qwen3.6-27b",
         max_tokens: 2048,
         messages: [{ role: "system", content: systemPrompt }, ...chatMessages],
         stream: true,
