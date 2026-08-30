@@ -9,6 +9,7 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check:auth-guards": "tsx scripts/check-auth-guards.ts",
+    "e2e:team-scope": "tsx scripts/e2e-team-scope.ts",
     "e2e-sweep-health": "tsx scripts/e2e-sweep-health.ts"
   },
   "dependencies": {
