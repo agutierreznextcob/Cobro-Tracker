@@ -1331,56 +1331,171 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
   }
 });
 
-// Dashboard metrics — scoped to current user, with period filter
+const SANTIAGO_DAY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Santiago",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function addCalendarDays(dateStr: string, delta: number): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + delta, 12));
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfSantiagoDay(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const target = Date.UTC(year, month - 1, day);
+  let instant = target;
+  const partsFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Santiago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  // Converge from UTC midnight to midnight in Santiago. This handles both
+  // standard time and DST without hard-coding an offset.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = Object.fromEntries(
+      partsFormatter.formatToParts(new Date(instant)).map((part) => [part.type, part.value]),
+    );
+    const representedAsUtc = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second),
+    );
+    instant += target - representedAsUtc;
+  }
+  return new Date(instant);
+}
+
+function dashboardPeriodStart(periodo: "hoy" | "semana" | "mes" | "total"): Date | null {
+  if (periodo === "total") return null;
+  const today = SANTIAGO_DAY_FORMATTER.format(new Date());
+  if (periodo === "hoy") return startOfSantiagoDay(today);
+  if (periodo === "mes") return startOfSantiagoDay(`${today.slice(0, 8)}01`);
+  const mondayOffset = (new Date(`${today}T12:00:00.000Z`).getUTCDay() + 6) % 7;
+  return startOfSantiagoDay(addCalendarDays(today, -mondayOffset));
+}
+
+// Dashboard metrics — scoped to the current user's org/team, with Chilean
+// calendar periods. Revenue is based on actual confirmed payment events, not
+// on when the cobro record was created.
 cobrosRouter.get("/dashboard/metrics", async (req, res) => {
   const userId = req.user!.id;
-  const periodo = (req.query.periodo as string) || "mes";
-  const responsable = typeof req.query.responsable === "string" ? req.query.responsable : undefined;
-
-  let periodStart: Date | null = null;
-  const now = new Date();
-  if (periodo === "hoy") {
-    periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  } else if (periodo === "semana") {
-    const day = now.getDay(); // 0=Sun
-    const diff = (day + 6) % 7; // days since Monday
-    periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff, 0, 0, 0, 0);
-  } else if (periodo === "mes") {
-    periodStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-  }
-  // "total" => no date filter
+  const requestedPeriod = typeof req.query.periodo === "string" ? req.query.periodo : "mes";
+  const periodo: "hoy" | "semana" | "mes" | "total" =
+    requestedPeriod === "hoy" || requestedPeriod === "semana" ||
+    requestedPeriod === "total" ? requestedPeriod : "mes";
+  const periodStart = dashboardPeriodStart(periodo);
 
   try {
     const ctx = await getOrgContext(userId);
-    const scope = cobroScopeCondition(ctx, userId, responsable);
-    const baseConditions = periodStart
-      ? and(scope, gte(cobrosTable.creadoEn, periodStart))
-      : scope;
-
-    const rows = await db
+    const scope = cobroScopeCondition(ctx, userId, undefined);
+    const confirmedPaymentConditions = [
+      scope,
+      eq(pagosParciales.estado, "confirmado"),
+      isNotNull(pagosParciales.confirmadoEn),
+      ...(periodStart ? [gte(pagosParciales.confirmadoEn, periodStart)] : []),
+    ];
+    const [paymentEvents] = await db
       .select({
-        estado: cobrosTable.estado,
         cantidad: sql<number>`count(*)::int`,
-        monto: sql<number>`coalesce(sum(${cobrosTable.monto})::float, 0)`,
+        monto: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)`,
+      })
+      .from(pagosParciales)
+      .innerJoin(cobrosTable, eq(cobrosTable.id, pagosParciales.cobroId))
+      .where(and(...confirmedPaymentConditions));
+
+    // A cobro may be settled manually without creating an abono. Add only the
+    // residual amount not already represented by confirmed payment events.
+    const manualPaidConditions = [
+      scope,
+      eq(cobrosTable.estado, "pagado"),
+      isNotNull(cobrosTable.pagadoEn),
+      ...(periodStart ? [gte(cobrosTable.pagadoEn, periodStart)] : []),
+    ];
+    const manualPaidRows = await db
+      .select({
+        id: cobrosTable.id,
+        monto: cobrosTable.monto,
+        montoDescuento: cobrosTable.montoDescuento,
       })
       .from(cobrosTable)
-      .where(baseConditions)
-      .groupBy(cobrosTable.estado);
+      .where(and(...manualPaidConditions));
+    const manualPaidAbonos = manualPaidRows.length
+      ? await db
+          .select({
+            cobroId: pagosParciales.cobroId,
+            total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)`,
+          })
+          .from(pagosParciales)
+          .where(and(
+            inArray(pagosParciales.cobroId, manualPaidRows.map((row) => row.id)),
+            eq(pagosParciales.estado, "confirmado"),
+          ))
+          .groupBy(pagosParciales.cobroId)
+      : [];
+    const manualPaidMap = new Map(manualPaidAbonos.map((row) => [row.cobroId, Number(row.total)]));
+    const manualSettlements = manualPaidRows
+      .map((row) => Math.max(Number(row.monto) - Number(row.montoDescuento ?? 0) - (manualPaidMap.get(row.id) ?? 0), 0))
+      .filter((amount) => amount > 0);
 
-    const pagado = rows.find((r) => r.estado === "pagado");
-    const pendiente = rows.find((r) => r.estado === "pendiente");
+    const outstandingConditions = [
+      scope,
+      inArray(cobrosTable.estado, ["pendiente", "parcial"]),
+      ...(periodStart ? [gte(cobrosTable.creadoEn, periodStart)] : []),
+    ];
+    const outstandingRows = await db
+      .select({
+        id: cobrosTable.id,
+        monto: cobrosTable.monto,
+        montoDescuento: cobrosTable.montoDescuento,
+      })
+      .from(cobrosTable)
+      .where(and(...outstandingConditions));
+    const outstandingAbonos = outstandingRows.length
+      ? await db
+          .select({
+            cobroId: pagosParciales.cobroId,
+            total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)`,
+          })
+          .from(pagosParciales)
+          .where(and(
+            inArray(pagosParciales.cobroId, outstandingRows.map((row) => row.id)),
+            eq(pagosParciales.estado, "confirmado"),
+          ))
+          .groupBy(pagosParciales.cobroId)
+      : [];
+    const outstandingPaidMap = new Map(outstandingAbonos.map((row) => [row.cobroId, Number(row.total)]));
+    const pendientesMonto = outstandingRows.reduce(
+      (sum, row) => sum + Math.max(
+        Number(row.monto) - Number(row.montoDescuento ?? 0) - (outstandingPaidMap.get(row.id) ?? 0),
+        0,
+      ),
+      0,
+    );
 
-    const transaccionesPagadas = pagado?.cantidad ?? 0;
-    const montoRecaudado = pagado?.monto ?? 0;
+    const transaccionesPagadas = Number(paymentEvents?.cantidad ?? 0) + manualSettlements.length;
+    const montoRecaudado =
+      Number(paymentEvents?.monto ?? 0) + manualSettlements.reduce((sum, amount) => sum + amount, 0);
     const ticketPromedio = transaccionesPagadas > 0 ? montoRecaudado / transaccionesPagadas : 0;
 
     res.json({
       transaccionesPagadas,
       montoRecaudado,
       ticketPromedio,
-      pendientesCantidad: pendiente?.cantidad ?? 0,
-      pendientesMonto: pendiente?.monto ?? 0,
-      periodo: ["hoy", "semana", "mes", "total"].includes(periodo) ? periodo : "mes",
+      pendientesCantidad: outstandingRows.length,
+      pendientesMonto,
+      periodo,
     });
   } catch (err) {
     req.log.error({ err }, "Error getting dashboard metrics");

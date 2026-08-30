@@ -1,8 +1,8 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Webhook, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock } from "lucide-react";
+import { Home, Plus, Search, Users, Webhook, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
-import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus } from "@workspace/api-client-react";
+import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus, useGetGestionResumen, getGetGestionResumenQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useWebhookPolling } from "@/hooks/use-webhook-polling";
@@ -183,6 +183,75 @@ function TrialBanner() {
   );
 }
 
+function GestionNavGroup({ closeMobile, esStarter, setUpgradeFeature }: { closeMobile: () => void, esStarter: boolean, setUpgradeFeature: (f: string) => void }) {
+  const [location, navigate] = useLocation();
+  const [isOpen, setIsOpen] = useState(() => location.startsWith("/gestion") || location.startsWith("/tareas"));
+
+  const { data } = useGetGestionResumen({ query: { queryKey: getGetGestionResumenQueryKey() } });
+  const badgeTotal = data ? (data.total || 0) : 0;
+
+  const subItems = [
+    { href: "/gestion/hoy", label: "Qué hacer hoy", icon: Calendar },
+    { href: "/gestion/clientes-prioritarios", label: "Clientes prioritarios", icon: Star },
+    { href: "/gestion/tareas", label: "Tareas", icon: ListTodo },
+  ];
+
+  const isActive = location.startsWith("/gestion") || location.startsWith("/tareas");
+
+  return (
+    <div className="space-y-0.5">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
+          isActive && !isOpen
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <CheckSquare className={`h-4 w-4 shrink-0 ${
+            isActive && !isOpen ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+          }`} />
+          <span>Gestión</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {badgeTotal > 0 && (
+            <span className={`inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold ${
+              isActive && !isOpen ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground"
+            }`}>
+              {badgeTotal > 99 ? "99+" : badgeTotal}
+            </span>
+          )}
+          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="pl-9 pr-2 py-1 space-y-1">
+          {subItems.map(item => {
+            const isSubActive = location === item.href || (item.href === '/gestion/tareas' && location === '/tareas');
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={closeMobile}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isSubActive
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                }`}
+              >
+                <item.icon className={`h-3.5 w-3.5 shrink-0 ${isSubActive ? "text-primary" : "text-muted-foreground"}`} />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
   const { user, logout } = useAuth();
@@ -203,7 +272,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock, feature: "Recordatorios automáticos" },
     { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes" },
-    { href: "/tareas", label: "Tareas", icon: CheckSquare },
+    { id: "gestion_group" },
     { href: "/encuestas", label: "Satisfacción", icon: MessageSquare, feature: "Encuestas de satisfacción" },
     { href: "/webhooks/log", label: "Log webhooks", icon: Webhook },
     { href: "/perfil", label: "Perfil", icon: UserCircle },
@@ -279,6 +348,11 @@ export function Layout({ children }: { children: ReactNode }) {
         {/* Nav */}
         <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
+            if ("id" in item && item.id === "gestion_group") {
+              return <GestionNavGroup key="gestion_group" closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
+            }
+            if (!("href" in item)) return null;
+
             const isActive = location === item.href;
             const bloqueado = esStarter && !!item.feature;
             return (

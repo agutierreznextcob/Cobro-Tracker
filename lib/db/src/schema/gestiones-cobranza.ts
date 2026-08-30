@@ -30,6 +30,7 @@ export const gestionesCobranzaTable = pgTable("gestiones_cobranza", {
   nota: text("nota"),
   proximaGestionEn: timestamp("proxima_gestion_en", { withTimezone: true }),
   proximaGestionTipo: gestionTipoEnum("proxima_gestion_tipo"),
+  proximaGestionCompletadaEn: timestamp("proxima_gestion_completada_en", { withTimezone: true }),
   creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
 });
 

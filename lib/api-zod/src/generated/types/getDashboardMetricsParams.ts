@@ -9,8 +9,4 @@ import type { GetDashboardMetricsPeriodo } from './getDashboardMetricsPeriodo';
 
 export type GetDashboardMetricsParams = {
 periodo?: GetDashboardMetricsPeriodo;
-/**
- * Filter by a specific ejecutivo (org admins only)
- */
-responsable?: string;
 };

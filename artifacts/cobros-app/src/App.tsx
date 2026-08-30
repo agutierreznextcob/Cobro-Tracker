@@ -29,6 +29,8 @@ import RecordatoriosConfig from "@/pages/recordatorios-config";
 import WorkflowsPage from "@/pages/workflows";
 import WorkflowDetail from "@/pages/workflow-detail";
 import TareasPage from "@/pages/tareas";
+import GestionHoyPage from "@/pages/gestion-hoy";
+import ClientesPrioritariosPage from "@/pages/clientes-prioritarios";
 import EncuestasPage from "@/pages/encuestas";
 import EncuestaPublicaPage from "@/pages/encuesta-publica";
 import ConsultorLoginPage from "@/pages/consultor-login";
@@ -246,6 +248,27 @@ function AppRouter() {
         )}
       </Route>
       <Route path="/tareas">
+        <AuthGate>
+          <Layout>
+            <TareasPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/gestion/hoy">
+        <AuthGate>
+          <Layout>
+            <GestionHoyPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/gestion/clientes-prioritarios">
+        <AuthGate>
+          <Layout>
+            <ClientesPrioritariosPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/gestion/tareas">
         <AuthGate>
           <Layout>
             <TareasPage />

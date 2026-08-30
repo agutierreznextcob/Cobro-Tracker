@@ -48,6 +48,7 @@ import type {
   ClienteConHistorial,
   ClienteConScore,
   ClienteInput,
+  ClientePrioritario,
   Cobro,
   CobroAjuste,
   CobroEliminado,
@@ -78,8 +79,10 @@ import type {
   GenerarFlowLinkInput,
   GestionAgendaItem,
   GestionCobranza,
+  GestionHoy,
   GestionInput,
   GestionMetricaEjecutivo,
+  GestionResumen,
   GetDashboardMetricsParams,
   GetPaymentMethodUrl200,
   GetRendimientoEquipoParams,
@@ -143,6 +146,8 @@ import type {
   SubscriptionStatus,
   SugerenciaWorkflow,
   Tarea,
+  TareaEstadoUpdate,
+  TareaInput,
   TrialExtension,
   UpdateUserPacks200,
   VerifyEmailParams,
@@ -3532,6 +3537,307 @@ export function useGetGestionesAgenda<TData = Awaited<ReturnType<typeof getGesti
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetGestionesAgendaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCompletarGestionAgendaUrl = (gestionId: number,) => {
+
+
+
+
+  return `/api/gestiones/agenda/${gestionId}/completar`
+}
+
+/**
+ * @summary Complete a scheduled next gestión
+ */
+export const completarGestionAgenda = async (gestionId: number, options?: RequestInit): Promise<GestionCobranza> => {
+
+  return customFetch<GestionCobranza>(getCompletarGestionAgendaUrl(gestionId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCompletarGestionAgendaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completarGestionAgenda>>, TError,{gestionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completarGestionAgenda>>, TError,{gestionId: number}, TContext> => {
+
+const mutationKey = ['completarGestionAgenda'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completarGestionAgenda>>, {gestionId: number}> = (props) => {
+          const {gestionId} = props ?? {};
+
+          return  completarGestionAgenda(gestionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompletarGestionAgendaMutationResult = NonNullable<Awaited<ReturnType<typeof completarGestionAgenda>>>
+
+    export type CompletarGestionAgendaMutationError = ErrorType<void>
+
+    /**
+ * @summary Complete a scheduled next gestión
+ */
+export const useCompletarGestionAgenda = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completarGestionAgenda>>, TError,{gestionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completarGestionAgenda>>,
+        TError,
+        {gestionId: number},
+        TContext
+      > => {
+      return useMutation(getCompletarGestionAgendaMutationOptions(options));
+    }
+
+export const getGetGestionResumenUrl = () => {
+
+
+
+
+  return `/api/gestion/resumen`
+}
+
+/**
+ * @summary Operational collections badge counts
+ */
+export const getGestionResumen = async ( options?: RequestInit): Promise<GestionResumen> => {
+
+  return customFetch<GestionResumen>(getGetGestionResumenUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGestionResumenQueryKey = () => {
+    return [
+    `/api/gestion/resumen`
+    ] as const;
+    }
+
+
+export const getGetGestionResumenQueryOptions = <TData = Awaited<ReturnType<typeof getGestionResumen>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGestionResumen>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGestionResumenQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGestionResumen>>> = ({ signal }) => getGestionResumen({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGestionResumen>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGestionResumenQueryResult = NonNullable<Awaited<ReturnType<typeof getGestionResumen>>>
+export type GetGestionResumenQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Operational collections badge counts
+ */
+
+export function useGetGestionResumen<TData = Awaited<ReturnType<typeof getGestionResumen>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGestionResumen>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGestionResumenQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetGestionHoyUrl = () => {
+
+
+
+
+  return `/api/gestion/hoy`
+}
+
+/**
+ * @summary Today's and overdue collections work
+ */
+export const getGestionHoy = async ( options?: RequestInit): Promise<GestionHoy> => {
+
+  return customFetch<GestionHoy>(getGetGestionHoyUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGestionHoyQueryKey = () => {
+    return [
+    `/api/gestion/hoy`
+    ] as const;
+    }
+
+
+export const getGetGestionHoyQueryOptions = <TData = Awaited<ReturnType<typeof getGestionHoy>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGestionHoy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGestionHoyQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGestionHoy>>> = ({ signal }) => getGestionHoy({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGestionHoy>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGestionHoyQueryResult = NonNullable<Awaited<ReturnType<typeof getGestionHoy>>>
+export type GetGestionHoyQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Today's and overdue collections work
+ */
+
+export function useGetGestionHoy<TData = Awaited<ReturnType<typeof getGestionHoy>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGestionHoy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGestionHoyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetClientesPrioritariosUrl = () => {
+
+
+
+
+  return `/api/gestion/clientes-prioritarios`
+}
+
+/**
+ * @summary Highest risk scoped clients
+ */
+export const getClientesPrioritarios = async ( options?: RequestInit): Promise<ClientePrioritario[]> => {
+
+  return customFetch<ClientePrioritario[]>(getGetClientesPrioritariosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetClientesPrioritariosQueryKey = () => {
+    return [
+    `/api/gestion/clientes-prioritarios`
+    ] as const;
+    }
+
+
+export const getGetClientesPrioritariosQueryOptions = <TData = Awaited<ReturnType<typeof getClientesPrioritarios>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClientesPrioritarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetClientesPrioritariosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getClientesPrioritarios>>> = ({ signal }) => getClientesPrioritarios({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getClientesPrioritarios>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetClientesPrioritariosQueryResult = NonNullable<Awaited<ReturnType<typeof getClientesPrioritarios>>>
+export type GetClientesPrioritariosQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Highest risk scoped clients
+ */
+
+export function useGetClientesPrioritarios<TData = Awaited<ReturnType<typeof getClientesPrioritarios>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClientesPrioritarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetClientesPrioritariosQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -9478,6 +9784,77 @@ export function useListTareas<TData = Awaited<ReturnType<typeof listTareas>>, TE
 
 
 
+export const getCreateTareaUrl = () => {
+
+
+
+
+  return `/api/tareas`
+}
+
+/**
+ * @summary Create a manual task
+ */
+export const createTarea = async (tareaInput: TareaInput, options?: RequestInit): Promise<Tarea> => {
+
+  return customFetch<Tarea>(getCreateTareaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      tareaInput,)
+  }
+);}
+
+
+
+
+export const getCreateTareaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTarea>>, TError,{data: BodyType<TareaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTarea>>, TError,{data: BodyType<TareaInput>}, TContext> => {
+
+const mutationKey = ['createTarea'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTarea>>, {data: BodyType<TareaInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTarea(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTareaMutationResult = NonNullable<Awaited<ReturnType<typeof createTarea>>>
+    export type CreateTareaMutationBody = BodyType<TareaInput>
+    export type CreateTareaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a manual task
+ */
+export const useCreateTarea = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTarea>>, TError,{data: BodyType<TareaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTarea>>,
+        TError,
+        {data: BodyType<TareaInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTareaMutationOptions(options));
+    }
+
 export const getCompletarTareaUrl = (id: number,) => {
 
 
@@ -9546,6 +9923,78 @@ export const useCompletarTarea = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCompletarTareaMutationOptions(options));
+    }
+
+export const getUpdateTareaEstadoUrl = (id: number,) => {
+
+
+
+
+  return `/api/tareas/${id}/estado`
+}
+
+/**
+ * @summary Change task state
+ */
+export const updateTareaEstado = async (id: number,
+    tareaEstadoUpdate: TareaEstadoUpdate, options?: RequestInit): Promise<Tarea> => {
+
+  return customFetch<Tarea>(getUpdateTareaEstadoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      tareaEstadoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateTareaEstadoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTareaEstado>>, TError,{id: number;data: BodyType<TareaEstadoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTareaEstado>>, TError,{id: number;data: BodyType<TareaEstadoUpdate>}, TContext> => {
+
+const mutationKey = ['updateTareaEstado'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTareaEstado>>, {id: number;data: BodyType<TareaEstadoUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTareaEstado(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTareaEstadoMutationResult = NonNullable<Awaited<ReturnType<typeof updateTareaEstado>>>
+    export type UpdateTareaEstadoMutationBody = BodyType<TareaEstadoUpdate>
+    export type UpdateTareaEstadoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Change task state
+ */
+export const useUpdateTareaEstado = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTareaEstado>>, TError,{id: number;data: BodyType<TareaEstadoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTareaEstado>>,
+        TError,
+        {id: number;data: BodyType<TareaEstadoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTareaEstadoMutationOptions(options));
     }
 
 export const getGetEncuestasResumenUrl = () => {

@@ -6,17 +6,20 @@ import {
   gestionesCobranzaTable,
   pagosParciales,
   usersTable,
+  tareasTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, isNotNull, isNull } from "drizzle-orm";
 import { CrearGestionBody } from "@workspace/api-zod";
 import { z } from "zod";
 import {
   getOrgContext,
   cobroScopeCondition,
+  clienteScopeCondition,
   userCanAccessCobro,
 } from "../lib/org";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { requirePlanFeature } from "../middlewares/requirePlanFeature";
+import { computeClienteScores } from "../lib/scoring";
 
 const gestionesRouter = Router();
 
@@ -35,6 +38,7 @@ const requireAuthGestiones = [
   requireSubscription,
 ];
 gestionesRouter.use("/gestiones", requireAuthGestiones);
+gestionesRouter.use("/gestion", requireAuthGestiones);
 gestionesRouter.use("/cobros/:id/gestiones", requireAuthGestiones);
 
 const CobroIdParam = z.object({ id: z.coerce.number().int().positive() });
@@ -106,6 +110,7 @@ gestionesRouter.get("/cobros/:id/gestiones", async (req, res) => {
         nota: g.nota,
         proximaGestionEn: g.proximaGestionEn ? g.proximaGestionEn.toISOString() : null,
         proximaGestionTipo: g.proximaGestionTipo,
+        proximaGestionCompletadaEn: g.proximaGestionCompletadaEn ? g.proximaGestionCompletadaEn.toISOString() : null,
         creadoEn: g.creadoEn.toISOString(),
       })),
     );
@@ -180,6 +185,7 @@ gestionesRouter.post("/cobros/:id/gestiones", async (req, res) => {
         ? inserted.proximaGestionEn.toISOString()
         : null,
       proximaGestionTipo: inserted.proximaGestionTipo,
+      proximaGestionCompletadaEn: inserted.proximaGestionCompletadaEn ? inserted.proximaGestionCompletadaEn.toISOString() : null,
       creadoEn: inserted.creadoEn.toISOString(),
     });
   } catch (err) {
@@ -225,35 +231,33 @@ gestionesRouter.get("/gestiones/agenda", async (req, res) => {
 
     const cobroIds = cobros.map((c) => c.id);
 
-    // Most recent gestión per cobro that actually scheduled a próxima gestión
-    // (both fecha and tipo present, so the agenda item is contract-complete).
+    // Only the latest gestión decides an agenda commitment. An older commitment
+    // must not reappear after a later management note changes the plan.
     const ultimaPorCobro = new Map<
       number,
       { gestionId: number; proximaGestionEn: Date; proximaGestionTipo: string }
     >();
+    const gestionVista = new Set<number>();
     const gestiones = await db
       .select({
         id: gestionesCobranzaTable.id,
         cobroId: gestionesCobranzaTable.cobroId,
         proximaGestionEn: gestionesCobranzaTable.proximaGestionEn,
         proximaGestionTipo: gestionesCobranzaTable.proximaGestionTipo,
+        proximaGestionCompletadaEn: gestionesCobranzaTable.proximaGestionCompletadaEn,
         creadoEn: gestionesCobranzaTable.creadoEn,
       })
       .from(gestionesCobranzaTable)
       .where(
         and(
           inArray(gestionesCobranzaTable.cobroId, cobroIds),
-          isNotNull(gestionesCobranzaTable.proximaGestionEn),
-          isNotNull(gestionesCobranzaTable.proximaGestionTipo),
         ),
       )
       .orderBy(desc(gestionesCobranzaTable.creadoEn));
     for (const g of gestiones) {
-      if (
-        !ultimaPorCobro.has(g.cobroId) &&
-        g.proximaGestionEn &&
-        g.proximaGestionTipo
-      ) {
+      if (gestionVista.has(g.cobroId)) continue;
+      gestionVista.add(g.cobroId);
+      if (g.proximaGestionEn && g.proximaGestionTipo && !g.proximaGestionCompletadaEn) {
         ultimaPorCobro.set(g.cobroId, {
           gestionId: g.id,
           proximaGestionEn: g.proximaGestionEn,
@@ -312,6 +316,213 @@ gestionesRouter.get("/gestiones/agenda", async (req, res) => {
     req.log.error({ err }, "Error building gestiones agenda");
     res.status(500).json({ error: "Error interno del servidor" });
   }
+});
+
+// Completing is deliberately conditional: concurrent clicks cannot overwrite
+// each other and a commitment from an inaccessible cobro is indistinguishable
+// from a missing one.
+gestionesRouter.post("/gestiones/agenda/:gestionId/completar", async (req, res) => {
+  const gestionId = Number(req.params.gestionId);
+  if (!Number.isInteger(gestionId) || gestionId <= 0) return void res.status(400).json({ error: "ID inválido" });
+  const userId = req.user!.id;
+  try {
+    const ctx = await getOrgContext(userId);
+    const [row] = await db.select({
+      gestion: gestionesCobranzaTable,
+      organizationId: cobrosTable.organizationId,
+      responsableId: cobrosTable.responsableId,
+    }).from(gestionesCobranzaTable).innerJoin(cobrosTable, eq(cobrosTable.id, gestionesCobranzaTable.cobroId))
+      .where(eq(gestionesCobranzaTable.id, gestionId));
+    if (!row || !userCanAccessCobro(ctx, userId, row)) return void res.status(404).json({ error: "Gestión no encontrada" });
+    const [latest] = await db.select({ id: gestionesCobranzaTable.id })
+      .from(gestionesCobranzaTable).where(eq(gestionesCobranzaTable.cobroId, row.gestion.cobroId))
+      .orderBy(desc(gestionesCobranzaTable.creadoEn));
+    if (!latest || latest.id !== gestionId || !row.gestion.proximaGestionEn || !row.gestion.proximaGestionTipo) {
+      return void res.status(404).json({ error: "Gestión no encontrada" });
+    }
+    const [updated] = await db.update(gestionesCobranzaTable)
+      .set({ proximaGestionCompletadaEn: new Date() })
+      .where(and(eq(gestionesCobranzaTable.id, gestionId), isNull(gestionesCobranzaTable.proximaGestionCompletadaEn)))
+      .returning();
+    if (!updated) return void res.status(404).json({ error: "Gestión no encontrada" });
+    res.json({
+      ...updated,
+      proximaGestionEn: updated.proximaGestionEn?.toISOString() ?? null,
+      proximaGestionCompletadaEn: updated.proximaGestionCompletadaEn?.toISOString() ?? null,
+      creadoEn: updated.creadoEn.toISOString(),
+    });
+  } catch (err) { req.log.error({ err }, "Error completing agenda gestión"); res.status(500).json({ error: "Error interno del servidor" }); }
+});
+
+function chileDay(d: Date) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+async function prioridadClientes(ctx: Awaited<ReturnType<typeof getOrgContext>>, userId: string) {
+  const clientes = await db.select({ id: clientesTable.id, nombre: clientesTable.nombre }).from(clientesTable).where(
+    clienteScopeCondition(ctx, userId),
+  );
+  const scope = cobroScopeCondition(ctx, userId);
+  const [scores, abiertos] = await Promise.all([
+    computeClienteScores(clientes.map((c) => c.id), scope),
+    db.select({ id: cobrosTable.id, clienteId: cobrosTable.clienteId, fechaVencimiento: cobrosTable.fechaVencimiento })
+      .from(cobrosTable).where(and(scope, inArray(cobrosTable.estado, ["pendiente", "parcial"]))),
+  ]);
+  const today = chileDay(new Date());
+  const moraPorCliente = new Map<number, { diasMora: number; cobroId: number | null }>();
+  for (const cobro of abiertos) {
+    if (cobro.clienteId == null) continue;
+    const diasMora = cobro.fechaVencimiento
+      ? Math.max(0, Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${cobro.fechaVencimiento}T12:00:00Z`)) / 86_400_000))
+      : 0;
+    const prior = moraPorCliente.get(cobro.clienteId);
+    if (!prior || diasMora > prior.diasMora) moraPorCliente.set(cobro.clienteId, { diasMora, cobroId: cobro.id });
+  }
+  return clientes.map((cliente) => {
+    const s = scores.get(cliente.id);
+    const riesgo = s?.score == null ? (s?.cobrosVencidos ? 70 : 50) : 100 - s.score;
+    const totalPendiente = s?.totalPendiente ?? 0;
+    const mora = moraPorCliente.get(cliente.id) ?? { diasMora: 0, cobroId: null };
+    return { clienteId: cliente.id, clienteNombre: cliente.nombre, totalPendiente, riesgo,
+      prioridad: Math.round(totalPendiente * (riesgo / 100)), score: s?.score ?? null, categoria: s?.categoria ?? "sin_datos",
+      diasMora: mora.diasMora, cobroId: mora.cobroId, probabilidadPago: s?.probabilidadPago ?? null,
+      cobrosVencidos: s?.cobrosVencidos ?? 0,
+      recomendacion: s?.recomendacion ? `${s.recomendacion.titulo}: ${s.recomendacion.detalle}` : null };
+  }).filter((x) => x.totalPendiente > 0).sort((a, b) =>
+    (a.score == null ? 1 : b.score == null ? -1 : a.score - b.score) || b.prioridad - a.prioridad);
+}
+
+gestionesRouter.get("/gestion/clientes-prioritarios", async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    res.json(await prioridadClientes(await getOrgContext(userId), userId));
+  } catch (err) { req.log.error({ err }, "Error building priority clients"); res.status(500).json({ error: "Error interno del servidor" }); }
+});
+
+async function pendientesOperativos(ctx: Awaited<ReturnType<typeof getOrgContext>>, userId: string) {
+  const scope = cobroScopeCondition(ctx, userId);
+  const cobros = await db.select({ id: cobrosTable.id }).from(cobrosTable).where(and(scope, inArray(cobrosTable.estado, ["pendiente", "parcial"])));
+  const cobroIds = cobros.map((c) => c.id);
+  const gestiones = cobroIds.length ? await db.select().from(gestionesCobranzaTable)
+    .where(inArray(gestionesCobranzaTable.cobroId, cobroIds)).orderBy(desc(gestionesCobranzaTable.creadoEn)) : [];
+  const seen = new Set<number>();
+  const agenda = gestiones.filter((g) => {
+    if (seen.has(g.cobroId)) return false;
+    seen.add(g.cobroId);
+    return !!g.proximaGestionEn && !!g.proximaGestionTipo && !g.proximaGestionCompletadaEn;
+  });
+  const taskScope = ctx.isOrgAdmin && ctx.organizationId != null ? eq(tareasTable.organizationId, ctx.organizationId)
+    : ctx.isSupervisor ? inArray(tareasTable.userId, ctx.teamMemberIds.length ? ctx.teamMemberIds : [userId])
+    : eq(tareasTable.userId, userId);
+  const tareas = await db.select().from(tareasTable).where(and(taskScope, eq(tareasTable.estado, "pendiente")));
+  return { agenda, tareas };
+}
+
+async function sugerenciasOperativas(ctx: Awaited<ReturnType<typeof getOrgContext>>, userId: string) {
+  return (await prioridadClientes(ctx, userId)).sort((a, b) => b.prioridad - a.prioridad).slice(0, 5).map((x) => ({
+    clienteId: x.clienteId, clienteNombre: x.clienteNombre, cobroId: x.cobroId,
+    prioridad: x.prioridad, totalPendiente: x.totalPendiente, diasMora: x.diasMora,
+    probabilidadPago: x.probabilidadPago,
+    texto: x.recomendacion ?? `Contactar al cliente por un saldo pendiente de ${x.totalPendiente}.`,
+  }));
+}
+
+gestionesRouter.get("/gestion/resumen", async (req, res) => {
+  try {
+    const userId = req.user!.id, ctx = await getOrgContext(userId), today = chileDay(new Date());
+    const { agenda, tareas } = await pendientesOperativos(ctx, userId);
+    const tareasPendientes = tareas.filter((t) => t.venceEn && chileDay(t.venceEn) <= today).length;
+    const compromisosPendientes = agenda.filter((g) => chileDay(g.proximaGestionEn!) <= today).length;
+    const sugerencias = (await sugerenciasOperativas(ctx, userId)).length;
+    res.json({ tareasPendientes, compromisosPendientes, sugerencias, total: tareasPendientes + compromisosPendientes + sugerencias });
+  } catch (err) { req.log.error({ err }, "Error building gestión resumen"); res.status(500).json({ error: "Error interno del servidor" }); }
+});
+
+gestionesRouter.get("/gestion/hoy", async (req, res) => {
+  try {
+    const userId = req.user!.id, ctx = await getOrgContext(userId), today = chileDay(new Date());
+    const { agenda, tareas } = await pendientesOperativos(ctx, userId);
+    const dueTaskRows = tareas.filter((t) => t.venceEn && chileDay(t.venceEn) <= today)
+      .sort((a, b) => a.venceEn!.getTime() - b.venceEn!.getTime() || b.creadoEn.getTime() - a.creadoEn.getTime());
+    const dueAgendaRows = agenda.filter((g) => chileDay(g.proximaGestionEn!) <= today)
+      .sort((a, b) => a.proximaGestionEn!.getTime() - b.proximaGestionEn!.getTime());
+    const linkedCobroIds = [...new Set([
+      ...dueTaskRows.flatMap((t) => t.cobroId == null ? [] : [t.cobroId]),
+      ...dueAgendaRows.map((g) => g.cobroId),
+    ])];
+    const responsibleIds = [...new Set(dueTaskRows.map((t) => t.userId))];
+    const [linkedCobros, responsibleUsers, abonosRows] = await Promise.all([
+      linkedCobroIds.length
+        ? db.select({
+            id: cobrosTable.id,
+            clienteNombre: clientesTable.nombre,
+            descripcion: cobrosTable.descripcion,
+            estado: cobrosTable.estado,
+            monto: cobrosTable.monto,
+            montoDescuento: cobrosTable.montoDescuento,
+            responsableId: cobrosTable.responsableId,
+            respFirstName: usersTable.firstName,
+            respLastName: usersTable.lastName,
+            respEmail: usersTable.email,
+          })
+          .from(cobrosTable)
+          .leftJoin(clientesTable, eq(clientesTable.id, cobrosTable.clienteId))
+          .leftJoin(usersTable, eq(usersTable.id, cobrosTable.responsableId))
+          .where(inArray(cobrosTable.id, linkedCobroIds))
+        : [],
+      responsibleIds.length
+        ? db.select({
+            id: usersTable.id,
+            firstName: usersTable.firstName,
+            lastName: usersTable.lastName,
+            email: usersTable.email,
+          }).from(usersTable).where(inArray(usersTable.id, responsibleIds))
+        : [],
+      linkedCobroIds.length
+        ? db.select({
+            cobroId: pagosParciales.cobroId,
+            total: sql<string>`coalesce(sum(${pagosParciales.monto}), 0)`,
+          })
+          .from(pagosParciales)
+          .where(and(inArray(pagosParciales.cobroId, linkedCobroIds), eq(pagosParciales.estado, "confirmado")))
+          .groupBy(pagosParciales.cobroId)
+        : [],
+    ]);
+    const cobroMap = new Map(linkedCobros.map((c) => [c.id, c]));
+    const responsableMap = new Map(responsibleUsers.map((u) => [u.id, nombreDe(u)]));
+    const abonadoMap = new Map(abonosRows.map((a) => [a.cobroId, Number(a.total)]));
+    const dueTasks = dueTaskRows.map((t) => ({
+      ...t,
+      creadoEn: t.creadoEn.toISOString(),
+      completadoEn: t.completadoEn?.toISOString() ?? null,
+      venceEn: t.venceEn?.toISOString() ?? null,
+      canceladoEn: t.canceladoEn?.toISOString() ?? null,
+      clienteNombre: t.cobroId == null ? null : cobroMap.get(t.cobroId)?.clienteNombre ?? null,
+      responsableNombre: responsableMap.get(t.userId) ?? null,
+    }));
+    const dueAgenda = dueAgendaRows.map((g) => {
+      const cobro = cobroMap.get(g.cobroId);
+      const total = cobro ? Number(cobro.monto) - Number(cobro.montoDescuento ?? 0) : 0;
+      return {
+        gestionId: g.id,
+        cobroId: g.cobroId,
+        cobroDescripcion: cobro?.descripcion ?? null,
+        clienteNombre: cobro?.clienteNombre ?? null,
+        saldo: Math.max(total - (abonadoMap.get(g.cobroId) ?? 0), 0),
+        estado: cobro?.estado ?? "pendiente",
+        responsableId: cobro?.responsableId ?? null,
+        responsableNombre: cobro
+          ? nombreDe({ firstName: cobro.respFirstName, lastName: cobro.respLastName, email: cobro.respEmail })
+          : null,
+        proximaGestionEn: g.proximaGestionEn!.toISOString(),
+        proximaGestionTipo: g.proximaGestionTipo!,
+        vencida: chileDay(g.proximaGestionEn!) < today,
+      };
+    });
+    const sugerencias = await sugerenciasOperativas(ctx, userId);
+    const recuperacionPotencialSemanal = sugerencias.reduce((total, s) => total + s.totalPendiente, 0);
+    res.json({ tareas: dueTasks, agenda: dueAgenda, sugerencias, recuperacionPotencialSemanal, clientesSugeridos: sugerencias.length });
+  } catch (err) { req.log.error({ err }, "Error building gestión hoy"); res.status(500).json({ error: "Error interno del servidor" }); }
 });
 
 // GET /gestiones/metricas — per-ejecutivo management metrics within the user's scope.

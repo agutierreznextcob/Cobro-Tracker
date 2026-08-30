@@ -67,6 +67,8 @@ async function main() {
   const me = await api("GET", "/auth/user");
   const myId: string = me.json?.user?.id;
   check("auth/user returns user", !!myId);
+  const dashboardBefore = await api("GET", "/dashboard/metrics?periodo=total");
+  check("dashboard metrics baseline 200", dashboardBefore.status === 200, dashboardBefore);
 
   // ---- Baseline rendimiento (may be 403 if demo is not admin/supervisor) ----
   const rendBefore = await api("GET", "/organization/rendimiento");
@@ -162,10 +164,23 @@ async function main() {
   check("D montoACobrar=40000", dGet.montoACobrar === 40000, dGet.montoACobrar);
 
   // =========================================================================
+  console.log("== Cobro E: fallido no cuenta como pendiente ==");
+  const e = await api("POST", "/cobros", {
+    monto: 77000,
+    descripcion: "E2E test cobro E (fallido terminal)",
+    referencia: "E2E-E",
+  });
+  check("crear cobro E 201", e.status === 201, e);
+  const eId = e.json.id as number;
+  createdCobroIds.push(eId);
+  const eFailed = await api("PATCH", `/cobros/${eId}`, { estado: "fallido" });
+  check("E estado fallido", eFailed.status === 200 && eFailed.json?.estado === "fallido", eFailed);
+
+  // =========================================================================
   console.log("== Informes-style aggregation (cliente) sobre los cobros E2E ==");
   const list = (await api("GET", "/cobros")).json as any[];
   const mine = list.filter((x) => createdCobroIds.includes(x.id));
-  check("los 4 cobros E2E aparecen en la lista", mine.length === 4, mine.length);
+  check("los 5 cobros E2E aparecen en la lista", mine.length === 5, mine.length);
   const montoCobrar = (x: any) => x.montoACobrar ?? x.monto - (x.montoDescuento ?? 0);
   const pagados = mine.filter((x) => x.estado === "pagado");
   const abonadoParcial = mine
@@ -177,6 +192,30 @@ async function main() {
   const totalDescuento = mine.reduce((s, x) => s + (x.montoDescuento ?? 0), 0);
   check("totalDescuento E2E = 20000", totalDescuento === 20000, totalDescuento);
   check("todos los pagados tienen pagadoEn", pagados.every((x) => !!x.pagadoEn));
+
+  console.log("== Dashboard operativo basado en eventos de pago ==");
+  const dashboardAfter = await api("GET", "/dashboard/metrics?periodo=total");
+  check("dashboard metrics 200", dashboardAfter.status === 200, dashboardAfter);
+  check(
+    "montoRecaudado dashboard delta = 155000",
+    Number(dashboardAfter.json?.montoRecaudado ?? 0) - Number(dashboardBefore.json?.montoRecaudado ?? 0) === 155000,
+    { before: dashboardBefore.json, after: dashboardAfter.json },
+  );
+  check(
+    "transaccionesPagadas dashboard delta = 4",
+    Number(dashboardAfter.json?.transaccionesPagadas ?? 0) - Number(dashboardBefore.json?.transaccionesPagadas ?? 0) === 4,
+    { before: dashboardBefore.json, after: dashboardAfter.json },
+  );
+  check(
+    "pendientesMonto dashboard delta = 154000 (excluye fallido)",
+    Number(dashboardAfter.json?.pendientesMonto ?? 0) - Number(dashboardBefore.json?.pendientesMonto ?? 0) === 154000,
+    { before: dashboardBefore.json, after: dashboardAfter.json },
+  );
+  check(
+    "pendientesCantidad dashboard delta = 2 (excluye fallido)",
+    Number(dashboardAfter.json?.pendientesCantidad ?? 0) - Number(dashboardBefore.json?.pendientesCantidad ?? 0) === 2,
+    { before: dashboardBefore.json, after: dashboardAfter.json },
+  );
 
   // =========================================================================
   if (rendAvailable) {

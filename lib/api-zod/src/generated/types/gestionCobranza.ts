@@ -21,5 +21,7 @@ export interface GestionCobranza {
   /** @nullable */
   proximaGestionEn?: Date | null;
   proximaGestionTipo?: GestionTipo | null;
+  /** @nullable */
+  proximaGestionCompletadaEn?: Date | null;
   creadoEn: Date;
 }

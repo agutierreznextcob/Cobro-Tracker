@@ -821,12 +821,6 @@ paths:
             type: string
             enum: [hoy, semana, mes, total]
             default: mes
-        - name: responsable
-          in: query
-          required: false
-          description: Filter by a specific ejecutivo (org admins only)
-          schema:
-            type: string
       responses:
         "200":
           description: Dashboard metrics
@@ -1187,6 +1181,63 @@ paths:
                   $ref: "#/components/schemas/GestionAgendaItem"
         "401":
           description: Unauthorized
+
+  /gestiones/agenda/{gestionId}/completar:
+    post:
+      operationId: completarGestionAgenda
+      tags: [gestiones]
+      summary: Complete a scheduled next gestión
+      parameters:
+        - name: gestionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Completed agenda item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GestionCobranza" }
+        "404":
+          description: Not found
+
+  /gestion/resumen:
+    get:
+      operationId: getGestionResumen
+      tags: [gestiones]
+      summary: Operational collections badge counts
+      responses:
+        "200":
+          description: Collections summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GestionResumen" }
+
+  /gestion/hoy:
+    get:
+      operationId: getGestionHoy
+      tags: [gestiones]
+      summary: Today's and overdue collections work
+      responses:
+        "200":
+          description: Today's operational work
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GestionHoy" }
+
+  /gestion/clientes-prioritarios:
+    get:
+      operationId: getClientesPrioritarios
+      tags: [gestiones]
+      summary: Highest risk scoped clients
+      responses:
+        "200":
+          description: Prioritized clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ClientePrioritario" }
 
   /gestiones/metricas:
     get:
@@ -3194,7 +3245,22 @@ paths:
           required: false
           schema:
             type: string
-            enum: [pendiente, completada]
+            enum: [pendiente, completada, cancelada]
+        - name: responsableId
+          in: query
+          required: false
+          schema: { type: string }
+        - name: cobroId
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: fecha
+          in: query
+          required: false
+          description: Due-date window in America/Santiago calendar days
+          schema:
+            type: string
+            enum: [vencidas, hoy, proximos_7, todas]
       responses:
         "200":
           description: Tasks
@@ -3204,6 +3270,21 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Tarea"
+    post:
+      operationId: createTarea
+      tags: [tareas]
+      summary: Create a manual task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TareaInput" }
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tarea" }
 
   /tareas/{id}/completar:
     post:
@@ -3229,6 +3310,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /tareas/{id}/estado:
+    patch:
+      operationId: updateTareaEstado
+      tags: [tareas]
+      summary: Change task state
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TareaEstadoUpdate" }
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tarea" }
 
   /encuestas/stats/resumen:
     get:
@@ -3601,11 +3704,13 @@ components:
           type: ["string", "null"]
         estado:
           type: string
-          enum: [pendiente, completada]
+          enum: [pendiente, completada, cancelada]
         origen:
           type: string
           enum: [workflow, manual]
         clienteNombre:
+          type: ["string", "null"]
+        responsableNombre:
           type: ["string", "null"]
         creadoEn:
           type: string
@@ -3613,6 +3718,31 @@ components:
         completadoEn:
           type: ["string", "null"]
           format: date-time
+        venceEn:
+          type: ["string", "null"]
+          format: date-time
+        canceladoEn:
+          type: ["string", "null"]
+          format: date-time
+    TareaInput:
+      type: object
+      required: [titulo]
+      properties:
+        titulo: { type: string, minLength: 1, maxLength: 200 }
+        descripcion: { type: string, maxLength: 2000 }
+        responsableId: { type: string }
+        cobroId: { type: integer, minimum: 1 }
+        venceEn:
+          type: string
+          format: date
+          description: Calendar due date in America/Santiago (YYYY-MM-DD)
+    TareaEstadoUpdate:
+      type: object
+      required: [estado]
+      properties:
+        estado:
+          type: string
+          enum: [pendiente, completada, cancelada]
     EncuestaPublica:
       type: object
       required: [empresa, descripcion, monto, yaRespondida]
@@ -4822,6 +4952,9 @@ components:
           oneOf:
             - $ref: "#/components/schemas/GestionTipo"
             - type: "null"
+        proximaGestionCompletadaEn:
+          type: ["string", "null"]
+          format: date-time
         creadoEn:
           type: string
           format: date-time
@@ -4874,6 +5007,57 @@ components:
           $ref: "#/components/schemas/GestionTipo"
         vencida:
           type: boolean
+
+    GestionResumen:
+      type: object
+      required: [tareasPendientes, compromisosPendientes, sugerencias, total]
+      properties:
+        tareasPendientes: { type: integer }
+        compromisosPendientes: { type: integer }
+        sugerencias: { type: integer }
+        total: { type: integer }
+    GestionHoy:
+      type: object
+      required: [tareas, agenda, sugerencias, recuperacionPotencialSemanal, clientesSugeridos]
+      properties:
+        tareas:
+          type: array
+          items: { $ref: "#/components/schemas/Tarea" }
+        agenda:
+          type: array
+          items: { $ref: "#/components/schemas/GestionAgendaItem" }
+        sugerencias:
+          type: array
+          items: { $ref: "#/components/schemas/SugerenciaGestion" }
+        recuperacionPotencialSemanal: { type: number }
+        clientesSugeridos: { type: integer }
+    SugerenciaGestion:
+      type: object
+      required: [clienteId, clienteNombre, texto, prioridad, totalPendiente, diasMora]
+      properties:
+        clienteId: { type: integer }
+        clienteNombre: { type: string }
+        cobroId: { type: ["integer", "null"] }
+        texto: { type: string }
+        prioridad: { type: number }
+        totalPendiente: { type: number }
+        diasMora: { type: integer }
+        probabilidadPago: { type: ["number", "null"] }
+    ClientePrioritario:
+      type: object
+      required: [clienteId, clienteNombre, totalPendiente, riesgo, prioridad, categoria, diasMora]
+      properties:
+        clienteId: { type: integer }
+        clienteNombre: { type: string }
+        totalPendiente: { type: number }
+        riesgo: { type: number }
+        prioridad: { type: number }
+        score: { type: ["number", "null"] }
+        categoria: { $ref: "#/components/schemas/ScoreCategoria" }
+        diasMora: { type: integer }
+        probabilidadPago: { type: ["number", "null"] }
+        cobrosVencidos: { type: integer }
+        recomendacion: { type: ["string", "null"] }
 
     GestionMetricaEjecutivo:
       type: object

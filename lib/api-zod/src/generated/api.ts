@@ -770,8 +770,7 @@ export const GetCobrosSummaryResponse = zod.object({
 export const getDashboardMetricsQueryPeriodoDefault = `mes`;
 
 export const GetDashboardMetricsQueryParams = zod.object({
-  "periodo": zod.enum(['hoy', 'semana', 'mes', 'total']).default(getDashboardMetricsQueryPeriodoDefault),
-  "responsable": zod.coerce.string().optional().describe('Filter by a specific ejecutivo (org admins only)')
+  "periodo": zod.enum(['hoy', 'semana', 'mes', 'total']).default(getDashboardMetricsQueryPeriodoDefault)
 })
 
 export const GetDashboardMetricsResponse = zod.object({
@@ -1019,6 +1018,7 @@ export const ListGestionesResponseItem = zod.object({
   "nota": zod.string().nullish(),
   "proximaGestionEn": zod.coerce.date().nullish(),
   "proximaGestionTipo": zod.union([zod.enum(['llamada', 'email', 'whatsapp', 'visita', 'otro']),zod.null()]).optional(),
+  "proximaGestionCompletadaEn": zod.coerce.date().nullish(),
   "creadoEn": zod.coerce.date()
 })
 export const ListGestionesResponse = zod.array(ListGestionesResponseItem)
@@ -1057,6 +1057,106 @@ export const GetGestionesAgendaResponseItem = zod.object({
   "vencida": zod.boolean()
 })
 export const GetGestionesAgendaResponse = zod.array(GetGestionesAgendaResponseItem)
+
+
+/**
+ * @summary Complete a scheduled next gestión
+ */
+export const CompletarGestionAgendaParams = zod.object({
+  "gestionId": zod.coerce.number()
+})
+
+export const CompletarGestionAgendaResponse = zod.object({
+  "id": zod.number(),
+  "cobroId": zod.number(),
+  "usuarioId": zod.string(),
+  "usuarioNombre": zod.string().nullish(),
+  "tipo": zod.enum(['llamada', 'email', 'whatsapp', 'visita', 'otro']),
+  "resultado": zod.enum(['contactado_pagara', 'contactado_no_pagara', 'no_contesto', 'numero_no_disponible', 'acordo_pago_parcial', 'acordo_fecha_pago', 'disputa_reclamo']),
+  "nota": zod.string().nullish(),
+  "proximaGestionEn": zod.coerce.date().nullish(),
+  "proximaGestionTipo": zod.union([zod.enum(['llamada', 'email', 'whatsapp', 'visita', 'otro']),zod.null()]).optional(),
+  "proximaGestionCompletadaEn": zod.coerce.date().nullish(),
+  "creadoEn": zod.coerce.date()
+})
+
+
+/**
+ * @summary Operational collections badge counts
+ */
+export const GetGestionResumenResponse = zod.object({
+  "tareasPendientes": zod.number(),
+  "compromisosPendientes": zod.number(),
+  "sugerencias": zod.number(),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Today's and overdue collections work
+ */
+export const GetGestionHoyResponse = zod.object({
+  "tareas": zod.array(zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "userId": zod.string(),
+  "cobroId": zod.number().nullish(),
+  "titulo": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "estado": zod.enum(['pendiente', 'completada', 'cancelada']),
+  "origen": zod.enum(['workflow', 'manual']),
+  "clienteNombre": zod.string().nullish(),
+  "responsableNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date(),
+  "completadoEn": zod.coerce.date().nullish(),
+  "venceEn": zod.coerce.date().nullish(),
+  "canceladoEn": zod.coerce.date().nullish()
+})),
+  "agenda": zod.array(zod.object({
+  "gestionId": zod.number(),
+  "cobroId": zod.number(),
+  "cobroDescripcion": zod.string().nullish(),
+  "clienteNombre": zod.string().nullish(),
+  "saldo": zod.number().optional(),
+  "estado": zod.string().optional(),
+  "responsableId": zod.string().nullish(),
+  "responsableNombre": zod.string().nullish(),
+  "proximaGestionEn": zod.coerce.date(),
+  "proximaGestionTipo": zod.enum(['llamada', 'email', 'whatsapp', 'visita', 'otro']),
+  "vencida": zod.boolean()
+})),
+  "sugerencias": zod.array(zod.object({
+  "clienteId": zod.number(),
+  "clienteNombre": zod.string(),
+  "cobroId": zod.number().nullish(),
+  "texto": zod.string(),
+  "prioridad": zod.number(),
+  "totalPendiente": zod.number(),
+  "diasMora": zod.number(),
+  "probabilidadPago": zod.number().nullish()
+})),
+  "recuperacionPotencialSemanal": zod.number(),
+  "clientesSugeridos": zod.number()
+})
+
+
+/**
+ * @summary Highest risk scoped clients
+ */
+export const GetClientesPrioritariosResponseItem = zod.object({
+  "clienteId": zod.number(),
+  "clienteNombre": zod.string(),
+  "totalPendiente": zod.number(),
+  "riesgo": zod.number(),
+  "prioridad": zod.number(),
+  "score": zod.number().nullish(),
+  "categoria": zod.enum(['excelente', 'bueno', 'regular', 'riesgoso', 'critico', 'sin_datos']),
+  "diasMora": zod.number(),
+  "probabilidadPago": zod.number().nullish(),
+  "cobrosVencidos": zod.number().optional(),
+  "recomendacion": zod.string().nullish()
+})
+export const GetClientesPrioritariosResponse = zod.array(GetClientesPrioritariosResponseItem)
 
 
 /**
@@ -2718,7 +2818,10 @@ export const ListCobroEjecucionesResponse = zod.array(ListCobroEjecucionesRespon
  * @summary List tasks for the current user
  */
 export const ListTareasQueryParams = zod.object({
-  "estado": zod.enum(['pendiente', 'completada']).optional()
+  "estado": zod.enum(['pendiente', 'completada', 'cancelada']).optional(),
+  "responsableId": zod.coerce.string().optional(),
+  "cobroId": zod.coerce.number().optional(),
+  "fecha": zod.enum(['vencidas', 'hoy', 'proximos_7', 'todas']).optional().describe('Due-date window in America\/Santiago calendar days')
 })
 
 export const ListTareasResponseItem = zod.object({
@@ -2728,13 +2831,35 @@ export const ListTareasResponseItem = zod.object({
   "cobroId": zod.number().nullish(),
   "titulo": zod.string(),
   "descripcion": zod.string().nullish(),
-  "estado": zod.enum(['pendiente', 'completada']),
+  "estado": zod.enum(['pendiente', 'completada', 'cancelada']),
   "origen": zod.enum(['workflow', 'manual']),
   "clienteNombre": zod.string().nullish(),
+  "responsableNombre": zod.string().nullish(),
   "creadoEn": zod.coerce.date(),
-  "completadoEn": zod.coerce.date().nullish()
+  "completadoEn": zod.coerce.date().nullish(),
+  "venceEn": zod.coerce.date().nullish(),
+  "canceladoEn": zod.coerce.date().nullish()
 })
 export const ListTareasResponse = zod.array(ListTareasResponseItem)
+
+
+/**
+ * @summary Create a manual task
+ */
+export const createTareaBodyTituloMax = 200;
+
+export const createTareaBodyDescripcionMax = 2000;
+
+
+
+
+export const CreateTareaBody = zod.object({
+  "titulo": zod.string().min(1).max(createTareaBodyTituloMax),
+  "descripcion": zod.string().max(createTareaBodyDescripcionMax).optional(),
+  "responsableId": zod.string().optional(),
+  "cobroId": zod.number().min(1).optional(),
+  "venceEn": zod.coerce.date().optional().describe('Calendar due date in America\/Santiago (YYYY-MM-DD)')
+})
 
 
 /**
@@ -2751,11 +2876,43 @@ export const CompletarTareaResponse = zod.object({
   "cobroId": zod.number().nullish(),
   "titulo": zod.string(),
   "descripcion": zod.string().nullish(),
-  "estado": zod.enum(['pendiente', 'completada']),
+  "estado": zod.enum(['pendiente', 'completada', 'cancelada']),
   "origen": zod.enum(['workflow', 'manual']),
   "clienteNombre": zod.string().nullish(),
+  "responsableNombre": zod.string().nullish(),
   "creadoEn": zod.coerce.date(),
-  "completadoEn": zod.coerce.date().nullish()
+  "completadoEn": zod.coerce.date().nullish(),
+  "venceEn": zod.coerce.date().nullish(),
+  "canceladoEn": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary Change task state
+ */
+export const UpdateTareaEstadoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateTareaEstadoBody = zod.object({
+  "estado": zod.enum(['pendiente', 'completada', 'cancelada'])
+})
+
+export const UpdateTareaEstadoResponse = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "userId": zod.string(),
+  "cobroId": zod.number().nullish(),
+  "titulo": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "estado": zod.enum(['pendiente', 'completada', 'cancelada']),
+  "origen": zod.enum(['workflow', 'manual']),
+  "clienteNombre": zod.string().nullish(),
+  "responsableNombre": zod.string().nullish(),
+  "creadoEn": zod.coerce.date(),
+  "completadoEn": zod.coerce.date().nullish(),
+  "venceEn": zod.coerce.date().nullish(),
+  "canceladoEn": zod.coerce.date().nullish()
 })
 
 

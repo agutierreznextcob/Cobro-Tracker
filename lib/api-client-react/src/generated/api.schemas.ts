@@ -275,6 +275,7 @@ export type TareaEstado = typeof TareaEstado[keyof typeof TareaEstado];
 export const TareaEstado = {
   pendiente: 'pendiente',
   completada: 'completada',
+  cancelada: 'cancelada',
 } as const;
 
 export type TareaOrigen = typeof TareaOrigen[keyof typeof TareaOrigen];
@@ -299,9 +300,43 @@ export interface Tarea {
   origen: TareaOrigen;
   /** @nullable */
   clienteNombre?: string | null;
+  /** @nullable */
+  responsableNombre?: string | null;
   creadoEn: string;
   /** @nullable */
   completadoEn?: string | null;
+  /** @nullable */
+  venceEn?: string | null;
+  /** @nullable */
+  canceladoEn?: string | null;
+}
+
+export interface TareaInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  titulo: string;
+  /** @maxLength 2000 */
+  descripcion?: string;
+  responsableId?: string;
+  /** @minimum 1 */
+  cobroId?: number;
+  /** Calendar due date in America/Santiago (YYYY-MM-DD) */
+  venceEn?: string;
+}
+
+export type TareaEstadoUpdateEstado = typeof TareaEstadoUpdateEstado[keyof typeof TareaEstadoUpdateEstado];
+
+
+export const TareaEstadoUpdateEstado = {
+  pendiente: 'pendiente',
+  completada: 'completada',
+  cancelada: 'cancelada',
+} as const;
+
+export interface TareaEstadoUpdate {
+  estado: TareaEstadoUpdateEstado;
 }
 
 export interface EncuestaPublica {
@@ -1384,6 +1419,8 @@ export interface GestionCobranza {
   /** @nullable */
   proximaGestionEn?: string | null;
   proximaGestionTipo?: GestionTipo | null;
+  /** @nullable */
+  proximaGestionCompletadaEn?: string | null;
   creadoEn: string;
 }
 
@@ -1411,6 +1448,51 @@ export interface GestionAgendaItem {
   proximaGestionEn: string;
   proximaGestionTipo: GestionTipo;
   vencida: boolean;
+}
+
+export interface GestionResumen {
+  tareasPendientes: number;
+  compromisosPendientes: number;
+  sugerencias: number;
+  total: number;
+}
+
+export interface SugerenciaGestion {
+  clienteId: number;
+  clienteNombre: string;
+  /** @nullable */
+  cobroId?: number | null;
+  texto: string;
+  prioridad: number;
+  totalPendiente: number;
+  diasMora: number;
+  /** @nullable */
+  probabilidadPago?: number | null;
+}
+
+export interface GestionHoy {
+  tareas: Tarea[];
+  agenda: GestionAgendaItem[];
+  sugerencias: SugerenciaGestion[];
+  recuperacionPotencialSemanal: number;
+  clientesSugeridos: number;
+}
+
+export interface ClientePrioritario {
+  clienteId: number;
+  clienteNombre: string;
+  totalPendiente: number;
+  riesgo: number;
+  prioridad: number;
+  /** @nullable */
+  score?: number | null;
+  categoria: ScoreCategoria;
+  diasMora: number;
+  /** @nullable */
+  probabilidadPago?: number | null;
+  cobrosVencidos?: number;
+  /** @nullable */
+  recomendacion?: string | null;
 }
 
 export interface GestionMetricaEjecutivo {
@@ -2530,10 +2612,6 @@ export const ListCobrosMetodo = {
 
 export type GetDashboardMetricsParams = {
 periodo?: GetDashboardMetricsPeriodo;
-/**
- * Filter by a specific ejecutivo (org admins only)
- */
-responsable?: string;
 };
 
 export type GetDashboardMetricsPeriodo = typeof GetDashboardMetricsPeriodo[keyof typeof GetDashboardMetricsPeriodo];
@@ -2663,6 +2741,12 @@ cobroId: number;
 
 export type ListTareasParams = {
 estado?: ListTareasEstado;
+responsableId?: string;
+cobroId?: number;
+/**
+ * Due-date window in America/Santiago calendar days
+ */
+fecha?: ListTareasFecha;
 };
 
 export type ListTareasEstado = typeof ListTareasEstado[keyof typeof ListTareasEstado];
@@ -2671,5 +2755,16 @@ export type ListTareasEstado = typeof ListTareasEstado[keyof typeof ListTareasEs
 export const ListTareasEstado = {
   pendiente: 'pendiente',
   completada: 'completada',
+  cancelada: 'cancelada',
+} as const;
+
+export type ListTareasFecha = typeof ListTareasFecha[keyof typeof ListTareasFecha];
+
+
+export const ListTareasFecha = {
+  vencidas: 'vencidas',
+  hoy: 'hoy',
+  proximos_7: 'proximos_7',
+  todas: 'todas',
 } as const;
 

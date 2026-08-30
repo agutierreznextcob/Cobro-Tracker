@@ -12,4 +12,5 @@ export type TareaEstado = typeof TareaEstado[keyof typeof TareaEstado];
 export const TareaEstado = {
   pendiente: 'pendiente',
   completada: 'completada',
+  cancelada: 'cancelada',
 } as const;

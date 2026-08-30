@@ -22,7 +22,13 @@ export interface Tarea {
   origen: TareaOrigen;
   /** @nullable */
   clienteNombre?: string | null;
+  /** @nullable */
+  responsableNombre?: string | null;
   creadoEn: Date;
   /** @nullable */
   completadoEn?: Date | null;
+  /** @nullable */
+  venceEn?: Date | null;
+  /** @nullable */
+  canceladoEn?: Date | null;
 }

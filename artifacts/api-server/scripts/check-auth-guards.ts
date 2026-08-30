@@ -35,7 +35,6 @@ const ALLOWED_BLANKET_GUARD_FILES = new Set([
   "ai.ts",
   "profile.ts",
   "subscription.ts",
-  "tareas.ts",
   "workflows.ts",
 ]);
 

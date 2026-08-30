@@ -11,10 +11,12 @@ export const tareasTable = pgTable("tareas", {
   cobroId: integer("cobro_id").references(() => cobrosTable.id, { onDelete: "set null" }),
   titulo: text("titulo").notNull(),
   descripcion: text("descripcion"),
-  estado: text("estado").notNull().$type<"pendiente" | "completada">().default("pendiente"),
+  estado: text("estado").notNull().$type<"pendiente" | "completada" | "cancelada">().default("pendiente"),
   origen: text("origen").notNull().$type<"workflow" | "manual">().default("workflow"),
   creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
   completadoEn: timestamp("completado_en", { withTimezone: true }),
+  venceEn: timestamp("vence_en", { withTimezone: true }),
+  canceladoEn: timestamp("cancelado_en", { withTimezone: true }),
 });
 
 export type Tarea = typeof tareasTable.$inferSelect;

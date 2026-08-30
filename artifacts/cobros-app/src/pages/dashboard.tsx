@@ -1,197 +1,12 @@
 import { useState, useMemo } from "react";
-import { useListCobros, useGetDashboardMetrics, useListClientes, useGetGestionesAgenda, useGetSaludCartera, GestionTipo } from "@workspace/api-client-react";
+import { useListCobros, useGetDashboardMetrics } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatShortDate, formatDate } from "@/lib/format";
+import { formatCurrency, formatShortDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
-import { ScoreBadge } from "@/components/score-badge";
 import { Link } from "wouter";
-import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, Wallet, AlertCircle, Minus, ShieldAlert, CalendarClock, TrendingDown, MoveRight, MessageSquare, Sparkles } from "lucide-react";
-import { EvolucionCarteraChart } from "@/components/evolucion-cartera-chart";
-import type { SaludCarteraBloque, SaludCarteraAccion } from "@workspace/api-client-react";
-
-function TendenciaIcon({ tendencia }: { tendencia: SaludCarteraBloque["tendencia"] }) {
-  if (tendencia === "mejor")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600" title="Mejor que la semana pasada">
-        <TrendingUp className="h-3.5 w-3.5" /> Mejor
-      </span>
-    );
-  if (tendencia === "peor")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600" title="Peor que la semana pasada">
-        <TrendingDown className="h-3.5 w-3.5" /> Peor
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground" title="Sin cambios significativos">
-      <MoveRight className="h-3.5 w-3.5" /> Igual
-    </span>
-  );
-}
-
-function razonDe(a: SaludCarteraAccion): string {
-  const partes: string[] = [];
-  if (a.diasMora != null) partes.push(a.diasMora === 1 ? "Vencido hace 1 día" : `Vencido hace ${a.diasMora} días`);
-  else if (a.diasParaVencer != null)
-    partes.push(a.diasParaVencer === 0 ? "Vence hoy" : a.diasParaVencer === 1 ? "Vence mañana" : `Vence en ${a.diasParaVencer} días`);
-  partes.push(formatCurrency(a.saldoPendiente));
-  const catLabel: Record<string, string> = {
-    excelente: "Score Excelente",
-    bueno: "Score Bueno",
-    regular: "Score Regular",
-    riesgoso: "Score Riesgoso",
-    critico: "Score Crítico",
-  };
-  if (a.probabilidadPago != null) partes.push(`Prob. pago: ${a.probabilidadPago}%`);
-  if (catLabel[a.categoria]) partes.push(catLabel[a.categoria]);
-  if (!a.ultimoContactoEn) partes.push("sin contacto registrado");
-  return partes.join(" · ");
-}
-
-function SaludCarteraPanel() {
-  const { data, isLoading } = useGetSaludCartera();
-
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-3">
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader className="h-10 bg-muted/50" />
-            <CardContent className="h-20 bg-muted/20" />
-          </Card>
-        ))}
-      </div>
-    );
-  }
-  if (!data) return null;
-
-  const { semaforo, acciones, resumen } = data;
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Wallet className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold tracking-tight">Salud de cartera</h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="shadow-sm border-green-500/30 bg-green-500/5">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-semibold text-green-700 flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-green-500 inline-block" /> Cartera sana
-              </CardTitle>
-              <TendenciaIcon tendencia={semaforo.sana.tendencia} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold font-mono text-green-700">{formatCurrency(semaforo.sana.monto)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {semaforo.sana.cantidad} {semaforo.sana.cantidad === 1 ? "cobro dentro del plazo" : "cobros dentro del plazo"}
-              </p>
-              <p className="text-xs font-medium text-green-700 mt-2">Sin riesgo inmediato</p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border-yellow-500/30 bg-yellow-500/5">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-semibold text-yellow-700 flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-yellow-400 inline-block" /> Cartera en riesgo
-              </CardTitle>
-              <TendenciaIcon tendencia={semaforo.riesgo.tendencia} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold font-mono text-yellow-700">{formatCurrency(semaforo.riesgo.monto)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {semaforo.riesgo.cantidad} {semaforo.riesgo.cantidad === 1 ? "cobro vence" : "cobros vencen"} en los próximos 7 días
-              </p>
-              <p className="text-xs font-medium text-yellow-700 mt-2">Requieren seguimiento pronto</p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border-red-500/30 bg-red-500/5">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-semibold text-red-700 flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-red-500 inline-block" /> Cartera crítica
-              </CardTitle>
-              <TendenciaIcon tendencia={semaforo.critica.tendencia} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold font-mono text-red-700">{formatCurrency(semaforo.critica.monto)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {semaforo.critica.cantidad} {semaforo.critica.cantidad === 1 ? "cobro vencido" : "cobros vencidos"}
-                {semaforo.critica.cantidad > 0 && semaforo.critica.diasPromedioMora != null
-                  ? ` · ${semaforo.critica.diasPromedioMora} días promedio de mora`
-                  : ""}
-              </p>
-              <p className="text-xs font-medium text-red-700 mt-2">Acción inmediata requerida</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <EvolucionCarteraChart />
-
-      {acciones.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold tracking-tight">Acciones recomendadas para hoy</h2>
-          </div>
-
-          <Card className="shadow-sm border-primary/25 bg-primary/5 mb-4">
-            <CardContent className="p-4 flex items-center gap-3">
-              <TrendingUp className="h-5 w-5 text-primary shrink-0" />
-              <p className="text-sm">
-                Esta semana podrías recuperar hasta{" "}
-                <span className="font-bold font-mono">{formatCurrency(resumen.montoRecuperable)}</span> si contactas a{" "}
-                {resumen.clientes === 1 ? "este cliente prioritario" : `estos ${resumen.clientes} clientes prioritarios`}.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardContent className="p-0 divide-y">
-              {acciones.map((a) => (
-                <div key={a.clienteId} className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Link href={`/clientes/${a.clienteId}`} className="font-semibold text-sm truncate hover:text-primary transition-colors">
-                        {a.clienteNombre}
-                      </Link>
-                      <ScoreBadge score={a.score ?? null} categoria={a.categoria} size="xs" />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{razonDe(a)}</p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="font-mono font-semibold text-sm">{formatCurrency(a.saldoPendiente)}</span>
-                    {a.cobroId != null && (
-                      <Link
-                        href={`/cobros/${a.cobroId}?contactar=1`}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" />
-                        Contactar
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const GESTION_TIPO_LABEL: Record<GestionTipo, string> = {
-  llamada: "Llamada",
-  email: "Email",
-  whatsapp: "WhatsApp",
-  visita: "Visita",
-  otro: "Otro",
-};
+import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, Wallet, AlertCircle, Minus } from "lucide-react";
 
 function PasarelaBadge({ flowLinkPago, mpPaymentLinkUrl }: { flowLinkPago?: string | null; mpPaymentLinkUrl?: string | null }) {
   if (flowLinkPago && mpPaymentLinkUrl) {
@@ -231,19 +46,8 @@ export default function Dashboard() {
       : undefined;
   const { data: metrics, isLoading: isLoadingMetrics } = useGetDashboardMetrics({
     periodo,
-    ...(responsableParam ? { responsable: responsableParam } : {}),
   });
   const { data: cobros, isLoading: isLoadingCobros } = useListCobros();
-  const { data: clientes } = useListClientes();
-  const { data: agenda } = useGetGestionesAgenda();
-
-  const clientesPrioritarios = useMemo(() => {
-    if (!clientes) return [];
-    return clientes
-      .filter((c) => c.score != null && c.totalPendiente > 0)
-      .sort((a, b) => (a.score ?? 100) - (b.score ?? 100) || b.totalPendiente - a.totalPendiente)
-      .slice(0, 5);
-  }, [clientes]);
 
   const responsablesUnicos = useMemo(() => {
     if (!cobros) return [];
@@ -296,8 +100,6 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
-
-      <SaludCarteraPanel />
 
       {isLoadingMetrics ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -357,80 +159,6 @@ export default function Dashboard() {
           </Card>
         </div>
       ) : null}
-
-      {clientesPrioritarios.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <ShieldAlert className="h-5 w-5 text-orange-500" />
-            <h2 className="text-xl font-semibold tracking-tight">Clientes prioritarios</h2>
-            <span className="text-sm text-muted-foreground">— con saldo pendiente y bajo score</span>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {clientesPrioritarios.map((c) => (
-              <Link key={c.id} href={`/clientes/${c.id}`}>
-                <Card className="shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group h-full">
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
-                        {c.nombre}
-                      </p>
-                      <ScoreBadge score={c.score} categoria={c.categoria} size="xs" showLabel={false} />
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold font-mono text-foreground">{formatCurrency(c.totalPendiente)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        pendiente
-                        {c.cobrosVencidos > 0 && (
-                          <span className="text-red-600 font-medium">
-                            {" · "}
-                            {c.cobrosVencidos} vencido{c.cobrosVencidos !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {agenda && agenda.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <CalendarClock className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold tracking-tight">Próximas gestiones</h2>
-            <span className="text-sm text-muted-foreground">— agenda de cobranza programada</span>
-          </div>
-          <Card className="shadow-sm overflow-hidden">
-            <div className="divide-y divide-border/60">
-              {agenda.map((g) => (
-                <Link key={g.gestionId} href={`/cobros/${g.cobroId}`}>
-                  <div className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40 transition-colors cursor-pointer">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {g.clienteNombre || g.cobroDescripcion || `Cobro #${g.cobroId}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {GESTION_TIPO_LABEL[g.proximaGestionTipo]}
-                        {g.responsableNombre && ` · ${g.responsableNombre}`}
-                        {typeof g.saldo === "number" && g.saldo > 0 && ` · ${formatCurrency(g.saldo)} pendiente`}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-xs font-medium ${g.vencida ? "text-red-600" : "text-foreground"}`}>
-                        {formatDate(g.proximaGestionEn)}
-                      </p>
-                      {g.vencida && <p className="text-[10px] text-red-600 font-medium">Vencida</p>}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
 
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">

@@ -41,3 +41,4 @@
 - [Scoring predictivo](scoring-predictivo.md) — prob. pago 7d/fecha estimada/promesas incumplidas on-the-fly en scoring; promesas se evalúan por timestamps de pago vs deadline, nunca por estado actual del cobro.
 - [Flujo de invitaciones](invitaciones-flujo.md) — página pública /invitacion/:token; aceptación transaccional con cupo revalidado; registro atado al token; returnTo con validación anti open-redirect; gating de cupos en UI.
 - [Superadmin = libro de ingresos](superadmin-ledger.md) — módulo Cobros del superadmin muestra pagos de suscripción; seed borra sus cobros; pagos_suscripcion con UNIQUE user+período (idempotencia obligatoria).
+- [OpenAPI date coercion](openapi-date-coercion.md) — Orval Zod coerces both date and date-time inputs to Date objects; route handlers must not assume validated values remain strings.

@@ -6,7 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ListTareasEstado } from './listTareasEstado';
+import type { ListTareasFecha } from './listTareasFecha';
 
 export type ListTareasParams = {
 estado?: ListTareasEstado;
+responsableId?: string;
+cobroId?: number;
+/**
+ * Due-date window in America/Santiago calendar days
+ */
+fecha?: ListTareasFecha;
 };

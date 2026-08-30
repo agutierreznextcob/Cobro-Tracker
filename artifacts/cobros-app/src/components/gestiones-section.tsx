@@ -4,6 +4,8 @@ import {
   useCrearGestion,
   getListGestionesQueryKey,
   getGetGestionesAgendaQueryKey,
+  getGetGestionHoyQueryKey,
+  getGetGestionResumenQueryKey,
   GestionTipo,
   GestionResultado,
   type GestionInput,
@@ -137,6 +139,12 @@ export function GestionesSection({ cobroId }: { cobroId: number }) {
           });
           queryClient.invalidateQueries({
             queryKey: getGetGestionesAgendaQueryKey(),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getGetGestionHoyQueryKey(),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getGetGestionResumenQueryKey(),
           });
           resetForm();
         },
