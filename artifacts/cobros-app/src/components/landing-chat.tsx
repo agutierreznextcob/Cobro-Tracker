@@ -178,8 +178,8 @@ export function LandingChat() {
         onClick={() => (open ? setOpen(false) : handleOpen())}
         className="fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105"
         style={{ backgroundColor: open ? "#4b3fb0" : MORADO }}
-        title="¿Dudas? Pregúntale a nuestro asistente"
-        aria-label="Abrir chat de ayuda"
+        title="¿Dudas? Pregúntale a Diana"
+        aria-label="Abrir chat con Diana"
       >
         {open ? (
           <X className="h-6 w-6" />
@@ -200,13 +200,13 @@ export function LandingChat() {
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 shrink-0 text-white" style={{ backgroundColor: MORADO }}>
             <div
-              className="h-8 w-8 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: AMARILLO, color: "#1a1a2e" }}
+              className="h-8 w-8 rounded-full flex items-center justify-center font-bold"
+              style={{ backgroundColor: "#090f16", color: AMARILLO }}
             >
-              <Sparkles className="h-4 w-4" />
+              D
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm leading-tight">Asistente NextCob</p>
+              <p className="font-semibold text-sm leading-tight">Diana · Asistente NextCob</p>
               <p className="text-xs text-white/80">Resolvemos tus dudas al instante</p>
             </div>
           </div>
@@ -217,12 +217,12 @@ export function LandingChat() {
               {messages.length === 0 && streamingContent === null && (
                 <div className="text-center py-6 text-muted-foreground text-sm">
                   <div
-                    className="h-12 w-12 mx-auto mb-3 rounded-full flex items-center justify-center text-white"
-                    style={{ backgroundColor: MORADO }}
+                    className="h-12 w-12 mx-auto mb-3 rounded-full flex items-center justify-center text-xl font-bold"
+                    style={{ backgroundColor: "#090f16", color: AMARILLO }}
                   >
-                    <Sparkles className="h-6 w-6" />
+                    D
                   </div>
-                  <p className="font-medium text-foreground">¡Hola! 👋 ¿En qué te ayudo?</p>
+                  <p className="font-medium text-foreground">Hola, soy Diana 👋 ¿En qué puedo ayudarte sobre NextCob?</p>
                   <p className="text-xs mt-1 opacity-80">
                     Pregúntame sobre NextCob: precios, funciones, seguridad o cómo empezar tu prueba gratis.
                   </p>

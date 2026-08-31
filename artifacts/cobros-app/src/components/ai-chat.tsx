@@ -164,10 +164,10 @@ export function AiChat() {
         className={`fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${
           open ? "bg-secondary text-foreground" : "bg-primary text-primary-foreground hover:bg-primary/90"
         }`}
-        title="Asistente IA"
-        aria-label="Asistente IA"
+        title="Abrir chat con Diana"
+        aria-label="Abrir chat con Diana"
       >
-        {open ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6" />}
+        {open ? <X className="h-6 w-6" /> : <span className="text-lg font-bold">D</span>}
       </button>
 
       {/* Chat panel — anchored bottom-right */}
@@ -175,12 +175,12 @@ export function AiChat() {
         <div className="fixed bottom-24 right-4 z-50 w-[380px] max-w-[calc(100vw-3rem)] h-[520px] max-h-[calc(100vh-8rem)] flex flex-col rounded-2xl border bg-card shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-card shrink-0">
-            <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
-              <Bot className="h-4 w-4" />
+            <div className="h-8 w-8 rounded-full bg-black flex items-center justify-center text-[#F2A900] font-bold">
+              D
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm leading-tight">Asistente IA</p>
-              <p className="text-xs text-muted-foreground">Llama 3.3 70B</p>
+              <p className="font-semibold text-sm leading-tight">Diana · Asistente NextCob</p>
+              <p className="text-xs text-muted-foreground">Experta en cobranza y finanzas</p>
             </div>
             <button
               onClick={handleNewChat}
@@ -196,9 +196,13 @@ export function AiChat() {
             <div className="px-4 py-3">
               {messages.length === 0 && streamingContent === null && (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  <Bot className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                  <p className="font-medium">¿En qué puedo ayudarte?</p>
-                  <p className="text-xs mt-1 opacity-70">Pregúntame sobre tus cobros, clientes o montos recaudados.</p>
+                  <div className="h-12 w-12 mx-auto mb-3 rounded-full bg-black flex items-center justify-center text-[#F2A900] text-xl font-bold">
+                    D
+                  </div>
+                  <p className="font-medium text-foreground">Hola, soy Diana, tu asistente de NextCob.</p>
+                  <p className="text-xs mt-2 opacity-80 leading-relaxed">
+                    Puedo ayudarte a analizar tu cartera, identificar clientes prioritarios y responder cualquier pregunta sobre tu cobranza.
+                  </p>
                 </div>
               )}
               {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}

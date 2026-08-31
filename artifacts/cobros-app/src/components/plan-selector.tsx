@@ -52,7 +52,7 @@ const PLANES_UI = {
     bloqueado: [
       "Workflows inteligentes",
       "Scoring predictivo",
-      "Asistente IA",
+      "Diana, asistente NextCob",
       "Recordatorios automáticos",
       "Informes avanzados",
       "Equipos (más usuarios)",
@@ -69,7 +69,7 @@ const PLANES_UI = {
       "Todo lo del plan Starter",
       "Workflows inteligentes",
       "Scoring predictivo y probabilidad de pago",
-      "Asistente IA",
+      "Diana, asistente NextCob",
       "Recordatorios automáticos por email y WhatsApp",
       "Informes avanzados y rendimiento de equipo",
     ],

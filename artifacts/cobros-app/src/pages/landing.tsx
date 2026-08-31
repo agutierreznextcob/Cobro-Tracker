@@ -317,7 +317,7 @@ function ComoFuncionaSection() {
       number: "05",
       icon: BarChart3,
       title: "Predice tu flujo de caja",
-      desc: "Dashboard en tiempo real, scoring de clientes, informes aging, proyección de flujo de caja y asistente IA que responde preguntas sobre tu negocio en lenguaje natural.",
+      desc: "Dashboard en tiempo real, scoring de clientes, informes aging, proyección de flujo de caja y Diana, que responde preguntas sobre tu negocio en lenguaje natural.",
     },
   ];
   return (
@@ -365,7 +365,7 @@ function CaracteristicasSection() {
     { title: "Cobranza manual", desc: "Registra pagos en efectivo, transferencia u otro medio" },
     { title: "Recordatorios automáticos", desc: "Email y WhatsApp programados antes y después del vencimiento" },
     { title: "Workflows inteligentes", desc: "Flujos condicionales que se adaptan al comportamiento del cliente" },
-    { title: "Asistente IA incluido", desc: "Pregúntale sobre tu negocio en lenguaje natural" },
+    { title: "Diana incluida", desc: "Pregúntale sobre tu negocio en lenguaje natural" },
     { title: "Scoring de clientes", desc: "Clasificación automática por historial de pago" },
     { title: "Portal del deudor", desc: "Link único donde tu cliente ve y paga todas sus deudas" },
     { title: "Gestión de equipos", desc: "Asigna cobros a ejecutivos y mide su rendimiento" },
@@ -542,7 +542,7 @@ function PreciosSection() {
                   "Todo lo del plan Starter",
                   "Recordatorios automáticos por email y WhatsApp",
                   "Workflows inteligentes de cobranza",
-                  "Asistente IA incluido",
+                  "Diana incluida",
                   "Scoring predictivo de clientes",
                   "Informes avanzados y exportación Excel",
                   "Rendimiento de equipo",
@@ -618,7 +618,7 @@ function QuienesSomosSection() {
           <div className="grid grid-cols-1 gap-4">
             {[
               { icon: CreditCard, label: "Pagos con Webpay y MercadoPago" },
-              { icon: Bot, label: "Asistente IA incluido" },
+              { icon: Bot, label: "Diana incluida" },
               { icon: Coins, label: "Cobros parciales y seguimiento automático" },
               { icon: Sparkles, label: "14 días de prueba gratis" },
             ].map((item, i) => (

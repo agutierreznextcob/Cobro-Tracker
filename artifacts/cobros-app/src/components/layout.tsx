@@ -490,7 +490,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      {/* Asistente IA: solo plan NextCob (trial/demo incluidos). */}
+      {/* Diana: solo plan NextCob (trial/demo incluidos). */}
       {!esStarter && <AiChat />}
 
       {/* Mensaje al intentar usar una función bloqueada en Starter. */}
