@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ReactMarkdown from "react-markdown";
+import { stripThinkingBlocks } from "@/lib/strip-thinking";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -146,11 +147,15 @@ export function LandingChat() {
       content,
       (chunk) => {
         accumulated += chunk;
-        setStreamingContent(accumulated);
+        setStreamingContent(stripThinkingBlocks(accumulated));
         scrollToBottom();
       },
       () => {
-        const assistantMsg: LocalMessage = { id: Date.now() + 1, role: "assistant", content: accumulated };
+        const assistantMsg: LocalMessage = {
+          id: Date.now() + 1,
+          role: "assistant",
+          content: stripThinkingBlocks(accumulated),
+        };
         setMessages((prev) => [...prev, assistantMsg]);
         setStreamingContent(null);
         setIsSending(false);

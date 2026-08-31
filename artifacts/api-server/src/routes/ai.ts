@@ -418,6 +418,8 @@ aiRouter.post("/ai/conversations/:id/messages", async (req, res) => {
       const stream = await groq.chat.completions.create({
         model: "qwen/qwen3.6-27b",
         max_tokens: 2048,
+        reasoning_effort: "none",
+        reasoning_format: "hidden",
         messages: [{ role: "system", content: systemPrompt }, ...chatMessages],
         stream: true,
       });
@@ -488,6 +490,8 @@ aiRouter.post("/ai/chat", async (req, res) => {
       const stream = await groq.chat.completions.create({
         model: "qwen/qwen3.6-27b",
         max_tokens: 2048,
+        reasoning_effort: "none",
+        reasoning_format: "hidden",
         messages: [{ role: "system", content: systemPrompt }, ...chatMessages],
         stream: true,
       });
