@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, Webhook, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo } from "lucide-react";
+import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus, useGetGestionResumen, getGetGestionResumenQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -273,18 +273,21 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
-    { href: "/cobros", label: "Cobros", icon: List },
     { href: "/cobros/nuevo", label: "Nuevo cobro", icon: Plus },
+    { href: "/cobros", label: "Cobros", icon: List },
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
-    { href: "/cobros/informes", label: "Informes", icon: BarChart3 },
     { href: "/clientes", label: "Clientes", icon: Users },
+    { id: "gestion_group" },
+    { id: "notificaciones" },
     { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock, feature: "Recordatorios automáticos" },
     { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes" },
-    { id: "gestion_group" },
     { href: "/encuestas", label: "Satisfacción", icon: MessageSquare, feature: "Encuestas de satisfacción" },
-    { href: "/webhooks/log", label: "Log webhooks", icon: Webhook },
+    { href: "/cobros/informes", label: "Informes", icon: BarChart3 },
     { href: "/perfil", label: "Perfil", icon: UserCircle },
-  ] as Array<{ href: string; label: string; icon: typeof Home; feature?: string }>;
+  ] as Array<
+    | { href: string; label: string; icon: typeof Home; feature?: string }
+    | { id: "gestion_group" | "notificaciones" }
+  >;
 
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Usuario"
@@ -359,6 +362,9 @@ export function Layout({ children }: { children: ReactNode }) {
             if ("id" in item && item.id === "gestion_group") {
               return <GestionNavGroup key="gestion_group" closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
             }
+            if ("id" in item && item.id === "notificaciones") {
+              return <NotificacionesNavItem key="notificaciones" location={location} onNavigate={closeMobile} />;
+            }
             if (!("href" in item)) return null;
 
             const isActive = location === item.href;
@@ -393,9 +399,6 @@ export function Layout({ children }: { children: ReactNode }) {
                 />
                 <span>{item.label}</span>
               </Link>
-              )}
-              {item.href === "/clientes" && (
-                <NotificacionesNavItem location={location} onNavigate={closeMobile} />
               )}
               </div>
             );

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import {
   useListAdminUsuarios,
   useGetAdminMetricas,
@@ -65,6 +66,7 @@ import {
   Trash2,
   Headset,
   Copy,
+  Webhook,
 } from "lucide-react";
 
 function formatFecha(iso: string | null): string {
@@ -627,6 +629,25 @@ export default function AdminPage() {
           label="Cuentas demo"
         />
       </div>
+
+      <Card className="shadow-sm">
+        <CardContent className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 font-semibold">
+              <Webhook className="h-4 w-4 text-primary" />
+              Herramientas técnicas
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Diagnóstico interno de integraciones y eventos de pago.
+            </p>
+          </div>
+          <Link href="/webhooks/log">
+            <Button variant="outline" className="w-full sm:w-auto">
+              Ver log de webhooks
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-sm">
         <CardContent className="p-0">

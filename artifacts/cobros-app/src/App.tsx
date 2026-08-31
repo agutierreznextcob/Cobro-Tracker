@@ -283,11 +283,11 @@ function AppRouter() {
         </AuthGate>
       </Route>
       <Route path="/webhooks/log">
-        <AuthGate>
+        <AdminGate>
           <Layout>
             <WebhookLog />
           </Layout>
-        </AuthGate>
+        </AdminGate>
       </Route>
       <Route path="/perfil">
         <AuthGate skipProfile skipSubscription>
