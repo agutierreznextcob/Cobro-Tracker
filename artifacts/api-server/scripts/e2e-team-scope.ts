@@ -199,12 +199,24 @@ async function main() {
     check("can complete team task", completeOwn.status === 200 && completeOwn.json.estado === "completada", completeOwn);
     const patchOther = await api("PATCH", `/tareas/${fixtureByTeam.b.tareaId}/estado`, { estado: "cancelada" });
     check("cannot patch other team task", patchOther.status === 404 && !JSON.stringify(patchOther.json).includes("Secret"), patchOther);
+    const supervisorOwnTask = await api("POST", "/tareas", {
+      titulo: `Supervisor A personal badge ${stamp}`,
+    });
+    check("can create a task assigned to self", supervisorOwnTask.status === 201 && supervisorOwnTask.json.userId === users["sup-a"].id, supervisorOwnTask);
+    if (supervisorOwnTask.json?.id) createdTareaIds.push(supervisorOwnTask.json.id);
 
     console.log("== Supervisor A: three gestión dashboard endpoints ==");
     const priorityA = await api("GET", "/gestion/clientes-prioritarios");
     check("priority clients only include team A", priorityA.status === 200 && priorityA.json.some((x: any) => x.clienteId === fixtureByTeam.a.clienteId) && !priorityA.json.some((x: any) => x.clienteId === fixtureByTeam.b.clienteId), priorityA);
     const summaryA = await api("GET", "/gestion/resumen");
-    check("summary counts only team A fixtures", summaryA.status === 200 && summaryA.json.tareasPendientes === 1 && summaryA.json.compromisosPendientes === 1, summaryA);
+    check(
+      "summary separates personal task badge from team-visible agenda",
+      summaryA.status === 200
+        && summaryA.json.tareasPendientes === 1
+        && summaryA.json.compromisosPendientes === 1
+        && summaryA.json.total === 2,
+      summaryA,
+    );
     const todayA = await api("GET", "/gestion/hoy");
     check("today only returns team A task/agenda", todayA.status === 200 && todayA.json.tareas.some((x: any) => x.id === fixtureByTeam.a.tareaId) && !todayA.json.tareas.some((x: any) => x.id === fixtureByTeam.b.tareaId) && todayA.json.agenda.some((x: any) => x.gestionId === fixtureByTeam.a.gestionId) && !todayA.json.agenda.some((x: any) => x.gestionId === fixtureByTeam.b.gestionId), todayA);
     check("today response leaks no team B names or amounts", !JSON.stringify(todayA.json).includes("999999") && !JSON.stringify(todayA.json).includes("Secret Cliente B"), todayA.json);

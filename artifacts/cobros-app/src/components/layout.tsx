@@ -191,9 +191,9 @@ function GestionNavGroup({ closeMobile, esStarter, setUpgradeFeature }: { closeM
   const badgeTotal = data ? (data.total || 0) : 0;
 
   const subItems = [
-    { href: "/gestion/hoy", label: "Qué hacer hoy", icon: Calendar },
+    { href: "/gestion/hoy", label: "Qué hacer hoy", icon: Calendar, badge: data?.compromisosPendientes },
     { href: "/gestion/clientes-prioritarios", label: "Clientes prioritarios", icon: Star },
-    { href: "/gestion/tareas", label: "Tareas", icon: ListTodo },
+    { href: "/gestion/tareas", label: "Tareas", icon: ListTodo, badge: data?.tareasPendientes },
   ];
 
   const isActive = location.startsWith("/gestion") || location.startsWith("/tareas");
@@ -230,19 +230,27 @@ function GestionNavGroup({ closeMobile, esStarter, setUpgradeFeature }: { closeM
         <div className="pl-9 pr-2 py-1 space-y-1">
           {subItems.map(item => {
             const isSubActive = location === item.href || (item.href === '/gestion/tareas' && location === '/tareas');
+            const hasBadge = typeof item.badge === 'number' && item.badge > 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={closeMobile}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center justify-between gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isSubActive
                     ? "bg-secondary text-foreground"
                     : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
                 }`}
               >
-                <item.icon className={`h-3.5 w-3.5 shrink-0 ${isSubActive ? "text-primary" : "text-muted-foreground"}`} />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-2.5">
+                  <item.icon className={`h-3.5 w-3.5 shrink-0 ${isSubActive ? "text-primary" : "text-muted-foreground"}`} />
+                  <span>{item.label}</span>
+                </div>
+                {hasBadge && (
+                  <span className={`inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold bg-primary text-primary-foreground`}>
+                    {item.badge! > 99 ? "99+" : item.badge}
+                  </span>
+                )}
               </Link>
             )
           })}

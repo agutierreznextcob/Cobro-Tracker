@@ -7,6 +7,9 @@ import {
   useUpdateTareaEstado,
   useListMiembros,
   useListCobros,
+  useGetGestionesAgenda,
+  useCompletarGestionAgenda,
+  getGetGestionesAgendaQueryKey,
   getListMiembrosQueryKey,
   getListCobrosQueryKey,
   getGetGestionHoyQueryKey,
@@ -14,7 +17,9 @@ import {
   type ListTareasParams,
   type ListTareasFecha,
   type MiembroEquipo,
-  type Cobro
+  type Cobro,
+  type Tarea,
+  type GestionAgendaItem
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +36,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+
+const getSantiagoDateString = (dateInput: string | Date | undefined | null) => {
+  if (!dateInput) return "";
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santiago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(new Date(dateInput));
+  const map = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+};
 
 const tareaSchema = z.object({
   titulo: z.string().min(1, "El título es requerido"),
@@ -62,9 +80,16 @@ export default function TareasPage() {
     params.cobroId = parseInt(cobroFiltro, 10);
   }
 
-  const { data: tareas, isLoading, isError } = useListTareas(params, {
+  const { data: tareas, isLoading: isTareasLoading, isError: isTareasError } = useListTareas(params, {
     query: { queryKey: getListTareasQueryKey(params) },
   });
+
+  const { data: agendaData, isLoading: isAgendaLoading, isError: isAgendaError } = useGetGestionesAgenda({
+    query: { queryKey: getGetGestionesAgendaQueryKey() },
+  });
+
+  const isLoading = isTareasLoading || isAgendaLoading;
+  const isError = isTareasError || isAgendaError;
 
   const { data: miembros } = useListMiembros({
     query: { queryKey: getListMiembrosQueryKey() }
@@ -79,6 +104,58 @@ export default function TareasPage() {
 
   const createTarea = useCreateTarea();
   const updateTarea = useUpdateTareaEstado();
+  const completarAgenda = useCompletarGestionAgenda();
+
+  const todayStr = getSantiagoDateString(new Date());
+  const next7Date = new Date();
+  next7Date.setDate(next7Date.getDate() + 7);
+  const next7Str = getSantiagoDateString(next7Date);
+
+  const filteredAgenda = (agendaData || []).filter(item => {
+    if (estadoFiltro !== "pendiente") return false;
+    if (responsableFiltro !== "all" && item.responsableId !== responsableFiltro) return false;
+    if (cobroFiltro !== "all" && item.cobroId.toString() !== cobroFiltro) return false;
+
+    const itemDateStr = getSantiagoDateString(item.proximaGestionEn);
+    if (fechaFiltro === "vencidas" && itemDateStr >= todayStr) return false;
+    if (fechaFiltro === "hoy" && itemDateStr !== todayStr) return false;
+    if (fechaFiltro === "proximos_7" && (itemDateStr <= todayStr || itemDateStr > next7Str)) return false;
+
+    return true;
+  });
+
+  type MergedItem =
+    | { type: 'tarea'; id: string; data: Tarea; dateStr: string; time: number; createdTime: number }
+    | { type: 'agenda'; id: string; data: GestionAgendaItem; dateStr: string; time: number; createdTime: number };
+
+  const allItems: MergedItem[] = [
+    ...(tareas || []).map(t => ({
+      type: 'tarea' as const,
+      id: `tarea-${t.id}`,
+      data: t,
+      dateStr: getSantiagoDateString(t.venceEn),
+      time: t.venceEn ? new Date(t.venceEn).getTime() : Infinity,
+      createdTime: new Date(t.creadoEn).getTime()
+    })),
+    ...filteredAgenda.map(a => ({
+      type: 'agenda' as const,
+      id: `agenda-${a.gestionId}`,
+      data: a,
+      dateStr: getSantiagoDateString(a.proximaGestionEn),
+      time: a.proximaGestionEn ? new Date(a.proximaGestionEn).getTime() : Infinity,
+      createdTime: 0 // Agenda items don't expose creadoEn, so we fallback to 0
+    }))
+  ];
+
+  allItems.sort((a, b) => {
+    if (a.time === Infinity && b.time === Infinity) {
+      return b.createdTime - a.createdTime;
+    }
+    if (a.time === b.time) {
+      return b.createdTime - a.createdTime;
+    }
+    return a.time - b.time;
+  });
 
   const form = useForm<TareaFormValues>({
     resolver: zodResolver(tareaSchema),
@@ -100,6 +177,7 @@ export default function TareasPage() {
         venceEn: data.venceEn || undefined
       } });
       queryClient.invalidateQueries({ queryKey: getListTareasQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetGestionesAgendaQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetGestionHoyQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetGestionResumenQueryKey() });
       toast({ title: "Tarea creada exitosamente" });
@@ -119,6 +197,18 @@ export default function TareasPage() {
       toast({ title: `Tarea marcada como ${nuevoEstado}` });
     } catch {
       toast({ title: "Error al actualizar tarea", variant: "destructive" });
+    }
+  };
+
+  const handleCompletarAgenda = async (gestionId: number) => {
+    try {
+      await completarAgenda.mutateAsync({ gestionId });
+      queryClient.invalidateQueries({ queryKey: getGetGestionesAgendaQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetGestionHoyQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetGestionResumenQueryKey() });
+      toast({ title: "Gestión marcada como completada" });
+    } catch {
+      toast({ title: "Error al completar gestión", variant: "destructive" });
     }
   };
 
@@ -233,106 +323,173 @@ export default function TareasPage() {
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : !tareas || tareas.length === 0 ? (
+        ) : allItems.length === 0 ? (
           <Card className="border-dashed bg-muted/30">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
               <CheckSquare className="h-12 w-12 mb-4 opacity-20" />
               <h3 className="text-lg font-medium text-foreground mb-1">Sin tareas encontradas</h3>
-              <p>No hay tareas que coincidan con los filtros seleccionados.</p>
+              <p>No hay tareas ni gestiones que coincidan con los filtros seleccionados.</p>
             </CardContent>
           </Card>
         ) : (
-          tareas.map((t) => {
-            const isVencida = t.estado === "pendiente" && t.venceEn && isVencidoSantiago(t.venceEn);
-            return (
-              <Card key={t.id} className={`group hover-elevate transition-all shadow-sm hover:shadow-md ${isVencida ? 'border-l-4 border-l-destructive' : ''}`}>
-                <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                      <span className={`font-semibold text-base ${t.estado !== "pendiente" ? "text-muted-foreground" : ""}`}>
-                        {t.titulo}
-                      </span>
-                      {t.estado === 'completada' && <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 text-[10px] uppercase">Completada</Badge>}
-                      {t.estado === 'cancelada' && <Badge variant="secondary" className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 text-[10px] uppercase">Cancelada</Badge>}
-                      {isVencida && <Badge variant="destructive" className="text-[10px] uppercase">Atrasada</Badge>}
-                      {t.origen === "workflow" && <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">Automática</Badge>}
+          allItems.map((item) => {
+            if (item.type === 'tarea') {
+              const t = item.data;
+              const isVencida = t.estado === "pendiente" && t.venceEn && isVencidoSantiago(t.venceEn);
+              return (
+                <Card key={item.id} className={`group hover-elevate transition-all shadow-sm hover:shadow-md ${isVencida ? 'border-l-4 border-l-destructive' : ''}`}>
+                  <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <Badge variant="outline" className="text-[10px] uppercase font-semibold border-border bg-muted/20">Tarea</Badge>
+                        <span className={`font-semibold text-base ${t.estado !== "pendiente" ? "text-muted-foreground" : ""}`}>
+                          {t.titulo}
+                        </span>
+                        {t.estado === 'completada' && <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 text-[10px] uppercase">Completada</Badge>}
+                        {t.estado === 'cancelada' && <Badge variant="secondary" className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 text-[10px] uppercase">Cancelada</Badge>}
+                        {isVencida && <Badge variant="destructive" className="text-[10px] uppercase">Atrasada</Badge>}
+                        {t.origen === "workflow" && <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">Automática</Badge>}
+                      </div>
+
+                      {t.descripcion && (
+                        <p className="text-sm text-muted-foreground mb-3">{t.descripcion}</p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground/80">
+                        {t.clienteNombre && (
+                          <span className="font-medium text-foreground/80">{t.clienteNombre}</span>
+                        )}
+
+                        {t.responsableNombre && (
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" /> {t.responsableNombre}
+                          </span>
+                        )}
+
+                        {t.venceEn && (
+                          <span className={`flex items-center gap-1 ${isVencida ? 'text-destructive font-medium' : ''}`}>
+                            <Clock className="h-3 w-3" /> Vence {formatDateSantiago(t.venceEn)}
+                          </span>
+                        )}
+
+                        {t.estado === "completada" && t.completadoEn && (
+                          <span className="flex items-center gap-1">
+                            <Check className="h-3 w-3 text-emerald-500" /> Completada {formatDate(t.completadoEn)}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {t.descripcion && (
-                      <p className="text-sm text-muted-foreground mb-3">{t.descripcion}</p>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground/80">
-                      {t.clienteNombre && (
-                        <span className="font-medium text-foreground/80">{t.clienteNombre}</span>
+                    <div className="shrink-0 flex flex-wrap sm:flex-col items-end gap-2 mt-4 sm:mt-0">
+                      {t.cobroId && (
+                        <Button size="sm" variant="ghost" className="h-8 text-primary" asChild>
+                          <Link href={`/cobros/${t.cobroId}`}>
+                            Ver cobro <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
                       )}
 
-                      {t.responsableNombre && (
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" /> {t.responsableNombre}
-                        </span>
+                      {t.estado === "pendiente" && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleUpdateEstado(t.id, "cancelada")}
+                            disabled={updateTarea.isPending}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-8 shadow-sm"
+                            onClick={() => handleUpdateEstado(t.id, "completada")}
+                            disabled={updateTarea.isPending}
+                          >
+                            <Check className="mr-1.5 h-4 w-4" /> Completar
+                          </Button>
+                        </div>
                       )}
 
-                      {t.venceEn && (
-                        <span className={`flex items-center gap-1 ${isVencida ? 'text-destructive font-medium' : ''}`}>
-                          <Clock className="h-3 w-3" /> Vence {formatDateSantiago(t.venceEn)}
-                        </span>
-                      )}
-
-                      {t.estado === "completada" && t.completadoEn && (
-                        <span className="flex items-center gap-1">
-                          <Check className="h-3 w-3 text-emerald-500" /> Completada {formatDate(t.completadoEn)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 flex flex-wrap sm:flex-col items-end gap-2 mt-4 sm:mt-0">
-                    {t.cobroId && (
-                      <Button size="sm" variant="ghost" className="h-8 text-primary" asChild>
-                        <Link href={`/cobros/${t.cobroId}`}>
-                          Ver cobro <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-                        </Link>
-                      </Button>
-                    )}
-
-                    {t.estado === "pendiente" && (
-                      <div className="flex items-center gap-2">
+                      {t.estado !== "pendiente" && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleUpdateEstado(t.id, "cancelada")}
+                          className="h-8"
+                          onClick={() => handleUpdateEstado(t.id, "pendiente")}
                           disabled={updateTarea.isPending}
                         >
-                          <XCircle className="h-4 w-4" />
+                          <RotateCcw className="mr-1.5 h-4 w-4" /> Reabrir
                         </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            } else {
+              const a = item.data;
+              const isVencida = a.vencida;
+              return (
+                <Card key={item.id} className={`group hover-elevate transition-all shadow-sm hover:shadow-md ${isVencida ? 'border-l-4 border-l-destructive' : ''}`}>
+                  <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <Badge variant="outline" className="text-[10px] uppercase font-semibold text-indigo-600 border-indigo-200 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-800 dark:text-indigo-300">
+                          Gestión programada
+                        </Badge>
+                        <span className="font-semibold text-base">
+                          {a.proximaGestionTipo.charAt(0).toUpperCase() + a.proximaGestionTipo.slice(1)} a cliente
+                        </span>
+                        {isVencida && <Badge variant="destructive" className="text-[10px] uppercase">Atrasada</Badge>}
+                      </div>
+
+                      {a.cobroDescripcion && (
+                        <p className="text-sm text-muted-foreground mb-3">{a.cobroDescripcion}</p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground/80">
+                        {a.clienteNombre && (
+                          <span className="font-medium text-foreground/80">{a.clienteNombre}</span>
+                        )}
+
+                        {a.responsableNombre && (
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" /> {a.responsableNombre}
+                          </span>
+                        )}
+
+                        {a.proximaGestionEn && (
+                          <span className={`flex items-center gap-1 ${isVencida ? 'text-destructive font-medium' : ''}`}>
+                            <Clock className="h-3 w-3" /> Programada: {formatDateSantiago(a.proximaGestionEn)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 flex flex-wrap sm:flex-col items-end gap-2 mt-4 sm:mt-0">
+                      {a.cobroId && (
+                        <Button size="sm" variant="ghost" className="h-8 text-primary" asChild>
+                          <Link href={`/cobros/${a.cobroId}`}>
+                            Ver cobro <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
+                      )}
+
+                      <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           className="h-8 shadow-sm"
-                          onClick={() => handleUpdateEstado(t.id, "completada")}
-                          disabled={updateTarea.isPending}
+                          onClick={() => handleCompletarAgenda(a.gestionId)}
+                          disabled={completarAgenda.isPending}
                         >
                           <Check className="mr-1.5 h-4 w-4" /> Completar
                         </Button>
                       </div>
-                    )}
-
-                    {t.estado !== "pendiente" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8"
-                        onClick={() => handleUpdateEstado(t.id, "pendiente")}
-                        disabled={updateTarea.isPending}
-                      >
-                        <RotateCcw className="mr-1.5 h-4 w-4" /> Reabrir
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
           })
         )}
       </div>

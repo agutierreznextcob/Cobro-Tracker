@@ -430,11 +430,21 @@ async function sugerenciasOperativas(ctx: Awaited<ReturnType<typeof getOrgContex
 gestionesRouter.get("/gestion/resumen", async (req, res) => {
   try {
     const userId = req.user!.id, ctx = await getOrgContext(userId), today = chileDay(new Date());
-    const { agenda, tareas } = await pendientesOperativos(ctx, userId);
-    const tareasPendientes = tareas.filter((t) => t.venceEn && chileDay(t.venceEn) <= today).length;
+    const { agenda } = await pendientesOperativos(ctx, userId);
+    // The Tareas submenu badge is intentionally personal even when a supervisor
+    // or admin can browse a wider scope in the page itself.
+    const tareasPendientes = await db.$count(
+      tareasTable,
+      and(eq(tareasTable.userId, userId), eq(tareasTable.estado, "pendiente")),
+    );
     const compromisosPendientes = agenda.filter((g) => chileDay(g.proximaGestionEn!) <= today).length;
     const sugerencias = (await sugerenciasOperativas(ctx, userId)).length;
-    res.json({ tareasPendientes, compromisosPendientes, sugerencias, total: tareasPendientes + compromisosPendientes + sugerencias });
+    res.json({
+      tareasPendientes,
+      compromisosPendientes,
+      sugerencias,
+      total: tareasPendientes + compromisosPendientes,
+    });
   } catch (err) { req.log.error({ err }, "Error building gestión resumen"); res.status(500).json({ error: "Error interno del servidor" }); }
 });
 
