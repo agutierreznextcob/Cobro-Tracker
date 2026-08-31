@@ -10,6 +10,7 @@ import { generarComprobantePdf } from "./comprobante";
 import { sendComprobanteEmail } from "./email";
 import { getRemitenteContacto } from "./org";
 import { crearYEnviarEncuesta } from "./encuestas-service";
+import { crearNotificacion } from "./notificaciones-service";
 
 interface Logger {
   info: (obj: object, msg: string) => void;
@@ -195,10 +196,22 @@ export async function emitirComprobante(
 
     if (result.ok) {
       // Mark the final success state. The claim (emailIntentoEn) stays set.
+      const emailEnviadoEn = new Date();
       await db
         .update(comprobantesTable)
-        .set({ emailEnviado: true })
+        .set({ emailEnviado: true, emailEnviadoEn })
         .where(eq(comprobantesTable.cobroId, cobro.id));
+      if (cobro.responsableId) {
+        await crearNotificacion({
+          eventKey: `comprobante:${cobro.id}:email`,
+          userId: cobro.responsableId,
+          cobroId: cobro.id,
+          tipo: "comprobante",
+          titulo: `📄 Comprobante enviado a ${cobro.clienteNombre || "Cliente"}`,
+          mensaje: `El comprobante ${numero} fue enviado por email.`,
+          creadoEn: emailEnviadoEn,
+        });
+      }
       log?.info({ cobroId, numero }, "Comprobante sent");
     } else {
       // Release the claim immediately so a subsequent trigger (or webhook retry)

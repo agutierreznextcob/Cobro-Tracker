@@ -42,6 +42,11 @@ import { getDatosBancariosUsuario, buildDatosBancariosHtml } from "../lib/datos-
 import { computeClienteScores } from "../lib/scoring";
 import { userTieneFeature } from "../middlewares/requirePlanFeature";
 import { buscarSnapshotPrevio, calcularBloquesUsuario, hoySantiagoStr, sumarDias as sumarDiasSantiago } from "../lib/salud-cartera";
+import { crearNotificacion } from "../lib/notificaciones-service";
+import {
+  recalcularCobroDesdeAbonosSeguro,
+  transicionarAbonoYRecalcularCobro,
+} from "../lib/abonos-state";
 
 const cobrosRouter = Router();
 
@@ -143,32 +148,7 @@ function serializeDescuento(d: CobroDescuento) {
 async function recalcularEstadoCobro(
   cobroId: number,
 ): Promise<"pagado" | "parcial" | "pendiente" | null> {
-  const [result] = await db
-    .select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
-    .from(pagosParciales)
-    .where(and(eq(pagosParciales.cobroId, cobroId), eq(pagosParciales.estado, "confirmado")));
-  const [cobro] = await db
-    .select({ monto: cobrosTable.monto, montoDescuento: cobrosTable.montoDescuento })
-    .from(cobrosTable)
-    .where(eq(cobrosTable.id, cobroId));
-  if (!cobro) return null;
-  const totalPagado = result?.total ?? 0;
-  const montoTotal = montoACobrar(cobro);
-  const nuevoEstado: "pagado" | "parcial" | "pendiente" =
-    totalPagado >= montoTotal ? "pagado" : totalPagado > 0 ? "parcial" : "pendiente";
-  await db
-    .update(cobrosTable)
-    .set({
-      estado: nuevoEstado,
-      actualizadoEn: new Date(),
-      // Set pagadoEn on first transition to pagado; clear it if the state drops back.
-      pagadoEn:
-        nuevoEstado === "pagado"
-          ? sql`coalesce(${cobrosTable.pagadoEn}, now())`
-          : null,
-    })
-    .where(eq(cobrosTable.id, cobroId));
-  return nuevoEstado;
+  return recalcularCobroDesdeAbonosSeguro(cobroId);
 }
 
 // Authorization guard for any /cobros/:id/* route. Loads the org context and the
@@ -1319,9 +1299,22 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
       }
     }
 
-    // A manual transition to `pagado` should also emit the receipt (idempotent).
+    // Manual terminal payment transitions also feed the activity center.
     if (bodyParsed.data.estado === "pagado") {
       void emitirComprobante(cobro.id, { metodo: "manual", referencia: cobro.referencia ?? null }, req.log);
+      if (cobro.responsableId) await crearNotificacion({
+        eventKey: `cobro:${cobro.id}:pagado`, userId: cobro.responsableId, cobroId: cobro.id,
+        tipo: "pago",
+        titulo: `💰 ${cobro.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}`,
+      });
+    } else if (bodyParsed.data.estado === "fallido" && cobro.responsableId) {
+      await crearNotificacion({
+        eventKey: `cobro:${cobro.id}:fallido`,
+        userId: cobro.responsableId,
+        cobroId: cobro.id,
+        tipo: "pago_fallido",
+        titulo: `❌ Pago fallido de ${cobro.clienteNombre || "Cliente"} por ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}`,
+      });
     }
 
     res.json(serializeCobro(cobro));
@@ -1907,14 +1900,27 @@ cobrosRouter.post("/cobros/:id/abonos", async (req, res) => {
     if (metodo === "manual") {
       const [abono] = await db.insert(pagosParciales).values({
         cobroId: cobro.id, monto: String(monto), metodo: "manual",
-        estado: "confirmado", notas: notas ?? null, confirmadoEn: new Date(), creadoEn: new Date(),
+        estado: "pendiente", notas: notas ?? null, creadoEn: new Date(),
       }).returning();
-      const estadoTrasAbono = await recalcularEstadoCobro(cobro.id);
+      const confirmadoEn = new Date();
+      const transicion = await transicionarAbonoYRecalcularCobro({
+        abonoId: abono.id,
+        cobroId: cobro.id,
+        verificadoEn: confirmadoEn,
+        cambios: { estado: "confirmado", confirmadoEn },
+      });
+      const estadoTrasAbono = transicion.estadoCobro;
+      const abonoConfirmado = transicion.abono!;
+      if (cobro.responsableId) await crearNotificacion(
+        estadoTrasAbono === "pagado"
+          ? { eventKey: `cobro:${cobro.id}:pagado`, userId: cobro.responsableId, cobroId: cobro.id, tipo: "pago", titulo: `💰 ${cobro.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}` }
+          : { eventKey: `abono:${abono.id}:confirmado`, userId: cobro.responsableId, cobroId: cobro.id, tipo: "abono", titulo: `💛 ${cobro.clienteNombre || "Cliente"} realizó un abono de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(monto))}` },
+      );
       if (estadoTrasAbono === "pagado") {
         void emitirComprobante(cobro.id, { metodo: "manual" }, req.log);
       }
       req.log.info({ cobroId: cobro.id, abonoId: abono.id, monto }, "Manual abono confirmed");
-      res.status(201).json({ ...abono, monto: Number(abono.monto), creadoEn: abono.creadoEn.toISOString(), confirmadoEn: abono.confirmadoEn?.toISOString() ?? null });
+      res.status(201).json({ ...abonoConfirmado, monto: Number(abonoConfirmado.monto), creadoEn: abonoConfirmado.creadoEn.toISOString(), confirmadoEn: abonoConfirmado.confirmadoEn?.toISOString() ?? null });
       return;
     }
 
@@ -2000,12 +2006,38 @@ cobrosRouter.post("/cobros/:id/abonos/:abonoId/confirmar", async (req, res) => {
       and(eq(pagosParciales.id, abonoId), eq(pagosParciales.cobroId, paramsParsed.data.id))
     );
     if (!abono) { res.status(404).json({ error: "Abono no encontrado" }); return; }
+    if (abono.metodo !== "manual") {
+      res.status(400).json({ error: "Los abonos Flow o MercadoPago sólo pueden confirmarse mediante su proveedor" });
+      return;
+    }
     if (abono.estado === "confirmado") { res.status(400).json({ error: "El abono ya está confirmado" }); return; }
-    const [updated] = await db.update(pagosParciales)
-      .set({ estado: "confirmado", confirmadoEn: new Date() })
-      .where(eq(pagosParciales.id, abonoId))
-      .returning();
-    const estadoTrasConfirmar = await recalcularEstadoCobro(paramsParsed.data.id);
+    const confirmadoEn = new Date();
+    const transicion = await transicionarAbonoYRecalcularCobro({
+      abonoId,
+      cobroId: paramsParsed.data.id,
+      verificadoEn: confirmadoEn,
+      cambios: { estado: "confirmado", confirmadoEn },
+    });
+    const updated = transicion.abono!;
+    const estadoTrasConfirmar = transicion.estadoCobro;
+    const [cobroActual] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, paramsParsed.data.id));
+    if (cobroActual?.responsableId) {
+      await crearNotificacion(estadoTrasConfirmar === "pagado"
+        ? {
+            eventKey: `cobro:${cobroActual.id}:pagado`,
+            userId: cobroActual.responsableId,
+            cobroId: cobroActual.id,
+            tipo: "pago",
+            titulo: `💰 ${cobroActual.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobroActual.monto) - Number(cobroActual.montoDescuento ?? 0)))}`,
+          }
+        : {
+            eventKey: `abono:${updated.id}:confirmado`,
+            userId: cobroActual.responsableId,
+            cobroId: cobroActual.id,
+            tipo: "abono",
+            titulo: `💛 ${cobroActual.clienteNombre || "Cliente"} realizó un abono de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(updated.monto)))}`,
+          });
+    }
     if (estadoTrasConfirmar === "pagado") {
       void emitirComprobante(paramsParsed.data.id, { metodo: "manual" }, req.log);
     }
@@ -2104,6 +2136,16 @@ cobrosRouter.post("/cobros/:id/comprobantes-transferencia/:comprobanteId/confirm
     }
 
     // Solo tras el commit: efectos secundarios (email de comprobante, encuesta).
+    const [cobroPagado] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, paramsParsed.data.id));
+    if (cobroPagado?.responsableId) {
+      await crearNotificacion({
+        eventKey: `cobro:${cobroPagado.id}:pagado`,
+        userId: cobroPagado.responsableId,
+        cobroId: cobroPagado.id,
+        tipo: "pago",
+        titulo: `💰 ${cobroPagado.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobroPagado.monto) - Number(cobroPagado.montoDescuento ?? 0)))}`,
+      });
+    }
     void emitirComprobante(paramsParsed.data.id, { metodo: "manual" }, req.log);
 
     req.log.info(

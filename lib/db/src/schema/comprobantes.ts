@@ -18,6 +18,8 @@ export const comprobantesTable = pgTable("comprobantes", {
   emailDestino: text("email_destino"),
   // Final success flag: true ONLY after the email was actually sent.
   emailEnviado: boolean("email_enviado").notNull().default(false),
+  // Durable delivery time used by notification reconciliation and ordering.
+  emailEnviadoEn: timestamp("email_enviado_en"),
   // Atomic send-claim timestamp. Set when a caller claims the send; cleared on
   // transient failure. A stale value (older than the TTL) is treated as an
   // orphaned/crashed attempt and may be reclaimed by a later trigger.
@@ -28,6 +30,7 @@ export const comprobantesTable = pgTable("comprobantes", {
 export const insertComprobanteSchema = createInsertSchema(comprobantesTable).omit({
   id: true,
   creadoEn: true,
+  emailEnviadoEn: true,
 });
 
 export type InsertComprobante = z.infer<typeof insertComprobanteSchema>;

@@ -28,6 +28,7 @@ import {
   backfillUserOrgRecords,
   getOrgContext,
 } from "../lib/org";
+import { notificarInvitacionAceptada } from "../lib/notificaciones-service";
 import { logger } from "../lib/logger";
 import {
   clearSession,
@@ -140,6 +141,12 @@ async function assignOrganization(user: {
         // createSoloOrganization is called OUTSIDE the transaction because it
         // uses `db` directly and must not nest inside the tx.
         let needsSoloOrg = false;
+        let acceptedInvite: {
+          id: number;
+          invitadoPorId: string | null;
+          organizationId: number;
+          aceptadaEn: Date;
+        } | null = null;
         await db.transaction(async (tx) => {
           const [lockedInv] = await tx
             .select()
@@ -186,13 +193,36 @@ async function assignOrganization(user: {
               activo: true,
             })
             .where(eq(usersTable.id, user.id));
+          const aceptadaEn = new Date();
           await tx
             .update(invitacionesTable)
-            .set({ estado: "aceptada", aceptadaEn: new Date() })
+            .set({ estado: "aceptada", aceptadaEn })
             .where(eq(invitacionesTable.id, lockedInv.id));
+          acceptedInvite = {
+            id: lockedInv.id,
+            invitadoPorId: lockedInv.invitadoPorId,
+            organizationId: lockedInv.organizationId,
+            aceptadaEn,
+          };
         });
+        const accepted = acceptedInvite as {
+          id: number;
+          invitadoPorId: string | null;
+          organizationId: number;
+          aceptadaEn: Date;
+        } | null;
         if (needsSoloOrg) {
           await createSoloOrganization(user);
+        } else if (accepted) {
+          await notificarInvitacionAceptada({
+            invitacionId: accepted.id,
+            invitadoPorId: accepted.invitadoPorId,
+            organizationId: accepted.organizationId,
+            aceptadaEn: accepted.aceptadaEn,
+            nombreAceptante: [user.firstName, user.lastName].filter(Boolean).join(" ")
+              || user.email
+              || "Un integrante",
+          });
         }
         return;
       }

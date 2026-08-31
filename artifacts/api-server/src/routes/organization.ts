@@ -17,6 +17,7 @@ import { getOrgContext, computePricing } from "../lib/org";
 import { normalizarPacks } from "../lib/plans";
 import { sendInvitacionEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
+import { notificarInvitacionAceptada } from "../lib/notificaciones-service";
 
 const organizationRouter = Router();
 
@@ -904,7 +905,13 @@ organizationRouter.post("/invitaciones/:token/aceptar", async (req, res) => {
   const userId = req.user.id;
   try {
     type Resultado =
-      | { ok: true }
+      | {
+          ok: true;
+          invitacionId: number;
+          invitadoPorId: string | null;
+          organizationId: number;
+          aceptadaEn: Date;
+        }
       | { fail: { status: number; error: string; code?: string } };
     const resultado = await db.transaction(async (tx): Promise<Resultado> => {
       // Lock the invitation row: prevents double-accept races.
@@ -945,11 +952,18 @@ organizationRouter.post("/invitaciones/:token/aceptar", async (req, res) => {
       }
       // Already a member of the inviting org: mark accepted, nothing to move.
       if (me.organizationId === inv.organizationId) {
+        const aceptadaEn = new Date();
         await tx
           .update(invitacionesTable)
-          .set({ estado: "aceptada", aceptadaEn: new Date() })
+          .set({ estado: "aceptada", aceptadaEn })
           .where(eq(invitacionesTable.id, inv.id));
-        return { ok: true };
+        return {
+          ok: true,
+          invitacionId: inv.id,
+          invitadoPorId: inv.invitadoPorId,
+          organizationId: inv.organizationId,
+          aceptadaEn,
+        };
       }
       // Only users alone in their own solo org (or without org) can move.
       if (
@@ -1002,11 +1016,18 @@ organizationRouter.post("/invitaciones/:token/aceptar", async (req, res) => {
           updatedAt: new Date(),
         })
         .where(eq(usersTable.id, userId));
+      const aceptadaEn = new Date();
       await tx
         .update(invitacionesTable)
-        .set({ estado: "aceptada", aceptadaEn: new Date() })
+        .set({ estado: "aceptada", aceptadaEn })
         .where(eq(invitacionesTable.id, inv.id));
-      return { ok: true };
+      return {
+        ok: true,
+        invitacionId: inv.id,
+        invitadoPorId: inv.invitadoPorId,
+        organizationId: inv.organizationId,
+        aceptadaEn,
+      };
     });
 
     if ("fail" in resultado) {
@@ -1014,6 +1035,15 @@ organizationRouter.post("/invitaciones/:token/aceptar", async (req, res) => {
       res.status(status).json(code ? { error, code } : { error });
       return;
     }
+    await notificarInvitacionAceptada({
+      invitacionId: resultado.invitacionId,
+      invitadoPorId: resultado.invitadoPorId,
+      organizationId: resultado.organizationId,
+      aceptadaEn: resultado.aceptadaEn,
+      nombreAceptante: [req.user!.firstName, req.user!.lastName].filter(Boolean).join(" ")
+        || req.user!.email
+        || "Un integrante",
+    });
     req.log.info({ userId }, "Invitación aceptada");
     res.json({ ok: true, mensaje: "Te uniste a la organización." });
   } catch (err) {

@@ -2135,6 +2135,14 @@ export const MarcarNotificacionLeidaResponse = zod.object({
 
 
 /**
+ * @summary Mark all current-user notifications as read
+ */
+export const MarcarTodasNotificacionesLeidasResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary Submit a contact/demo request from the public landing page
  */
 export const crearLeadPublicoBodyNombreMax = 200;

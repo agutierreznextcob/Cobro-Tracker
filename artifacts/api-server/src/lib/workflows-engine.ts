@@ -3,7 +3,6 @@ import {
   cobrosTable,
   clientesTable,
   usersTable,
-  notificacionesTable,
   tareasTable,
   cobroDescuentosTable,
   workflowsTable,
@@ -22,6 +21,7 @@ import { emitirComprobante } from "./comprobante-service";
 import { crearYEnviarEncuesta } from "./encuestas-service";
 import { userTieneFeature, getPlanEfectivoDeOrg } from "../middlewares/requirePlanFeature";
 import { planIncluye } from "./plans";
+import { crearNotificacion } from "./notificaciones-service";
 
 interface RunLogger {
   info: (obj: object, msg: string) => void;
@@ -215,6 +215,30 @@ interface StepOutcome {
   pagado?: boolean; // signals the cobro reached "pagado" — stop further steps
 }
 
+interface PersistedWorkflowNotification {
+  eventKey: string;
+  userId: string;
+  cobroId: number;
+  tipo: string;
+  titulo: string;
+  mensaje?: string | null;
+  waUrl?: string | null;
+}
+
+function persistedNotifications(resultado: unknown): PersistedWorkflowNotification[] {
+  if (!resultado || typeof resultado !== "object") return [];
+  const rows = (resultado as { notificaciones?: unknown }).notificaciones;
+  if (!Array.isArray(rows)) return [];
+  return rows.filter((row): row is PersistedWorkflowNotification =>
+    row != null &&
+    typeof row === "object" &&
+    typeof (row as PersistedWorkflowNotification).eventKey === "string" &&
+    typeof (row as PersistedWorkflowNotification).userId === "string" &&
+    typeof (row as PersistedWorkflowNotification).cobroId === "number" &&
+    typeof (row as PersistedWorkflowNotification).tipo === "string" &&
+    typeof (row as PersistedWorkflowNotification).titulo === "string");
+}
+
 // Executes a single workflow step's action against a cobro. Never throws.
 async function ejecutarAccion(
   cobro: Cobro,
@@ -312,15 +336,21 @@ async function ejecutarAccion(
         // Fallback: notificación in-app "listo para enviar".
         const base = telefono ? `https://wa.me/${sanitizePhone(telefono)}` : `https://wa.me/`;
         const waUrl = `${base}?text=${encodeURIComponent(mensaje)}`;
-        await db.insert(notificacionesTable).values({
-          userId: cobro.responsableId,
-          cobroId: cobro.id,
-          tipo: "whatsapp",
-          titulo: `WhatsApp listo para enviar a ${nombre}`,
-          mensaje,
-          waUrl,
-        });
-        return { ok: true, detalle: "WhatsApp en notificación in-app (listo para enviar)." };
+        return {
+          ok: true,
+          detalle: "WhatsApp en notificación in-app (listo para enviar).",
+          resultado: {
+            notificaciones: [{
+              eventKey: `workflow:whatsapp:${cobro.id}:${step.id}`,
+              userId: cobro.responsableId,
+              cobroId: cobro.id,
+              tipo: "whatsapp",
+              titulo: `WhatsApp listo para enviar a ${nombre}`,
+              mensaje,
+              waUrl,
+            }],
+          },
+        };
       }
 
       case "crear_tarea": {
@@ -370,16 +400,18 @@ async function ejecutarAccion(
           currency: "CLP",
           maximumFractionDigits: 0,
         }).format(Math.round(montoACobrar(cobro)));
-        await db.insert(notificacionesTable).values(
-          destinatarios.map((userId) => ({
-            userId,
+        const notificaciones: PersistedWorkflowNotification[] = destinatarios.map((userId) => ({
+            eventKey: `workflow:admin:${cobro.id}:${step.id}:${userId}`, userId,
             cobroId: cobro.id,
-            tipo: "workflow" as const,
+            tipo: "workflow",
             titulo: `Cobro requiere atención: ${cobro.clienteNombre || cobro.descripcion}`,
             mensaje: `El workflow de cobranza escaló este cobro de ${monto}.`,
-          })),
-        );
-        return { ok: true, detalle: `Administrador(es) notificado(s): ${destinatarios.length}.` };
+          }));
+        return {
+          ok: true,
+          detalle: `Administrador(es) notificado(s): ${destinatarios.length}.`,
+          resultado: { notificaciones },
+        };
       }
 
       case "aplicar_descuento": {
@@ -603,7 +635,7 @@ export async function procesarWorkflows(log: RunLogger): Promise<WorkflowsRunRes
         // Row exists. Reclaim only if it was left "fallido" (retry); otherwise skip.
         const reclaimed = await db
           .update(workflowEjecucionesTable)
-          .set({ estado: "pendiente", fecha: hoy })
+          .set({ estado: "pendiente", fecha: hoy, actualizadoEn: new Date() })
           .where(
             and(
               eq(workflowEjecucionesTable.cobroId, cobro.id),
@@ -617,17 +649,41 @@ export async function procesarWorkflows(log: RunLogger): Promise<WorkflowsRunRes
       }
 
       const outcome = await ejecutarAccion(cobro, step, log);
+      const ejecutadoEn = new Date();
+      const notificaciones = persistedNotifications(outcome.resultado);
+      if (outcome.ok && cobro.responsableId) {
+        notificaciones.push({
+          eventKey: `workflow:${ejecucionId}:exitoso`,
+          userId: cobro.responsableId,
+          cobroId: cobro.id,
+          tipo: "workflow",
+          titulo: `⚡ Workflow ejecutó acción para ${cobro.clienteNombre || "Cliente"}`,
+          mensaje: `El workflow ejecutó: ${outcome.detalle}`,
+        });
+      }
+      const resultadoPersistido = outcome.resultado && typeof outcome.resultado === "object"
+        ? { ...outcome.resultado, notificaciones }
+        : notificaciones.length > 0
+          ? { notificaciones }
+          : outcome.resultado ?? null;
       await db
         .update(workflowEjecucionesTable)
         .set({
           estado: outcome.ok ? "enviado" : "fallido",
           detalle: outcome.detalle,
-          resultado: outcome.resultado ?? null,
+          resultado: resultadoPersistido,
+          actualizadoEn: ejecutadoEn,
         })
         .where(eq(workflowEjecucionesTable.id, ejecucionId));
 
       if (outcome.ok) pasosEjecutados++;
       else errores++;
+      for (const notification of notificaciones) {
+        await crearNotificacion({
+          ...notification,
+          creadoEn: ejecutadoEn,
+        });
+      }
 
       // If the cobro just became paid, stop running further steps for it.
       if (outcome.pagado) break;

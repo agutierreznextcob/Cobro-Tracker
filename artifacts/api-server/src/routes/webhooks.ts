@@ -17,6 +17,8 @@ import {
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { emitirComprobante } from "../lib/comprobante-service";
 import { reveniuWebhookSecret, reveniuConfigured, getReveniuSubscription } from "../lib/reveniu";
+import { crearNotificacion } from "../lib/notificaciones-service";
+import { transicionarAbonoYRecalcularCobro } from "../lib/abonos-state";
 
 // Comparación en tiempo constante entre strings de largo posiblemente distinto.
 function safeEquals(a: string, b: string): boolean {
@@ -87,6 +89,7 @@ async function aplicarEstadoCobro(
     .set({
       estado: nuevoEstado,
       actualizadoEn: new Date(),
+      pagadoOrigen: nuevoEstado === "pagado" ? "pago_completo" : null,
       // Track the payment confirmation timestamp for accurate revenue reporting.
       pagadoEn:
         nuevoEstado === "pagado"
@@ -100,50 +103,6 @@ async function aplicarEstadoCobro(
     .returning({ id: cobrosTable.id });
 
   return filas.length > 0;
-}
-
-/**
- * Recalcula el estado de un cobro a partir de sus abonos confirmados, usando el
- * monto neto (monto - descuento) y manteniendo pagadoEn consistente:
- * se fija al primer paso a "pagado" y se conserva si ya existía.
- * Compartido por los webhooks de Flow y MercadoPago para abonos.
- */
-async function recalcularCobroDesdeAbonos(
-  cobroId: number,
-): Promise<"pagado" | "parcial" | "pendiente"> {
-  const [sumResult] = await db
-    .select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
-    .from(pagosParciales)
-    .where(and(eq(pagosParciales.cobroId, cobroId), eq(pagosParciales.estado, "confirmado")));
-  const [cobro] = await db
-    .select({ monto: cobrosTable.monto, montoDescuento: cobrosTable.montoDescuento })
-    .from(cobrosTable)
-    .where(eq(cobrosTable.id, cobroId));
-  const totalPagado = sumResult?.total ?? 0;
-  const montoTotal = Math.max(
-    Number(cobro?.monto ?? 0) - Number(cobro?.montoDescuento ?? 0),
-    0,
-  );
-  const nuevoEstado: "pagado" | "parcial" | "pendiente" =
-    totalPagado >= montoTotal && montoTotal > 0
-      ? "pagado"
-      : totalPagado > 0
-        ? "parcial"
-        : "pendiente";
-  await db
-    .update(cobrosTable)
-    .set({
-      estado: nuevoEstado,
-      actualizadoEn: new Date(),
-      pagadoEn:
-        nuevoEstado === "pagado"
-          ? sql`coalesce(${cobrosTable.pagadoEn}, now())`
-          : nuevoEstado === "parcial"
-            ? sql`${cobrosTable.pagadoEn}`
-            : null,
-    })
-    .where(eq(cobrosTable.id, cobroId));
-  return nuevoEstado;
 }
 
 function verifySignature(rawBody: Buffer, signatureHeader: string, secret: string): boolean {
@@ -222,16 +181,61 @@ webhooksRouter.post("/webhooks/flow", async (req, res) => {
       const creds = await getFlowCredentials(cobroParcial.responsableId);
       if (!creds) { res.status(200).json({ ok: false }); return; }
       const pagoStatus = await verificarPagoFlow(creds.apiKey, creds.secretKey, token);
+      const verificadoEn = new Date();
       req.log.info({ abonoId: abono.id, cobroId: abono.cobroId, flowStatus: pagoStatus.status }, "Flow abono payment verified");
       if (pagoStatus.status === 2) {
-        await db.update(pagosParciales).set({ estado: "confirmado", confirmadoEn: new Date() }).where(eq(pagosParciales.id, abono.id));
-        // Recalculate cobro estado from confirmed abonos (net of discounts, keeps pagadoEn consistent)
-        const nuevoEstadoCobro = await recalcularCobroDesdeAbonos(abono.cobroId);
+        const transicion = await transicionarAbonoYRecalcularCobro({
+          abonoId: abono.id,
+          cobroId: abono.cobroId,
+          verificadoEn,
+          cambios: { estado: "confirmado", confirmadoEn: verificadoEn },
+        });
+        if (!transicion.aplicado) {
+          await logEvento({ evento: "flow.abono.ignorado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id}: observación antigua ignorada` });
+          res.status(200).json({ ok: true });
+          return;
+        }
+        const nuevoEstadoCobro = transicion.estadoCobro;
+        if (!nuevoEstadoCobro) throw new Error(`Cobro ${abono.cobroId} no encontrado`);
+        await crearNotificacion(nuevoEstadoCobro === "pagado"
+          ? {
+              eventKey: `cobro:${cobroParcial.id}:pagado`,
+              userId: cobroParcial.responsableId,
+              cobroId: cobroParcial.id,
+              tipo: "pago",
+              titulo: `💰 ${cobroParcial.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobroParcial.monto) - Number(cobroParcial.montoDescuento ?? 0)))}`,
+            }
+          : {
+              eventKey: `abono:${abono.id}:confirmado`,
+              userId: cobroParcial.responsableId,
+              cobroId: abono.cobroId,
+              tipo: "abono",
+              titulo: `💛 ${cobroParcial.clienteNombre || "Cliente"} realizó un abono de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(abono.monto)))}`,
+            });
         await logEvento({ evento: "flow.abono.confirmado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id} confirmado, cobro ahora ${nuevoEstadoCobro}` });
         emitirComprobanteSiPagado(nuevoEstadoCobro, abono.cobroId, "flow", token.trim(), req.log);
       } else if (pagoStatus.status === 3 || pagoStatus.status === 4) {
-        await db.update(pagosParciales).set({ estado: "fallido" }).where(eq(pagosParciales.id, abono.id));
-        await logEvento({ evento: "flow.abono.fallido", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id} fallido (status ${pagoStatus.status})` });
+        const transicion = await transicionarAbonoYRecalcularCobro({
+          abonoId: abono.id,
+          cobroId: abono.cobroId,
+          verificadoEn,
+          cambios: { estado: "fallido" },
+        });
+        if (!transicion.aplicado) {
+          await logEvento({ evento: "flow.abono.ignorado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id}: observación antigua ignorada` });
+          res.status(200).json({ ok: true });
+          return;
+        }
+        const nuevoEstadoCobro = transicion.estadoCobro;
+        if (!nuevoEstadoCobro) throw new Error(`Cobro ${abono.cobroId} no encontrado`);
+        await crearNotificacion({
+          eventKey: `abono:${abono.id}:fallido`,
+          userId: cobroParcial.responsableId,
+          cobroId: abono.cobroId,
+          tipo: "pago_fallido",
+          titulo: `❌ Pago fallido de ${cobroParcial.clienteNombre || "Cliente"} por ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(abono.monto)))}`,
+        });
+        await logEvento({ evento: "flow.abono.fallido", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abono.id} fallido (status ${pagoStatus.status}), cobro ahora ${nuevoEstadoCobro}` });
       }
       res.status(200).json({ ok: true });
       return;
@@ -322,6 +326,15 @@ webhooksRouter.post("/webhooks/flow", async (req, res) => {
     });
 
     req.log.info({ cobroId: cobro.id, nuevoEstado }, "Cobro updated via Flow webhook (verified)");
+    if (cobro.responsableId && (nuevoEstado === "pagado" || nuevoEstado === "fallido")) {
+      await crearNotificacion({
+        eventKey: `cobro:${cobro.id}:${nuevoEstado}`, userId: cobro.responsableId, cobroId: cobro.id,
+        tipo: nuevoEstado === "pagado" ? "pago" : "pago_fallido",
+        titulo: nuevoEstado === "pagado"
+          ? `💰 ${cobro.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}`
+          : `❌ Pago fallido de ${cobro.clienteNombre || "Cliente"} por ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}`,
+      });
+    }
     emitirComprobanteSiPagado(nuevoEstado, cobro.id, "flow", pagoStatus.flowOrder != null ? String(pagoStatus.flowOrder) : token.trim(), req.log);
     res.status(200).json({ ok: true });
   } catch (err) {
@@ -444,7 +457,7 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
         return;
       }
       const [cobroPadre] = await db
-        .select({ responsableId: cobrosTable.responsableId })
+        .select()
         .from(cobrosTable)
         .where(eq(cobrosTable.id, abono.cobroId));
       const pagoVerificado = await verificarConTokenPropietario(cobroPadre?.responsableId ?? null);
@@ -454,14 +467,62 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
         return;
       }
       payment = pagoVerificado;
+      const verificadoEn = new Date();
       if (payment.status === "approved") {
-        await db.update(pagosParciales).set({ estado: "confirmado", mpPaymentId: String(paymentId), confirmadoEn: new Date() }).where(eq(pagosParciales.id, abonoId));
-        const nuevoEstadoCobro = await recalcularCobroDesdeAbonos(abono.cobroId);
+        const transicion = await transicionarAbonoYRecalcularCobro({
+          abonoId,
+          cobroId: abono.cobroId,
+          verificadoEn,
+          cambios: { estado: "confirmado", mpPaymentId: String(paymentId), confirmadoEn: verificadoEn },
+        });
+        if (!transicion.aplicado) {
+          await logEvento({ evento: "mp.abono.ignorado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId}: observación antigua ignorada` });
+          res.status(200).json({ ok: true });
+          return;
+        }
+        const nuevoEstadoCobro = transicion.estadoCobro;
+        if (!nuevoEstadoCobro) throw new Error(`Cobro ${abono.cobroId} no encontrado`);
+        if (cobroPadre?.responsableId) {
+          await crearNotificacion(nuevoEstadoCobro === "pagado"
+            ? {
+                eventKey: `cobro:${cobroPadre.id}:pagado`,
+                userId: cobroPadre.responsableId,
+                cobroId: cobroPadre.id,
+                tipo: "pago",
+                titulo: `💰 ${cobroPadre.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobroPadre.monto) - Number(cobroPadre.montoDescuento ?? 0)))}`,
+              }
+            : {
+                eventKey: `abono:${abono.id}:confirmado`,
+                userId: cobroPadre.responsableId,
+                cobroId: abono.cobroId,
+                tipo: "abono",
+                titulo: `💛 ${cobroPadre.clienteNombre || "Cliente"} realizó un abono de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(abono.monto)))}`,
+              });
+        }
         await logEvento({ evento: "mp.abono.confirmado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId} confirmado, cobro ahora ${nuevoEstadoCobro}` });
         emitirComprobanteSiPagado(nuevoEstadoCobro, abono.cobroId, "mp", String(paymentId), req.log);
       } else if (["rejected", "cancelled", "refunded"].includes(payment.status)) {
-        await db.update(pagosParciales).set({ estado: "fallido", mpPaymentId: String(paymentId) }).where(eq(pagosParciales.id, abonoId));
-        await logEvento({ evento: "mp.abono.fallido", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId} fallido (${payment.status})` });
+        const transicion = await transicionarAbonoYRecalcularCobro({
+          abonoId,
+          cobroId: abono.cobroId,
+          verificadoEn,
+          cambios: { estado: "fallido", mpPaymentId: String(paymentId) },
+        });
+        if (!transicion.aplicado) {
+          await logEvento({ evento: "mp.abono.ignorado", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId}: observación antigua ignorada` });
+          res.status(200).json({ ok: true });
+          return;
+        }
+        const nuevoEstadoCobro = transicion.estadoCobro;
+        if (!nuevoEstadoCobro) throw new Error(`Cobro ${abono.cobroId} no encontrado`);
+        if (cobroPadre?.responsableId) await crearNotificacion({
+          eventKey: `abono:${abono.id}:fallido`,
+          userId: cobroPadre.responsableId,
+          cobroId: abono.cobroId,
+          tipo: "pago_fallido",
+          titulo: `❌ Pago fallido de ${cobroPadre.clienteNombre || "Cliente"} por ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(abono.monto)))}`,
+        });
+        await logEvento({ evento: "mp.abono.fallido", cobroId: abono.cobroId, ipOrigen: ip, exitoso: true, detalle: `Abono #${abonoId} fallido (${payment.status}), cobro ahora ${nuevoEstadoCobro}` });
       }
       res.status(200).json({ ok: true });
       return;
@@ -528,6 +589,15 @@ webhooksRouter.post("/webhooks/mercadopago", async (req, res) => {
     });
 
     req.log.info({ cobroId: cobro.id, nuevoEstado, paymentId }, "Cobro updated via MercadoPago webhook");
+    if (cobro.responsableId && (nuevoEstado === "pagado" || nuevoEstado === "fallido")) {
+      await crearNotificacion({
+        eventKey: `cobro:${cobro.id}:${nuevoEstado}`, userId: cobro.responsableId, cobroId: cobro.id,
+        tipo: nuevoEstado === "pagado" ? "pago" : "pago_fallido",
+        titulo: nuevoEstado === "pagado"
+          ? `💰 ${cobro.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}`
+          : `❌ Pago fallido de ${cobro.clienteNombre || "Cliente"} por ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}`,
+      });
+    }
     emitirComprobanteSiPagado(nuevoEstado, cobro.id, "mp", String(paymentId), req.log);
     res.status(200).json({ ok: true });
   } catch (err) {

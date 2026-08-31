@@ -6,10 +6,10 @@ import {
   organizacionesTable,
   pagosParciales,
   comprobantesTransferenciaTable,
-  notificacionesTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import { crearNotificacion } from "../lib/notificaciones-service";
 
 const portalRouter: IRouter = Router();
 
@@ -240,16 +240,21 @@ portalRouter.post("/public/portal/:token/comprobante", async (req, res) => {
         nombreArchivo: parsed.data.nombreArchivo ?? null,
         comentario: parsed.data.comentario ?? null,
       })
-      .returning({ id: comprobantesTransferenciaTable.id });
+      .returning({
+        id: comprobantesTransferenciaTable.id,
+        creadoEn: comprobantesTransferenciaTable.creadoEn,
+      });
 
     // Notificar al ejecutivo responsable del cobro.
     if (cobro.responsableId) {
-      await db.insert(notificacionesTable).values({
+      await crearNotificacion({
+        eventKey: `transferencia:${comprobante.id}:recibida`,
         userId: cobro.responsableId,
         cobroId: cobro.id,
         tipo: "comprobante",
         titulo: `El cliente ${cliente.nombre} envió un comprobante para el cobro "${cobro.descripcion}"`,
         mensaje: "Revisa el comprobante de transferencia y confirma el pago.",
+        creadoEn: comprobante.creadoEn,
       });
     }
 

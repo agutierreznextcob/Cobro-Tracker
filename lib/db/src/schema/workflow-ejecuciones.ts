@@ -22,6 +22,7 @@ export const workflowEjecucionesTable = pgTable(
     resultado: jsonb("resultado"),
     fecha: date("fecha", { mode: "string" }).notNull(),
     creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
+    actualizadoEn: timestamp("actualizado_en", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex("ux_workflow_ejecuciones_step").on(table.cobroId, table.stepId)],
 );

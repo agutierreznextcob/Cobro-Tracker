@@ -16,4 +16,5 @@ Payment webhooks (Flow, MercadoPago, generic `/webhooks/cobro`) must never let t
 **How to apply:**
 - Precedence MUST be atomic in SQL, not select-then-check-then-update (that has a TOCTOU race under concurrent webhooks). For non-money proposed states, add `WHERE estado NOT IN ('pagado','parcial')`; for money states / refunds, update unconditionally. Use the returned affected-row count to detect "ignored by precedence".
 - Manual estado edits (`PATCH /cobros/:id`) intentionally do NOT clear `flowToken` / `mpPreferenceId`, so the webhook can still locate and correct the cobro after a manual change. Keep it that way.
-- Abono (partial-payment) recalculation paths derive estado from the confirmed-abonos sum (authoritative money state) and are left unguarded on purpose.
+- All abono transitions and parent recalculations must share one per-cobro transaction lock. Compare durable provider-verification timestamps under that lock so an older observation cannot overwrite a newer one.
+- Track whether `pagado` came from abonos or a full/direct payment. Abono reversals may downgrade only abono-origin paid states; preserve direct and legacy paid states unless their own authoritative source reverses them.

@@ -60,6 +60,10 @@ export const cobrosTable = pgTable("cobros", {
   // When the cobro was confirmed as fully paid (webhook, recalc or manual).
   // Used for accurate revenue-by-period reporting; null until paid.
   pagadoEn: timestamp("pagado_en", { withTimezone: true }),
+  // Durable provenance prevents an abono recalculation from downgrading a
+  // payment confirmed through another source. Null legacy paid rows are
+  // treated conservatively as non-abono payments.
+  pagadoOrigen: text("pagado_origen").$type<"abonos" | "pago_completo">(),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),
 });

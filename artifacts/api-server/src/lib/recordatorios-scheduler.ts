@@ -8,6 +8,7 @@ import {
   procesarGraciaPagosFallidos,
 } from "./reveniu";
 import { generarSnapshotsSaludCartera, verificarSaludSweep } from "./salud-cartera";
+import { procesarAvisosTrial, procesarVencimientosNotificaciones } from "./notificaciones-service";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 // Surveys are scheduled ~1h after payment; sweep often so delivery stays close
@@ -38,6 +39,8 @@ async function tick(): Promise<void> {
   if (lastProcessedDate === hoy) return;
   try {
     await procesarRecordatorios(runLogger, hoy);
+    await procesarVencimientosNotificaciones(hoy);
+    await procesarAvisosTrial();
     // Workflows de cobranza corren DESPUÉS de los recordatorios simples. Ambos
     // engines coexisten: procesarRecordatorios ignora cobros con workflowId y
     // procesarWorkflows sólo actúa sobre cobros con workflowId asignado.

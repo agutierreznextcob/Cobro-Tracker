@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { db, notificacionesTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
+import {
+  marcarTodasNotificacionesLeidas,
+  programarBackfillNotificacionesUsuario,
+} from "../lib/notificaciones-service";
 
 const notificacionesRouter = Router();
 
@@ -29,16 +33,30 @@ notificacionesRouter.get("/notificaciones", async (req, res) => {
   const soloNoLeidas = req.query.soloNoLeidas === "true";
   const userId = req.user!.id;
   try {
+    void programarBackfillNotificacionesUsuario(userId).catch((err) => {
+      req.log.error({ err, userId }, "Error backfilling notifications");
+    });
     const conditions = [eq(notificacionesTable.userId, userId)];
     if (soloNoLeidas) conditions.push(eq(notificacionesTable.leida, false));
     const rows = await db
       .select()
       .from(notificacionesTable)
       .where(and(...conditions))
-      .orderBy(desc(notificacionesTable.creadoEn));
+      .orderBy(desc(notificacionesTable.creadoEn), desc(notificacionesTable.id))
+      .limit(100);
     res.json(rows.map(mapNotificacion));
   } catch (err) {
     req.log.error({ err }, "Error listing notifications");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+notificacionesRouter.post("/notificaciones/marcar-todas-leidas", async (req, res) => {
+  try {
+    await marcarTodasNotificacionesLeidas(req.user!.id);
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Error marking all notifications read");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

@@ -2,6 +2,7 @@
 - [Frontend auth gating](auth-gating.md) — useAuth is mount-time fetch (not shared/TanStack); use ONE useAuth per guard chain or protected content leaks; reload (not query invalidation) to refresh after mutating user state.
 - [Informes reporting page](informes-reporting.md) — Cobros>Informes reuses useListCobros + aggregates client-side (no report endpoint); method pie precedence Flow>MP>Manual; route must precede /cobros/:id.
 - [Webhook estado precedence](webhook-estado-precedencia.md) — payment webhooks: money state (pagado/parcial) always wins over manual/stale; protect against downgrade atomically in SQL (except MP refund).
+- [Notification durability](notification-durability.md) — reconcile incrementally from scan-start watermarks; serialize per-inbox writes and persist a read cursor for cross-process mark-all races.
 - [Cobro & cliente authz model](cobro-ownership-gap.md) — org-aware per-record access: admin_org=whole org, ejecutivo=own; guard every :id route (404 not 403) + aggregate/POST paths via lib/org.ts helpers.
 - [Cobro descuentos](cobro-descuentos.md) — monto=charged total (incl IVA when incluyeIva); montoDescuento=absolute; montoACobrar=monto-montoDescuento; discounts replace field + insert history; links/reports use montoACobrar.
 - [Cobro IVA (19%)](cobro-iva.md) — optional Chilean VAT + tipoDocumento (DTE) gating: only *_afecta carry IVA; tipoDocumentoPermiteIva dup'd server+client; PATCH to non-afecta normalizes IVA off.

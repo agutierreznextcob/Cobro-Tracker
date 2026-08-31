@@ -15,8 +15,12 @@ export const recordatoriosEnviadosTable = pgTable(
     canal: text("canal").notNull().$type<"email" | "whatsapp">(),
     estado: text("estado").notNull().$type<"enviado" | "fallido" | "pendiente">(),
     detalle: text("detalle"),
+    fallbackListoEn: timestamp("fallback_listo_en", { withTimezone: true }),
+    fallbackWaUrl: text("fallback_wa_url"),
+    fallbackMensaje: text("fallback_mensaje"),
     fecha: date("fecha", { mode: "string" }).notNull(),
     creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
+    actualizadoEn: timestamp("actualizado_en", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("ux_recordatorios_enviados_dia").on(

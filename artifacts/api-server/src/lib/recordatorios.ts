@@ -5,7 +5,6 @@ import {
   recordatoriosTable,
   recordatoriosDefaultTable,
   recordatoriosEnviadosTable,
-  notificacionesTable,
   type RecordatorioDefault,
 } from "@workspace/db";
 import { and, eq, isNotNull, isNull, inArray } from "drizzle-orm";
@@ -20,6 +19,7 @@ import {
 import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "./whatsapp";
 import { userTieneFeature, getPlanEfectivoDeOrg } from "../middlewares/requirePlanFeature";
 import { planIncluye } from "./plans";
+import { crearNotificacion } from "./notificaciones-service";
 
 type Canal = "email" | "whatsapp" | "ambos";
 type Momento = "antes" | "dia" | "despues" | "recurrente";
@@ -184,7 +184,15 @@ async function claimEnvio(
   // A row already exists. Only re-claim if the prior attempt failed.
   const reclaimed = await db
     .update(recordatoriosEnviadosTable)
-    .set({ estado: "pendiente", detalle: null, creadoEn: new Date() })
+    .set({
+      estado: "pendiente",
+      detalle: null,
+      fallbackListoEn: null,
+      fallbackWaUrl: null,
+      fallbackMensaje: null,
+      creadoEn: new Date(),
+      actualizadoEn: new Date(),
+    })
     .where(
       and(
         eq(recordatoriosEnviadosTable.cobroId, cobroId),
@@ -202,11 +210,21 @@ async function marcarEnvio(
   id: number,
   estado: "enviado" | "fallido" | "pendiente",
   detalle: string | null,
-): Promise<void> {
+  fallback?: { listoEn: Date; waUrl: string; mensaje: string },
+): Promise<Date> {
+  const actualizadoEn = new Date();
   await db
     .update(recordatoriosEnviadosTable)
-    .set({ estado, detalle })
+    .set({
+      estado,
+      detalle,
+      actualizadoEn,
+      fallbackListoEn: fallback?.listoEn ?? null,
+      fallbackWaUrl: fallback?.waUrl ?? null,
+      fallbackMensaje: fallback?.mensaje ?? null,
+    })
     .where(eq(recordatoriosEnviadosTable.id, id));
+  return actualizadoEn;
 }
 
 export async function procesarRecordatorios(
@@ -323,7 +341,13 @@ export async function procesarRecordatorios(
           );
           if (result.ok) {
             emailsEnviados++;
-            await marcarEnvio(envioId, "enviado", null);
+            const enviadoEn = await marcarEnvio(envioId, "enviado", null);
+            if (cobro.responsableId) await crearNotificacion({
+              eventKey: `recordatorio:${envioId}:enviado`, userId: cobro.responsableId, cobroId: cobro.id,
+              tipo: "recordatorio", titulo: `📧 Recordatorio enviado a ${cobro.clienteNombre || "Cliente"}`,
+              mensaje: `Se envió un recordatorio por email para "${cobro.descripcion}".`,
+              creadoEn: enviadoEn,
+            });
           } else {
             errores++;
             await marcarEnvio(envioId, "fallido", result.error ?? "Error al enviar email");
@@ -352,13 +376,19 @@ export async function procesarRecordatorios(
             const result = await sendWhatsAppMensaje({ telefono, mensaje }, log);
             if (result.ok) {
               whatsappsEnviados++;
-              await marcarEnvio(
+              const enviadoEn = await marcarEnvio(
                 envioId,
                 "enviado",
                 result.messageId
                   ? `WhatsApp enviado automáticamente (id ${result.messageId}).`
                   : "WhatsApp enviado automáticamente.",
               );
+              await crearNotificacion({
+                eventKey: `recordatorio:${envioId}:enviado`, userId: cobro.responsableId, cobroId: cobro.id,
+                tipo: "recordatorio", titulo: `📧 Recordatorio enviado a ${cobro.clienteNombre || "Cliente"}`,
+                mensaje: `Se envió un recordatorio por WhatsApp para "${cobro.descripcion}".`,
+                creadoEn: enviadoEn,
+              });
             } else {
               errores++;
               await marcarEnvio(envioId, "fallido", result.error ?? "Error al enviar WhatsApp");
@@ -366,16 +396,24 @@ export async function procesarRecordatorios(
           } else {
             // Fallback: notificación in-app con botón "Abrir WhatsApp".
             const waUrl = buildWaUrl(telefono, mensaje);
-            await db.insert(notificacionesTable).values({
+            const listoEn = new Date();
+            await marcarEnvio(
+              envioId,
+              "pendiente",
+              "WhatsApp listo para enviar.",
+              { listoEn, waUrl, mensaje },
+            );
+            const created = await crearNotificacion({
+              eventKey: `recordatorio:${envioId}:listo`,
               userId: cobro.responsableId,
               cobroId: cobro.id,
               tipo: "whatsapp",
               titulo: `WhatsApp listo para enviar a ${cobro.clienteNombre || "cliente"}`,
               mensaje,
               waUrl,
+              creadoEn: listoEn,
             });
-            notificacionesCreadas++;
-            await marcarEnvio(envioId, "pendiente", "WhatsApp listo para enviar.");
+            if (created) notificacionesCreadas++;
           }
         }
       }

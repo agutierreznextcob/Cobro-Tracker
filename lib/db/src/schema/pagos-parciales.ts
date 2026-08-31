@@ -29,6 +29,8 @@ export const pagosParciales = pgTable("pagos_parciales", {
   notas: text("notas"),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   confirmadoEn: timestamp("confirmado_en"),
+  actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),
+  estadoVerificadoEn: timestamp("estado_verificado_en"),
 });
 
 export type PagoParcial = typeof pagosParciales.$inferSelect;

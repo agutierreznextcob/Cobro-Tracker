@@ -7701,6 +7701,76 @@ export const useMarcarNotificacionLeida = <TError = ErrorType<ErrorResponse>,
       return useMutation(getMarcarNotificacionLeidaMutationOptions(options));
     }
 
+export const getMarcarTodasNotificacionesLeidasUrl = () => {
+
+
+
+
+  return `/api/notificaciones/marcar-todas-leidas`
+}
+
+/**
+ * @summary Mark all current-user notifications as read
+ */
+export const marcarTodasNotificacionesLeidas = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getMarcarTodasNotificacionesLeidasUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMarcarTodasNotificacionesLeidasMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof marcarTodasNotificacionesLeidas>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof marcarTodasNotificacionesLeidas>>, TError,void, TContext> => {
+
+const mutationKey = ['marcarTodasNotificacionesLeidas'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof marcarTodasNotificacionesLeidas>>, void> = () => {
+
+
+          return  marcarTodasNotificacionesLeidas(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarcarTodasNotificacionesLeidasMutationResult = NonNullable<Awaited<ReturnType<typeof marcarTodasNotificacionesLeidas>>>
+
+    export type MarcarTodasNotificacionesLeidasMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark all current-user notifications as read
+ */
+export const useMarcarTodasNotificacionesLeidas = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof marcarTodasNotificacionesLeidas>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof marcarTodasNotificacionesLeidas>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getMarcarTodasNotificacionesLeidasMutationOptions(options));
+    }
+
 export const getCrearLeadPublicoUrl = () => {
 
 

@@ -25,25 +25,28 @@ export function useNotificacionesPolling() {
   );
 
   useEffect(() => {
-    if (!data || data.length === 0) return;
-
-    const latestId = data[0].id;
+    if (!data) return;
 
     if (!initializedRef.current) {
-      lastIdRef.current = latestId;
+      lastIdRef.current = data.length > 0 ? data[0].id : null;
       initializedRef.current = true;
       return;
     }
 
-    if (latestId !== lastIdRef.current && latestId > (lastIdRef.current ?? 0)) {
-      const diff = data.filter((n) => n.id > (lastIdRef.current ?? 0)).length;
+    if (data.length === 0) return;
+
+    const latestId = data[0].id;
+    const previousId = lastIdRef.current ?? 0;
+
+    if (latestId !== previousId && latestId > previousId) {
+      const diff = data.filter((n) => n.id > previousId).length;
       lastIdRef.current = latestId;
 
       queryClient.invalidateQueries({ queryKey: getListNotificacionesQueryKey() });
 
       toast({
-        title: diff > 1 ? `${diff} recordatorios nuevos` : data[0].titulo,
-        description: diff > 1 ? "Revisa tus notificaciones de WhatsApp." : data[0].mensaje ?? undefined,
+        title: diff > 1 ? `${diff} notificaciones nuevas` : data[0].titulo,
+        description: diff > 1 ? "Revisa tu centro de actividades." : data[0].mensaje ?? undefined,
         duration: 6000,
       });
     }
