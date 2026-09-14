@@ -79,6 +79,16 @@ export interface Cobro {
      */
   fechaVencimiento?: string | null;
   /**
+     * Opaque internal batch provenance; never customer-facing.
+     * @nullable
+     */
+  loteId?: string | null;
+  /**
+     * Internal recurring schedule that generated this charge.
+     * @nullable
+     */
+  recurrenteProgramacionId?: number | null;
+  /**
      * Flow order ID returned after creating payment
      * @nullable
      */
@@ -98,6 +108,11 @@ export interface Cobro {
      * @nullable
      */
   mpPaymentLinkUrl?: string | null;
+  /**
+     * Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.
+     * @nullable
+     */
+  linkPago?: string | null;
   /**
      * ID of the collections workflow assigned to this cobro (null when using simple reminders)
      * @nullable

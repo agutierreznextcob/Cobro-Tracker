@@ -11,7 +11,9 @@
     "check:auth-guards": "tsx scripts/check-auth-guards.ts",
     "e2e:notificaciones": "tsx scripts/e2e-notificaciones.ts",
     "e2e:team-scope": "tsx scripts/e2e-team-scope.ts",
-    "e2e-sweep-health": "tsx scripts/e2e-sweep-health.ts"
+    "e2e-sweep-health": "tsx scripts/e2e-sweep-health.ts",
+    "test-cobros-avanzados": "tsx scripts/test-cobros-avanzados.ts",
+    "e2e:cobros-avanzados": "tsx scripts/test-cobros-avanzados.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",

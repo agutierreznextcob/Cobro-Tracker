@@ -11,10 +11,13 @@ import {
   pagosParciales,
   recordatoriosTable,
   recordatoriosEnviadosTable,
+  workflowsTable,
   usersTable,
   comprobantesTransferenciaTable,
   gestionesCobranzaTable,
   saludCarteraSnapshotsTable,
+  cobrosRecurrentesTable,
+  cobroEntregasInicialesTable,
 } from "@workspace/db";
 import type { Cobro, CobroDescuento, CobroAjuste } from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
@@ -35,18 +38,22 @@ import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
 import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
 import { requireSubscription } from "../middlewares/requireSubscription";
-import { aplicarDefaultsACobro } from "../lib/recordatorios";
+import { aplicarDefaultsACobro, fechaHoySantiago, ensureUserDefaults } from "../lib/recordatorios";
 import { emitirComprobante } from "../lib/comprobante-service";
 import { getOrgContext, cobroScopeCondition, clienteScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
-import { getDatosBancariosUsuario, buildDatosBancariosHtml } from "../lib/datos-bancarios";
+import { getDatosBancariosUsuario, buildDatosBancariosHtml, buildDatosBancariosTextoWa } from "../lib/datos-bancarios";
 import { computeClienteScores } from "../lib/scoring";
-import { userTieneFeature } from "../middlewares/requirePlanFeature";
+import { userTieneFeature, requirePlanFeature } from "../middlewares/requirePlanFeature";
 import { buscarSnapshotPrevio, calcularBloquesUsuario, hoySantiagoStr, sumarDias as sumarDiasSantiago } from "../lib/salud-cartera";
 import { crearNotificacion } from "../lib/notificaciones-service";
 import {
   recalcularCobroDesdeAbonosSeguro,
   transicionarAbonoYRecalcularCobro,
 } from "../lib/abonos-state";
+import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "../lib/whatsapp";
+import { fechaCicloAnclada } from "../lib/cobros-recurrentes";
+import { asegurarLinkPagoCobro, portalUrlExistenteParaCobro } from "../lib/cobro-payment-link";
+import { createHash } from "crypto";
 
 const cobrosRouter = Router();
 
@@ -110,7 +117,22 @@ function serializeCobro(cobro: Cobro, abonado?: number) {
     pagadoEn: cobro.pagadoEn ? cobro.pagadoEn.toISOString() : null,
     creadoEn: cobro.creadoEn.toISOString(),
     actualizadoEn: cobro.actualizadoEn.toISOString(),
+    linkPago: cobro.flowLinkPago ?? cobro.mpPaymentLinkUrl ?? null,
   };
+}
+
+// Never mint a portal token while reading a list. A previously provisioned
+// fallback remains a usable, focused address after reload, while plain legacy
+// charges still remain plain/manual.
+async function serializeCobrosConLinks(
+  cobros: Cobro[],
+  abonado?: Map<number, number>,
+) {
+  return Promise.all(cobros.map(async (c) => {
+    const serializado = serializeCobro(c, abonado?.get(c.id) ?? (abonado ? 0 : undefined));
+    if (serializado.linkPago) return serializado;
+    return { ...serializado, linkPago: await portalUrlExistenteParaCobro(c.clienteId, c.id) };
+  }));
 }
 
 // Sums confirmed partial payments (abonos) per cobro id, returning a map.
@@ -127,6 +149,14 @@ async function abonadoPorCobro(cobroIds: number[]): Promise<Map<number, number>>
     .groupBy(pagosParciales.cobroId);
   for (const s of sums) map.set(s.cobroId, s.total);
   return map;
+}
+
+async function montoRecordatorio(cobro: Cobro): Promise<number> {
+  if (cobro.estado !== "parcial") return montoACobrar(cobro);
+  const [row] = await db.select({ total: sql<number>`coalesce(sum(${pagosParciales.monto})::float, 0)` })
+    .from(pagosParciales)
+    .where(and(eq(pagosParciales.cobroId, cobro.id), eq(pagosParciales.estado, "confirmado")));
+  return Math.max(montoACobrar(cobro) - (row?.total ?? 0), 0);
 }
 
 function serializeDescuento(d: CobroDescuento) {
@@ -203,7 +233,7 @@ cobrosRouter.get("/cobros", async (req, res) => {
       .orderBy(desc(cobrosTable.creadoEn));
 
     const abonado = await abonadoPorCobro(cobros.map((c) => c.id));
-    res.json(cobros.map((c) => serializeCobro(c, abonado.get(c.id) ?? 0)));
+    res.json(await serializeCobrosConLinks(cobros, abonado));
   } catch (err) {
     req.log.error({ err }, "Error listing cobros");
     res.status(500).json({ error: "Error interno del servidor" });
@@ -333,6 +363,462 @@ cobrosRouter.post("/cobros", async (req, res) => {
   }
 });
 
+const CobroAvanzadoBaseBody = z.object({
+  monto: z.number().int().positive(),
+  descripcion: z.string().min(1).max(255),
+  tipoDocumento: z.enum(["factura_afecta", "factura_exenta", "boleta_afecta", "boleta_exenta", "sin_documento"]).default("sin_documento"),
+  incluyeIva: z.boolean().optional(),
+  referencia: z.string().max(255).optional(),
+  clienteId: z.number().int().positive(),
+  responsableId: z.string().optional(),
+  emailPagador: z.string().email().optional(),
+  automatizacion: z.enum(["ninguna", "simple", "workflow"]).default("ninguna"),
+  workflowId: z.number().int().positive().optional(),
+  canalesIniciales: z.array(z.enum(["email", "whatsapp"])).default([]),
+  idempotencyKey: z.string().uuid(),
+});
+
+async function resolverAutomatizacion(
+  userId: string,
+  ctx: Awaited<ReturnType<typeof getOrgContext>>,
+  automation: "ninguna" | "simple" | "workflow",
+  workflowId?: number,
+) {
+  if (automation !== "workflow") return { workflowId: null, snapshot: null };
+  if (!workflowId) throw new Error("Debes seleccionar un workflow.");
+  const [workflow] = await db.select().from(workflowsTable).where(eq(workflowsTable.id, workflowId));
+  // The same scope as workflow listing: org admins can use org workflows and
+  // everyone else can only use their own. Never let a supervisor attach a
+  // teammate's private workflow by guessing its id.
+  const canUse = !!workflow && (
+    (ctx.isOrgAdmin && ctx.organizationId != null && workflow.organizationId === ctx.organizationId) ||
+    workflow.userId === userId
+  );
+  if (!canUse) throw new Error("Workflow no encontrado");
+  return { workflowId, snapshot: null };
+}
+
+async function snapshotRecordatorios(responsableId: string, automation: "ninguna" | "simple" | "workflow") {
+  if (automation !== "simple") return null;
+  const defaults = await ensureUserDefaults(responsableId);
+  return defaults.map((r) => ({ canal: r.canal, momento: r.momento, diasOffset: r.diasOffset, activo: r.activo }));
+}
+const FrecuenciaRecurrenteBody = CobroAvanzadoBaseBody.extend({
+  frecuencia: z.enum(["semanal", "quincenal", "mensual", "bimestral", "trimestral", "anual"]),
+  fechaInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  fechaTermino: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).superRefine((value, ctx) => {
+  const esFechaCalendario = (fecha: string) => {
+    const [year, month, day] = fecha.split("-").map(Number);
+    const d = new Date(Date.UTC(year, month - 1, day));
+    return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+  };
+  if (!esFechaCalendario(value.fechaInicio)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fechaInicio"], message: "La fecha de inicio no existe en el calendario." });
+  }
+  if (value.fechaTermino && !esFechaCalendario(value.fechaTermino)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fechaTermino"], message: "La fecha de término no existe en el calendario." });
+  }
+  if (value.fechaTermino && value.fechaTermino < value.fechaInicio) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fechaTermino"], message: "La fecha de término debe ser posterior al inicio." });
+  }
+});
+
+function idempotencyFingerprint(value: unknown): string {
+  // Inputs are Zod-normalized plain objects. Sorting object keys recursively
+  // makes the check independent of JSON property order.
+  const canonical = (v: unknown): unknown => Array.isArray(v)
+    ? v.map(canonical)
+    : v && typeof v === "object"
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, canonical(x)]))
+      : v;
+  return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
+}
+
+function scopedIdempotencyKey(actorId: string, key: string): string {
+  return `${actorId}:${key}`;
+}
+
+async function asignacionYCliente(
+  user: { id: string; firstName: string | null; lastName: string | null; email: string | null },
+  clienteId: number,
+  responsableIdInput?: string,
+) {
+  const ctx = await getOrgContext(user.id);
+  let responsableId = user.id;
+  let responsableNombre = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null;
+  if (responsableIdInput && responsableIdInput !== user.id) {
+    if (ctx.organizationId == null || !canAssignTo(ctx, user.id, responsableIdInput)) throw new Error("No puedes asignar cobros a otros usuarios.");
+    const [assignee] = await db.select().from(usersTable).where(and(eq(usersTable.id, responsableIdInput), eq(usersTable.organizationId, ctx.organizationId)));
+    if (!assignee) throw new Error("El responsable no pertenece a tu organización.");
+    responsableId = assignee.id;
+    responsableNombre = [assignee.firstName, assignee.lastName].filter(Boolean).join(" ") || assignee.email || null;
+  }
+  const [cliente] = await db.select().from(clientesTable).where(eq(clientesTable.id, clienteId));
+  if (!cliente || !userCanAccessCliente(ctx, user.id, cliente)) throw new Error("Cliente no encontrado");
+  return { ctx, cliente, responsableId, responsableNombre };
+}
+
+// Advanced schedule creation deliberately has its own endpoint: a schedule and
+// its first independent charge are committed together. It is gated here (not
+// just in the UI) so Starter cannot create schedules through direct API calls.
+cobrosRouter.post("/cobros/recurrentes", requirePlanFeature("cobros_recurrentes"), async (req, res) => {
+  const parsed = FrecuenciaRecurrenteBody.safeParse(req.body);
+  if (!parsed.success) return void res.status(400).json({ error: parsed.error.message });
+  try {
+    const d = parsed.data;
+    const { ctx, cliente, responsableId, responsableNombre } = await asignacionYCliente(req.user!, d.clienteId, d.responsableId);
+    const automation = await resolverAutomatizacion(req.user!.id, ctx, d.automatizacion, d.workflowId);
+    const reminderSnapshot = await snapshotRecordatorios(responsableId, d.automatizacion);
+    const incluyeIva = tipoDocumentoPermiteIva(d.tipoDocumento) && d.incluyeIva === true;
+    const montos = computeMontoConIva(d.monto, incluyeIva);
+    const hoy = fechaHoySantiago();
+    const scopedKey = scopedIdempotencyKey(req.user!.id, d.idempotencyKey);
+    const requestHash = idempotencyFingerprint(d);
+    const { schedule, cobro, reused } = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${scopedKey}))`);
+      const [existing] = await tx.select().from(cobrosRecurrentesTable).where(eq(cobrosRecurrentesTable.idempotencyKey, scopedKey));
+      if (existing) {
+        if (existing.creadorId !== req.user!.id || existing.idempotencyPayloadHash !== requestHash) {
+          throw new Error("La clave de idempotencia ya fue usada con una solicitud diferente.");
+        }
+        const [existingCobro] = await tx.select().from(cobrosTable).where(eq(cobrosTable.recurrenteProgramacionId, existing.id)).orderBy(desc(cobrosTable.id));
+        return { schedule: existing, cobro: existingCobro ?? null, reused: true };
+      }
+      const startsNow = d.fechaInicio <= hoy;
+      const [schedule] = await tx.insert(cobrosRecurrentesTable).values({
+        organizationId: ctx.organizationId,
+        responsableId, responsableNombre, clienteId: cliente.id, clienteNombre: cliente.nombre,
+        emailPagador: d.emailPagador ?? cliente.email ?? null,
+        monto: String(montos.montoFinal), montoNeto: montos.montoNeto != null ? String(montos.montoNeto) : null,
+        montoIva: montos.montoIva != null ? String(montos.montoIva) : null, incluyeIva,
+        tipoDocumento: d.tipoDocumento, descripcion: d.descripcion, referencia: d.referencia ?? null,
+        frecuencia: d.frecuencia, fechaInicio: d.fechaInicio, fechaTermino: d.fechaTermino ?? null,
+        proximaGeneracion: startsNow ? fechaCicloAnclada(d.fechaInicio, d.frecuencia, 1) : d.fechaInicio,
+        ciclo: startsNow ? 1 : 0,
+        automatizacion: d.automatizacion, workflowId: automation.workflowId, recordatoriosSnapshot: reminderSnapshot,
+        canalesIniciales: d.canalesIniciales, creadorId: req.user!.id,
+        idempotencyKey: scopedKey, idempotencyPayloadHash: requestHash,
+      }).returning();
+      if (!startsNow) return { schedule, cobro: null, reused: false };
+      const [cobro] = await tx.insert(cobrosTable).values({
+        monto: String(montos.montoFinal), montoNeto: montos.montoNeto != null ? String(montos.montoNeto) : null,
+        montoIva: montos.montoIva != null ? String(montos.montoIva) : null, incluyeIva, tipoDocumento: d.tipoDocumento,
+        descripcion: d.descripcion, referencia: d.referencia ?? null, estado: "pendiente", organizationId: ctx.organizationId,
+        responsableId, responsableNombre, clienteId: cliente.id, clienteNombre: cliente.nombre,
+        emailPagador: d.emailPagador ?? cliente.email ?? null,
+        fechaVencimiento: fechaCicloAnclada(d.fechaInicio, d.frecuencia, 1),
+        recurrenteProgramacionId: schedule.id, recurrenteFechaCiclo: d.fechaInicio,
+        workflowId: automation.workflowId,
+      }).returning();
+      if (reminderSnapshot?.length) {
+        await tx.insert(recordatoriosTable).values(reminderSnapshot.map((r) => ({ cobroId: cobro.id, ...r })));
+      }
+      if (d.canalesIniciales.length) {
+        await tx.insert(cobroEntregasInicialesTable).values(
+          d.canalesIniciales.map((canal) => ({ cobroId: cobro.id, canal })),
+        );
+      }
+      return { schedule, cobro, reused: false };
+    });
+    let responseCobro = cobro;
+    let responseLinkPago: string | null = cobro?.flowLinkPago ?? cobro?.mpPaymentLinkUrl ?? null;
+    const deliveryResults: Array<{ canal: "email" | "whatsapp"; estado: string; detalle?: string; waUrl?: string }> = [];
+    // Delivery is intentionally after the committed schedule/child. A provider
+    // outage must never turn a successful, retry-safe creation into a false 500.
+    if (cobro && !reused) {
+      try {
+      let linked: Awaited<ReturnType<typeof asegurarLinkPagoCobro>>;
+      try {
+        linked = await asegurarLinkPagoCobro(cobro, req.log);
+      } catch (err) {
+        req.log.warn({ err, cobroId: cobro.id }, "No se pudo preparar enlace para cobro recurrente");
+        linked = { cobro, linkPago: null, portalUrl: null };
+      }
+      responseCobro = linked.cobro;
+      const linkPago = linked.linkPago ?? linked.portalUrl;
+      responseLinkPago = linkPago;
+      if (d.canalesIniciales.includes("email")) {
+        if (!responseCobro.emailPagador) deliveryResults.push({ canal: "email", estado: "fallido", detalle: "Sin email del pagador." });
+        else if (!linkPago) deliveryResults.push({ canal: "email", estado: "fallido", detalle: "No se pudo preparar un enlace de pago." });
+        else {
+          try {
+            const remitente = await getRemitenteContacto(responsableId);
+            const result = await sendPaymentLinkEmail({ emailPagador: responseCobro.emailPagador, clienteNombre: responseCobro.clienteNombre, descripcion: responseCobro.descripcion, monto: montoACobrar(responseCobro), linkPago, comercioNombre: responseCobro.responsableNombre || "NextCob", remitenteNombre: remitente.nombre || responseCobro.responsableNombre, remitenteEmail: remitente.email }, req.log);
+            if (result.ok) await db.insert(seguimientosCobranzaTable).values({ cobroId: responseCobro.id, tipo: "email", notas: "Aviso inicial de cobro recurrente enviado" });
+            deliveryResults.push({ canal: "email", estado: result.ok ? "enviado" : "fallido", detalle: result.error });
+          } catch (err) { deliveryResults.push({ canal: "email", estado: "fallido", detalle: err instanceof Error ? err.message : "Error de envío." }); }
+        }
+      }
+      if (d.canalesIniciales.includes("whatsapp")) {
+        const phone = cliente.telefono;
+        const mensaje = `Hola ${responseCobro.clienteNombre || "cliente"}, tienes un cobro pendiente de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(montoACobrar(responseCobro)))} por "${responseCobro.descripcion}".${linkPago ? ` Puedes pagar aquí: ${linkPago}` : ""}`;
+        if (!phone || !sanitizePhone(phone)) deliveryResults.push({ canal: "whatsapp", estado: "fallido", detalle: "Sin teléfono válido." });
+        else if (!isWhatsAppConfigured()) {
+          const waUrl = `https://wa.me/${sanitizePhone(phone)}?text=${encodeURIComponent(mensaje)}`;
+          await db.insert(seguimientosCobranzaTable).values({ cobroId: responseCobro.id, tipo: "whatsapp", notas: "Aviso inicial de cobro recurrente listo para envío manual" });
+          deliveryResults.push({ canal: "whatsapp", estado: "pendiente_manual", waUrl });
+        } else {
+          try {
+            const result = await sendWhatsAppMensaje({ telefono: phone, mensaje }, req.log);
+            if (result.ok) await db.insert(seguimientosCobranzaTable).values({ cobroId: responseCobro.id, tipo: "whatsapp", notas: "Aviso inicial de cobro recurrente enviado automáticamente" });
+            deliveryResults.push({ canal: "whatsapp", estado: result.ok ? "enviado" : "fallido", detalle: result.error });
+          } catch (err) { deliveryResults.push({ canal: "whatsapp", estado: "fallido", detalle: err instanceof Error ? err.message : "Error de envío." }); }
+        }
+      }
+      } catch (err) {
+        // This includes profile/bank/history lookups. The charge and its
+        // outbox already committed, so never turn that success into HTTP 500.
+        req.log.warn({ err, cobroId: cobro.id }, "Falló la entrega inicial post-commit");
+      }
+    }
+    // The outbox is committed with the child. Success/manual outcomes are
+    // acknowledged; failures deliberately remain pending for a scheduler retry.
+    for (const result of deliveryResults) {
+      if (result.estado === "enviado" || result.estado === "pendiente_manual") {
+        try {
+          await db.update(cobroEntregasInicialesTable).set({
+            estado: result.estado as "enviado" | "pendiente_manual", intentos: 1, ultimoError: null, actualizadoEn: new Date(),
+          }).where(and(eq(cobroEntregasInicialesTable.cobroId, cobro!.id), eq(cobroEntregasInicialesTable.canal, result.canal)));
+        } catch (err) {
+          req.log.warn({ err, cobroId: cobro!.id, canal: result.canal }, "No se pudo confirmar entrega inicial");
+        }
+      }
+    }
+    res.status(201).json({ schedule: { ...schedule, monto: Number(schedule.monto) }, cobro: responseCobro ? { ...serializeCobro(responseCobro), linkPago: responseLinkPago } : null, deliveryResults });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error al programar cobro recurrente";
+    res.status(message.includes("Cliente no encontrado") ? 404 : message.includes("No puedes") ? 403 : message.includes("idempotencia") ? 409 : 500).json({ error: message });
+  }
+});
+
+const CobroMasivoBody = CobroAvanzadoBaseBody.omit({ clienteId: true }).extend({
+  clienteIds: z.array(z.number().int().positive()).min(1).max(100),
+  fechaVencimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).superRefine((value, ctx) => {
+  if (!value.fechaVencimiento) return;
+  const [year, month, day] = value.fechaVencimiento.split("-").map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fechaVencimiento"], message: "La fecha de vencimiento no existe en el calendario." });
+  }
+});
+
+cobrosRouter.post("/cobros/masivo", requirePlanFeature("cobros_masivos"), async (req, res) => {
+  const parsed = CobroMasivoBody.safeParse(req.body);
+  if (!parsed.success) return void res.status(400).json({ error: parsed.error.message });
+  try {
+    const d = parsed.data;
+    const ids = [...new Set(d.clienteIds)];
+    const ctx = await getOrgContext(req.user!.id);
+    const clientes = await db.select().from(clientesTable).where(inArray(clientesTable.id, ids));
+    if (clientes.length !== ids.length || clientes.some((c) => !userCanAccessCliente(ctx, req.user!.id, c))) {
+      return void res.status(404).json({ error: "Uno o más clientes no están disponibles." });
+    }
+    const { responsableId, responsableNombre } = await asignacionYCliente(req.user!, ids[0], d.responsableId);
+    const automation = await resolverAutomatizacion(req.user!.id, ctx, d.automatizacion, d.workflowId);
+    const reminderSnapshot = await snapshotRecordatorios(responsableId, d.automatizacion);
+    const incluyeIva = tipoDocumentoPermiteIva(d.tipoDocumento) && d.incluyeIva === true;
+    const montos = computeMontoConIva(d.monto, incluyeIva);
+    const scopedKey = scopedIdempotencyKey(req.user!.id, d.idempotencyKey);
+    const loteId = `batch:${scopedKey}`;
+    const requestHash = idempotencyFingerprint({ ...d, clienteIds: ids.sort((a, b) => a - b) });
+    const { created, reused } = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${scopedKey}))`);
+      const existing = await tx.select().from(cobrosTable).where(eq(cobrosTable.loteId, loteId));
+      if (existing.length) {
+        if (existing.some((c) => c.idempotencyPayloadHash !== requestHash)) {
+          throw new Error("La clave de idempotencia ya fue usada con una solicitud diferente.");
+        }
+        return { created: existing, reused: true };
+      }
+      const created = await tx.insert(cobrosTable).values(clientes.map((cliente) => ({
+      monto: String(montos.montoFinal), montoNeto: montos.montoNeto != null ? String(montos.montoNeto) : null,
+      montoIva: montos.montoIva != null ? String(montos.montoIva) : null, incluyeIva, tipoDocumento: d.tipoDocumento,
+      descripcion: d.descripcion, referencia: d.referencia ?? null, estado: "pendiente" as const, organizationId: ctx.organizationId,
+      responsableId, responsableNombre, clienteId: cliente.id, clienteNombre: cliente.nombre,
+       emailPagador: cliente.email ?? null, fechaVencimiento: d.fechaVencimiento ?? null, loteId,
+       idempotencyPayloadHash: requestHash, workflowId: automation.workflowId,
+      }))).returning();
+      if (reminderSnapshot?.length && d.fechaVencimiento) {
+        await tx.insert(recordatoriosTable).values(created.flatMap((c) => reminderSnapshot.map((r) => ({ cobroId: c.id, ...r }))));
+      }
+      return { created, reused: false };
+    });
+    // Send separately per charge/customer. We never add a "batch" marker to
+    // the customer-facing message and write history only after a provider
+    // confirms success (so unavailable email is not represented as sent).
+    const deliveryCobros = new Map<number, { cobro: Cobro; linkPago: string | null }>();
+    for (const cobro of reused ? [] : created) {
+      try {
+        const linked = await asegurarLinkPagoCobro(cobro, req.log);
+        deliveryCobros.set(cobro.id, { cobro: linked.cobro, linkPago: linked.linkPago ?? linked.portalUrl });
+      } catch (err) {
+        req.log.warn({ err, cobroId: cobro.id }, "No se pudo preparar enlace para cobro masivo");
+        deliveryCobros.set(cobro.id, { cobro, linkPago: null });
+      }
+    }
+    const deliveryResults: Array<{ cobroId: number; canal: "email" | "whatsapp"; estado: "enviado" | "fallido" | "pendiente_manual"; detalle?: string; waUrl?: string }> = [];
+    for (const cobro of reused ? [] : created) {
+      const prepared = deliveryCobros.get(cobro.id)!;
+      const deliveryCobro = prepared.cobro;
+      const linkPago = prepared.linkPago;
+      if (d.canalesIniciales.includes("email")) {
+        try {
+          if (!deliveryCobro.emailPagador) {
+            deliveryResults.push({ cobroId: cobro.id, canal: "email", estado: "fallido", detalle: "Sin email del pagador." });
+          } else if (!linkPago) {
+            deliveryResults.push({ cobroId: cobro.id, canal: "email", estado: "fallido", detalle: "No se pudo preparar un enlace de pago." });
+          } else {
+            const remitente = await getRemitenteContacto(responsableId);
+            const result = await sendPaymentLinkEmail({
+              emailPagador: deliveryCobro.emailPagador, clienteNombre: deliveryCobro.clienteNombre, descripcion: deliveryCobro.descripcion,
+              monto: montoACobrar(deliveryCobro), linkPago, comercioNombre: deliveryCobro.responsableNombre || "NextCob",
+              remitenteNombre: remitente.nombre || deliveryCobro.responsableNombre, remitenteEmail: remitente.email,
+            }, req.log);
+            if (result.ok) await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "email", notas: "Aviso inicial individual enviado al crear lote" });
+            deliveryResults.push({ cobroId: cobro.id, canal: "email", estado: result.ok ? "enviado" : "fallido", detalle: result.error });
+          }
+        } catch (err) {
+          deliveryResults.push({ cobroId: cobro.id, canal: "email", estado: "fallido", detalle: err instanceof Error ? err.message : "Error de envío." });
+        }
+      }
+      if (d.canalesIniciales.includes("whatsapp")) {
+        try {
+          const cliente = clientes.find((c) => c.id === cobro.clienteId);
+          const phone = cliente?.telefono ?? null;
+          const mensaje = `Hola ${deliveryCobro.clienteNombre || "cliente"}, tienes un cobro pendiente de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(montoACobrar(deliveryCobro)))} por "${deliveryCobro.descripcion}".${linkPago ? ` Puedes pagar aquí: ${linkPago}` : ""}`;
+          if (!phone || !sanitizePhone(phone)) {
+            deliveryResults.push({ cobroId: cobro.id, canal: "whatsapp", estado: "fallido", detalle: "Sin teléfono válido." });
+          } else if (!isWhatsAppConfigured()) {
+            const waUrl = `https://wa.me/${sanitizePhone(phone)}?text=${encodeURIComponent(mensaje)}`;
+            await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "whatsapp", notas: "Aviso inicial listo para envío manual por WhatsApp" });
+            deliveryResults.push({ cobroId: cobro.id, canal: "whatsapp", estado: "pendiente_manual", detalle: "WhatsApp listo para envío manual.", waUrl });
+          } else {
+            const result = await sendWhatsAppMensaje({ telefono: phone, mensaje }, req.log);
+            if (result.ok) await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "whatsapp", notas: "Aviso inicial enviado automáticamente por WhatsApp" });
+            deliveryResults.push({ cobroId: cobro.id, canal: "whatsapp", estado: result.ok ? "enviado" : "fallido", detalle: result.error });
+          }
+        } catch (err) {
+          deliveryResults.push({ cobroId: cobro.id, canal: "whatsapp", estado: "fallido", detalle: err instanceof Error ? err.message : "Error de envío." });
+        }
+      }
+    }
+    const responseCobros = created.map((c) => deliveryCobros.get(c.id)?.cobro ?? c);
+    res.status(201).json({
+      loteId,
+      cobros: responseCobros.map((c) => ({
+        ...serializeCobro(c),
+        linkPago: deliveryCobros.get(c.id)?.linkPago ?? c.flowLinkPago ?? c.mpPaymentLinkUrl ?? null,
+      })),
+      deliveryResults,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error al crear cobros masivos";
+    res.status(message.includes("idempotencia") ? 409 : 500).json({ error: message });
+  }
+});
+
+const RecordatorioMasivoBody = z.object({
+  cobroIds: z.array(z.number().int().positive()).min(1).max(100),
+  canales: z.array(z.enum(["email", "whatsapp"])).min(1),
+});
+
+cobrosRouter.post("/cobros/recordatorios/masivo", requirePlanFeature("recordatorios_masivos"), async (req, res) => {
+  const parsed = RecordatorioMasivoBody.safeParse(req.body);
+  if (!parsed.success) return void res.status(400).json({ error: parsed.error.message });
+  const ctx = await getOrgContext(req.user!.id);
+  const cobros = await db.select().from(cobrosTable).where(inArray(cobrosTable.id, [...new Set(parsed.data.cobroIds)]));
+  if (cobros.length !== new Set(parsed.data.cobroIds).size || cobros.some((c) => !userCanAccessCobro(ctx, req.user!.id, c))) {
+    return void res.status(404).json({ error: "Uno o más cobros no están disponibles." });
+  }
+  const results: Array<{ cobroId: number; canal: string; estado: string; detalle?: string }> = [];
+  for (const cobro of cobros) {
+    if (!["pendiente", "parcial"].includes(cobro.estado)) {
+      for (const canal of parsed.data.canales) {
+        results.push({ cobroId: cobro.id, canal, estado: "fallido", detalle: "El cobro no está pendiente." });
+        try { await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: canal, notas: "Recordatorio masivo no enviado: el cobro no está pendiente" }); } catch (err) { req.log.warn({ err, cobroId: cobro.id, canal }, "No se pudo registrar intento de recordatorio"); }
+      }
+      continue;
+    }
+    // Reminders must not create a new full-amount processor order for a
+    // partially paid charge. Reuse a stored processor URL or an already-issued
+    // debtor portal address, which computes saldo independently.
+    const linkPago = cobro.flowLinkPago ?? cobro.mpPaymentLinkUrl
+      ?? await portalUrlExistenteParaCobro(cobro.clienteId, cobro.id);
+    for (const canal of parsed.data.canales) {
+      try {
+        const saldoRecordatorio = await montoRecordatorio(cobro);
+        const remitente = await getRemitenteContacto(cobro.responsableId);
+        if (canal === "email") {
+          if (!cobro.emailPagador) {
+            results.push({ cobroId: cobro.id, canal, estado: "fallido", detalle: "Sin email del pagador." });
+            await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "email", notas: "Recordatorio masivo fallido: sin email del pagador" });
+          } else {
+            const r = await sendRecordatorioEmail({ emailPagador: cobro.emailPagador, clienteNombre: cobro.clienteNombre, descripcion: cobro.descripcion, monto: saldoRecordatorio, linkPago: linkPago ?? "", comercioNombre: cobro.responsableNombre || "NextCob", remitenteNombre: remitente.nombre || cobro.responsableNombre, remitenteEmail: remitente.email }, req.log);
+            await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "email", notas: r.ok ? "Recordatorio masivo enviado por email" : `Recordatorio masivo fallido por email: ${r.error ?? "sin detalle"}` });
+            results.push({ cobroId: cobro.id, canal, estado: r.ok ? "enviado" : "fallido", detalle: r.error });
+          }
+        } else {
+          const [cliente] = cobro.clienteId ? await db.select({ telefono: clientesTable.telefono }).from(clientesTable).where(eq(clientesTable.id, cobro.clienteId)) : [undefined];
+          const mensaje = `Hola ${cobro.clienteNombre || "cliente"}, tienes un cobro pendiente de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(saldoRecordatorio))} por "${cobro.descripcion}".${linkPago ? ` Puedes pagar aquí: ${linkPago}` : ""}`;
+          if (cliente?.telefono && sanitizePhone(cliente.telefono) && isWhatsAppConfigured()) {
+            const r = await sendWhatsAppMensaje({ telefono: cliente.telefono, mensaje }, req.log);
+            await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "whatsapp", notas: r.ok ? "Recordatorio masivo enviado automáticamente por WhatsApp" : `Recordatorio masivo fallido por WhatsApp: ${r.error ?? "sin detalle"}` });
+            results.push({ cobroId: cobro.id, canal, estado: r.ok ? "enviado" : "fallido", detalle: r.error });
+          } else if (!cliente?.telefono || !sanitizePhone(cliente.telefono)) {
+            await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "whatsapp", notas: "Recordatorio masivo fallido: sin teléfono válido" });
+            results.push({ cobroId: cobro.id, canal, estado: "fallido", detalle: "Sin teléfono válido." });
+          } else {
+            const waUrl = `https://wa.me/${sanitizePhone(cliente.telefono)}?text=${encodeURIComponent(mensaje)}`;
+            await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "whatsapp", notas: "Recordatorio masivo listo para envío manual por WhatsApp" });
+            results.push({ cobroId: cobro.id, canal, estado: "pendiente_manual", detalle: waUrl });
+          }
+        }
+      } catch (err) {
+        const detalle = err instanceof Error ? err.message : "Error de envío.";
+        results.push({ cobroId: cobro.id, canal, estado: "fallido", detalle });
+        try { await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: canal, notas: `Recordatorio masivo fallido: ${detalle}` }); } catch (historyErr) { req.log.warn({ err: historyErr, cobroId: cobro.id, canal }, "No se pudo registrar fallo de recordatorio"); }
+      }
+    }
+  }
+  res.json({ results });
+});
+
+cobrosRouter.get("/cobros/recurrentes", requirePlanFeature("cobros_recurrentes"), async (req, res) => {
+  const ctx = await getOrgContext(req.user!.id);
+  const scope = ctx.isOrgAdmin
+    ? eq(cobrosRecurrentesTable.organizationId, ctx.organizationId!)
+    : ctx.isSupervisor
+      ? inArray(cobrosRecurrentesTable.responsableId, ctx.teamMemberIds)
+      : eq(cobrosRecurrentesTable.responsableId, req.user!.id);
+  const rows = await db.select().from(cobrosRecurrentesTable).where(and(
+    eq(cobrosRecurrentesTable.activo, true),
+    scope,
+  ));
+  const hoy = fechaHoySantiago();
+  const hasta = new Date(`${hoy}T00:00:00Z`);
+  hasta.setUTCDate(hasta.getUTCDate() + 30);
+  const hastaStr = hasta.toISOString().slice(0, 10);
+  const proyeccion = rows.flatMap((r) => {
+    const ocurrencias: Array<{ programacionId: number; fecha: string; monto: number }> = [];
+    // `ciclo` is the next generation trigger. The first generated charge is
+    // due one interval after fechaInicio, so an as-yet-unstarted schedule (0)
+    // also projects cycle 1 rather than an immediate due date.
+    for (let ciclo = Math.max(1, r.ciclo); ciclo < Math.max(1, r.ciclo) + 100 && ocurrencias.length < 60; ciclo++) {
+      const fecha = fechaCicloAnclada(r.fechaInicio, r.frecuencia, ciclo);
+      if (fecha > hastaStr || (r.fechaTermino && fecha > r.fechaTermino)) break;
+      if (fecha >= hoy) ocurrencias.push({ programacionId: r.id, fecha, monto: Number(r.monto) });
+    }
+    return ocurrencias;
+  });
+  res.json({
+    schedules: rows.map((r) => ({ ...r, monto: Number(r.monto), montoNeto: r.montoNeto != null ? Number(r.montoNeto) : null, montoIva: r.montoIva != null ? Number(r.montoIva) : null })),
+    proyeccion30Dias: proyeccion.reduce((sum, item) => sum + item.monto, 0),
+    ocurrencias30Dias: proyeccion,
+  });
+});
+
 cobrosRouter.get("/cobros/stats/summary", async (req, res) => {
   const userId = req.user!.id;
   const responsable = typeof req.query.responsable === "string" ? req.query.responsable : undefined;
@@ -392,7 +878,7 @@ cobrosRouter.get("/cobros/:id", async (req, res) => {
     }
 
     const abonado = await abonadoPorCobro([cobro.id]);
-    res.json(serializeCobro(cobro, abonado.get(cobro.id) ?? 0));
+    res.json((await serializeCobrosConLinks([cobro], abonado))[0]);
   } catch (err) {
     req.log.error({ err }, "Error getting cobro");
     res.status(500).json({ error: "Error interno del servidor" });

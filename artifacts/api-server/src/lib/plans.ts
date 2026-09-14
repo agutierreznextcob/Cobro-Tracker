@@ -20,6 +20,9 @@ export type PlanFeature =
   | "scoring_predictivo" // probabilidad de pago, fecha estimada, promesas
   | "asistente_ia" // chat asistente IA dentro de la app
   | "recordatorios_automaticos" // envío automático programado de recordatorios
+  | "cobros_recurrentes"
+  | "cobros_masivos"
+  | "recordatorios_masivos"
   | "informes_avanzados" // rendimiento de equipo, métricas de gestión, satisfacción
   | "equipo"; // invitar a más usuarios que los incluidos
 
@@ -64,6 +67,9 @@ export const PLANES: Record<PlanId, PlanDef> = {
       "scoring_predictivo",
       "asistente_ia",
       "recordatorios_automaticos",
+      "cobros_recurrentes",
+      "cobros_masivos",
+      "recordatorios_masivos",
       "informes_avanzados",
       "equipo",
     ]),

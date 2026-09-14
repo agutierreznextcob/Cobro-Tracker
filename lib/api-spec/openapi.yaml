@@ -624,6 +624,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /cobros/recurrentes:
+    get:
+      operationId: listCobrosRecurrentes
+      tags: [cobros]
+      summary: List active recurring schedules and server-computed 30-day projection
+      responses:
+        "200":
+          description: Schedules and projected scheduled charges
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CobrosRecurrentesReport"
+    post:
+      operationId: createCobroRecurrente
+      tags: [cobros]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CobroRecurrenteInput"
+      responses:
+        "201":
+          description: Created schedule and optional first charge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CobroRecurrenteCreated"
+  /cobros/masivo:
+    post:
+      operationId: createCobrosMasivos
+      tags: [cobros]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CobroMasivoInput"
+      responses:
+        "201":
+          description: Independent charges with individual delivery outcomes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CobrosMasivosCreated"
+  /cobros/recordatorios/masivo:
+    post:
+      operationId: sendRecordatoriosMasivos
+      tags: [cobros]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordatoriosMasivosInput"
+      responses:
+        "200":
+          description: Per-charge, per-channel outcomes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordatoriosMasivosResult"
+
   /cobros/{id}:
     get:
       operationId: getCobro
@@ -4594,6 +4657,90 @@ components:
           items:
             $ref: "#/components/schemas/SaludCarteraHistorialPunto"
 
+    DeliveryOutcome:
+      type: object
+      required: [canal, estado]
+      properties:
+        cobroId: { type: integer }
+        canal: { type: string, enum: [email, whatsapp] }
+        estado: { type: string, enum: [enviado, fallido, pendiente_manual] }
+        detalle: { type: string }
+        waUrl: { type: string }
+    CobroAvanzadoBase:
+      type: object
+      required: [monto, descripcion, tipoDocumento, automatizacion, canalesIniciales, idempotencyKey]
+      properties:
+        monto: { type: number, minimum: 1 }
+        descripcion: { type: string, minLength: 1, maxLength: 255 }
+        tipoDocumento: { type: string, enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento] }
+        incluyeIva: { type: boolean }
+        referencia: { type: string }
+        responsableId: { type: string }
+        automatizacion: { type: string, enum: [ninguna, simple, workflow] }
+        workflowId: { type: integer }
+        canalesIniciales: { type: array, items: { type: string, enum: [email, whatsapp] } }
+        idempotencyKey: { type: string, format: uuid }
+    CobroRecurrenteInput:
+      allOf:
+        - $ref: "#/components/schemas/CobroAvanzadoBase"
+        - type: object
+          required: [clienteId, frecuencia, fechaInicio]
+          properties:
+            clienteId: { type: integer }
+            emailPagador: { type: string, format: email }
+            frecuencia: { type: string, enum: [semanal, quincenal, mensual, bimestral, trimestral, anual] }
+            fechaInicio: { type: string, format: date }
+            fechaTermino: { type: string, format: date }
+    CobroMasivoInput:
+      allOf:
+        - $ref: "#/components/schemas/CobroAvanzadoBase"
+        - type: object
+          required: [clienteIds]
+          properties:
+            clienteIds: { type: array, minItems: 1, maxItems: 100, items: { type: integer } }
+            fechaVencimiento: { type: string, format: date }
+    CobroRecurrenteSchedule:
+      type: object
+      required: [id, clienteNombre, monto, frecuencia, proximaGeneracion, activo]
+      properties:
+        id: { type: integer }
+        clienteNombre: { type: string }
+        monto: { type: number }
+        frecuencia: { type: string }
+        proximaGeneracion: { type: string, format: date }
+        activo: { type: boolean }
+    CobroRecurrenteCreated:
+      type: object
+      required: [schedule, deliveryResults]
+      properties:
+        schedule: { $ref: "#/components/schemas/CobroRecurrenteSchedule" }
+        cobro: { $ref: "#/components/schemas/Cobro" }
+        deliveryResults: { type: array, items: { $ref: "#/components/schemas/DeliveryOutcome" } }
+    CobrosMasivosCreated:
+      type: object
+      required: [loteId, cobros, deliveryResults]
+      properties:
+        loteId: { type: string }
+        cobros: { type: array, items: { $ref: "#/components/schemas/Cobro" } }
+        deliveryResults: { type: array, items: { $ref: "#/components/schemas/DeliveryOutcome" } }
+    RecordatoriosMasivosInput:
+      type: object
+      required: [cobroIds, canales]
+      properties:
+        cobroIds: { type: array, minItems: 1, maxItems: 100, items: { type: integer } }
+        canales: { type: array, minItems: 1, items: { type: string, enum: [email, whatsapp] } }
+    RecordatoriosMasivosResult:
+      type: object
+      required: [results]
+      properties:
+        results: { type: array, items: { $ref: "#/components/schemas/DeliveryOutcome" } }
+    CobrosRecurrentesReport:
+      type: object
+      required: [schedules, proyeccion30Dias, ocurrencias30Dias]
+      properties:
+        schedules: { type: array, items: { $ref: "#/components/schemas/CobroRecurrenteSchedule" } }
+        proyeccion30Dias: { type: number }
+        ocurrencias30Dias: { type: array, items: { type: object, properties: { programacionId: { type: integer }, fecha: { type: string, format: date }, monto: { type: number } } } }
     Cobro:
       type: object
       required: [id, monto, descripcion, estado, creadoEn]
@@ -4655,6 +4802,12 @@ components:
           type: ["string", "null"]
           pattern: '^\d{4}-\d{2}-\d{2}$'
           description: Due date (YYYY-MM-DD) used to schedule reminders
+        loteId:
+          type: ["string", "null"]
+          description: Opaque internal batch provenance; never customer-facing.
+        recurrenteProgramacionId:
+          type: ["integer", "null"]
+          description: Internal recurring schedule that generated this charge.
         flowOrdenId:
           type: ["string", "null"]
           description: Flow order ID returned after creating payment
@@ -4667,6 +4820,9 @@ components:
         mpPaymentLinkUrl:
           type: ["string", "null"]
           description: MercadoPago checkout URL for the payer
+        linkPago:
+          type: ["string", "null"]
+          description: Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.
         workflowId:
           type: ["integer", "null"]
           description: ID of the collections workflow assigned to this cobro (null when using simple reminders)
@@ -5879,6 +6035,10 @@ components:
           type: boolean
         esDemo:
           type: boolean
+        plan:
+          type: string
+          enum: [starter, nextcob]
+          description: Plan efectivo de la organización (incluye herencia del dueño).
         role:
           type: string
           enum: [user, admin]

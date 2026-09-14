@@ -47,6 +47,7 @@ import { sendVerificacionEmail, sendResetPasswordEmail, sendWelcomeEmail } from 
 import { getPublicBaseUrl } from "../lib/flow-api";
 import { normalizeRut } from "../lib/rut";
 import { orgPuedeActivarMiembroTx } from "../middlewares/requirePlanFeature";
+import { getPlanEfectivoDeUsuario } from "../middlewares/requirePlanFeature";
 
 const router: IRouter = Router();
 
@@ -332,6 +333,9 @@ router.get("/auth/user", async (req: Request, res: Response) => {
         profileImageUrl,
         emailVerified,
         esDemo,
+        // Expose only the effective plan needed for feature-lock UI; backend
+        // authorization continues to resolve this independently on every call.
+        plan: (await getPlanEfectivoDeUsuario(req.user.id)) ?? "starter",
         role,
         profileCompleted,
         rut,

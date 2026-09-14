@@ -11,16 +11,16 @@ import { getOrgContext } from "../lib/org";
 
 const aiRouter = Router();
 
-aiRouter.use((req, res, next) => {
+aiRouter.use("/ai", (req, res, next) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autorizado" });
     return;
   }
   next();
 });
-aiRouter.use(requireSubscription);
+aiRouter.use("/ai", requireSubscription);
 // Diana: solo plan NextCob (trial/demo/admin incluidos).
-aiRouter.use(requirePlanFeature("asistente_ia"));
+aiRouter.use("/ai", requirePlanFeature("asistente_ia"));
 
 function getGroqClient(): Groq {
   const apiKey = process.env.GROQ_API_KEY;

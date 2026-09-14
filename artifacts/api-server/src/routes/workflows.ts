@@ -33,7 +33,8 @@ import { requirePlanFeature } from "../middlewares/requirePlanFeature";
 
 const workflowsRouter: IRouter = Router();
 
-workflowsRouter.use((req, res, next) => {
+const workflowPaths = ["/workflows", "/cobros/:id/workflow", "/cobros/:id/workflow-ejecuciones"];
+workflowsRouter.use(workflowPaths, (req, res, next) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autorizado" });
     return;
@@ -41,7 +42,7 @@ workflowsRouter.use((req, res, next) => {
   next();
 });
 // Workflows inteligentes: solo plan NextCob (trial/demo/admin incluidos).
-workflowsRouter.use(requirePlanFeature("workflows"));
+workflowsRouter.use(workflowPaths, requirePlanFeature("workflows"));
 
 // Scope: admin_org sees all workflows in their org; ejecutivo sees only their own.
 function workflowScope(ctx: OrgContext, userId: string): SQL | undefined {

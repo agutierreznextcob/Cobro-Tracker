@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AuthUserOrgRole } from './authUserOrgRole';
+import type { AuthUserPlan } from './authUserPlan';
 import type { AuthUserRole } from './authUserRole';
 
 export interface AuthUser {
@@ -25,6 +26,8 @@ export interface AuthUser {
   profileImageUrl: string | null;
   emailVerified?: boolean;
   esDemo?: boolean;
+  /** Plan efectivo de la organización (incluye herencia del dueño). */
+  plan?: AuthUserPlan;
   role?: AuthUserRole;
   /**
      * Role within the user's organization

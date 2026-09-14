@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useToast } from "@/hooks/use-toast";
 import SuscripcionesRegistro from "./suscripciones-registro";
-import { useListCobros, useListClientes } from "@workspace/api-client-react";
+import { useListCobros, useListClientes, useSendRecordatoriosMasivos } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,7 +14,7 @@ import { formatCurrency, formatShortDate } from "@/lib/format";
 import { tipoDocumentoLabelCorto } from "@/lib/tipo-documento";
 import { StatusBadge } from "@/components/status-badge";
 import { ScoreBadge, SCORE_META } from "@/components/score-badge";
-import { ArrowRight, Minus, Search, X } from "lucide-react";
+import { ArrowRight, Minus, Search, X, Lock } from "lucide-react";
 import type { ListCobrosParams, ScoreCategoria } from "@workspace/api-client-react";
 
 type EstadoFilter = ListCobrosParams["estado"];
@@ -77,11 +78,19 @@ export default function CobrosList() {
 }
 
 function CobrosListNormal() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [filterEstado, setFilterEstado] = useState<EstadoFilter>(undefined);
   const [filterMetodo, setFilterMetodo] = useState<MetodoFilter>(undefined);
   const [filterScore, setFilterScore] = useState<ScoreCategoria | undefined>(undefined);
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [debouncedBusqueda, setDebouncedBusqueda] = useState("");
+  const [seleccionados, setSeleccionados] = useState<number[]>([]);
+  const [canales, setCanales] = useState<Array<"email" | "whatsapp">>(["email"]);
+  const [enviandoMasivo, setEnviandoMasivo] = useState(false);
+  const sendRecordatoriosMasivos = useSendRecordatoriosMasivos();
+  const [resultadosMasivos, setResultadosMasivos] = useState<Array<{ cobroId?: number; canal: string; estado: string; detalle?: string; waUrl?: string }>>([]);
+  const [filtroRecordatorio, setFiltroRecordatorio] = useState<"pendientes" | "vencidos">("pendientes");
   const [, navigate] = useLocation();
 
   const { data: clientes } = useListClientes();
@@ -118,6 +127,29 @@ function CobrosListNormal() {
   }, [cobros, debouncedBusqueda, filterScore, categoriaPorCliente]);
 
   const hayFiltros = !!filterEstado || !!filterMetodo || !!filterScore || busquedaCliente.trim() !== "";
+  const planUser = user as (typeof user & { subscriptionStatus?: string; plan?: string }) | null;
+  const nextCob = user?.role === "admin" || user?.esDemo || planUser?.subscriptionStatus === "prueba" || planUser?.plan !== "starter";
+  const recordables = (cobrosFiltrados ?? []).filter((c) => {
+    if (c.estado !== "pendiente" && c.estado !== "parcial") return false;
+    const vencido = !!c.fechaVencimiento && new Date(`${c.fechaVencimiento}T00:00:00`) < new Date(new Date().toDateString());
+    return filtroRecordatorio === "vencidos" ? vencido : !vencido;
+  });
+  const toggleAll = () => setSeleccionados(seleccionados.length === recordables.length ? [] : recordables.map((c) => c.id));
+  const enviarMasivo = async () => {
+    if (!nextCob) { toast({ title: "Disponible en plan NextCob", description: "Disponible en plan NextCob", variant: "destructive" }); return; }
+    if (!seleccionados.length || !canales.length) return;
+    setEnviandoMasivo(true);
+    try {
+      const data = await sendRecordatoriosMasivos.mutateAsync({ data: { cobroIds: seleccionados, canales } });
+      setResultadosMasivos(data.results ?? []);
+      const enviados = data.results?.filter((x) => x.estado === "enviado").length ?? 0;
+      const pendientes = data.results?.filter((x) => x.estado === "pendiente_manual").length ?? 0;
+      toast({ title: "Recordatorios procesados", description: `${enviados} enviados${pendientes ? `; ${pendientes} WhatsApp listos para envío manual` : ""}.` });
+      setSeleccionados([]);
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "No se pudieron enviar recordatorios.", variant: "destructive" });
+    } finally { setEnviandoMasivo(false); }
+  };
 
   return (
     <div className="space-y-6">
@@ -134,6 +166,33 @@ function CobrosListNormal() {
           <Button size="sm">+ Nuevo cobro</Button>
         </Link>
       </div>
+
+      <Card className="p-3 flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium flex items-center gap-1">{!nextCob && <Lock className="h-3.5 w-3.5" />}Enviar recordatorio masivo</span>
+        <span className="text-xs text-muted-foreground">Selecciona cobros pendientes o vencidos y el canal.</span>
+        <Select value={filtroRecordatorio} onValueChange={(value) => { setFiltroRecordatorio(value as "pendientes" | "vencidos"); setSeleccionados([]); }}><SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pendientes">Pendientes</SelectItem><SelectItem value="vencidos">Vencidos</SelectItem></SelectContent></Select>
+        {(["email", "whatsapp"] as const).map((canal) => <label key={canal} className="flex items-center gap-1 text-xs"><input type="checkbox" checked={canales.includes(canal)} onChange={(e) => setCanales((current) => e.target.checked ? [...current, canal] : current.filter((x) => x !== canal))} />{canal === "email" ? "Email" : "WhatsApp"}</label>)}
+        <Button size="sm" className="ml-auto" disabled={!seleccionados.length || !canales.length || enviandoMasivo} onClick={enviarMasivo}>{!nextCob && <Lock className="mr-1 h-3 w-3" />}{enviandoMasivo ? "Enviando..." : `Enviar (${seleccionados.length})`}</Button>
+        {!nextCob && <span className="w-full text-xs text-muted-foreground">Disponible en plan NextCob</span>}
+      </Card>
+
+      {resultadosMasivos.length > 0 && (
+        <Card className="p-4 space-y-3" aria-live="polite">
+          <h2 className="font-semibold text-sm">Resultado de recordatorios</h2>
+          {resultadosMasivos.map((r, index) => {
+            const waUrl = r.waUrl ?? (r.estado === "pendiente_manual" && r.detalle?.startsWith("https://wa.me/") ? r.detalle : undefined);
+            return (
+              <div key={`${r.cobroId}-${r.canal}-${index}`} className="flex flex-wrap items-center gap-2 text-sm border-t pt-2">
+                <span className="font-medium">Cobro #{r.cobroId} · {r.canal === "email" ? "Email" : "WhatsApp"}</span>
+                <span className={r.estado === "fallido" ? "text-destructive" : "text-muted-foreground"}>
+                  {r.estado === "enviado" ? "Enviado" : r.estado === "pendiente_manual" ? "Listo para envío manual" : `No enviado: ${r.detalle ?? "Error de envío"}`}
+                </span>
+                {waUrl && <a className="text-primary underline ml-auto" href={waUrl} target="_blank" rel="noreferrer">Abrir WhatsApp</a>}
+              </div>
+            );
+          })}
+        </Card>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -213,6 +272,7 @@ function CobrosListNormal() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              <TableHead className="w-8"><input aria-label="Seleccionar todos los cobros recordables" type="checkbox" checked={recordables.length > 0 && seleccionados.length === recordables.length} onChange={toggleAll} /></TableHead>
               <TableHead className="text-xs">Fecha</TableHead>
               <TableHead className="text-xs">Descripción</TableHead>
               <TableHead className="text-xs">Cliente</TableHead>
@@ -227,7 +287,7 @@ function CobrosListNormal() {
             {isLoading ? (
               [1, 2, 3, 4, 5, 6].map((i) => (
                 <TableRow key={i} className="animate-pulse">
-                  <TableCell><div className="h-4 w-20 bg-muted rounded" /></TableCell>
+                  <TableCell /><TableCell><div className="h-4 w-20 bg-muted rounded" /></TableCell>
                   <TableCell><div className="h-4 w-48 bg-muted rounded" /></TableCell>
                   <TableCell><div className="h-4 w-28 bg-muted rounded" /></TableCell>
                   <TableCell><div className="h-5 w-20 bg-muted rounded-full" /></TableCell>
@@ -239,7 +299,7 @@ function CobrosListNormal() {
               ))
             ) : !cobrosFiltrados || cobrosFiltrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground text-sm">
+                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground text-sm">
                   {hayFiltros ? "Ningún cobro coincide con los filtros." : "Sin cobros registrados."}
                 </TableCell>
               </TableRow>
@@ -250,11 +310,15 @@ function CobrosListNormal() {
                   className="cursor-pointer hover:bg-muted/40 transition-colors"
                   onClick={() => navigate(`/cobros/${cobro.id}`)}
                 >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    {recordables.some((item) => item.id === cobro.id) && <input aria-label={`Seleccionar cobro ${cobro.id}`} type="checkbox" checked={seleccionados.includes(cobro.id)} onChange={(e) => setSeleccionados((ids) => e.target.checked ? [...ids, cobro.id] : ids.filter((id) => id !== cobro.id))} />}
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {formatShortDate(cobro.creadoEn)}
                   </TableCell>
                   <TableCell className="max-w-[220px]">
                     <div className="text-sm font-medium truncate">{cobro.descripcion}</div>
+                    {(cobro as typeof cobro & { loteId?: string | null }).loteId && <Badge variant="secondary" className="mt-1 text-[9px]">Generado en lote</Badge>}
                     {cobro.referencia && (
                       <div className="text-[10px] text-muted-foreground/60 font-mono truncate">{cobro.referencia}</div>
                     )}

@@ -977,6 +977,16 @@ export interface Cobro {
      */
   fechaVencimiento?: string | null;
   /**
+     * Opaque internal batch provenance; never customer-facing.
+     * @nullable
+     */
+  loteId?: string | null;
+  /**
+     * Internal recurring schedule that generated this charge.
+     * @nullable
+     */
+  recurrenteProgramacionId?: number | null;
+  /**
      * Flow order ID returned after creating payment
      * @nullable
      */
@@ -996,6 +1006,11 @@ export interface Cobro {
      * @nullable
      */
   mpPaymentLinkUrl?: string | null;
+  /**
+     * Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.
+     * @nullable
+     */
+  linkPago?: string | null;
   /**
      * ID of the collections workflow assigned to this cobro (null when using simple reminders)
      * @nullable
@@ -1144,6 +1159,161 @@ export interface SaludCarteraHistorial {
   desde: string;
   hasta: string;
   puntos: SaludCarteraHistorialPunto[];
+}
+
+export type DeliveryOutcomeCanal = typeof DeliveryOutcomeCanal[keyof typeof DeliveryOutcomeCanal];
+
+
+export const DeliveryOutcomeCanal = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export type DeliveryOutcomeEstado = typeof DeliveryOutcomeEstado[keyof typeof DeliveryOutcomeEstado];
+
+
+export const DeliveryOutcomeEstado = {
+  enviado: 'enviado',
+  fallido: 'fallido',
+  pendiente_manual: 'pendiente_manual',
+} as const;
+
+export interface DeliveryOutcome {
+  cobroId?: number;
+  canal: DeliveryOutcomeCanal;
+  estado: DeliveryOutcomeEstado;
+  detalle?: string;
+  waUrl?: string;
+}
+
+export type CobroAvanzadoBaseTipoDocumento = typeof CobroAvanzadoBaseTipoDocumento[keyof typeof CobroAvanzadoBaseTipoDocumento];
+
+
+export const CobroAvanzadoBaseTipoDocumento = {
+  factura_afecta: 'factura_afecta',
+  factura_exenta: 'factura_exenta',
+  boleta_afecta: 'boleta_afecta',
+  boleta_exenta: 'boleta_exenta',
+  sin_documento: 'sin_documento',
+} as const;
+
+export type CobroAvanzadoBaseAutomatizacion = typeof CobroAvanzadoBaseAutomatizacion[keyof typeof CobroAvanzadoBaseAutomatizacion];
+
+
+export const CobroAvanzadoBaseAutomatizacion = {
+  ninguna: 'ninguna',
+  simple: 'simple',
+  workflow: 'workflow',
+} as const;
+
+export type CobroAvanzadoBaseCanalesInicialesItem = typeof CobroAvanzadoBaseCanalesInicialesItem[keyof typeof CobroAvanzadoBaseCanalesInicialesItem];
+
+
+export const CobroAvanzadoBaseCanalesInicialesItem = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export interface CobroAvanzadoBase {
+  /** @minimum 1 */
+  monto: number;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  descripcion: string;
+  tipoDocumento: CobroAvanzadoBaseTipoDocumento;
+  incluyeIva?: boolean;
+  referencia?: string;
+  responsableId?: string;
+  automatizacion: CobroAvanzadoBaseAutomatizacion;
+  workflowId?: number;
+  canalesIniciales: CobroAvanzadoBaseCanalesInicialesItem[];
+  idempotencyKey: string;
+}
+
+export type CobroRecurrenteInputFrecuencia = typeof CobroRecurrenteInputFrecuencia[keyof typeof CobroRecurrenteInputFrecuencia];
+
+
+export const CobroRecurrenteInputFrecuencia = {
+  semanal: 'semanal',
+  quincenal: 'quincenal',
+  mensual: 'mensual',
+  bimestral: 'bimestral',
+  trimestral: 'trimestral',
+  anual: 'anual',
+} as const;
+
+export type CobroRecurrenteInput = CobroAvanzadoBase & {
+  clienteId: number;
+  emailPagador?: string;
+  frecuencia: CobroRecurrenteInputFrecuencia;
+  fechaInicio: string;
+  fechaTermino?: string;
+};
+
+export type CobroMasivoInput = CobroAvanzadoBase & {
+  /**
+     * @minItems 1
+     * @maxItems 100
+     */
+  clienteIds: number[];
+  fechaVencimiento?: string;
+};
+
+export interface CobroRecurrenteSchedule {
+  id: number;
+  clienteNombre: string;
+  monto: number;
+  frecuencia: string;
+  proximaGeneracion: string;
+  activo: boolean;
+}
+
+export interface CobroRecurrenteCreated {
+  schedule: CobroRecurrenteSchedule;
+  cobro?: Cobro;
+  deliveryResults: DeliveryOutcome[];
+}
+
+export interface CobrosMasivosCreated {
+  loteId: string;
+  cobros: Cobro[];
+  deliveryResults: DeliveryOutcome[];
+}
+
+export type RecordatoriosMasivosInputCanalesItem = typeof RecordatoriosMasivosInputCanalesItem[keyof typeof RecordatoriosMasivosInputCanalesItem];
+
+
+export const RecordatoriosMasivosInputCanalesItem = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export interface RecordatoriosMasivosInput {
+  /**
+     * @minItems 1
+     * @maxItems 100
+     */
+  cobroIds: number[];
+  /** @minItems 1 */
+  canales: RecordatoriosMasivosInputCanalesItem[];
+}
+
+export interface RecordatoriosMasivosResult {
+  results: DeliveryOutcome[];
+}
+
+export type CobrosRecurrentesReportOcurrencias30DiasItem = {
+  programacionId?: number;
+  fecha?: string;
+  monto?: number;
+};
+
+export interface CobrosRecurrentesReport {
+  schedules: CobroRecurrenteSchedule[];
+  proyeccion30Dias: number;
+  ocurrencias30Dias: CobrosRecurrentesReportOcurrencias30DiasItem[];
 }
 
 /**
@@ -2166,6 +2336,17 @@ export type LiquidacionDetalle = Liquidacion & {
   data: PagoLiquidacion[];
 };
 
+/**
+ * Plan efectivo de la organización (incluye herencia del dueño).
+ */
+export type AuthUserPlan = typeof AuthUserPlan[keyof typeof AuthUserPlan];
+
+
+export const AuthUserPlan = {
+  starter: 'starter',
+  nextcob: 'nextcob',
+} as const;
+
 export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole];
 
 
@@ -2204,6 +2385,8 @@ export interface AuthUser {
   profileImageUrl: string | null;
   emailVerified?: boolean;
   esDemo?: boolean;
+  /** Plan efectivo de la organización (incluye herencia del dueño). */
+  plan?: AuthUserPlan;
   role?: AuthUserRole;
   /**
      * Role within the user's organization

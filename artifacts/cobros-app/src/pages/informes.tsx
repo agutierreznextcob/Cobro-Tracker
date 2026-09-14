@@ -6,6 +6,8 @@ import {
   getGetRendimientoEquipoQueryKey,
   useGetGestionesMetricas,
   useGetEncuestasResumen,
+  useListCobrosRecurrentes,
+  getListCobrosRecurrentesQueryKey,
   getGetEncuestasResumenQueryKey,
 } from "@workspace/api-client-react";
 import type { Cobro, ClienteConScore, GestionMetricaEjecutivo } from "@workspace/api-client-react";
@@ -131,6 +133,12 @@ export default function Informes() {
   const [filterTipoDoc, setFilterTipoDoc] = useState<TipoDocumento | "todos">("todos");
 
   const { user } = useAuth();
+  const planUser = user as (typeof user & { subscriptionStatus?: string; plan?: string }) | null;
+  const nextCob = user?.role === "admin" || user?.esDemo || planUser?.subscriptionStatus === "prueba" || planUser?.plan !== "starter";
+  const { data: reporteRecurrentes, isLoading: recurrentesLoading, isError: recurrentesError, refetch: refetchRecurrentes } = useListCobrosRecurrentes({ query: { enabled: nextCob, queryKey: getListCobrosRecurrentesQueryKey(), refetchOnMount: "always", refetchInterval: 60000 } });
+  const recurrentes = reporteRecurrentes?.schedules ?? [];
+  const [exportandoRecurrentes, setExportandoRecurrentes] = useState(false);
+  const [errorExportRecurrentes, setErrorExportRecurrentes] = useState<string | null>(null);
   const isOrgAdmin = user?.orgRole === "admin_org";
   const isSupervisor = user?.orgRole === "supervisor";
   const veRendimiento = isOrgAdmin || isSupervisor;
@@ -344,6 +352,44 @@ export default function Informes() {
     };
   }, [filtered]);
 
+  const proyeccionRecurrente = reporteRecurrentes?.proyeccion30Dias ?? 0;
+
+  async function exportRecurrentes() {
+    setExportandoRecurrentes(true);
+    setErrorExportRecurrentes(null);
+    try {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.json_to_sheet(recurrentes.map((r) => ({
+      Cliente: r.clienteNombre, "Monto programado (CLP)": r.monto, Frecuencia: r.frecuencia,
+      "Próxima fecha de generación": r.proximaGeneracion,
+    })));
+    ws["!cols"] = [{ wch: 28 }, { wch: 22 }, { wch: 16 }, { wch: 28 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cobros recurrentes");
+    const detalle = XLSX.utils.json_to_sheet((reporteRecurrentes?.ocurrencias30Dias ?? []).map((o) => ({
+      "Programación": o.programacionId,
+      "Fecha programada": o.fecha,
+      "Monto programado (CLP)": o.monto,
+    })));
+    XLSX.utils.book_append_sheet(wb, detalle, "Próximos 30 días");
+    const content = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const url = URL.createObjectURL(new Blob([content], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `cobros-recurrentes-${format(new Date(), "yyyyMMdd")}.xlsx`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setErrorExportRecurrentes("No se pudo generar el archivo Excel. Inténtalo nuevamente.");
+    } finally {
+      setExportandoRecurrentes(false);
+    }
+  }
+
   // Paid cobros: full price vs. with discount (for the chart).
   const recuperacionData = useMemo(() => {
     const pagados = filtered.filter((c) => c.estado === "pagado");
@@ -452,6 +498,7 @@ export default function Informes() {
           <TabsTrigger value="ranking">Ranking de clientes</TabsTrigger>
           <TabsTrigger value="gestiones">Gestiones</TabsTrigger>
           <TabsTrigger value="satisfaccion">Satisfacción</TabsTrigger>
+          <TabsTrigger value="recurrentes">Recurrentes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-6 mt-0">
@@ -893,6 +940,32 @@ export default function Informes() {
 
         <TabsContent value="satisfaccion" className="space-y-6 mt-0">
           <SatisfaccionReport />
+        </TabsContent>
+        <TabsContent value="recurrentes" className="space-y-4 mt-0">
+          {!nextCob ? (
+            <Card className="p-8 text-center">
+              <p className="font-medium">🔒 Disponible en plan NextCob</p>
+              <p className="mt-1 text-sm text-muted-foreground">Programa cobros recurrentes y consulta su proyección.</p>
+            </Card>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold">Cobros recurrentes programados</h2>
+              {recurrentesLoading && <p className="text-sm text-muted-foreground">Cargando programación…</p>}
+              {recurrentesError && <Card className="p-4 text-sm text-destructive">No se pudo cargar la programación. <Button variant="outline" onClick={() => refetchRecurrentes()}>Reintentar</Button></Card>}
+              <Card className="p-5">
+                <p className="text-sm font-semibold">Proyección de ingresos futuros</p>
+                <p className="mt-2 text-2xl font-bold">{formatCurrency(proyeccionRecurrente)}</p>
+                <p className="text-xs text-muted-foreground">En los próximos 30 días se generarán {formatCurrency(proyeccionRecurrente)} en cobros recurrentes programados. No corresponde a ingresos garantizados ni recibidos.</p>
+              </Card>
+              <div className="flex justify-end"><Button onClick={exportRecurrentes} disabled={!recurrentes.length || exportandoRecurrentes} className="gap-2"><Download className="h-4 w-4" />{exportandoRecurrentes ? "Preparando Excel…" : "Descargar Excel"}</Button></div>
+              {errorExportRecurrentes && <p role="alert" className="text-sm text-destructive">{errorExportRecurrentes}</p>}
+              <Card className="overflow-hidden">
+                <Table><TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead className="text-right">Monto</TableHead><TableHead>Frecuencia</TableHead><TableHead>Próxima generación</TableHead></TableRow></TableHeader>
+                  <TableBody>{recurrentes.length ? recurrentes.map((r) => <TableRow key={r.id}><TableCell>{r.clienteNombre}</TableCell><TableCell className="text-right font-mono">{formatCurrency(r.monto)}</TableCell><TableCell className="capitalize">{r.frecuencia}</TableCell><TableCell>{r.proximaGeneracion}</TableCell></TableRow>) : <TableRow><TableCell colSpan={4} className="h-24 text-center text-sm text-muted-foreground">No hay cobros recurrentes activos.</TableCell></TableRow>}</TableBody>
+                </Table>
+              </Card>
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -53,7 +53,12 @@ import type {
   CobroAjuste,
   CobroEliminado,
   CobroInput,
+  CobroMasivoInput,
+  CobroRecurrenteCreated,
+  CobroRecurrenteInput,
   CobroUpdate,
+  CobrosMasivosCreated,
+  CobrosRecurrentesReport,
   CobrosSummary,
   CompletarPerfilInput,
   ComprobanteTransferencia,
@@ -131,6 +136,8 @@ import type {
   RecordatorioInput,
   RecordatorioUpdate,
   RecordatoriosDefaultInput,
+  RecordatoriosMasivosInput,
+  RecordatoriosMasivosResult,
   RecordatoriosRunResult,
   RegenerarPortalResult,
   RegisterInput,
@@ -1967,6 +1974,278 @@ export const useCreateCobro = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCreateCobroMutationOptions(options));
+    }
+
+export const getListCobrosRecurrentesUrl = () => {
+
+
+
+
+  return `/api/cobros/recurrentes`
+}
+
+/**
+ * @summary List active recurring schedules and server-computed 30-day projection
+ */
+export const listCobrosRecurrentes = async ( options?: RequestInit): Promise<CobrosRecurrentesReport> => {
+
+  return customFetch<CobrosRecurrentesReport>(getListCobrosRecurrentesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCobrosRecurrentesQueryKey = () => {
+    return [
+    `/api/cobros/recurrentes`
+    ] as const;
+    }
+
+
+export const getListCobrosRecurrentesQueryOptions = <TData = Awaited<ReturnType<typeof listCobrosRecurrentes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCobrosRecurrentes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCobrosRecurrentesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCobrosRecurrentes>>> = ({ signal }) => listCobrosRecurrentes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCobrosRecurrentes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCobrosRecurrentesQueryResult = NonNullable<Awaited<ReturnType<typeof listCobrosRecurrentes>>>
+export type ListCobrosRecurrentesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List active recurring schedules and server-computed 30-day projection
+ */
+
+export function useListCobrosRecurrentes<TData = Awaited<ReturnType<typeof listCobrosRecurrentes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCobrosRecurrentes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCobrosRecurrentesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCobroRecurrenteUrl = () => {
+
+
+
+
+  return `/api/cobros/recurrentes`
+}
+
+export const createCobroRecurrente = async (cobroRecurrenteInput: CobroRecurrenteInput, options?: RequestInit): Promise<CobroRecurrenteCreated> => {
+
+  return customFetch<CobroRecurrenteCreated>(getCreateCobroRecurrenteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cobroRecurrenteInput,)
+  }
+);}
+
+
+
+
+export const getCreateCobroRecurrenteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCobroRecurrente>>, TError,{data: BodyType<CobroRecurrenteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCobroRecurrente>>, TError,{data: BodyType<CobroRecurrenteInput>}, TContext> => {
+
+const mutationKey = ['createCobroRecurrente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCobroRecurrente>>, {data: BodyType<CobroRecurrenteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCobroRecurrente(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCobroRecurrenteMutationResult = NonNullable<Awaited<ReturnType<typeof createCobroRecurrente>>>
+    export type CreateCobroRecurrenteMutationBody = BodyType<CobroRecurrenteInput>
+    export type CreateCobroRecurrenteMutationError = ErrorType<unknown>
+
+    export const useCreateCobroRecurrente = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCobroRecurrente>>, TError,{data: BodyType<CobroRecurrenteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCobroRecurrente>>,
+        TError,
+        {data: BodyType<CobroRecurrenteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCobroRecurrenteMutationOptions(options));
+    }
+
+export const getCreateCobrosMasivosUrl = () => {
+
+
+
+
+  return `/api/cobros/masivo`
+}
+
+export const createCobrosMasivos = async (cobroMasivoInput: CobroMasivoInput, options?: RequestInit): Promise<CobrosMasivosCreated> => {
+
+  return customFetch<CobrosMasivosCreated>(getCreateCobrosMasivosUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cobroMasivoInput,)
+  }
+);}
+
+
+
+
+export const getCreateCobrosMasivosMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCobrosMasivos>>, TError,{data: BodyType<CobroMasivoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCobrosMasivos>>, TError,{data: BodyType<CobroMasivoInput>}, TContext> => {
+
+const mutationKey = ['createCobrosMasivos'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCobrosMasivos>>, {data: BodyType<CobroMasivoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCobrosMasivos(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCobrosMasivosMutationResult = NonNullable<Awaited<ReturnType<typeof createCobrosMasivos>>>
+    export type CreateCobrosMasivosMutationBody = BodyType<CobroMasivoInput>
+    export type CreateCobrosMasivosMutationError = ErrorType<unknown>
+
+    export const useCreateCobrosMasivos = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCobrosMasivos>>, TError,{data: BodyType<CobroMasivoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCobrosMasivos>>,
+        TError,
+        {data: BodyType<CobroMasivoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCobrosMasivosMutationOptions(options));
+    }
+
+export const getSendRecordatoriosMasivosUrl = () => {
+
+
+
+
+  return `/api/cobros/recordatorios/masivo`
+}
+
+export const sendRecordatoriosMasivos = async (recordatoriosMasivosInput: RecordatoriosMasivosInput, options?: RequestInit): Promise<RecordatoriosMasivosResult> => {
+
+  return customFetch<RecordatoriosMasivosResult>(getSendRecordatoriosMasivosUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      recordatoriosMasivosInput,)
+  }
+);}
+
+
+
+
+export const getSendRecordatoriosMasivosMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendRecordatoriosMasivos>>, TError,{data: BodyType<RecordatoriosMasivosInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendRecordatoriosMasivos>>, TError,{data: BodyType<RecordatoriosMasivosInput>}, TContext> => {
+
+const mutationKey = ['sendRecordatoriosMasivos'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendRecordatoriosMasivos>>, {data: BodyType<RecordatoriosMasivosInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendRecordatoriosMasivos(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendRecordatoriosMasivosMutationResult = NonNullable<Awaited<ReturnType<typeof sendRecordatoriosMasivos>>>
+    export type SendRecordatoriosMasivosMutationBody = BodyType<RecordatoriosMasivosInput>
+    export type SendRecordatoriosMasivosMutationError = ErrorType<unknown>
+
+    export const useSendRecordatoriosMasivos = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendRecordatoriosMasivos>>, TError,{data: BodyType<RecordatoriosMasivosInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendRecordatoriosMasivos>>,
+        TError,
+        {data: BodyType<RecordatoriosMasivosInput>},
+        TContext
+      > => {
+      return useMutation(getSendRecordatoriosMasivosMutationOptions(options));
     }
 
 export const getGetCobroUrl = (id: number,) => {

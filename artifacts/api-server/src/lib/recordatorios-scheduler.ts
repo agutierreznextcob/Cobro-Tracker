@@ -9,6 +9,7 @@ import {
 } from "./reveniu";
 import { generarSnapshotsSaludCartera, verificarSaludSweep } from "./salud-cartera";
 import { procesarAvisosTrial, procesarVencimientosNotificaciones } from "./notificaciones-service";
+import { procesarCobrosRecurrentes, procesarEntregasIniciales } from "./cobros-recurrentes";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 // Surveys are scheduled ~1h after payment; sweep often so delivery stays close
@@ -36,8 +37,21 @@ async function tick(): Promise<void> {
     logger.error({ err }, "Error verificando salud del sweep de salud de cartera");
   }
 
+  // This outbox is independent from the once-per-day reminder sweep. It makes
+  // post-commit initial notices retryable after provider/profile failures.
+  try {
+    await procesarEntregasIniciales(runLogger);
+  } catch (err) {
+    logger.error({ err }, "Error procesando entregas iniciales de cobros");
+  }
+
   if (lastProcessedDate === hoy) return;
   try {
+    // Emits only one overdue cycle per schedule and is transactionally
+    // idempotent, so restart/catch-up cannot create duplicate charges.
+    const recurrentes = await procesarCobrosRecurrentes(runLogger, hoy);
+    // Run after recurring generation so a new same-day due child receives the
+    // normal reminder/workflow sweep in this tick.
     await procesarRecordatorios(runLogger, hoy);
     await procesarVencimientosNotificaciones(hoy);
     await procesarAvisosTrial();
@@ -54,7 +68,9 @@ async function tick(): Promise<void> {
     // Snapshot diario de salud de cartera por usuario (tendencias exactas del
     // dashboard). Idempotente por (usuario, fecha), seguro re-ejecutar.
     await generarSnapshotsSaludCartera(runLogger);
-    lastProcessedDate = hoy;
+    // Leave the date open while the bounded recurring page has work pending;
+    // the next hourly tick continues catch-up instead of losing old periods.
+    if (!recurrentes.pendientes) lastProcessedDate = hoy;
   } catch (err) {
     logger.error({ err }, "Error en el scheduler de recordatorios");
   }

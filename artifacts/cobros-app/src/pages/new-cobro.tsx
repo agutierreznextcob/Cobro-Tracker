@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateCobro, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, useListWorkflows, getListWorkflowsQueryKey, useListWorkflowPlantillas, useCreateWorkflowFromPlantilla, useAsignarWorkflow, useGetDatosBancarios, getGetDatosBancariosQueryKey, type CobroInput } from "@workspace/api-client-react";
+import { useCreateCobro, useCreateCobroRecurrente, useCreateCobrosMasivos, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, useListWorkflows, getListWorkflowsQueryKey, useListWorkflowPlantillas, useCreateWorkflowFromPlantilla, useAsignarWorkflow, useGetDatosBancarios, getGetDatosBancariosQueryKey, type CobroInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLocation } from "wouter";
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/format";
 import { TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
-import { Loader2, ArrowLeft, Users } from "lucide-react";
+import { Loader2, ArrowLeft, Users, Lock } from "lucide-react";
 import { Link } from "wouter";
 
 const IVA_RATE = 0.19;
@@ -40,6 +40,8 @@ export default function NewCobro() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createCobro = useCreateCobro();
+  const createCobroRecurrente = useCreateCobroRecurrente();
+  const createCobrosMasivos = useCreateCobrosMasivos();
   const { data: datosBancarios } = useGetDatosBancarios({
     query: { queryKey: getGetDatosBancariosQueryKey() },
   });
@@ -65,6 +67,22 @@ export default function NewCobro() {
   const [automatizacion, setAutomatizacion] = useState<"ninguna" | "simple" | "workflow">("ninguna");
   // "wf:<id>" for a saved workflow, "tpl:<key>" for a template to instantiate.
   const [workflowSeleccionado, setWorkflowSeleccionado] = useState<string>("");
+  const [modoAvanzado, setModoAvanzado] = useState<"individual" | "masivo" | "recurrente">("individual");
+  const [frecuencia, setFrecuencia] = useState("mensual");
+  const [fechaInicio, setFechaInicio] = useState("");
+  const [fechaTermino, setFechaTermino] = useState("");
+  const [busquedaMasiva, setBusquedaMasiva] = useState("");
+  const [clienteIdsMasivos, setClienteIdsMasivos] = useState<number[]>([]);
+  const [creandoAvanzado, setCreandoAvanzado] = useState(false);
+  const advancedAttempt = useRef<{ signature: string; key: string } | null>(null);
+  const advancedInFlight = useRef(false);
+  const templateAttempt = useRef<{ key: string; id: number } | null>(null);
+  const [canalesIniciales, setCanalesIniciales] = useState<Array<"email" | "whatsapp">>([]);
+  const [resultadosEntrega, setResultadosEntrega] = useState<Array<{ cobroId?: number; canal: string; estado: string; detalle?: string; waUrl?: string }>>([]);
+  // Trial/demo/admin users inherit NextCob features even if a historical plan
+  // field says Starter; server endpoints remain the source of enforcement.
+  const planUser = user as (typeof user & { subscriptionStatus?: string; plan?: string }) | null;
+  const nextCob = user?.role === "admin" || user?.esDemo || planUser?.subscriptionStatus === "prueba" || planUser?.plan !== "starter";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -107,7 +125,8 @@ export default function NewCobro() {
     }
   }, [permiteIva]);
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
+    if (advancedInFlight.current) return;
     const payload: CobroInput = {
       monto: values.monto,
       tipoDocumento: values.tipoDocumento,
@@ -126,6 +145,77 @@ export default function NewCobro() {
         description: "Elige una plantilla o un workflow guardado, o cambia la opción de automatización.",
         variant: "destructive",
       });
+      return;
+    }
+
+    if (modoAvanzado !== "individual") {
+      if (!nextCob) {
+        toast({ title: "Disponible en plan NextCob", description: "Disponible en plan NextCob", variant: "destructive" });
+        return;
+      }
+      if (modoAvanzado === "recurrente" && (!values.clienteId || !fechaInicio)) {
+        toast({ title: "Completa la programación", description: "Selecciona cliente y fecha de inicio.", variant: "destructive" });
+        return;
+      }
+      if (modoAvanzado === "masivo" && clienteIdsMasivos.length === 0) {
+        toast({ title: "Selecciona clientes", description: "Elige al menos un cliente para el cobro masivo.", variant: "destructive" });
+        return;
+      }
+      setCreandoAvanzado(true);
+      advancedInFlight.current = true;
+      try {
+        let workflowId: number | undefined;
+        if (automatizacion === "workflow") {
+          if (workflowSeleccionado.startsWith("tpl:")) {
+            if (templateAttempt.current?.key !== workflowSeleccionado) {
+              const nuevo = await crearDesdePlantilla.mutateAsync({ data: { plantillaKey: workflowSeleccionado.slice(4) } });
+              templateAttempt.current = { key: workflowSeleccionado, id: nuevo.id };
+            }
+            workflowId = templateAttempt.current.id;
+            queryClient.invalidateQueries({ queryKey: getListWorkflowsQueryKey() });
+          } else {
+            workflowId = Number(workflowSeleccionado.replace(/^wf:/, ""));
+          }
+          if (!Number.isInteger(workflowId) || workflowId! <= 0) throw new Error("Workflow inválido.");
+        }
+        const advancedPayload = {
+          monto: values.monto, tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
+          descripcion: values.descripcion, referencia: values.referencia || undefined,
+          responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
+           automatizacion, workflowId, canalesIniciales,
+          ...(modoAvanzado === "recurrente"
+            ? { clienteId: values.clienteId, emailPagador: values.emailPagador || selectedCliente?.email || undefined, frecuencia, fechaInicio, fechaTermino: fechaTermino || undefined }
+            : { clienteIds: clienteIdsMasivos, fechaVencimiento: values.fechaVencimiento || undefined }),
+        };
+        const signature = JSON.stringify({ modoAvanzado, ...advancedPayload });
+        if (advancedAttempt.current?.signature !== signature) {
+          advancedAttempt.current = { signature, key: crypto.randomUUID() };
+        }
+        const requestPayload = { ...advancedPayload, idempotencyKey: advancedAttempt.current.key };
+        const data = (modoAvanzado === "recurrente"
+          ? await createCobroRecurrente.mutateAsync({ data: requestPayload as never })
+          : await createCobrosMasivos.mutateAsync({ data: requestPayload as never })) as { cobro?: { id: number } | null; cobros?: Array<{ id: number }>; deliveryResults?: Array<{ cobroId?: number; canal: string; estado: string; detalle?: string; waUrl?: string }> };
+        setResultadosEntrega(data.deliveryResults ?? []);
+        queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardMetricsQueryKey() });
+        toast({
+          title: modoAvanzado === "recurrente" ? "Cobro recurrente programado" : "Cobros masivos creados",
+          description: modoAvanzado === "recurrente" ? "Cada ciclo tendrá su propio cobro y link de pago." : `${data.cobros?.length ?? 0} cobros independientes generados.`,
+        });
+        // Keep the user on this page when delivery was requested so every
+        // customer-specific outcome (including manual WhatsApp links) remains
+        // actionable instead of disappearing behind a redirect.
+        if (!(data.deliveryResults?.length)) {
+          const targetId = data.cobro?.id ?? data.cobros?.[0]?.id;
+          setLocation(targetId ? `/cobros/${targetId}` : "/cobros/informes");
+        }
+      } catch (error) {
+        toast({ title: "Error", description: error instanceof Error ? error.message : "No se pudo crear el cobro.", variant: "destructive" });
+      } finally {
+        advancedInFlight.current = false;
+        setCreandoAvanzado(false);
+      }
       return;
     }
 
@@ -263,6 +353,55 @@ export default function NewCobro() {
                 )}
               />
 
+              <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                <p className="text-sm font-medium">¿Es un cobro recurrente o un cobro único?</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {([
+                    ["individual", "Cobro único", "Comportamiento habitual"],
+                    ["recurrente", "Cobro recurrente", "Generación automática por frecuencia"],
+                    ["masivo", "Cobro masivo", "Un cobro por cliente seleccionado"],
+                  ] as const).map(([key, label, desc]) => (
+                    <button key={key} type="button" onClick={() => {
+                      if (key !== "individual" && !nextCob) {
+                        toast({ title: "Disponible en plan NextCob" });
+                        return;
+                      }
+                      setModoAvanzado(key);
+                    }}
+                      className={`rounded-md border p-3 text-left text-sm ${modoAvanzado === key ? "border-primary bg-primary/5" : "border-border/50"} ${key !== "individual" && !nextCob ? "opacity-70" : ""}`}>
+                      <span className="flex items-center gap-1 font-medium">{key !== "individual" && !nextCob && <Lock className="h-3 w-3" />}{label}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{key !== "individual" && !nextCob ? "Disponible en plan NextCob" : desc}</span>
+                    </button>
+                  ))}
+                </div>
+                {modoAvanzado === "recurrente" && (
+                  <div className="grid gap-3 border-t pt-3 sm:grid-cols-3">
+                    <div><label className="text-xs font-medium">Frecuencia</label><Select value={frecuencia} onValueChange={setFrecuencia}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent>{[["semanal","Semanal"],["quincenal","Quincenal"],["mensual","Mensual"],["bimestral","Bimestral"],["trimestral","Trimestral"],["anual","Anual"]].map(([v,l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent></Select></div>
+                    <div><label className="text-xs font-medium">Fecha de inicio</label><Input className="mt-1" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} /></div>
+                    <div><label className="text-xs font-medium">Fecha de término (opcional)</label><Input className="mt-1" type="date" min={fechaInicio || undefined} value={fechaTermino} onChange={(e) => setFechaTermino(e.target.value)} /><p className="mt-1 text-xs text-muted-foreground">{!fechaTermino && "Sin fecha de término"}</p></div>
+                    <p className="sm:col-span-3 text-xs text-muted-foreground">El siguiente cobro se genera al vencer el anterior. Cada ciclo es independiente y tiene su propio link y seguimiento.</p>
+                  </div>
+                )}
+              </div>
+              {modoAvanzado !== "individual" && (
+                <div className="rounded-lg border border-border/60 p-4">
+                  <p className="text-sm font-medium">Aviso inicial individual</p>
+                  <p className="mb-2 text-xs text-muted-foreground">Cada cliente recibe solo sus propios datos. Los WhatsApp sin proveedor quedan listos para envío manual.</p>
+                  {(["email", "whatsapp"] as const).map((canal) => (
+                    <label key={canal} className="mr-4 inline-flex items-center gap-1.5 text-sm">
+                      <input type="checkbox" checked={canalesIniciales.includes(canal)} onChange={(e) => setCanalesIniciales((current) => e.target.checked ? [...current, canal] : current.filter((item) => item !== canal))} />
+                      {canal === "email" ? "Email" : "WhatsApp"}
+                    </label>
+                  ))}
+                </div>
+              )}
+              {resultadosEntrega.length > 0 && (
+                <div className="rounded-lg border border-border/60 p-4 text-sm">
+                  <p className="font-medium">Resultado de avisos</p>
+                  <div className="mt-2 space-y-1">{resultadosEntrega.map((r, i) => <div key={`${r.cobroId ?? "schedule"}-${r.canal}-${i}`} className="flex items-center justify-between gap-2"><span>{r.cobroId ? `Cobro #${r.cobroId} · ` : ""}{r.canal}</span><span className="text-muted-foreground">{r.estado === "enviado" ? "Enviado" : r.estado === "pendiente_manual" ? "Listo para envío manual" : `Falló: ${r.detalle ?? "sin detalle"}`}</span>{r.waUrl && <a className="text-primary underline" href={r.waUrl} target="_blank" rel="noreferrer">Abrir WhatsApp</a>}</div>)}</div>
+                </div>
+              )}
+
               {permiteIva && (
                 <FormField
                   control={form.control}
@@ -320,14 +459,30 @@ export default function NewCobro() {
                 )}
               />
 
-              <FormField
+              {modoAvanzado === "masivo" && (
+                <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between"><p className="text-sm font-medium">Clientes del lote</p><span className="text-xs text-muted-foreground">{clienteIdsMasivos.length} seleccionados</span></div>
+                  <Input value={busquedaMasiva} onChange={(e) => setBusquedaMasiva(e.target.value)} placeholder="Buscar por nombre o RUT" />
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {(clientes ?? []).filter((c) => `${c.nombre} ${c.rut ?? ""}`.toLowerCase().includes(busquedaMasiva.toLowerCase())).map((c) => (
+                      <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-muted text-sm">
+                        <input type="checkbox" checked={clienteIdsMasivos.includes(c.id)} onChange={(e) => setClienteIdsMasivos((ids) => e.target.checked ? [...ids, c.id] : ids.filter((id) => id !== c.id))} />
+                        <span>{c.nombre}</span>{c.rut && <span className="font-mono text-xs text-muted-foreground">{c.rut}</span>}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Monto, descripción, documento, vencimiento y automatización se aplican igual a cada cliente.</p>
+                </div>
+              )}
+
+              {modoAvanzado !== "masivo" && <FormField
                 control={form.control}
                 name="clienteId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-1.5">
                       <Users className="h-3.5 w-3.5" />
-                      Cliente (opcional)
+                      {modoAvanzado === "recurrente" ? "Cliente" : "Cliente (opcional)"}
                     </FormLabel>
                     <Select
                       onValueChange={(v) => field.onChange(v === "ninguno" ? undefined : Number(v))}
@@ -359,7 +514,7 @@ export default function NewCobro() {
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              />}
 
               {puedeAsignar && miembrosActivos.length > 0 && (
                 <FormField
@@ -405,7 +560,7 @@ export default function NewCobro() {
                 />
               )}
 
-              <FormField
+              {modoAvanzado !== "masivo" && <FormField
                 control={form.control}
                 name="emailPagador"
                 render={({ field }) => (
@@ -427,9 +582,9 @@ export default function NewCobro() {
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              />}
 
-              <FormField
+              {modoAvanzado !== "recurrente" && <FormField
                 control={form.control}
                 name="fechaVencimiento"
                 render={({ field }) => (
@@ -445,7 +600,7 @@ export default function NewCobro() {
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              />}
 
               <div className="space-y-3 rounded-lg border border-border/50 bg-muted/20 p-4">
                 <div>
@@ -551,10 +706,10 @@ export default function NewCobro() {
               <div className="flex justify-end pt-4 border-t border-border/50">
                 <Button
                   type="submit"
-                  disabled={createCobro.isPending || asignarWorkflow.isPending}
+                  disabled={createCobro.isPending || asignarWorkflow.isPending || creandoAvanzado}
                   className="min-w-32"
                 >
-                  {createCobro.isPending || asignarWorkflow.isPending ? (
+                  {createCobro.isPending || asignarWorkflow.isPending || creandoAvanzado ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creando...</>
                   ) : (
                     "Crear cobro"

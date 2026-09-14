@@ -2,6 +2,8 @@ export * from "./organizaciones";
 export * from "./invitaciones";
 export * from "./clientes";
 export * from "./cobros";
+export * from "./cobros-recurrentes";
+export * from "./cobro-entregas-iniciales";
 export * from "./cobro-descuentos";
 export * from "./cobro-ajustes";
 export * from "./cobros-eliminados";

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, timestamp, pgEnum, integer, date, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, timestamp, pgEnum, integer, date, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { clientesTable } from "./clientes";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -64,9 +64,24 @@ export const cobrosTable = pgTable("cobros", {
   // payment confirmed through another source. Null legacy paid rows are
   // treated conservatively as non-abono payments.
   pagadoOrigen: text("pagado_origen").$type<"abonos" | "pago_completo">(),
+  // Provenance for advanced creation flows. The batch id is intentionally an
+  // opaque internal value: it is never included in customer notifications.
+  loteId: text("lote_id"),
+  // Actor-scoped idempotency metadata for advanced bulk creation. Keeping the
+  // request fingerprint lets the API reject a reused key with a different body.
+  idempotencyPayloadHash: text("idempotency_payload_hash"),
+  recurrenteProgramacionId: integer("recurrente_programacion_id"),
+  // The generation date is separate from the due date: a recurring charge is
+  // generated on the previous due date and itself falls due next period.
+  recurrenteFechaCiclo: date("recurrente_fecha_ciclo", { mode: "string" }),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_cobros_lote_id").on(table.loteId),
+  uniqueIndex("uq_cobros_lote_cliente").on(table.loteId, table.clienteId),
+  index("idx_cobros_recurrente_programacion").on(table.recurrenteProgramacionId),
+  uniqueIndex("uq_cobros_recurrente_ciclo").on(table.recurrenteProgramacionId, table.recurrenteFechaCiclo),
+]);
 
 export const insertCobroSchema = createInsertSchema(cobrosTable).omit({
   id: true,

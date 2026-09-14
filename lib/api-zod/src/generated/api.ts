@@ -25,6 +25,7 @@ export const GetCurrentAuthUserResponse = zod.object({
   "profileImageUrl": zod.string().nullable(),
   "emailVerified": zod.boolean().optional(),
   "esDemo": zod.boolean().optional(),
+  "plan": zod.enum(['starter', 'nextcob']).optional().describe('Plan efectivo de la organización (incluye herencia del dueño).'),
   "role": zod.enum(['user', 'admin']).optional(),
   "orgRole": zod.union([zod.literal('admin_org'),zod.literal('supervisor'),zod.literal('ejecutivo'),zod.literal(null)]).nullish().describe('Role within the user\'s organization'),
   "organizationId": zod.number().nullish(),
@@ -301,10 +302,13 @@ export const GetClienteResponse = zod.object({
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "fechaVencimiento": zod.string().regex(getClienteResponseCobrosItemFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "loteId": zod.string().nullish().describe('Opaque internal batch provenance; never customer-facing.'),
+  "recurrenteProgramacionId": zod.number().nullish().describe('Internal recurring schedule that generated this charge.'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "linkPago": zod.string().nullish().describe('Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
@@ -526,10 +530,13 @@ export const ListCobrosResponseItem = zod.object({
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "fechaVencimiento": zod.string().regex(listCobrosResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "loteId": zod.string().nullish().describe('Opaque internal batch provenance; never customer-facing.'),
+  "recurrenteProgramacionId": zod.number().nullish().describe('Internal recurring schedule that generated this charge.'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "linkPago": zod.string().nullish().describe('Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
@@ -557,6 +564,97 @@ export const CreateCobroBody = zod.object({
   "responsableId": zod.string().optional().describe('Assign the cobro to an ejecutivo\/admin of the organization (admin only). Defaults to the creator.'),
   "emailPagador": zod.string().email().optional(),
   "fechaVencimiento": zod.string().regex(createCobroBodyFechaVencimientoRegExp).optional().describe('Due date (YYYY-MM-DD) used to schedule reminders')
+})
+
+
+/**
+ * @summary List active recurring schedules and server-computed 30-day projection
+ */
+export const ListCobrosRecurrentesResponse = zod.object({
+  "schedules": zod.array(zod.object({
+  "id": zod.number(),
+  "clienteNombre": zod.string(),
+  "monto": zod.number(),
+  "frecuencia": zod.string(),
+  "proximaGeneracion": zod.coerce.date(),
+  "activo": zod.boolean()
+})),
+  "proyeccion30Dias": zod.number(),
+  "ocurrencias30Dias": zod.array(zod.object({
+  "programacionId": zod.number().optional(),
+  "fecha": zod.coerce.date().optional(),
+  "monto": zod.number().optional()
+}))
+})
+
+
+
+export const createCobroRecurrenteBodyOneDescripcionMax = 255;
+
+
+
+export const CreateCobroRecurrenteBody = zod.object({
+  "monto": zod.number().min(1),
+  "descripcion": zod.string().min(1).max(createCobroRecurrenteBodyOneDescripcionMax),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']),
+  "incluyeIva": zod.boolean().optional(),
+  "referencia": zod.string().optional(),
+  "responsableId": zod.string().optional(),
+  "automatizacion": zod.enum(['ninguna', 'simple', 'workflow']),
+  "workflowId": zod.number().optional(),
+  "canalesIniciales": zod.array(zod.enum(['email', 'whatsapp'])),
+  "idempotencyKey": zod.string().uuid()
+}).and(zod.object({
+  "clienteId": zod.number(),
+  "emailPagador": zod.string().email().optional(),
+  "frecuencia": zod.enum(['semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'anual']),
+  "fechaInicio": zod.coerce.date(),
+  "fechaTermino": zod.coerce.date().optional()
+}))
+
+
+
+export const createCobrosMasivosBodyOneDescripcionMax = 255;
+
+export const createCobrosMasivosBodyTwoClienteIdsMax = 100;
+
+
+
+export const CreateCobrosMasivosBody = zod.object({
+  "monto": zod.number().min(1),
+  "descripcion": zod.string().min(1).max(createCobrosMasivosBodyOneDescripcionMax),
+  "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']),
+  "incluyeIva": zod.boolean().optional(),
+  "referencia": zod.string().optional(),
+  "responsableId": zod.string().optional(),
+  "automatizacion": zod.enum(['ninguna', 'simple', 'workflow']),
+  "workflowId": zod.number().optional(),
+  "canalesIniciales": zod.array(zod.enum(['email', 'whatsapp'])),
+  "idempotencyKey": zod.string().uuid()
+}).and(zod.object({
+  "clienteIds": zod.array(zod.number()).min(1).max(createCobrosMasivosBodyTwoClienteIdsMax),
+  "fechaVencimiento": zod.coerce.date().optional()
+}))
+
+
+export const sendRecordatoriosMasivosBodyCobroIdsMax = 100;
+
+
+
+
+export const SendRecordatoriosMasivosBody = zod.object({
+  "cobroIds": zod.array(zod.number()).min(1).max(sendRecordatoriosMasivosBodyCobroIdsMax),
+  "canales": zod.array(zod.enum(['email', 'whatsapp'])).min(1)
+})
+
+export const SendRecordatoriosMasivosResponse = zod.object({
+  "results": zod.array(zod.object({
+  "cobroId": zod.number().optional(),
+  "canal": zod.enum(['email', 'whatsapp']),
+  "estado": zod.enum(['enviado', 'fallido', 'pendiente_manual']),
+  "detalle": zod.string().optional(),
+  "waUrl": zod.string().optional()
+}))
 })
 
 
@@ -590,10 +688,13 @@ export const GetCobroResponse = zod.object({
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "fechaVencimiento": zod.string().regex(getCobroResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "loteId": zod.string().nullish().describe('Opaque internal batch provenance; never customer-facing.'),
+  "recurrenteProgramacionId": zod.number().nullish().describe('Internal recurring schedule that generated this charge.'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "linkPago": zod.string().nullish().describe('Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
@@ -649,10 +750,13 @@ export const UpdateCobroResponse = zod.object({
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "fechaVencimiento": zod.string().regex(updateCobroResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "loteId": zod.string().nullish().describe('Opaque internal batch provenance; never customer-facing.'),
+  "recurrenteProgramacionId": zod.number().nullish().describe('Internal recurring schedule that generated this charge.'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "linkPago": zod.string().nullish().describe('Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
@@ -718,10 +822,13 @@ export const AjustarMontoResponse = zod.object({
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "fechaVencimiento": zod.string().regex(ajustarMontoResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "loteId": zod.string().nullish().describe('Opaque internal batch provenance; never customer-facing.'),
+  "recurrenteProgramacionId": zod.number().nullish().describe('Internal recurring schedule that generated this charge.'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "linkPago": zod.string().nullish().describe('Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
@@ -915,6 +1022,7 @@ export const CompletarPerfilResponse = zod.object({
   "profileImageUrl": zod.string().nullable(),
   "emailVerified": zod.boolean().optional(),
   "esDemo": zod.boolean().optional(),
+  "plan": zod.enum(['starter', 'nextcob']).optional().describe('Plan efectivo de la organización (incluye herencia del dueño).'),
   "role": zod.enum(['user', 'admin']).optional(),
   "orgRole": zod.union([zod.literal('admin_org'),zod.literal('supervisor'),zod.literal('ejecutivo'),zod.literal(null)]).nullish().describe('Role within the user\'s organization'),
   "organizationId": zod.number().nullish(),
@@ -1309,10 +1417,13 @@ export const AplicarDescuentoResponse = zod.object({
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "fechaVencimiento": zod.string().regex(aplicarDescuentoResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "loteId": zod.string().nullish().describe('Opaque internal batch provenance; never customer-facing.'),
+  "recurrenteProgramacionId": zod.number().nullish().describe('Internal recurring schedule that generated this charge.'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "linkPago": zod.string().nullish().describe('Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
@@ -2746,10 +2857,13 @@ export const AsignarWorkflowResponse = zod.object({
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "fechaVencimiento": zod.string().regex(asignarWorkflowResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "loteId": zod.string().nullish().describe('Opaque internal batch provenance; never customer-facing.'),
+  "recurrenteProgramacionId": zod.number().nullish().describe('Internal recurring schedule that generated this charge.'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "linkPago": zod.string().nullish().describe('Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
@@ -2787,10 +2901,13 @@ export const DesasignarWorkflowResponse = zod.object({
   "clienteNombre": zod.string().nullish().describe('Name of the associated cliente'),
   "emailPagador": zod.string().nullish().describe('Email of the payer for Flow payment link'),
   "fechaVencimiento": zod.string().regex(desasignarWorkflowResponseFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD) used to schedule reminders'),
+  "loteId": zod.string().nullish().describe('Opaque internal batch provenance; never customer-facing.'),
+  "recurrenteProgramacionId": zod.number().nullish().describe('Internal recurring schedule that generated this charge.'),
   "flowOrdenId": zod.string().nullish().describe('Flow order ID returned after creating payment'),
   "flowLinkPago": zod.string().nullish().describe('Flow payment URL for the payer'),
   "mpPreferenceId": zod.string().nullish().describe('MercadoPago preference ID'),
   "mpPaymentLinkUrl": zod.string().nullish().describe('MercadoPago checkout URL for the payer'),
+  "linkPago": zod.string().nullish().describe('Effective payment URL. Uses the processor link when present, otherwise an already-provisioned debtor portal URL focused on this cobro.'),
   "workflowId": zod.number().nullish().describe('ID of the collections workflow assigned to this cobro (null when using simple reminders)'),
   "pagadoEn": zod.coerce.date().nullish().describe('When the cobro was confirmed as fully paid (null until paid). Use for revenue-by-period reporting.'),
   "creadoEn": zod.coerce.date(),
