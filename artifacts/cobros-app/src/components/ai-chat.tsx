@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
-import { Bot, X, Send, Loader2, AlertCircle, Plus } from "lucide-react";
+import { X, Send, Loader2, AlertCircle, Plus } from "lucide-react";
+import { DianaAvatar } from "@/components/diana-avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 import { stripThinkingBlocks } from "@/lib/strip-thinking";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+const DIANA_UNAVAILABLE = "Diana no está disponible en este momento. Intenta nuevamente en unos minutos.";
 
 type LocalMessage = { id: number; role: "user" | "assistant"; content: string };
 
@@ -63,7 +65,7 @@ function MessageBubble({ msg }: { msg: LocalMessage | { id: number; role: string
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-3`}>
       {!isUser && (
         <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0 mr-2 mt-0.5">
-          <Bot className="h-4 w-4" />
+          <DianaAvatar className="h-7 w-7" />
         </div>
       )}
       <div
@@ -147,11 +149,15 @@ export function AiChat() {
         scrollToBottom();
       },
       (msg) => {
-        setError(msg);
+        setError(DIANA_UNAVAILABLE);
         setStreamingContent(null);
         setIsSending(false);
       }
-    );
+    ).catch(() => {
+      setError(DIANA_UNAVAILABLE);
+      setStreamingContent(null);
+      setIsSending(false);
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -172,7 +178,7 @@ export function AiChat() {
         title="Abrir chat con Diana"
         aria-label="Abrir chat con Diana"
       >
-        {open ? <X className="h-6 w-6" /> : <span className="text-lg font-bold">D</span>}
+        {open ? <X className="h-6 w-6" /> : <DianaAvatar className="h-12 w-12" />}
       </button>
 
       {/* Chat panel — anchored bottom-right */}
@@ -181,7 +187,7 @@ export function AiChat() {
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-card shrink-0">
             <div className="h-8 w-8 rounded-full bg-black flex items-center justify-center text-[#F2A900] font-bold">
-              D
+              <DianaAvatar />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm leading-tight">Diana · Asistente NextCob</p>
@@ -202,7 +208,7 @@ export function AiChat() {
               {messages.length === 0 && streamingContent === null && (
                 <div className="text-center py-8 text-muted-foreground text-sm">
                   <div className="h-12 w-12 mx-auto mb-3 rounded-full bg-black flex items-center justify-center text-[#F2A900] text-xl font-bold">
-                    D
+                    <DianaAvatar className="h-12 w-12" />
                   </div>
                   <p className="font-medium text-foreground">Hola, soy Diana, tu asistente de NextCob.</p>
                   <p className="text-xs mt-2 opacity-80 leading-relaxed">

@@ -150,10 +150,8 @@ publicChatRouter.post("/public/landing-chat", async (req, res) => {
     try {
       const groq = getGroqClient();
       const stream = await groq.chat.completions.create({
-        model: "qwen/qwen3.6-27b",
+        model: "llama-3.3-70b-versatile",
         max_tokens: 1024,
-        reasoning_effort: "none",
-        reasoning_format: "hidden",
         messages: [{ role: "system", content: systemPrompt }, ...chatMessages],
         stream: true,
       });
@@ -163,7 +161,7 @@ publicChatRouter.post("/public/landing-chat", async (req, res) => {
       }
     } catch (groqErr) {
       req.log.error({ groqErr }, "Groq streaming error in /public/landing-chat");
-      res.write(`data: ${JSON.stringify({ error: "Error al comunicarse con el modelo de IA" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: "Diana no está disponible en este momento. Intenta nuevamente en unos minutos." })}\n\n`);
     }
 
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);

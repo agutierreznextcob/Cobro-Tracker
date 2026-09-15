@@ -6,8 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ReactMarkdown from "react-markdown";
 import { stripThinkingBlocks } from "@/lib/strip-thinking";
+import { DianaAvatar } from "@/components/diana-avatar";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+const DIANA_UNAVAILABLE = "Diana no está disponible en este momento. Intenta nuevamente en unos minutos.";
 
 const MORADO = "#6C5CE7";
 const AMARILLO = "#FFD166";
@@ -162,11 +164,15 @@ export function LandingChat() {
         scrollToBottom();
       },
       (msg) => {
-        setError(msg);
+        setError(DIANA_UNAVAILABLE);
         setStreamingContent(null);
         setIsSending(false);
       },
-    );
+    ).catch(() => {
+      setError(DIANA_UNAVAILABLE);
+      setStreamingContent(null);
+      setIsSending(false);
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -190,7 +196,7 @@ export function LandingChat() {
           <X className="h-6 w-6" />
         ) : (
           <span className="relative">
-            <MessageCircle className="h-6 w-6" />
+            <DianaAvatar className="h-12 w-12" />
             <span
               className="absolute -top-2 -right-2 h-3 w-3 rounded-full border-2 border-white"
               style={{ backgroundColor: AMARILLO }}
@@ -208,7 +214,7 @@ export function LandingChat() {
               className="h-8 w-8 rounded-full flex items-center justify-center font-bold"
               style={{ backgroundColor: "#090f16", color: AMARILLO }}
             >
-              D
+              <DianaAvatar />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm leading-tight">Diana · Asistente NextCob</p>
@@ -225,7 +231,7 @@ export function LandingChat() {
                     className="h-12 w-12 mx-auto mb-3 rounded-full flex items-center justify-center text-xl font-bold"
                     style={{ backgroundColor: "#090f16", color: AMARILLO }}
                   >
-                    D
+                    <DianaAvatar className="h-12 w-12" />
                   </div>
                   <p className="font-medium text-foreground">Hola, soy Diana 👋 ¿En qué puedo ayudarte sobre NextCob?</p>
                   <p className="text-xs mt-1 opacity-80">

@@ -7,4 +7,4 @@ Check the live Groq model inventory before changing model IDs. The previously re
 
 **Why:** A static model switch passed typechecking but failed at runtime with `model_not_found`. The available Qwen model supports disabling reasoning with `reasoning_effort: "none"` and hiding it with `reasoning_format: "hidden"`.
 
-**How to apply:** Keep both defenses: disable/hide reasoning in every Groq call, and sanitize streamed output incrementally in the frontend because tags can be split across SSE chunks. Recheck the models endpoint before any future model replacement.
+**How to apply:** Disable/hide reasoning only with parameters supported by the selected model (do not carry Qwen-specific parameters into Llama calls). Retain incremental frontend sanitization because tags can be split across SSE chunks. Recheck the models endpoint and a minimal completion before any future model replacement; a valid key does not imply access to a particular model.
