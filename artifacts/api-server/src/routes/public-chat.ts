@@ -150,7 +150,8 @@ publicChatRouter.post("/public/landing-chat", async (req, res) => {
     try {
       const groq = getGroqClient();
       const stream = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
+        reasoning_effort: "low",
         max_tokens: 1024,
         messages: [{ role: "system", content: systemPrompt }, ...chatMessages],
         stream: true,
