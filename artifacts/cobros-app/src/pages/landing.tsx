@@ -5,6 +5,7 @@ import { LandingChat } from "@/components/landing-chat";
 import { DemoRequestModal } from "@/components/demo-request-modal";
 import { HeroParticles } from "@/components/hero-particles";
 import { Reveal } from "@/components/reveal";
+import "./landing.css";
 import {
   ArrowRight,
   BarChart3,
@@ -95,7 +96,7 @@ function LandingNav() {
             <>
               <button
                 onClick={() => navigate("/dashboard")}
-                className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
+                className={`landing-cta inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
                   scrolled
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
                     : "bg-[#F4A800] text-black hover:bg-[#ffba1f]"
@@ -164,14 +165,14 @@ function LandingNav() {
               </button>
               <DemoRequestModal
                 trigger={
-                  <button className={`hidden sm:inline-flex ${ghostBtnClass}`}>
+                  <button className={`landing-secondary hidden sm:inline-flex ${ghostBtnClass}`}>
                     Agenda una presentación
                   </button>
                 }
               />
               <button
                 onClick={() => navigate("/register")}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
+                className={`landing-cta text-sm font-semibold px-4 py-2 rounded-lg shadow transition-colors ${
                   scrolled
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
                     : "bg-[#F4A800] text-black hover:bg-[#ffba1f]"
@@ -209,7 +210,7 @@ function HeroSection() {
           </div>
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white leading-[1.1] mb-6">
             Controla el dinero que te deben.{" "}
-            <span className="text-[#F4A800]">Predícelo. Recupéralo.</span>
+            <span className="text-[#E86B2A]">Predícelo. Recupéralo.</span>
           </h1>
         </Reveal>
         <Reveal variant="up" delayMs={150}>
@@ -223,18 +224,22 @@ function HeroSection() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               onClick={() => navigate("/register")}
-              className="btn-shimmer inline-flex items-center gap-2 bg-[#F4A800] text-black px-6 py-3 rounded-lg text-base font-semibold shadow-lg shadow-[#F4A800]/20 hover:bg-[#ffba1f] transition-colors w-full sm:w-auto justify-center"
+              className="landing-cta btn-shimmer inline-flex items-center gap-2 px-6 py-3 rounded-lg text-base font-semibold transition-colors w-full sm:w-auto justify-center"
             >
               Comenzar gratis
               <ArrowRight className="h-4 w-4" />
             </button>
             <DemoRequestModal
               trigger={
-                <button className="inline-flex items-center gap-2 border border-white/70 text-white px-6 py-3 rounded-lg text-base font-semibold hover:bg-white/10 transition-colors w-full sm:w-auto justify-center">
+                <button className="landing-secondary inline-flex items-center gap-2 text-white px-6 py-3 rounded-lg text-base font-semibold transition-colors w-full sm:w-auto justify-center">
                   Agenda una presentación
                 </button>
               }
             />
+          </div>
+          <div className="inline-flex items-center gap-2 mt-5 rounded-full bg-[#0D6E6E] text-white px-3 py-1.5 text-xs font-medium">
+            <Bot className="h-4 w-4" />
+            Con asistente IA incluido
           </div>
           <p className="text-sm text-white/60 mt-5">
             14 días de prueba gratis con todas las funciones · Planes desde $14.990 + IVA CLP/mes
@@ -342,7 +347,7 @@ function ComoFuncionaSection() {
             >
             <div className="card-lift bg-card border rounded-2xl p-7 shadow-sm h-full">
               <div className="flex items-start justify-between mb-5">
-                <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-sm">
+                <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm ${i % 2 === 0 ? "bg-[#F4A800] text-[#0A0A0A]" : "bg-[#0D6E6E] text-white"}`}>
                   <step.icon className="h-5 w-5" />
                 </div>
                 <span className="text-5xl font-black text-muted-foreground/15 font-mono leading-none">{step.number}</span>
@@ -406,7 +411,7 @@ function CaracteristicasSection() {
               <span className="hidden sm:block text-sm text-muted-foreground flex-1">
                 {f.desc}
               </span>
-              <CheckCircle2 className="h-5 w-5 text-[#F4A800] shrink-0" />
+              <CheckCircle2 className={`h-5 w-5 shrink-0 ${i % 2 === 0 ? "text-[#F4A800]" : "text-[#0D6E6E]"}`} />
             </Reveal>
           ))}
         </div>
@@ -513,7 +518,7 @@ function PreciosSection() {
               </ul>
               <button
                 onClick={() => navigate("/register")}
-                className="w-full border border-border py-2.5 rounded-lg font-semibold text-sm hover:bg-muted transition-colors"
+                className="landing-cta w-full py-2.5 rounded-lg font-semibold text-sm transition-colors"
               >
                 Comenzar 14 días gratis
               </button>
@@ -558,7 +563,7 @@ function PreciosSection() {
               </p>
               <button
                 onClick={() => navigate("/register")}
-                className="w-full bg-[#F4A800] text-black py-2.5 rounded-lg font-semibold text-sm hover:bg-[#ffba1f] transition-colors"
+                className="landing-cta w-full py-2.5 rounded-lg font-semibold text-sm transition-colors"
               >
                 Comenzar 14 días gratis
               </button>
@@ -649,13 +654,13 @@ function CtaSection() {
       />
       <div className="relative max-w-2xl mx-auto text-center">
         <Reveal variant="up">
-          <h2 className="text-3xl font-bold text-white mb-4">Toma el control de tus cuentas por cobrar hoy</h2>
+          <h2 className="text-3xl font-bold text-white mb-4">Toma el control de tus cuentas por cobrar <span className="text-[#E86B2A]">hoy</span></h2>
           <p className="text-white/75 text-lg mb-8 leading-relaxed">
             14 días gratis. Sin tarjeta de crédito. Tu primer cobro en 5 minutos.
           </p>
           <button
             onClick={() => navigate("/register")}
-            className="btn-pulse inline-flex items-center gap-2 bg-[#F4A800] text-black px-8 py-3.5 rounded-lg text-base font-bold shadow-lg shadow-[#F4A800]/20 hover:bg-[#ffba1f] transition-colors"
+            className="landing-cta btn-pulse inline-flex items-center gap-2 px-8 py-3.5 rounded-lg text-base font-bold transition-colors"
           >
             Crear mi cuenta gratis
             <ChevronRight className="h-5 w-5" />
@@ -719,7 +724,7 @@ function Footer() {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="nextcob-landing min-h-screen bg-background text-foreground">
       <LandingNav />
       <HeroSection />
       <ComoFuncionaSection />

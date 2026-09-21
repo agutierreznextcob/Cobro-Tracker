@@ -11,8 +11,8 @@ import { DianaAvatar } from "@/components/diana-avatar";
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 const DIANA_UNAVAILABLE = "Diana no está disponible en este momento. Intenta nuevamente en unos minutos.";
 
-const MORADO = "#6C5CE7";
-const AMARILLO = "#FFD166";
+const MORADO = "#0D6E6E";
+const AMARILLO = "#F4A800";
 
 type LocalMessage = { id: number; role: "user" | "assistant"; content: string };
 
@@ -188,7 +188,7 @@ export function LandingChat() {
       <button
         onClick={() => (open ? setOpen(false) : handleOpen())}
         className="fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105"
-        style={{ backgroundColor: open ? "#4b3fb0" : MORADO }}
+        style={{ backgroundColor: open ? "#0A0A0A" : MORADO }}
         title="¿Dudas? Pregúntale a Diana"
         aria-label="Abrir chat con Diana"
       >

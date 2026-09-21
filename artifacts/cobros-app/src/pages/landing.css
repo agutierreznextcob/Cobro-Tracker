@@ -1,0 +1,41 @@
+/* Marketing-only tokens: never change :root or the internal app theme. */
+.nextcob-landing {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 4%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 4%;
+  --primary: 180 79% 24.12%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 180 79% 24.12%;
+}
+
+.nextcob-landing .hero-animated-bg {
+  background-image: linear-gradient(125deg, #0A0A0A, #111111, #0A0A0A, #151515);
+}
+
+.nextcob-landing .landing-cta {
+  background-color: #E86B2A;
+  color: #0A0A0A;
+  box-shadow: 0 8px 24px -8px rgb(232 107 42 / 35%);
+}
+
+.nextcob-landing .landing-cta:hover {
+  background-color: #F47B3B;
+}
+
+.nextcob-landing .landing-secondary {
+  border: 1px solid #0D6E6E;
+}
+
+.nextcob-landing .landing-secondary:hover {
+  background-color: rgb(13 110 110 / 18%);
+}
+
+@keyframes landingCtaPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(232 107 42 / 40%); }
+  50% { box-shadow: 0 0 0 12px rgb(232 107 42 / 0%); }
+}
+
+.nextcob-landing .btn-pulse {
+  animation-name: landingCtaPulse;
+}
