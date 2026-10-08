@@ -62,17 +62,17 @@ function LandingNav() {
 
   const linkClass = scrolled
     ? "text-muted-foreground hover:text-foreground transition-colors"
-    : "text-white/80 hover:text-white transition-colors";
+    : "text-neutral-700 hover:text-black transition-colors";
   const ghostBtnClass = scrolled
     ? "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-secondary/60"
-    : "text-sm font-medium text-white/80 hover:text-white transition-colors px-3 py-2 rounded-md hover:bg-white/10";
+    : "text-sm font-medium text-neutral-700 hover:text-black transition-colors px-3 py-2 rounded-md hover:bg-white/60";
 
   return (
     <header
       className={`fixed top-0 inset-x-0 z-50 transition-colors duration-300 ${
         scrolled
           ? "bg-background/80 backdrop-blur-md border-b border-border/50"
-          : "bg-transparent border-b border-transparent"
+          : "bg-white/80 backdrop-blur-md border-b border-transparent"
       }`}
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -80,9 +80,7 @@ function LandingNav() {
           <img
             src={`${import.meta.env.BASE_URL}brand/nextcob-logo.png`}
             alt="NextCob"
-            className={`h-8 w-auto transition-[filter] duration-300 ${
-              scrolled ? "" : "brightness-0 invert"
-            }`}
+            className="h-8 w-auto"
           />
         </div>
         <nav className="hidden md:flex items-center gap-6 text-sm">
@@ -114,7 +112,7 @@ function LandingNav() {
                   className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
                     scrolled
                       ? "bg-secondary text-foreground hover:bg-secondary/70 border border-border/60"
-                      : "bg-white/15 text-white hover:bg-white/25 border border-white/20"
+                      : "bg-white text-neutral-800 hover:bg-neutral-100 border border-neutral-200"
                   }`}
                 >
                   {accountInitial}
@@ -191,16 +189,7 @@ function LandingNav() {
 function HeroSection() {
   const [, navigate] = useLocation();
   return (
-    <section id="hero" className="relative overflow-hidden pt-32 pb-20 px-6 hero-animated-bg">
-      {/* Animated fintech particle network */}
-      <HeroParticles />
-      {/* Dark overlay so the white text always stays legible */}
-      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
-      {/* Fade-to-white transition into the next section */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-background"
-        aria-hidden="true"
-      />
+    <section id="hero" className="relative overflow-hidden pt-32 pb-20 px-6">
 
       <div className="relative z-10 max-w-4xl mx-auto text-center">
         <Reveal variant="up">
@@ -208,13 +197,13 @@ function HeroSection() {
             <Sparkles className="h-3.5 w-3.5 text-[#F4A800]" />
             Gestión inteligente de cuentas por cobrar
           </div>
-          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white leading-[1.1] mb-6">
+          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-[#0A0A0A] leading-[1.1] mb-6">
             Controla el dinero que te deben.{" "}
             <span className="text-[#E86B2A]">Predícelo. Recupéralo.</span>
           </h1>
         </Reveal>
         <Reveal variant="up" delayMs={150}>
-          <p className="text-xl text-white/80 max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p className="text-xl text-neutral-700 max-w-2xl mx-auto mb-10 leading-relaxed">
             NextCob es la plataforma de gestión de cuentas por cobrar para
             empresas y profesionales que quieren saber exactamente cuándo y
             cuánto dinero recibirán — y actuar antes de que sea tarde.
@@ -231,7 +220,7 @@ function HeroSection() {
             </button>
             <DemoRequestModal
               trigger={
-                <button className="landing-secondary inline-flex items-center gap-2 text-white px-6 py-3 rounded-lg text-base font-semibold transition-colors w-full sm:w-auto justify-center">
+                <button className="landing-secondary inline-flex items-center gap-2 text-[#0D6E6E] px-6 py-3 rounded-lg text-base font-semibold transition-colors w-full sm:w-auto justify-center">
                   Agenda una presentación
                 </button>
               }
@@ -241,7 +230,7 @@ function HeroSection() {
             <Bot className="h-4 w-4" />
             Con asistente IA incluido
           </div>
-          <p className="text-sm text-white/60 mt-5">
+          <p className="text-sm text-neutral-600 mt-5">
             14 días de prueba gratis con todas las funciones · Planes desde $14.990 + IVA CLP/mes
           </p>
         </Reveal>
@@ -526,7 +515,7 @@ function PreciosSection() {
           </Reveal>
           {/* Plan NextCob (destacado) */}
           <Reveal variant="zoom">
-            <div className="h-full bg-[#0A0A0A] text-white rounded-2xl p-8 shadow-xl flex flex-col relative overflow-hidden border-2 border-[#F4A800]">
+            <div className="h-full bg-white/95 text-[#0A0A0A] rounded-2xl p-8 shadow-xl flex flex-col relative overflow-hidden border-2 border-[#F4A800]">
               <div className="absolute top-5 right-5">
                 <span className="bg-[#F4A800] text-black text-xs font-bold px-2.5 py-1 rounded-full">RECOMENDADO</span>
               </div>
@@ -534,12 +523,12 @@ function PreciosSection() {
                 <p className="text-xs font-semibold text-[#F4A800] uppercase tracking-wider mb-2">Plan NextCob</p>
                 <div className="flex items-end gap-1">
                   <span className="text-4xl font-black">$24.990 + IVA</span>
-                  <span className="text-white/60 pb-1 text-sm">/mes</span>
+                  <span className="text-neutral-600 pb-1 text-sm">/mes</span>
                 </div>
-                <p className="text-sm text-white/80 mt-2 font-medium">
+                <p className="text-sm text-neutral-700 mt-2 font-medium">
                   Neto $24.990 + IVA $4.748 = Total $29.738/mes
                 </p>
-                <p className="text-sm text-white/60 mt-1">Todo NextCob, sin límites de funciones.</p>
+                <p className="text-sm text-neutral-600 mt-1">Todo NextCob, sin límites de funciones.</p>
               </div>
               <ul className="space-y-3 flex-1 mb-8">
                 {[
@@ -558,7 +547,7 @@ function PreciosSection() {
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-white/50 mb-4">
+              <p className="text-xs text-neutral-600 mb-4">
                 Usuarios adicionales: $9.990 + IVA/mes c/u
               </p>
               <button
@@ -646,7 +635,7 @@ function QuienesSomosSection() {
 function CtaSection() {
   const [, navigate] = useLocation();
   return (
-    <section className="relative overflow-hidden py-20 px-6 bg-[#0A0A0A]">
+    <section className="relative overflow-hidden py-20 px-6">
       {/* Subtle gold glow */}
       <div
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(244,168,0,0.18),transparent_70%)]"
@@ -654,8 +643,8 @@ function CtaSection() {
       />
       <div className="relative max-w-2xl mx-auto text-center">
         <Reveal variant="up">
-          <h2 className="text-3xl font-bold text-white mb-4">Toma el control de tus cuentas por cobrar <span className="text-[#E86B2A]">hoy</span></h2>
-          <p className="text-white/75 text-lg mb-8 leading-relaxed">
+          <h2 className="text-3xl font-bold text-[#0A0A0A] mb-4">Toma el control de tus cuentas por cobrar <span className="text-[#E86B2A]">hoy</span></h2>
+          <p className="text-neutral-700 text-lg mb-8 leading-relaxed">
             14 días gratis. Sin tarjeta de crédito. Tu primer cobro en 5 minutos.
           </p>
           <button
@@ -724,7 +713,10 @@ function Footer() {
 
 export default function LandingPage() {
   return (
-    <div className="nextcob-landing min-h-screen bg-background text-foreground">
+    <div className="nextcob-landing relative isolate min-h-screen bg-background text-foreground">
+      <div className="landing-particle-background" aria-hidden="true">
+        <HeroParticles />
+      </div>
       <LandingNav />
       <HeroSection />
       <ComoFuncionaSection />

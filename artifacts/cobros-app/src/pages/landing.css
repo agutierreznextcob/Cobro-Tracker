@@ -9,8 +9,19 @@
   --ring: 180 79% 24.12%;
 }
 
-.nextcob-landing .hero-animated-bg {
-  background-image: linear-gradient(125deg, #0A0A0A, #111111, #0A0A0A, #151515);
+.nextcob-landing .landing-particle-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: #FFFFFF;
+}
+
+/* Keep one viewport-sized animation visible throughout the scroll, rather
+   than stretching an enormous canvas across the entire document. */
+.nextcob-landing > section,
+.nextcob-landing > footer {
+  background-color: transparent;
 }
 
 .nextcob-landing .landing-cta {

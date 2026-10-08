@@ -79,8 +79,8 @@ export function HeroParticles() {
           const dy = a.y - b.y;
           const dist = Math.hypot(dx, dy);
           if (dist < maxDist) {
-            const alpha = (1 - dist / maxDist) * 0.18;
-            ctx.strokeStyle = `rgba(244, 168, 0, ${alpha})`;
+            const alpha = (1 - dist / maxDist) * 0.25;
+            ctx.strokeStyle = `rgba(13, 110, 110, ${alpha})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
@@ -94,9 +94,9 @@ export function HeroParticles() {
       for (const p of particles) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255, 214, 130, 0.85)";
-        ctx.shadowColor = "rgba(244, 168, 0, 0.9)";
-        ctx.shadowBlur = 6;
+        ctx.fillStyle = "rgba(244, 168, 0, 0.85)";
+        ctx.shadowColor = "rgba(244, 168, 0, 0.35)";
+        ctx.shadowBlur = 3;
         ctx.fill();
         ctx.shadowBlur = 0;
       }
