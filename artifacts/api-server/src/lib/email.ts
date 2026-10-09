@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { resolveCobroEmailOptions, type CobroEmailOptions } from "./cobro-email-options";
 
 // Escapes HTML-special characters so untrusted text can be safely interpolated
 // into email HTML bodies without injecting markup.
@@ -77,6 +78,7 @@ function buildEmailHtml(opts: {
   ctaText?: string;
   ctaUrl?: string;
   footerNote?: string;
+  afterCtaHtml?: string;
 }): string {
   return `<!DOCTYPE html>
 <html lang="es">
@@ -123,6 +125,7 @@ function buildEmailHtml(opts: {
               </table>`
                   : ""
               }
+              ${opts.afterCtaHtml ?? ""}
               ${opts.footerNote ? `<p style="margin:24px 0 0;font-size:13px;color:#a1a1aa;text-align:center;">${opts.footerNote}</p>` : ""}
             </td>
           </tr>
@@ -144,6 +147,8 @@ function buildEmailHtml(opts: {
 }
 
 export interface CobrosEmailData {
+  cobroId?: number;
+  fechaVencimiento?: string | null;
   emailPagador: string;
   clienteNombre: string | null;
   descripcion: string;
@@ -159,7 +164,45 @@ export interface EmailResult {
   error?: string;
 }
 
-export async function sendPaymentLinkEmail(data: CobrosEmailData, log?: { warn: (obj: object, msg: string) => void }): Promise<EmailResult> {
+/** Shared initial-charge content. Exported for no-send rendering regression tests. */
+export function buildCobroNoticeHtml(
+  data: Pick<CobrosEmailData, "clienteNombre" | "descripcion" | "monto" | "comercioNombre">,
+  options: CobroEmailOptions,
+): string {
+  const monto = formatCLP(data.monto);
+  const nombre = escapeHtml(data.clienteNombre || "cliente");
+  const comercio = escapeHtml(data.comercioNombre);
+  const concepto = escapeHtml(data.descripcion);
+  const link = options.linkPago && /^https:\/\//i.test(options.linkPago) ? options.linkPago : null;
+  const fecha = options.fechaVencimiento
+    ? options.fechaVencimiento.split("-").reverse().join("/")
+    : "Sin fecha de vencimiento";
+  return buildEmailHtml({
+    title: `Cobro pendiente — ${monto}`,
+    previewText: `${comercio} te envió un cobro de ${monto} por ${concepto}.`,
+    heading: `Hola ${nombre}, tienes un cobro pendiente`,
+    bodyLines: [
+      `<strong>${comercio}</strong> te informa del siguiente cobro pendiente:`,
+      `<span style="display:block;background:#f4f4f5;border-radius:8px;padding:12px 16px;font-size:14px;color:#09090b;">
+        <strong>Concepto:</strong> ${concepto}<br/>
+        <strong>Monto:</strong> <span style="font-weight:700;color:#2563eb;">${monto}</span><br/>
+        <strong>Fecha de vencimiento:</strong> ${escapeHtml(fecha)}
+      </span>`,
+    ],
+    ctaText: link ? `Pagar ${monto} con ${options.proveedor === "MercadoPago" ? "MercadoPago" : "Webpay / Flow"}` : undefined,
+    ctaUrl: link ? escapeHtml(link) : undefined,
+    afterCtaHtml: options.datosBancariosHtml ? `
+      <div style="margin-top:28px;font-size:15px;color:#52525b;line-height:1.6;">
+        <h2 style="font-size:17px;color:#09090b;">${link ? "O si prefieres, transfiere directamente" : "Datos para transferir"}</h2>
+        ${options.datosBancariosHtml}
+      </div>` : undefined,
+    footerNote: options.datosBancariosHtml
+      ? "Una vez realizada la transferencia, responde este correo con el comprobante."
+      : undefined,
+  });
+}
+
+export async function sendPaymentLinkEmail(data: Omit<CobrosEmailData, "linkPago"> & { linkPago?: string | null }, log?: { warn: (obj: object, msg: string) => void }): Promise<EmailResult> {
   const client = getResend();
   if (!client) {
     log?.warn({}, "RESEND_API_KEY not set — skipping payment link email");
@@ -169,26 +212,14 @@ export async function sendPaymentLinkEmail(data: CobrosEmailData, log?: { warn: 
   const montoFormato = formatCLP(data.monto);
   const nombre = data.clienteNombre || "cliente";
 
+  const options = data.cobroId
+    ? await resolveCobroEmailOptions(data.cobroId, log ?? { warn: () => {} })
+    : { fechaVencimiento: data.fechaVencimiento };
   const { error } = await client.emails.send({
     ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
     to: [data.emailPagador],
     subject: `Tienes un cobro pendiente de ${montoFormato} — ${data.comercioNombre}`,
-    html: buildEmailHtml({
-      title: `Cobro pendiente — ${montoFormato}`,
-      previewText: `${data.comercioNombre} te envió un cobro de ${montoFormato} por ${data.descripcion}.`,
-      heading: `Hola ${nombre}, tienes un cobro pendiente 👋`,
-      bodyLines: [
-        `<strong>${data.comercioNombre}</strong> te ha enviado un cobro por el siguiente concepto:`,
-        `<span style="display:block;background:#f4f4f5;border-radius:8px;padding:12px 16px;font-size:14px;color:#09090b;">
-          <strong>Concepto:</strong> ${data.descripcion}<br/>
-          <strong>Monto:</strong> <span style="font-family:monospace;font-weight:700;color:#2563eb;">${montoFormato}</span>
-        </span>`,
-        `Puedes pagar de forma segura con tarjeta de crédito, débito o transferencia a través de Webpay.`,
-      ],
-      ctaText: `Pagar ${montoFormato}`,
-      ctaUrl: data.linkPago,
-      footerNote: `Si no reconoces este cobro, ignora este correo. El link de pago es seguro y procesado por Webpay/Flow.`,
-    }),
+    html: buildCobroNoticeHtml(data, options),
   });
 
   if (error) {
@@ -200,6 +231,8 @@ export async function sendPaymentLinkEmail(data: CobrosEmailData, log?: { warn: 
 }
 
 export interface AvisoManualEmailData {
+  cobroId?: number;
+  fechaVencimiento?: string | null;
   emailPagador: string;
   clienteNombre: string | null;
   descripcion: string;
@@ -224,31 +257,15 @@ export async function sendAvisoManualEmail(
   const montoFormato = formatCLP(data.monto);
   const nombre = data.clienteNombre || "cliente";
 
-  const responderUrl = buildResponderCobroMailto(data.remitenteEmail, data.descripcion);
+  const options = data.cobroId
+    ? await resolveCobroEmailOptions(data.cobroId, log ?? { warn: () => {} })
+    : { datosBancariosHtml: data.datosBancariosHtml, fechaVencimiento: data.fechaVencimiento };
 
   const { error } = await client.emails.send({
     ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
     to: [data.emailPagador],
     subject: `Cobro pendiente de ${montoFormato} — ${data.comercioNombre}`,
-    html: buildEmailHtml({
-      title: `Cobro pendiente — ${montoFormato}`,
-      previewText: `${data.comercioNombre} te informa de un cobro pendiente de ${montoFormato} por ${data.descripcion}.`,
-      heading: `Hola ${nombre}, tienes un cobro pendiente 👋`,
-      bodyLines: [
-        `<strong>${data.comercioNombre}</strong> te informa del siguiente cobro pendiente:`,
-        `<span style="display:block;background:#f4f4f5;border-radius:8px;padding:12px 16px;font-size:14px;color:#09090b;">
-          <strong>Concepto:</strong> ${data.descripcion}<br/>
-          <strong>Monto:</strong> <span style="font-family:monospace;font-weight:700;color:#2563eb;">${montoFormato}</span>
-        </span>`,
-        ...(data.datosBancariosHtml ? [data.datosBancariosHtml] : []),
-        data.datosBancariosHtml
-          ? `Una vez realizada la transferencia, responde este correo adjuntando el comprobante, o envíalo al email indicado arriba.`
-          : `Para coordinar el pago, responde este correo o contacta directamente con <strong>${data.comercioNombre}</strong>.`,
-      ],
-      ctaText: responderUrl ? `Responder al cobro` : undefined,
-      ctaUrl: responderUrl ?? undefined,
-      footerNote: `Si no reconoces este cobro, ignora este correo.`,
-    }),
+    html: buildCobroNoticeHtml(data, options),
   });
 
   if (error) {

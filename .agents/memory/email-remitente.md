@@ -27,8 +27,8 @@ validates the Reply-To address (header-injection safety) — keep that.
 
 ## "Responder al cobro" CTA
 
-The debtor-facing "Responder al cobro" button (manual aviso + reminder-sequence no-pay-link
-branch) is a `mailto:` link addressed to the **sending executive's own email**, built by
+The debtor-facing "Responder al cobro" button in the reminder-sequence no-pay-link
+branch is a `mailto:` link addressed to the **sending executive's own email**, built by
 `buildResponderCobroMailto(remitenteEmail, concepto)` (subject `Re: Cobro pendiente -
 <concepto>`, empty body, both encodeURIComponent'd).
 
@@ -41,3 +41,9 @@ must then OMIT the button (pass `ctaText`/`ctaUrl` as `undefined`). `buildEmailH
 the CTA only when both are present. Do NOT reintroduce a NextCob/platform-address fallback for
 this button. Comprobante/portal/payment-link emails keep their own purposeful CTAs and already
 satisfy the reply requirement via Reply-To.
+
+Initial charge notices (including the manual notice function) are an exception: only show a payment button for a configured processor's real payment link; bank-only notices request the receipt by replying to the email, without a mailto button. With no payment configuration, show the amount and due date without payment options.
+
+**Why:** the user explicitly requested configuration-driven initial notices, replacing the old manual reply-button layout.
+
+**How to apply:** keep the sender's Reply-To, and do not confuse the debtor portal fallback with a Flow/MercadoPago payment link.

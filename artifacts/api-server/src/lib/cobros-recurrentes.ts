@@ -237,8 +237,7 @@ export async function procesarEntregasIniciales(
         }
         const prepared = await asegurarLinkPagoCobro(cobro, log);
         const linkPago = prepared.linkPago ?? prepared.portalUrl;
-        if (!linkPago) detalle = "No se pudo preparar un enlace de pago.";
-        else if (locked.canal === "email") {
+        if (locked.canal === "email") {
           if (!prepared.cobro.emailPagador) {
             estado = "fallido";
             detalle = "Sin email del pagador.";
@@ -246,6 +245,7 @@ export async function procesarEntregasIniciales(
           else {
             const remitente = await getRemitenteContacto(prepared.cobro.responsableId);
             const r = await sendPaymentLinkEmail({
+              cobroId: prepared.cobro.id,
               emailPagador: prepared.cobro.emailPagador, clienteNombre: prepared.cobro.clienteNombre,
               descripcion: prepared.cobro.descripcion,
               monto: Number(prepared.cobro.monto) - Number(prepared.cobro.montoDescuento ?? 0),
@@ -255,6 +255,8 @@ export async function procesarEntregasIniciales(
             estado = r.ok ? "enviado" : "pendiente";
             detalle = r.error ?? null;
           }
+        } else if (!linkPago) {
+          detalle = "No se pudo preparar un enlace de pago.";
         } else {
           const [cliente] = prepared.cobro.clienteId
             ? await tx.select({ telefono: clientesTable.telefono }).from(clientesTable).where(eq(clientesTable.id, prepared.cobro.clienteId))

@@ -41,7 +41,6 @@ import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro, fechaHoySantiago, ensureUserDefaults } from "../lib/recordatorios";
 import { emitirComprobante } from "../lib/comprobante-service";
 import { getOrgContext, cobroScopeCondition, clienteScopeCondition, userCanAccessCobro, userCanAccessCliente, getRemitenteContacto, canAssignTo } from "../lib/org";
-import { getDatosBancariosUsuario, buildDatosBancariosHtml, buildDatosBancariosTextoWa } from "../lib/datos-bancarios";
 import { computeClienteScores } from "../lib/scoring";
 import { userTieneFeature, requirePlanFeature } from "../middlewares/requirePlanFeature";
 import { buscarSnapshotPrevio, calcularBloquesUsuario, hoySantiagoStr, sumarDias as sumarDiasSantiago } from "../lib/salud-cartera";
@@ -540,11 +539,10 @@ cobrosRouter.post("/cobros/recurrentes", requirePlanFeature("cobros_recurrentes"
       responseLinkPago = linkPago;
       if (d.canalesIniciales.includes("email")) {
         if (!responseCobro.emailPagador) deliveryResults.push({ canal: "email", estado: "fallido", detalle: "Sin email del pagador." });
-        else if (!linkPago) deliveryResults.push({ canal: "email", estado: "fallido", detalle: "No se pudo preparar un enlace de pago." });
         else {
           try {
             const remitente = await getRemitenteContacto(responsableId);
-            const result = await sendPaymentLinkEmail({ emailPagador: responseCobro.emailPagador, clienteNombre: responseCobro.clienteNombre, descripcion: responseCobro.descripcion, monto: montoACobrar(responseCobro), linkPago, comercioNombre: responseCobro.responsableNombre || "NextCob", remitenteNombre: remitente.nombre || responseCobro.responsableNombre, remitenteEmail: remitente.email }, req.log);
+            const result = await sendPaymentLinkEmail({ cobroId: responseCobro.id, emailPagador: responseCobro.emailPagador, clienteNombre: responseCobro.clienteNombre, descripcion: responseCobro.descripcion, monto: montoACobrar(responseCobro), linkPago, comercioNombre: responseCobro.responsableNombre || "NextCob", remitenteNombre: remitente.nombre || responseCobro.responsableNombre, remitenteEmail: remitente.email }, req.log);
             if (result.ok) await db.insert(seguimientosCobranzaTable).values({ cobroId: responseCobro.id, tipo: "email", notas: "Aviso inicial de cobro recurrente enviado" });
             deliveryResults.push({ canal: "email", estado: result.ok ? "enviado" : "fallido", detalle: result.error });
           } catch (err) { deliveryResults.push({ canal: "email", estado: "fallido", detalle: err instanceof Error ? err.message : "Error de envío." }); }
@@ -667,11 +665,10 @@ cobrosRouter.post("/cobros/masivo", requirePlanFeature("cobros_masivos"), async 
         try {
           if (!deliveryCobro.emailPagador) {
             deliveryResults.push({ cobroId: cobro.id, canal: "email", estado: "fallido", detalle: "Sin email del pagador." });
-          } else if (!linkPago) {
-            deliveryResults.push({ cobroId: cobro.id, canal: "email", estado: "fallido", detalle: "No se pudo preparar un enlace de pago." });
           } else {
             const remitente = await getRemitenteContacto(responsableId);
             const result = await sendPaymentLinkEmail({
+              cobroId: deliveryCobro.id,
               emailPagador: deliveryCobro.emailPagador, clienteNombre: deliveryCobro.clienteNombre, descripcion: deliveryCobro.descripcion,
               monto: montoACobrar(deliveryCobro), linkPago, comercioNombre: deliveryCobro.responsableNombre || "NextCob",
               remitenteNombre: remitente.nombre || deliveryCobro.responsableNombre, remitenteEmail: remitente.email,
@@ -1328,6 +1325,7 @@ cobrosRouter.post("/cobros/:id/flow-link", async (req, res) => {
     // Send payment link email asynchronously (non-blocking)
     const remitente = await getRemitenteContacto(cobro.responsableId);
     sendPaymentLinkEmail({
+      cobroId: cobro.id,
       emailPagador: bodyParsed.data.emailPagador,
       clienteNombre: cobro.clienteNombre,
       descripcion: cobro.descripcion,
@@ -1514,15 +1512,13 @@ cobrosRouter.post("/cobros/:id/avisar", async (req, res) => {
         return;
       }
       const remitente = await getRemitenteContacto(cobro.responsableId);
-      const esManual = !cobro.flowLinkPago && !cobro.mpPaymentLinkUrl;
-      const datosBancarios = esManual ? await getDatosBancariosUsuario(cobro.responsableId) : null;
       const emailResult = await sendAvisoManualEmail(
         {
-          datosBancariosHtml: datosBancarios ? buildDatosBancariosHtml(datosBancarios) : null,
+          cobroId: cobro.id,
           emailPagador: cobro.emailPagador,
           clienteNombre: cobro.clienteNombre,
           descripcion: cobro.descripcion,
-          monto: Number(cobro.monto),
+          monto: await montoRecordatorio(cobro),
           comercioNombre: cobro.responsableNombre ?? "NextCob",
           remitenteNombre: remitente.nombre || cobro.responsableNombre,
           remitenteEmail: remitente.email,
