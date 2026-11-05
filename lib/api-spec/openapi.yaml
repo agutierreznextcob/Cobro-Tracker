@@ -33,6 +33,99 @@ tags:
   - name: encuestas
     description: Client satisfaction surveys
 paths:
+  /inventario:
+    get:
+      operationId: listInventario
+      tags: [inventario]
+      responses:
+        "200":
+          description: Catálogo de la organización
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Producto" } }
+    post:
+      operationId: createProducto
+      tags: [inventario]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductoInput" }
+      responses:
+        "201":
+          description: Producto creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Producto" }
+  /inventario/resumen:
+    get:
+      operationId: getInventarioResumen
+      tags: [inventario]
+      responses:
+        "200":
+          description: Resumen del inventario activo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [criticos, agotados, productos, servicios]
+                properties:
+                  criticos: { type: integer }
+                  agotados: { type: integer }
+                  productos: { type: integer }
+                  servicios: { type: integer }
+  /inventario/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: getProducto
+      tags: [inventario]
+      responses:
+        "200":
+          description: Producto o servicio
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Producto" }
+    patch:
+      operationId: updateProducto
+      tags: [inventario]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductoInput" }
+      responses:
+        "200":
+          description: Producto actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Producto" }
+  /inventario/{id}/movimientos:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: listMovimientosStock
+      tags: [inventario]
+      responses:
+        "200":
+          description: Historial de movimientos
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/MovimientoStock" } }
+    post:
+      operationId: createMovimientoStock
+      tags: [inventario]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MovimientoStockInput" }
+      responses:
+        "201":
+          description: Movimiento registrado y stock actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Producto" }
   /auth/user:
     get:
       tags: [Auth]
@@ -4670,6 +4763,10 @@ components:
       type: object
       required: [monto, descripcion, tipoDocumento, automatizacion, canalesIniciales, idempotencyKey]
       properties:
+        itemsInventario:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/ItemInventario" }
         monto: { type: number, minimum: 1 }
         descripcion: { type: string, minLength: 1, maxLength: 255 }
         tipoDocumento: { type: string, enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento] }
@@ -4745,6 +4842,9 @@ components:
       type: object
       required: [id, monto, descripcion, estado, creadoEn]
       properties:
+        itemsInventario:
+          type: array
+          items: { $ref: "#/components/schemas/ItemInventario" }
         id:
           type: integer
         monto:
@@ -4841,6 +4941,10 @@ components:
       type: object
       required: [monto, descripcion]
       properties:
+        itemsInventario:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/ItemInventario" }
         monto:
           type: number
           minimum: 0.01
@@ -4871,6 +4975,67 @@ components:
           pattern: '^\d{4}-\d{2}-\d{2}$'
           description: Due date (YYYY-MM-DD) used to schedule reminders
 
+    ItemInventario:
+      type: object
+      required: [productoId, cantidad, precioUnitario]
+      properties:
+        productoId: { type: integer, minimum: 1 }
+        cantidad: { type: number, exclusiveMinimum: 0 }
+        precioUnitario: { type: number, minimum: 0 }
+        nombre: { type: string }
+        tipo: { type: string, enum: [producto, servicio] }
+    ProductoInput:
+      type: object
+      required: [nombre, tipo, costoUnitario, precioUnitario]
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        descripcion: { type: string }
+        tipo: { type: string, enum: [producto, servicio] }
+        costoUnitario: { type: number, minimum: 0 }
+        precioUnitario: { type: number, minimum: 0 }
+        margenPorcentaje: { type: number }
+        metodoCalculo: { type: string, enum: [margen, recargo] }
+        stockActual: { type: number, nullable: true }
+        stockCritico: { type: number, minimum: 0 }
+        unidadMedida: { type: string }
+        activo: { type: boolean }
+        tarifaHora: { type: number, nullable: true }
+        tiempoEstimadoHoras: { type: number, nullable: true }
+        factorFactibilidad: { type: number, minimum: 1, maximum: 2, nullable: true }
+    Producto:
+      allOf:
+        - $ref: "#/components/schemas/ProductoInput"
+        - type: object
+          required: [id, activo, stockCritico, estadoStock, precioCalculado, utilidad, margenReal, creadoEn, actualizadoEn]
+          properties:
+            id: { type: integer }
+            activo: { type: boolean }
+            stockCritico: { type: number }
+            precioCalculado: { type: number, nullable: true }
+            utilidad: { type: number }
+            margenReal: { type: number }
+            estadoStock: { type: string, enum: [normal, critico, agotado, no_aplica] }
+            creadoEn: { type: string }
+            actualizadoEn: { type: string }
+    MovimientoStockInput:
+      type: object
+      required: [tipo, cantidad, motivo]
+      properties:
+        tipo: { type: string, enum: [entrada, salida, ajuste] }
+        cantidad: { type: number, minimum: 0, description: "Entrada/salida: unidades; ajuste: stock final contado." }
+        motivo: { type: string, minLength: 1 }
+    MovimientoStock:
+      type: object
+      required: [id, productoId, tipo, cantidad, motivo, usuarioId, creadoEn]
+      properties:
+        id: { type: integer }
+        productoId: { type: integer }
+        tipo: { type: string, enum: [entrada, salida, ajuste] }
+        cantidad: { type: number, description: "Ajustes guardan la diferencia firmada; entradas/salidas guardan unidades positivas." }
+        motivo: { type: string }
+        referenciaCobroId: { type: integer, nullable: true }
+        usuarioId: { type: string }
+        creadoEn: { type: string }
     AjustarMontoInput:
       type: object
       required: [monto, motivo]

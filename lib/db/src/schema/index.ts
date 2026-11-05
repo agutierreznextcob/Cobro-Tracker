@@ -1,3 +1,5 @@
+export * from "./productos";
+export * from "./movimientos-stock";
 export * from "./organizaciones";
 export * from "./invitaciones";
 export * from "./clientes";

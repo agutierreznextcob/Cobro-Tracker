@@ -35,6 +35,9 @@ import EncuestasPage from "@/pages/encuestas";
 import EncuestaPublicaPage from "@/pages/encuesta-publica";
 import ConsultorLoginPage from "@/pages/consultor-login";
 import InvitacionPage from "@/pages/invitacion";
+import InventarioPage from "@/pages/inventario";
+import InventarioFormPage from "@/pages/inventario-form";
+import InventarioMovimientoPage from "@/pages/inventario-movimiento";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -209,6 +212,34 @@ function AppRouter() {
             </Layout>
           </AuthGate>
         )}
+      </Route>
+      <Route path="/inventario">
+        <AuthGate>
+          <Layout>
+            <InventarioPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/inventario/nuevo">
+        <AuthGate>
+          <Layout>
+            <InventarioFormPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/inventario/:id/editar">
+        <AuthGate>
+          <Layout>
+            <InventarioFormPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/inventario/:id/movimiento">
+        <AuthGate>
+          <Layout>
+            <InventarioMovimientoPage />
+          </Layout>
+        </AuthGate>
       </Route>
       <Route path="/notificaciones">
         <AuthGate>

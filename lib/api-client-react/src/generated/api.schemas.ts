@@ -881,6 +881,25 @@ export interface ClienteInput {
   telefono?: string;
 }
 
+export type ItemInventarioTipo = typeof ItemInventarioTipo[keyof typeof ItemInventarioTipo];
+
+
+export const ItemInventarioTipo = {
+  producto: 'producto',
+  servicio: 'servicio',
+} as const;
+
+export interface ItemInventario {
+  /** @minimum 1 */
+  productoId: number;
+  /** @exclusiveMinimum 0 */
+  cantidad: number;
+  /** @minimum 0 */
+  precioUnitario: number;
+  nombre?: string;
+  tipo?: ItemInventarioTipo;
+}
+
 /**
  * Chilean electronic tax document type (DTE). Only "afecta" types carry IVA.
  */
@@ -907,6 +926,7 @@ export const CobroEstado = {
 } as const;
 
 export interface Cobro {
+  itemsInventario?: ItemInventario[];
   id: number;
   /** Original amount in currency units */
   monto: number;
@@ -1215,6 +1235,8 @@ export const CobroAvanzadoBaseCanalesInicialesItem = {
 } as const;
 
 export interface CobroAvanzadoBase {
+  /** @maxItems 100 */
+  itemsInventario?: ItemInventario[];
   /** @minimum 1 */
   monto: number;
   /**
@@ -1331,6 +1353,8 @@ export const CobroInputTipoDocumento = {
 } as const;
 
 export interface CobroInput {
+  /** @maxItems 100 */
+  itemsInventario?: ItemInventario[];
   /**
      * Amount entered by the user. When incluyeIva is true this is the NETO (pre-IVA); the server computes iva and total. When false, this is the final charge.
      * @minimum 0.01
@@ -1353,6 +1377,113 @@ export interface CobroInput {
      * @pattern ^\d{4}-\d{2}-\d{2}$
      */
   fechaVencimiento?: string;
+}
+
+export type ProductoInputTipo = typeof ProductoInputTipo[keyof typeof ProductoInputTipo];
+
+
+export const ProductoInputTipo = {
+  producto: 'producto',
+  servicio: 'servicio',
+} as const;
+
+export type ProductoInputMetodoCalculo = typeof ProductoInputMetodoCalculo[keyof typeof ProductoInputMetodoCalculo];
+
+
+export const ProductoInputMetodoCalculo = {
+  margen: 'margen',
+  recargo: 'recargo',
+} as const;
+
+export interface ProductoInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  nombre: string;
+  descripcion?: string;
+  tipo: ProductoInputTipo;
+  /** @minimum 0 */
+  costoUnitario: number;
+  /** @minimum 0 */
+  precioUnitario: number;
+  margenPorcentaje?: number;
+  metodoCalculo?: ProductoInputMetodoCalculo;
+  stockActual?: number | null;
+  /** @minimum 0 */
+  stockCritico?: number;
+  unidadMedida?: string;
+  activo?: boolean;
+  tarifaHora?: number | null;
+  tiempoEstimadoHoras?: number | null;
+  /**
+     * @minimum 1
+     * @maximum 2
+     */
+  factorFactibilidad?: number | null;
+}
+
+export type ProductoEstadoStock = typeof ProductoEstadoStock[keyof typeof ProductoEstadoStock];
+
+
+export const ProductoEstadoStock = {
+  normal: 'normal',
+  critico: 'critico',
+  agotado: 'agotado',
+  no_aplica: 'no_aplica',
+} as const;
+
+export type Producto = ProductoInput & ({
+  id: number;
+  activo: boolean;
+  stockCritico: number;
+  precioCalculado: number | null;
+  utilidad: number;
+  margenReal: number;
+  estadoStock: ProductoEstadoStock;
+  creadoEn: string;
+  actualizadoEn: string;
+});
+
+export type MovimientoStockInputTipo = typeof MovimientoStockInputTipo[keyof typeof MovimientoStockInputTipo];
+
+
+export const MovimientoStockInputTipo = {
+  entrada: 'entrada',
+  salida: 'salida',
+  ajuste: 'ajuste',
+} as const;
+
+export interface MovimientoStockInput {
+  tipo: MovimientoStockInputTipo;
+  /**
+     * Entrada/salida: unidades; ajuste: stock final contado.
+     * @minimum 0
+     */
+  cantidad: number;
+  /** @minLength 1 */
+  motivo: string;
+}
+
+export type MovimientoStockTipo = typeof MovimientoStockTipo[keyof typeof MovimientoStockTipo];
+
+
+export const MovimientoStockTipo = {
+  entrada: 'entrada',
+  salida: 'salida',
+  ajuste: 'ajuste',
+} as const;
+
+export interface MovimientoStock {
+  id: number;
+  productoId: number;
+  tipo: MovimientoStockTipo;
+  /** Ajustes guardan la diferencia firmada; entradas/salidas guardan unidades positivas. */
+  cantidad: number;
+  motivo: string;
+  referenciaCobroId?: number | null;
+  usuarioId: string;
+  creadoEn: string;
 }
 
 export interface AjustarMontoInput {
@@ -2738,6 +2869,13 @@ export interface RendimientoEjecutivo {
  * Opaque session token — Bearer <sid>.
  */
 export type AuthorizationSessionHeaderParameter = string;
+
+export type GetInventarioResumen200 = {
+  criticos: number;
+  agotados: number;
+  productos: number;
+  servicios: number;
+};
 
 export type VerifyEmailParams = {
 token: string;

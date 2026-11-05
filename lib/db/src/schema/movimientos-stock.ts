@@ -1,0 +1,19 @@
+import { pgTable, serial, integer, text, numeric, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { productosTable } from "./productos";
+import { createInsertSchema } from "drizzle-zod";
+
+export const movimientosStockTable = pgTable("movimientos_stock", {
+  id: serial("id").primaryKey(),
+  productoId: integer("producto_id").notNull().references(() => productosTable.id, { onDelete: "restrict" }),
+  tipo: text("tipo").$type<"entrada" | "salida" | "ajuste">().notNull(),
+  cantidad: numeric("cantidad", { precision: 18, scale: 3 }).notNull(),
+  motivo: text("motivo").notNull(),
+  // Keep the historical charge id even if an administrative purge deletes it.
+  referenciaCobroId: integer("referencia_cobro_id"),
+  usuarioId: text("usuario_id").notNull(),
+  creadoEn: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("movimientos_stock_producto_idx").on(t.productoId),
+  uniqueIndex("stock_venta_unica_idx").on(t.referenciaCobroId, t.productoId),
+]);
+export const insertMovimientoStockSchema = createInsertSchema(movimientosStockTable).omit({ id: true, creadoEn: true });

@@ -1046,6 +1046,27 @@ export default function CobroDetail() {
               <p className="text-base">{cobro.descripcion}</p>
             </div>
 
+            {(() => {
+              const items = (cobro as { itemsInventario?: Array<{ productoId: number; nombre?: string; tipo?: string; cantidad: number; precioUnitario: number }> }).itemsInventario ?? [];
+              if (items.length === 0) return null;
+              return (
+                <div className="pt-4 border-t border-border/50">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Ítems del catálogo</p>
+                  <div className="rounded-md border divide-y text-sm">
+                    {items.map((it) => (
+                      <div key={it.productoId} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{it.nombre ?? `Ítem #${it.productoId}`}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{it.cantidad.toLocaleString("es-CL")} × {formatCurrency(it.precioUnitario)}{it.tipo === "servicio" ? " · servicio" : ""}</p>
+                        </div>
+                        <span className="font-mono">{formatCurrency(it.cantidad * it.precioUnitario)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/50">
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">

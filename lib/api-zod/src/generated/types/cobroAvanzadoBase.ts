@@ -8,8 +8,11 @@
 import type { CobroAvanzadoBaseAutomatizacion } from './cobroAvanzadoBaseAutomatizacion';
 import type { CobroAvanzadoBaseCanalesInicialesItem } from './cobroAvanzadoBaseCanalesInicialesItem';
 import type { CobroAvanzadoBaseTipoDocumento } from './cobroAvanzadoBaseTipoDocumento';
+import type { ItemInventario } from './itemInventario';
 
 export interface CobroAvanzadoBase {
+  /** @maxItems 100 */
+  itemsInventario?: ItemInventario[];
   /** @minimum 1 */
   monto: number;
   /**

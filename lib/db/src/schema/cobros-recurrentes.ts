@@ -1,5 +1,6 @@
 import { boolean, date, index, integer, jsonb, pgEnum, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { clientesTable } from "./clientes";
+import type { ItemInventarioSnapshot } from "./productos";
 
 export const frecuenciaCobroRecurrenteEnum = pgEnum("frecuencia_cobro_recurrente", [
   "semanal",
@@ -14,6 +15,7 @@ export const frecuenciaCobroRecurrenteEnum = pgEnum("frecuencia_cobro_recurrente
 // A sweep locks this row before emitting a cycle, which is the idempotency
 // boundary even when two application instances sweep concurrently.
 export const cobrosRecurrentesTable = pgTable("cobros_recurrentes", {
+  itemsInventario: jsonb("items_inventario").$type<ItemInventarioSnapshot[]>().notNull().default([]),
   id: serial("id").primaryKey(),
   organizationId: integer("organization_id"),
   responsableId: text("responsable_id").notNull(),

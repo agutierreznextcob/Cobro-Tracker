@@ -7,8 +7,10 @@
  */
 import type { CobroEstado } from './cobroEstado';
 import type { CobroTipoDocumento } from './cobroTipoDocumento';
+import type { ItemInventario } from './itemInventario';
 
 export interface Cobro {
+  itemsInventario?: ItemInventario[];
   id: number;
   /** Original amount in currency units */
   monto: number;

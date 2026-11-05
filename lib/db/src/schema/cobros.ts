@@ -1,4 +1,5 @@
-import { pgTable, serial, text, numeric, timestamp, pgEnum, integer, date, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, timestamp, pgEnum, integer, date, boolean, index, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
+import type { ItemInventarioSnapshot } from "./productos";
 import { clientesTable } from "./clientes";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -22,6 +23,7 @@ export const tipoDocumentoEnum = pgEnum("tipo_documento", [
 ]);
 
 export const cobrosTable = pgTable("cobros", {
+  itemsInventario: jsonb("items_inventario").$type<ItemInventarioSnapshot[]>().notNull().default([]),
   id: serial("id").primaryKey(),
   monto: numeric("monto", { precision: 12, scale: 2 }).notNull(),
   montoDescuento: numeric("monto_descuento", { precision: 12, scale: 2 }),

@@ -8,6 +8,235 @@
 import * as zod from 'zod';
 
 
+export const listInventarioResponseOneNombreMax = 200;
+
+export const listInventarioResponseOneCostoUnitarioMin = 0;
+
+export const listInventarioResponseOnePrecioUnitarioMin = 0;
+
+export const listInventarioResponseOneStockCriticoMin = 0;
+
+export const listInventarioResponseOneFactorFactibilidadMax = 2;
+
+
+
+export const ListInventarioResponseItem = zod.object({
+  "nombre": zod.string().min(1).max(listInventarioResponseOneNombreMax),
+  "descripcion": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']),
+  "costoUnitario": zod.number().min(listInventarioResponseOneCostoUnitarioMin),
+  "precioUnitario": zod.number().min(listInventarioResponseOnePrecioUnitarioMin),
+  "margenPorcentaje": zod.number().optional(),
+  "metodoCalculo": zod.enum(['margen', 'recargo']).optional(),
+  "stockActual": zod.number().nullish(),
+  "stockCritico": zod.number().min(listInventarioResponseOneStockCriticoMin).optional(),
+  "unidadMedida": zod.string().optional(),
+  "activo": zod.boolean().optional(),
+  "tarifaHora": zod.number().nullish(),
+  "tiempoEstimadoHoras": zod.number().nullish(),
+  "factorFactibilidad": zod.number().min(1).max(listInventarioResponseOneFactorFactibilidadMax).nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "stockCritico": zod.number(),
+  "precioCalculado": zod.number().nullable(),
+  "utilidad": zod.number(),
+  "margenReal": zod.number(),
+  "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
+  "creadoEn": zod.string(),
+  "actualizadoEn": zod.string()
+}))
+export const ListInventarioResponse = zod.array(ListInventarioResponseItem)
+
+
+export const createProductoBodyNombreMax = 200;
+
+export const createProductoBodyCostoUnitarioMin = 0;
+
+export const createProductoBodyPrecioUnitarioMin = 0;
+
+export const createProductoBodyStockCriticoMin = 0;
+
+export const createProductoBodyFactorFactibilidadMax = 2;
+
+
+
+export const CreateProductoBody = zod.object({
+  "nombre": zod.string().min(1).max(createProductoBodyNombreMax),
+  "descripcion": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']),
+  "costoUnitario": zod.number().min(createProductoBodyCostoUnitarioMin),
+  "precioUnitario": zod.number().min(createProductoBodyPrecioUnitarioMin),
+  "margenPorcentaje": zod.number().optional(),
+  "metodoCalculo": zod.enum(['margen', 'recargo']).optional(),
+  "stockActual": zod.number().nullish(),
+  "stockCritico": zod.number().min(createProductoBodyStockCriticoMin).optional(),
+  "unidadMedida": zod.string().optional(),
+  "activo": zod.boolean().optional(),
+  "tarifaHora": zod.number().nullish(),
+  "tiempoEstimadoHoras": zod.number().nullish(),
+  "factorFactibilidad": zod.number().min(1).max(createProductoBodyFactorFactibilidadMax).nullish()
+})
+
+
+export const GetInventarioResumenResponse = zod.object({
+  "criticos": zod.number(),
+  "agotados": zod.number(),
+  "productos": zod.number(),
+  "servicios": zod.number()
+})
+
+
+export const GetProductoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getProductoResponseOneNombreMax = 200;
+
+export const getProductoResponseOneCostoUnitarioMin = 0;
+
+export const getProductoResponseOnePrecioUnitarioMin = 0;
+
+export const getProductoResponseOneStockCriticoMin = 0;
+
+export const getProductoResponseOneFactorFactibilidadMax = 2;
+
+
+
+export const GetProductoResponse = zod.object({
+  "nombre": zod.string().min(1).max(getProductoResponseOneNombreMax),
+  "descripcion": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']),
+  "costoUnitario": zod.number().min(getProductoResponseOneCostoUnitarioMin),
+  "precioUnitario": zod.number().min(getProductoResponseOnePrecioUnitarioMin),
+  "margenPorcentaje": zod.number().optional(),
+  "metodoCalculo": zod.enum(['margen', 'recargo']).optional(),
+  "stockActual": zod.number().nullish(),
+  "stockCritico": zod.number().min(getProductoResponseOneStockCriticoMin).optional(),
+  "unidadMedida": zod.string().optional(),
+  "activo": zod.boolean().optional(),
+  "tarifaHora": zod.number().nullish(),
+  "tiempoEstimadoHoras": zod.number().nullish(),
+  "factorFactibilidad": zod.number().min(1).max(getProductoResponseOneFactorFactibilidadMax).nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "stockCritico": zod.number(),
+  "precioCalculado": zod.number().nullable(),
+  "utilidad": zod.number(),
+  "margenReal": zod.number(),
+  "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
+  "creadoEn": zod.string(),
+  "actualizadoEn": zod.string()
+}))
+
+
+export const UpdateProductoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateProductoBodyNombreMax = 200;
+
+export const updateProductoBodyCostoUnitarioMin = 0;
+
+export const updateProductoBodyPrecioUnitarioMin = 0;
+
+export const updateProductoBodyStockCriticoMin = 0;
+
+export const updateProductoBodyFactorFactibilidadMax = 2;
+
+
+
+export const UpdateProductoBody = zod.object({
+  "nombre": zod.string().min(1).max(updateProductoBodyNombreMax),
+  "descripcion": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']),
+  "costoUnitario": zod.number().min(updateProductoBodyCostoUnitarioMin),
+  "precioUnitario": zod.number().min(updateProductoBodyPrecioUnitarioMin),
+  "margenPorcentaje": zod.number().optional(),
+  "metodoCalculo": zod.enum(['margen', 'recargo']).optional(),
+  "stockActual": zod.number().nullish(),
+  "stockCritico": zod.number().min(updateProductoBodyStockCriticoMin).optional(),
+  "unidadMedida": zod.string().optional(),
+  "activo": zod.boolean().optional(),
+  "tarifaHora": zod.number().nullish(),
+  "tiempoEstimadoHoras": zod.number().nullish(),
+  "factorFactibilidad": zod.number().min(1).max(updateProductoBodyFactorFactibilidadMax).nullish()
+})
+
+export const updateProductoResponseOneNombreMax = 200;
+
+export const updateProductoResponseOneCostoUnitarioMin = 0;
+
+export const updateProductoResponseOnePrecioUnitarioMin = 0;
+
+export const updateProductoResponseOneStockCriticoMin = 0;
+
+export const updateProductoResponseOneFactorFactibilidadMax = 2;
+
+
+
+export const UpdateProductoResponse = zod.object({
+  "nombre": zod.string().min(1).max(updateProductoResponseOneNombreMax),
+  "descripcion": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']),
+  "costoUnitario": zod.number().min(updateProductoResponseOneCostoUnitarioMin),
+  "precioUnitario": zod.number().min(updateProductoResponseOnePrecioUnitarioMin),
+  "margenPorcentaje": zod.number().optional(),
+  "metodoCalculo": zod.enum(['margen', 'recargo']).optional(),
+  "stockActual": zod.number().nullish(),
+  "stockCritico": zod.number().min(updateProductoResponseOneStockCriticoMin).optional(),
+  "unidadMedida": zod.string().optional(),
+  "activo": zod.boolean().optional(),
+  "tarifaHora": zod.number().nullish(),
+  "tiempoEstimadoHoras": zod.number().nullish(),
+  "factorFactibilidad": zod.number().min(1).max(updateProductoResponseOneFactorFactibilidadMax).nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "stockCritico": zod.number(),
+  "precioCalculado": zod.number().nullable(),
+  "utilidad": zod.number(),
+  "margenReal": zod.number(),
+  "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
+  "creadoEn": zod.string(),
+  "actualizadoEn": zod.string()
+}))
+
+
+export const ListMovimientosStockParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListMovimientosStockResponseItem = zod.object({
+  "id": zod.number(),
+  "productoId": zod.number(),
+  "tipo": zod.enum(['entrada', 'salida', 'ajuste']),
+  "cantidad": zod.number().describe('Ajustes guardan la diferencia firmada; entradas\/salidas guardan unidades positivas.'),
+  "motivo": zod.string(),
+  "referenciaCobroId": zod.number().nullish(),
+  "usuarioId": zod.string(),
+  "creadoEn": zod.string()
+})
+export const ListMovimientosStockResponse = zod.array(ListMovimientosStockResponseItem)
+
+
+export const CreateMovimientoStockParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const createMovimientoStockBodyCantidadMin = 0;
+
+
+
+
+export const CreateMovimientoStockBody = zod.object({
+  "tipo": zod.enum(['entrada', 'salida', 'ajuste']),
+  "cantidad": zod.number().min(createMovimientoStockBodyCantidadMin).describe('Entrada\/salida: unidades; ajuste: stock final contado.'),
+  "motivo": zod.string().min(1)
+})
+
+
 /**
  * @summary Get the currently authenticated user
  */
@@ -266,6 +495,11 @@ export const GetClienteParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+export const getClienteResponseCobrosItemItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const getClienteResponseCobrosItemItemsInventarioItemPrecioUnitarioMin = 0;
+
 export const getClienteResponseCobrosItemFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
@@ -283,6 +517,13 @@ export const GetClienteResponse = zod.object({
   "portalEnviadoEn": zod.coerce.date().nullish(),
   "portalEnviadoCanal": zod.string().nullish(),
   "cobros": zod.array(zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(getClienteResponseCobrosItemItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(getClienteResponseCobrosItemItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).optional(),
   "id": zod.number(),
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
@@ -507,10 +748,22 @@ export const ListCobrosQueryParams = zod.object({
   "metodo": zod.enum(['flow', 'mp', 'link', 'manual']).optional().describe('flow=solo Flow, mp=solo MP, link=cualquier pasarela, manual=sin pasarela')
 })
 
+
+export const listCobrosResponseItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const listCobrosResponseItemsInventarioItemPrecioUnitarioMin = 0;
+
 export const listCobrosResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const ListCobrosResponseItem = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(listCobrosResponseItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(listCobrosResponseItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).optional(),
   "id": zod.number(),
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
@@ -548,6 +801,13 @@ export const ListCobrosResponse = zod.array(ListCobrosResponseItem)
 /**
  * @summary Create a new cobro
  */
+
+export const createCobroBodyItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const createCobroBodyItemsInventarioItemPrecioUnitarioMin = 0;
+
+export const createCobroBodyItemsInventarioMax = 100;
+
 export const createCobroBodyMontoMin = 0.01;
 
 
@@ -555,6 +815,13 @@ export const createCobroBodyFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-
 
 
 export const CreateCobroBody = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(createCobroBodyItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(createCobroBodyItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).max(createCobroBodyItemsInventarioMax).optional(),
   "monto": zod.number().min(createCobroBodyMontoMin).describe('Amount entered by the user. When incluyeIva is true this is the NETO (pre-IVA); the server computes iva and total. When false, this is the final charge.'),
   "incluyeIva": zod.boolean().optional().describe('Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. Ignored (forced false) unless tipoDocumento is an \"afecta\" type.'),
   "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']).optional().describe('Chilean electronic tax document type (DTE). Only \"afecta\" types may carry IVA. Defaults to sin_documento.'),
@@ -589,11 +856,25 @@ export const ListCobrosRecurrentesResponse = zod.object({
 
 
 
+export const createCobroRecurrenteBodyOneItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const createCobroRecurrenteBodyOneItemsInventarioItemPrecioUnitarioMin = 0;
+
+export const createCobroRecurrenteBodyOneItemsInventarioMax = 100;
+
+
 export const createCobroRecurrenteBodyOneDescripcionMax = 255;
 
 
 
 export const CreateCobroRecurrenteBody = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(createCobroRecurrenteBodyOneItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(createCobroRecurrenteBodyOneItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).max(createCobroRecurrenteBodyOneItemsInventarioMax).optional(),
   "monto": zod.number().min(1),
   "descripcion": zod.string().min(1).max(createCobroRecurrenteBodyOneDescripcionMax),
   "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']),
@@ -614,6 +895,13 @@ export const CreateCobroRecurrenteBody = zod.object({
 
 
 
+export const createCobrosMasivosBodyOneItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const createCobrosMasivosBodyOneItemsInventarioItemPrecioUnitarioMin = 0;
+
+export const createCobrosMasivosBodyOneItemsInventarioMax = 100;
+
+
 export const createCobrosMasivosBodyOneDescripcionMax = 255;
 
 export const createCobrosMasivosBodyTwoClienteIdsMax = 100;
@@ -621,6 +909,13 @@ export const createCobrosMasivosBodyTwoClienteIdsMax = 100;
 
 
 export const CreateCobrosMasivosBody = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(createCobrosMasivosBodyOneItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(createCobrosMasivosBodyOneItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).max(createCobrosMasivosBodyOneItemsInventarioMax).optional(),
   "monto": zod.number().min(1),
   "descripcion": zod.string().min(1).max(createCobrosMasivosBodyOneDescripcionMax),
   "tipoDocumento": zod.enum(['factura_afecta', 'factura_exenta', 'boleta_afecta', 'boleta_exenta', 'sin_documento']),
@@ -665,10 +960,22 @@ export const GetCobroParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+export const getCobroResponseItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const getCobroResponseItemsInventarioItemPrecioUnitarioMin = 0;
+
 export const getCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const GetCobroResponse = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(getCobroResponseItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(getCobroResponseItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).optional(),
   "id": zod.number(),
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
@@ -727,10 +1034,22 @@ export const UpdateCobroBody = zod.object({
   "fechaVencimiento": zod.string().regex(updateCobroBodyFechaVencimientoRegExp).nullish().describe('Due date (YYYY-MM-DD); null clears it')
 })
 
+
+export const updateCobroResponseItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const updateCobroResponseItemsInventarioItemPrecioUnitarioMin = 0;
+
 export const updateCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const UpdateCobroResponse = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(updateCobroResponseItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(updateCobroResponseItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).optional(),
   "id": zod.number(),
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
@@ -799,10 +1118,22 @@ export const AjustarMontoBody = zod.object({
   "motivo": zod.string().min(1).describe('Obligatory reason for the amount adjustment (audit trail)')
 })
 
+
+export const ajustarMontoResponseItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const ajustarMontoResponseItemsInventarioItemPrecioUnitarioMin = 0;
+
 export const ajustarMontoResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const AjustarMontoResponse = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(ajustarMontoResponseItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(ajustarMontoResponseItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).optional(),
   "id": zod.number(),
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
@@ -1394,10 +1725,22 @@ export const AplicarDescuentoBody = zod.object({
   "fechaVigencia": zod.string().regex(aplicarDescuentoBodyFechaVigenciaRegExp).optional().describe('Optional validity date (YYYY-MM-DD) until which the discount is valid')
 })
 
+
+export const aplicarDescuentoResponseItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const aplicarDescuentoResponseItemsInventarioItemPrecioUnitarioMin = 0;
+
 export const aplicarDescuentoResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const AplicarDescuentoResponse = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(aplicarDescuentoResponseItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(aplicarDescuentoResponseItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).optional(),
   "id": zod.number(),
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
@@ -2834,10 +3177,22 @@ export const AsignarWorkflowBody = zod.object({
   "workflowId": zod.number()
 })
 
+
+export const asignarWorkflowResponseItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const asignarWorkflowResponseItemsInventarioItemPrecioUnitarioMin = 0;
+
 export const asignarWorkflowResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const AsignarWorkflowResponse = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(asignarWorkflowResponseItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(asignarWorkflowResponseItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).optional(),
   "id": zod.number(),
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),
@@ -2878,10 +3233,22 @@ export const DesasignarWorkflowParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+export const desasignarWorkflowResponseItemsInventarioItemCantidadExclusiveMin = 0;
+
+export const desasignarWorkflowResponseItemsInventarioItemPrecioUnitarioMin = 0;
+
 export const desasignarWorkflowResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const DesasignarWorkflowResponse = zod.object({
+  "itemsInventario": zod.array(zod.object({
+  "productoId": zod.number().min(1),
+  "cantidad": zod.number().gt(desasignarWorkflowResponseItemsInventarioItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(desasignarWorkflowResponseItemsInventarioItemPrecioUnitarioMin),
+  "nombre": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']).optional()
+})).optional(),
   "id": zod.number(),
   "monto": zod.number().describe('Original amount in currency units'),
   "montoDescuento": zod.number().nullish().describe('Current effective discount amount in currency units (absolute)'),

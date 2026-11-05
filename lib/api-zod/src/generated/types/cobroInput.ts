@@ -6,8 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CobroInputTipoDocumento } from './cobroInputTipoDocumento';
+import type { ItemInventario } from './itemInventario';
 
 export interface CobroInput {
+  /** @maxItems 100 */
+  itemsInventario?: ItemInventario[];
   /**
      * Amount entered by the user. When incluyeIva is true this is the NETO (pre-IVA); the server computes iva and total. When false, this is the final charge.
      * @minimum 0.01

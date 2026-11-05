@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
-import { useListCobros, useGetDashboardMetrics } from "@workspace/api-client-react";
+import { useListCobros, useGetDashboardMetrics, useGetInventarioResumen, getGetInventarioResumenQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { Link } from "wouter";
-import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, Wallet, AlertCircle, Minus } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, Wallet, AlertCircle, Minus, AlertTriangle, Boxes } from "lucide-react";
 
 function PasarelaBadge({ flowLinkPago, mpPaymentLinkUrl }: { flowLinkPago?: string | null; mpPaymentLinkUrl?: string | null }) {
   if (flowLinkPago && mpPaymentLinkUrl) {
@@ -48,6 +48,7 @@ export default function Dashboard() {
     periodo,
   });
   const { data: cobros, isLoading: isLoadingCobros } = useListCobros();
+  const { data: inventario } = useGetInventarioResumen({ query: { queryKey: getGetInventarioResumenQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
 
   const responsablesUnicos = useMemo(() => {
     if (!cobros) return [];
@@ -159,6 +160,29 @@ export default function Dashboard() {
           </Card>
         </div>
       ) : null}
+
+      {inventario && (inventario.productos > 0 || inventario.servicios > 0) && (
+        <Link
+          href="/inventario?filtro=alerta"
+          className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors ${
+            inventario.criticos > 0 ? "border-red-300 bg-red-50 text-red-800 hover:bg-red-100" : "bg-card hover:bg-muted/40"
+          }`}
+          data-testid="link-stock-critico"
+        >
+          <div className="flex items-center gap-3">
+            {inventario.criticos > 0 ? <AlertTriangle className="h-5 w-5 text-red-600" /> : <Boxes className="h-5 w-5 text-muted-foreground" />}
+            <div>
+              <p className="text-sm font-semibold">
+                {inventario.criticos > 0
+                  ? `${inventario.criticos} producto${inventario.criticos === 1 ? "" : "s"} con stock crítico`
+                  : "Inventario sin alertas de stock"}
+              </p>
+              <p className="text-xs opacity-80">{inventario.agotados} agotado{inventario.agotados === 1 ? "" : "s"} · {inventario.productos} productos · {inventario.servicios} servicios</p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0" />
+        </Link>
+      )}
 
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">

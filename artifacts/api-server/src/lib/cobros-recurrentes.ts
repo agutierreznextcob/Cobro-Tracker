@@ -51,6 +51,7 @@ export function fechaCicloAnclada(inicio: string, frecuencia: FrecuenciaRecurren
 
 function templateValues(s: CobroRecurrente, fechaVencimiento: string) {
   return {
+    itemsInventario: s.itemsInventario,
     monto: s.monto,
     montoNeto: s.montoNeto,
     montoIva: s.montoIva,

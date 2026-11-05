@@ -3,6 +3,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startRecordatoriosScheduler } from "./lib/recordatorios-scheduler";
 import { seedEssentialAccounts } from "./lib/seed";
+import { initializeInventarioTriggers } from "./lib/inventario-triggers";
 
 // node-postgres emits an 'error' event on idle clients when the backend drops a
 // pooled connection (routine in cloud Postgres: idle timeouts, failovers). With
@@ -27,7 +28,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+initializeInventarioTriggers().then(() => app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
@@ -40,4 +41,7 @@ app.listen(port, (err) => {
     logger.error({ err }, "Seed of essential accounts failed");
   });
   startRecordatoriosScheduler();
+})).catch((err) => {
+  logger.error({ err }, "No se pudo inicializar la protección transaccional de inventario");
+  process.exit(1);
 });

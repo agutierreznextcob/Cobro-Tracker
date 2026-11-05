@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo } from "lucide-react";
+import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus, useGetGestionResumen, getGetGestionResumenQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -277,6 +277,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/cobros", label: "Cobros", icon: List },
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
     { href: "/clientes", label: "Clientes", icon: Users },
+    { href: "/inventario", label: "Inventario", icon: Boxes },
     { id: "gestion_group" },
     { id: "notificaciones" },
     { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock, feature: "Recordatorios automáticos" },
@@ -367,7 +368,7 @@ export function Layout({ children }: { children: ReactNode }) {
             }
             if (!("href" in item)) return null;
 
-            const isActive = location === item.href;
+            const isActive = location === item.href || (item.href === "/inventario" && location.startsWith("/inventario/"));
             const bloqueado = esStarter && !!item.feature;
             return (
               <div key={item.href} className="space-y-0.5">

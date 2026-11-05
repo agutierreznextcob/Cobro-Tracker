@@ -37,6 +37,7 @@ import { getFlowCredentials, getMpCredentials } from "./profile";
 import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
 import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
+import { itemsInventarioBody, resolveItemsInventario } from "../lib/inventario";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro, fechaHoySantiago, ensureUserDefaults } from "../lib/recordatorios";
 import { emitirComprobante } from "../lib/comprobante-service";
@@ -239,6 +240,15 @@ cobrosRouter.get("/cobros", async (req, res) => {
   }
 });
 
+cobrosRouter.post(["/cobros", "/cobros/masivo", "/cobros/recurrentes"], async (req, res, next) => {
+  try {
+    req.body.itemsInventario = await resolveItemsInventario(req.user!.id, req.body.itemsInventario, req.body.monto);
+    next();
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : "Ítems de catálogo inválidos." });
+  }
+});
+
 cobrosRouter.post("/cobros", async (req, res) => {
   const parsed = CreateCobroBody.safeParse(req.body);
   if (!parsed.success) {
@@ -328,6 +338,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
     const [cobro] = await db
       .insert(cobrosTable)
       .values({
+        itemsInventario: req.body.itemsInventario,
         monto: String(montoFinal),
         incluyeIva,
         montoNeto: montoNeto != null ? String(montoNeto) : null,
@@ -363,6 +374,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
 });
 
 const CobroAvanzadoBaseBody = z.object({
+  itemsInventario: itemsInventarioBody,
   monto: z.number().int().positive(),
   descripcion: z.string().min(1).max(255),
   tipoDocumento: z.enum(["factura_afecta", "factura_exenta", "boleta_afecta", "boleta_exenta", "sin_documento"]).default("sin_documento"),
@@ -486,6 +498,7 @@ cobrosRouter.post("/cobros/recurrentes", requirePlanFeature("cobros_recurrentes"
       }
       const startsNow = d.fechaInicio <= hoy;
       const [schedule] = await tx.insert(cobrosRecurrentesTable).values({
+        itemsInventario: req.body.itemsInventario,
         organizationId: ctx.organizationId,
         responsableId, responsableNombre, clienteId: cliente.id, clienteNombre: cliente.nombre,
         emailPagador: d.emailPagador ?? cliente.email ?? null,
@@ -501,6 +514,7 @@ cobrosRouter.post("/cobros/recurrentes", requirePlanFeature("cobros_recurrentes"
       }).returning();
       if (!startsNow) return { schedule, cobro: null, reused: false };
       const [cobro] = await tx.insert(cobrosTable).values({
+        itemsInventario: req.body.itemsInventario,
         monto: String(montos.montoFinal), montoNeto: montos.montoNeto != null ? String(montos.montoNeto) : null,
         montoIva: montos.montoIva != null ? String(montos.montoIva) : null, incluyeIva, tipoDocumento: d.tipoDocumento,
         descripcion: d.descripcion, referencia: d.referencia ?? null, estado: "pendiente", organizationId: ctx.organizationId,
@@ -631,6 +645,7 @@ cobrosRouter.post("/cobros/masivo", requirePlanFeature("cobros_masivos"), async 
         return { created: existing, reused: true };
       }
       const created = await tx.insert(cobrosTable).values(clientes.map((cliente) => ({
+      itemsInventario: req.body.itemsInventario,
       monto: String(montos.montoFinal), montoNeto: montos.montoNeto != null ? String(montos.montoNeto) : null,
       montoIva: montos.montoIva != null ? String(montos.montoIva) : null, incluyeIva, tipoDocumento: d.tipoDocumento,
       descripcion: d.descripcion, referencia: d.referencia ?? null, estado: "pendiente" as const, organizationId: ctx.organizationId,

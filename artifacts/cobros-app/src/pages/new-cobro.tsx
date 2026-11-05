@@ -18,6 +18,7 @@ import { formatCurrency } from "@/lib/format";
 import { TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
 import { Loader2, ArrowLeft, Users, Lock } from "lucide-react";
 import { Link } from "wouter";
+import { CatalogoLineas, lineasPayload, lineasValidas, totalLineas, type LineaCatalogo } from "@/components/catalogo-lineas";
 
 const IVA_RATE = 0.19;
 
@@ -78,6 +79,9 @@ export default function NewCobro() {
   const advancedInFlight = useRef(false);
   const templateAttempt = useRef<{ key: string; id: number } | null>(null);
   const [canalesIniciales, setCanalesIniciales] = useState<Array<"email" | "whatsapp">>([]);
+  const [lineas, setLineas] = useState<LineaCatalogo[]>([]);
+  const usaLineas = lineas.length > 0;
+  const totalItems = totalLineas(lineas);
   const [resultadosEntrega, setResultadosEntrega] = useState<Array<{ cobroId?: number; canal: string; estado: string; detalle?: string; waUrl?: string }>>([]);
   // Trial/demo/admin users inherit NextCob features even if a historical plan
   // field says Starter; server endpoints remain the source of enforcement.
@@ -110,6 +114,11 @@ export default function NewCobro() {
   const ivaNum = incluyeIvaWatch ? Math.round(netoNum * IVA_RATE) : 0;
   const totalNum = incluyeIvaWatch ? netoNum + ivaNum : netoNum;
 
+  // Catalog lines drive the (neto) amount; keep the form field synchronized.
+  useEffect(() => {
+    if (usaLineas) form.setValue("monto", totalItems, { shouldValidate: true });
+  }, [usaLineas, totalItems]);
+
   // Auto-fill email when a client is selected
   useEffect(() => {
     if (selectedCliente?.email) {
@@ -127,8 +136,15 @@ export default function NewCobro() {
 
   const onSubmit = async (values: FormValues) => {
     if (advancedInFlight.current) return;
+    if (usaLineas && (!lineasValidas(lineas) || totalItems < 1)) {
+      toast({ title: "Revisa los ítems", description: "Cada ítem necesita cantidad mayor a 0 y precio válido, y el total debe ser mayor a $0.", variant: "destructive" });
+      return;
+    }
+    const itemsInventario = usaLineas ? lineasPayload(lineas) : undefined;
+    const montoFinal = usaLineas ? totalItems : values.monto;
     const payload: CobroInput = {
-      monto: values.monto,
+      itemsInventario,
+      monto: montoFinal,
       tipoDocumento: values.tipoDocumento,
       incluyeIva: permiteIva ? values.incluyeIva : false,
       descripcion: values.descripcion,
@@ -179,7 +195,7 @@ export default function NewCobro() {
           if (!Number.isInteger(workflowId) || workflowId! <= 0) throw new Error("Workflow inválido.");
         }
         const advancedPayload = {
-          monto: values.monto, tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
+          itemsInventario, monto: montoFinal, tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
           descripcion: values.descripcion, referencia: values.referencia || undefined,
           responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
            automatizacion, workflowId, canalesIniciales,
@@ -301,9 +317,12 @@ export default function NewCobro() {
                             placeholder="0"
                             className="pl-7 font-mono"
                             {...field}
+                            readOnly={usaLineas}
+                            disabled={usaLineas}
                           />
                         </div>
                       </FormControl>
+                      {usaLineas && <FormDescription>Calculado desde los ítems del catálogo.</FormDescription>}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -337,6 +356,8 @@ export default function NewCobro() {
                   )}
                 />
               </div>
+
+              <CatalogoLineas lineas={lineas} onChange={setLineas} incluyeIva={permiteIva && !!incluyeIvaWatch} />
 
               <FormField
                 control={form.control}
