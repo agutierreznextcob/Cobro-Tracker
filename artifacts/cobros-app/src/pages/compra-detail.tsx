@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { EstadoCompraBadge } from "@/components/estado-compra-badge";
 import { RecepcionCompraDialog } from "@/components/recepcion-compra-dialog";
+import { CompraDevoluciones } from "@/components/compra-devoluciones";
 import { EquivalenciaCLP } from "@/components/equivalencia-clp";
 import { formatDateOnly, formatMoney } from "@/lib/format";
 import { apiErrorMessage, formatQty } from "@/lib/inventario";
@@ -134,6 +135,7 @@ export default function CompraDetailPage() {
         </div>
       </div>
 
+      {!borrador && <CompraDevoluciones compra={c} />}
       <RecepcionCompraDialog compra={c} open={recepcion} onOpenChange={setRecepcion} onRecibida={() => toast({ title: "Recepción confirmada", description: "Stock ingresado en las bodegas destino." })} />
 
       <AlertDialog open={confirmDel} onOpenChange={setConfirmDel}>

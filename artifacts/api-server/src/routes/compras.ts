@@ -9,6 +9,7 @@ import { hoySantiago } from "../lib/preferencias";
 import { lockInventoryScope } from "../lib/inventario-bodegas";
 import { CompraError, compraPorId, compraScope, exigirRecepcion, guardarCompra, proveedorInput, proveedorPorId, proveedorScope, purchaseDate, serializeCompras, serializeProveedor } from "../lib/compras";
 import { previewRecepcion, recibirCompra } from "../lib/compras-recepcion";
+import { devolverCompra, listDevoluciones } from "../lib/compras-devoluciones";
 
 const router = Router();
 const requireLogin = (req: Request, res: Response, next: NextFunction) => {
@@ -91,6 +92,8 @@ router.delete("/compras/:id", route(async (req, res) => {
   res.sendStatus(204);
 }));
 router.get("/compras/:id/recepcion", route(async (req, res) => { res.json(await previewRecepcion(req.user!.id, idOf(req))); }));
+router.get("/compras/:id/devoluciones", route(async (req, res) => { res.json(await listDevoluciones(req.user!.id, idOf(req))); }));
+router.post("/compras/:id/devoluciones", route(async (req, res) => { res.json(await devolverCompra(req.user!.id, idOf(req), req.body)); }));
 router.post("/compras/:id/recepcion", route(async (req, res) => { res.json(await recibirCompra(req.user!.id, idOf(req), RecibirCompraBody.parse(req.body))); }));
 router.post("/compras/:id/contabilizar", route(async (req, res) => {
   const result = await db.transaction(async tx => {

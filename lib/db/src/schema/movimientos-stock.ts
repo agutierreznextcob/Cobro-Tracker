@@ -1,10 +1,13 @@
 import { comprasTable } from "./compras";
+import { compraItemsTable } from "./compra-items";
 import { pgTable, serial, integer, text, numeric, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { productosTable } from "./productos";
 import { createInsertSchema } from "drizzle-zod";
 import { bodegasTable } from "./bodegas";
 
 export const movimientosStockTable = pgTable("movimientos_stock", {
+  referenciaCompraItemId: integer("referencia_compra_item_id").references(() => compraItemsTable.id, { onDelete: "restrict" }),
+  devolucionClave: text("devolucion_clave"),
   referenciaCompraId: integer("referencia_compra_id").references(() => comprasTable.id, { onDelete: "restrict" }),
   id: serial("id").primaryKey(),
   productoId: integer("producto_id").notNull().references(() => productosTable.id, { onDelete: "restrict" }),

@@ -65,6 +65,8 @@ import type {
   CobrosSummary,
   CompletarPerfilInput,
   Compra,
+  CompraDevolucionInput,
+  CompraDevolucionMovimiento,
   CompraInput,
   CompraRecepcionInput,
   CompraRecepcionPreview,
@@ -958,6 +960,143 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getRecibirCompraMutationOptions(options));
+    }
+
+export const getListDevolucionesCompraUrl = (id: number,) => {
+
+
+
+
+  return `/api/compras/${id}/devoluciones`
+}
+
+export const listDevolucionesCompra = async (id: number, options?: RequestInit): Promise<CompraDevolucionMovimiento[]> => {
+
+  return customFetch<CompraDevolucionMovimiento[]>(getListDevolucionesCompraUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDevolucionesCompraQueryKey = (id: number,) => {
+    return [
+    `/api/compras/${id}/devoluciones`
+    ] as const;
+    }
+
+
+export const getListDevolucionesCompraQueryOptions = <TData = Awaited<ReturnType<typeof listDevolucionesCompra>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDevolucionesCompra>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDevolucionesCompraQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDevolucionesCompra>>> = ({ signal }) => listDevolucionesCompra(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDevolucionesCompra>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDevolucionesCompraQueryResult = NonNullable<Awaited<ReturnType<typeof listDevolucionesCompra>>>
+export type ListDevolucionesCompraQueryError = ErrorType<unknown>
+
+
+
+export function useListDevolucionesCompra<TData = Awaited<ReturnType<typeof listDevolucionesCompra>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDevolucionesCompra>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDevolucionesCompraQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDevolverCompraUrl = (id: number,) => {
+
+
+
+
+  return `/api/compras/${id}/devoluciones`
+}
+
+export const devolverCompra = async (id: number,
+    compraDevolucionInput: CompraDevolucionInput, options?: RequestInit): Promise<CompraDevolucionMovimiento[]> => {
+
+  return customFetch<CompraDevolucionMovimiento[]>(getDevolverCompraUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      compraDevolucionInput,)
+  }
+);}
+
+
+
+
+export const getDevolverCompraMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof devolverCompra>>, TError,{id: number;data: BodyType<CompraDevolucionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof devolverCompra>>, TError,{id: number;data: BodyType<CompraDevolucionInput>}, TContext> => {
+
+const mutationKey = ['devolverCompra'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof devolverCompra>>, {id: number;data: BodyType<CompraDevolucionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  devolverCompra(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DevolverCompraMutationResult = NonNullable<Awaited<ReturnType<typeof devolverCompra>>>
+    export type DevolverCompraMutationBody = BodyType<CompraDevolucionInput>
+    export type DevolverCompraMutationError = ErrorType<void>
+
+    export const useDevolverCompra = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof devolverCompra>>, TError,{id: number;data: BodyType<CompraDevolucionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof devolverCompra>>,
+        TError,
+        {id: number;data: BodyType<CompraDevolucionInput>},
+        TContext
+      > => {
+      return useMutation(getDevolverCompraMutationOptions(options));
     }
 
 export const getContabilizarCompraUrl = (id: number,) => {

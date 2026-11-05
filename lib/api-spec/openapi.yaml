@@ -145,6 +145,33 @@ paths:
           description: Recepción atómica e idempotente
           content:
             application/json: { schema: { $ref: "#/components/schemas/Compra" } }
+  /compras/{id}/devoluciones:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: listDevolucionesCompra
+      responses:
+        "200":
+          description: Historial inmutable de salidas por devolución
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/CompraDevolucionMovimiento" } }
+    post:
+      operationId: devolverCompra
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/CompraDevolucionInput" } }
+      responses:
+        "200":
+          description: Devolución atómica; misma clave y contenido no duplica stock
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/CompraDevolucionMovimiento" } }
+        "400": { description: Cantidades o motivo inválidos }
+        "403": { description: Requiere administrador o supervisor }
+        "404": { description: Compra no encontrada }
+        "409": { description: "Stock insuficiente, cantidad no retornable o clave reutilizada con otro contenido" }
   /compras/{id}/contabilizar:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer } }
@@ -4024,6 +4051,34 @@ components:
                       tipoProducto: { type: [string, "null"] }
                       costoActualizado: { type: boolean }
                       costoAnterior: { type: [number, "null"] }
+    CompraDevolucionInput:
+      type: object
+      required: [clave, motivo, items]
+      properties:
+        clave: { type: string, format: uuid }
+        motivo: { type: string, minLength: 1, maxLength: 500 }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            type: object
+            required: [itemId, cantidad]
+            properties:
+              itemId: { type: integer, minimum: 1 }
+              cantidad: { type: number, exclusiveMinimum: 0, maximum: 100000000 }
+    CompraDevolucionMovimiento:
+      type: object
+      required: [id, itemId, cantidad, bodegaId, motivo, usuarioId, creadoEn, clave]
+      properties:
+        id: { type: integer }
+        itemId: { type: integer }
+        cantidad: { type: number }
+        bodegaId: { type: integer }
+        motivo: { type: string }
+        usuarioId: { type: string }
+        creadoEn: { type: string }
+        clave: { type: string }
     CompraRecepcionPreview:
       type: object
       required: [cambiosCostos, updatedAt]

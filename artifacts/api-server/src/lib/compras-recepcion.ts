@@ -63,7 +63,7 @@ export async function recibirCompra(userId: string, id: number, input: unknown) 
           }).where(and(eq(stockPorBodegaTable.productoId, p.id), eq(stockPorBodegaTable.bodegaId, item.bodegaDestinoId)));
           await tx.insert(movimientosStockTable).values({
             productoId: p.id, tipo: "entrada", cantidad: item.cantidad, motivo: "Ingreso por compra",
-            referenciaCompraId: c.id, bodegaDestinoId: item.bodegaDestinoId, usuarioId: userId,
+            referenciaCompraId: c.id, referenciaCompraItemId: item.id, bodegaDestinoId: item.bodegaDestinoId, usuarioId: userId,
           });
         }
       }

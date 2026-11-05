@@ -18,3 +18,7 @@ La recepción es una operación atómica e idempotente: entradas por bodega, mov
 SII es preparación futura únicamente: origen manual hoy, campos reservados para folio/XML y botón deshabilitado. Marcar contabilizada es una marca manual, no una declaración al SII ni generación de asientos.
 **Why:** el alcance solicitado excluye integración real y requiere certificado digital para el futuro.
 **How to apply:** no presentar importaciones o contabilización externa como funcionales sin implementarlas explícitamente.
+
+Las devoluciones a proveedores son salidas físicas desde la bodega original de recepción, sin revertir costos ni generar reembolsos automáticamente. No cambian el estado recibido/contabilizado ni los importes originales.
+**Why:** el usuario pidió conservar el historial de recepción y separar la devolución física de su resolución financiera.
+**How to apply:** cualquier futura nota de crédito o informe neto debe distinguir compras originales de devoluciones, sin reescribir la factura recibida.

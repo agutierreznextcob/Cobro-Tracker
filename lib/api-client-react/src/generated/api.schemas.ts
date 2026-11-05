@@ -119,6 +119,41 @@ export type ProveedorDetail = Proveedor & {
   productosMasComprados: ProveedorDetailProductosMasCompradosItem[];
 };
 
+export type CompraDevolucionInputItemsItem = {
+  /** @minimum 1 */
+  itemId: number;
+  /**
+     * @maximum 100000000
+     * @exclusiveMinimum 0
+     */
+  cantidad: number;
+};
+
+export interface CompraDevolucionInput {
+  clave: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  motivo: string;
+  /**
+     * @minItems 1
+     * @maxItems 200
+     */
+  items: CompraDevolucionInputItemsItem[];
+}
+
+export interface CompraDevolucionMovimiento {
+  id: number;
+  itemId: number;
+  cantidad: number;
+  bodegaId: number;
+  motivo: string;
+  usuarioId: string;
+  creadoEn: string;
+  clave: string;
+}
+
 export type CompraRecepcionPreviewCambiosCostosItem = {
   productoId: number;
   nombre: string;

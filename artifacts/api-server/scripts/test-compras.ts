@@ -120,7 +120,60 @@ try {
   [p] = await db.select().from(productosTable).where(eq(productosTable.id, product.id));
   assert.equal(Number(p.stockActual), 10); assert.equal(Number(p.costoUnitario), 30, "Failed receipt rolls back costs and stock");
   assert.equal((await api("DELETE", `/compras/${noWarehouse.data.id}`)).status, 204);
-  console.log("PASS supplier CRUD/duplicate RUT, draft totals/IVA, tenant+warehouse isolation, executive guards, supervisor receipt, concurrent idempotency, stock by warehouse, cost accept/reject/stale decisions, no retail repricing, immutable received docs, preferences/history, supplier stats, contabilizar and rollback");
+  const returnPath = `/compras/${id}/devoluciones`;
+  const [lineA, lineB, freeLine] = a.data.items;
+  const returnInput = { clave: randomUUID(), motivo: "Mercadería dañada", items: [{ itemId: lineA.id, cantidad: 0.5 }] };
+  actor = outsider;
+  assert.equal((await api("GET", returnPath)).status, 404);
+  assert.equal((await api("POST", returnPath, returnInput)).status, 404);
+  actor = executive;
+  assert.equal((await api("POST", returnPath, returnInput)).status, 403);
+  actor = supervisor;
+  const draftReturn = await api("POST", "/compras", { ...draft, numeroFactura: "RETURN-DRAFT" });
+  assert.equal((await api("POST", `/compras/${draftReturn.data.id}/devoluciones`, returnInput)).status, 409);
+  assert.equal((await api("POST", returnPath, { ...returnInput, items: [{ itemId: freeLine.id, cantidad: 1 }] })).status, 400);
+  assert.equal((await api("POST", returnPath, { ...returnInput, items: [{ itemId: edited.data.items[0].id, cantidad: 1 }] })).status, 400);
+  assert.equal((await api("POST", returnPath, { ...returnInput, items: [returnInput.items[0], returnInput.items[0]] })).status, 400);
+  for (const cantidad of [0, -1, 0.0001, 1e9])
+    assert.equal((await api("POST", returnPath, { ...returnInput, items: [{ itemId: lineA.id, cantidad }] })).status, 400);
+  const returns = await Promise.all([api("POST", returnPath, returnInput), api("POST", returnPath, returnInput)]);
+  assert(returns.every(r => r.status === 200), JSON.stringify(returns));
+  assert.equal((await api("GET", returnPath)).data.length, 1, "Concurrent replay creates only one movement");
+  assert.equal((await api("POST", returnPath, { ...returnInput, motivo: "Otro motivo" })).status, 409);
+  const race = await Promise.all([1, 2].map(() => api("POST", returnPath, {
+    clave: randomUUID(), motivo: "Resto A", items: [{ itemId: lineA.id, cantidad: 1.5 }],
+  })));
+  assert.deepEqual(race.map(r => r.status).sort(), [200, 409], "Distinct simultaneous returns cannot exceed receipt");
+  const [afterA] = await db.select().from(productosTable).where(eq(productosTable.id, product.id));
+  assert.equal(Number(afterA.stockActual), 8);
+  assert.equal(Number(afterA.costoUnitario), 30);
+  assert.equal(Number(afterA.precioUnitario), 25);
+  // Exhaust B in a controlled fixture: a batch that first updates A must roll back entirely.
+  const { and } = await import("drizzle-orm");
+  await db.update(stockPorBodegaTable).set({ stockActual: "0" }).where(and(eq(stockPorBodegaTable.productoId, product.id), eq(stockPorBodegaTable.bodegaId, warehouseB.id)));
+  await db.update(productosTable).set({ stockActual: "2" }).where(eq(productosTable.id, product.id));
+  const otherReturnPath = `/compras/${executiveDraft.data.id}/devoluciones`;
+  const otherItems = (await api("GET", `/compras/${executiveDraft.data.id}`)).data.items;
+  const batch = { clave: randomUUID(), motivo: "Devolver lote", items: [
+    { itemId: otherItems[0].id, cantidad: 1 }, { itemId: otherItems[1].id, cantidad: 1 },
+  ] };
+  assert.equal((await api("POST", otherReturnPath, batch)).status, 409);
+  assert.equal((await api("GET", otherReturnPath)).data.length, 0);
+  assert.equal(Number((await db.select().from(productosTable).where(eq(productosTable.id, product.id)))[0].stockActual), 2, "Failed batch rolls back stock");
+  await db.update(stockPorBodegaTable).set({ stockActual: "6" }).where(and(eq(stockPorBodegaTable.productoId, product.id), eq(stockPorBodegaTable.bodegaId, warehouseB.id)));
+  await db.update(productosTable).set({ stockActual: "8" }).where(eq(productosTable.id, product.id));
+  actor = owner;
+  assert.equal((await api("POST", returnPath, { clave: randomUUID(), motivo: "Resto B", items: [{ itemId: lineB.id, cantidad: 3 }] })).status, 200);
+  assert.equal((await api("POST", returnPath, { clave: randomUUID(), motivo: "Exceso", items: [{ itemId: lineB.id, cantidad: 0.001 }] })).status, 409);
+  assert.equal((await api("POST", returnPath, returnInput)).status, 200, "Replay remains successful after full return");
+  const hist = (await api("GET", returnPath)).data;
+  assert.equal(hist.reduce((n: number, r: any) => n + r.cantidad, 0), 5);
+  assert(hist.every((r: any) => r.usuarioId && r.creadoEn && [warehouseA.id, warehouseB.id].includes(r.bodegaId)));
+  const finalDoc = (await api("GET", `/compras/${id}`)).data;
+  assert.equal(finalDoc.estado, "contabilizada"); assert.equal(finalDoc.total, 127.03);
+  assert.equal((await api("DELETE", `/compras/${id}`)).status, 409);
+  assert.equal(Number((await db.select().from(productosTable).where(eq(productosTable.id, product.id)))[0].stockActual), 5);
+  console.log("PASS compras + devoluciones: tenant/role guards, partial/full returns, precision, foreign lines, concurrent replay, distinct-key race, exhausted quantities, warehouse shortage, atomic batch rollback, immutable costs/prices/document and history");
 } finally {
   if (server) await new Promise<void>(resolve => server!.close(() => resolve()));
   if (pool) await pool.end();

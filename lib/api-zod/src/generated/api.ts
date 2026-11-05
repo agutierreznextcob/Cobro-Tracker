@@ -414,6 +414,59 @@ export const RecibirCompraResponse = zod.object({
 }))
 
 
+export const ListDevolucionesCompraParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListDevolucionesCompraResponseItem = zod.object({
+  "id": zod.number(),
+  "itemId": zod.number(),
+  "cantidad": zod.number(),
+  "bodegaId": zod.number(),
+  "motivo": zod.string(),
+  "usuarioId": zod.string(),
+  "creadoEn": zod.string(),
+  "clave": zod.string()
+})
+export const ListDevolucionesCompraResponse = zod.array(ListDevolucionesCompraResponseItem)
+
+
+export const DevolverCompraParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const devolverCompraBodyMotivoMax = 500;
+
+
+export const devolverCompraBodyItemsItemCantidadExclusiveMin = 0;
+export const devolverCompraBodyItemsItemCantidadMax = 100000000;
+
+export const devolverCompraBodyItemsMax = 200;
+
+
+
+export const DevolverCompraBody = zod.object({
+  "clave": zod.string().uuid(),
+  "motivo": zod.string().min(1).max(devolverCompraBodyMotivoMax),
+  "items": zod.array(zod.object({
+  "itemId": zod.number().min(1),
+  "cantidad": zod.number().gt(devolverCompraBodyItemsItemCantidadExclusiveMin).max(devolverCompraBodyItemsItemCantidadMax)
+})).min(1).max(devolverCompraBodyItemsMax)
+})
+
+export const DevolverCompraResponseItem = zod.object({
+  "id": zod.number(),
+  "itemId": zod.number(),
+  "cantidad": zod.number(),
+  "bodegaId": zod.number(),
+  "motivo": zod.string(),
+  "usuarioId": zod.string(),
+  "creadoEn": zod.string(),
+  "clave": zod.string()
+})
+export const DevolverCompraResponse = zod.array(DevolverCompraResponseItem)
+
+
 export const ContabilizarCompraParams = zod.object({
   "id": zod.coerce.number()
 })
