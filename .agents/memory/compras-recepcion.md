@@ -3,6 +3,10 @@ name: Compras y recepción
 description: Permisos confirmados y decisiones sobre inventario, costos y preparación para SII.
 ---
 
+Compras debe ser un módulo independiente en el menú principal, no un submenú de Ventas.
+**Why:** el usuario pidió expresamente separarlo de Ventas.
+**How to apply:** mantener esta separación al reorganizar la navegación.
+
 El usuario eligió que administradores y supervisores puedan confirmar recepciones y actualizar costos; los ejecutivos preparan borradores. Las cuentas independientes actúan como administradoras de su negocio.
 **Why:** la recepción modifica existencias y costos compartidos, no solo documentos personales.
 **How to apply:** aplicar el permiso en servidor, también en las acciones de recepción y contabilización, sin confiar en botones ocultos.

@@ -295,7 +295,6 @@ const VENTAS_ITEMS: NavLeaf[] = [
     match: (l) => l === "/cobros" || (/^\/cobros\/\d+/.test(l)),
   },
   { href: "/cotizaciones", label: "Cotizaciones", icon: FileSignature, match: (l) => l === "/cotizaciones" || l.startsWith("/cotizaciones/") },
-  { href: "/compras", label: "Compras", icon: ShoppingCart, match: (l) => l === "/compras" || l.startsWith("/compras/") },
 ];
 
 const CONFIG_ITEMS: NavLeaf[] = [
@@ -416,6 +415,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/dashboard", label: "Dashboard", icon: Home },
     { id: "notificaciones" },
     { id: "ventas_group" },
+    { href: "/compras", label: "Compras", icon: ShoppingCart },
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
     { href: "/proveedores", label: "Proveedores", icon: Truck },
@@ -513,7 +513,7 @@ export function Layout({ children }: { children: ReactNode }) {
             }
             if (!("href" in item)) return null;
 
-            const isActive = location === item.href || (item.href === "/inventario" && location.startsWith("/inventario/")) || (item.href === "/locales" && (location.startsWith("/locales/") || location.startsWith("/bodegas/")));
+            const isActive = location === item.href || (item.href === "/compras" && location.startsWith("/compras/")) || (item.href === "/inventario" && location.startsWith("/inventario/")) || (item.href === "/locales" && (location.startsWith("/locales/") || location.startsWith("/bodegas/")));
             const bloqueado = esStarter && !!item.feature;
             return (
               <div key={item.href} className="space-y-0.5">
