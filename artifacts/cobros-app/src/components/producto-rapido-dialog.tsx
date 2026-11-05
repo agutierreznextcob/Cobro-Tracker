@@ -1,23 +1,24 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateProducto, type Producto } from "@workspace/api-client-react";
+import { useCreateProducto, type Bodega, type Producto } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiErrorMessage, invalidateInventario, unidadesPara, capitalizar, CODIGO_RE } from "@/lib/inventario";
+import { apiErrorMessage, invalidateInventario, UNIDADES_PRODUCTO, capitalizar, CODIGO_RE } from "@/lib/inventario";
 import type { Moneda } from "@/lib/format";
 import { Loader2 } from "lucide-react";
 
-/** Quick product creation from a scanned unknown code. Stock is never set here: it enters only when the purchase is received. */
-export function ProductoRapidoDialog({ open, onOpenChange, codigo, moneda, onCreated }: {
+/** Physical products only (services need tariff data; pick existing services from the catalog). Quick product creation from a scanned unknown code. Stock is never set here: it enters only when the purchase is received. */
+export function ProductoRapidoDialog({ open, onOpenChange, codigo, moneda, onCreated, bodegas, bodegaSugerida }: {
   open: boolean; onOpenChange: (o: boolean) => void; codigo: string; moneda: Moneda; onCreated: (p: Producto) => void;
+  bodegas: Bodega[]; bodegaSugerida?: string;
 }) {
   const qc = useQueryClient();
   const crear = useCreateProducto();
   const [nombre, setNombre] = useState("");
-  const [tipo, setTipo] = useState<"producto" | "servicio">("producto");
+  const [bodegaId, setBodegaId] = useState("");
   const [codigoBarras, setCodigoBarras] = useState("");
   const [costo, setCosto] = useState("");
   const [precio, setPrecio] = useState("");
@@ -25,8 +26,8 @@ export function ProductoRapidoDialog({ open, onOpenChange, codigo, moneda, onCre
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) { setNombre(""); setTipo("producto"); setCodigoBarras(codigo); setCosto(""); setPrecio(""); setUnidad("unidad"); setError(null); }
-  }, [open, codigo]);
+    if (open) { setNombre(""); setBodegaId(bodegaSugerida && bodegas.some((b) => String(b.id) === bodegaSugerida) ? bodegaSugerida : bodegas.length === 1 ? String(bodegas[0].id) : ""); setCodigoBarras(codigo); setCosto(""); setPrecio(""); setUnidad("unidad"); setError(null); }
+  }, [open, codigo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async () => {
     if (!nombre.trim()) { setError("Ingresa el nombre."); return; }
@@ -34,9 +35,10 @@ export function ProductoRapidoDialog({ open, onOpenChange, codigo, moneda, onCre
     const c = Number(costo), p = Number(precio || 0);
     if (costo.trim() === "" || !(c >= 0)) { setError("Ingresa un costo válido."); return; }
     if (!(p >= 0)) { setError("Precio de venta inválido."); return; }
+    if (bodegas.length > 0 && !bodegas.some((b) => String(b.id) === bodegaId)) { setError("Elige la bodega del producto."); return; }
     setError(null);
     try {
-      const prod = await crear.mutateAsync({ data: { nombre: nombre.trim(), tipo, moneda, codigoBarras: codigoBarras.trim() || undefined, costoUnitario: c, precioUnitario: p, unidadMedida: unidad, activo: true, stockActual: tipo === "producto" ? 0 : null } });
+      const prod = await crear.mutateAsync({ data: { nombre: nombre.trim(), tipo: "producto", moneda, bodegaId: bodegaId ? Number(bodegaId) : null, codigoBarras: codigoBarras.trim() || undefined, costoUnitario: c, precioUnitario: p, unidadMedida: unidad, activo: true, stockActual: 0 } });
       invalidateInventario(qc);
       onCreated(prod);
       onOpenChange(false);
@@ -55,16 +57,16 @@ export function ProductoRapidoDialog({ open, onOpenChange, codigo, moneda, onCre
         <div className="space-y-3">
           <div className="space-y-1.5"><Label>Nombre *</Label><Input autoFocus value={nombre} onChange={(e) => setNombre(e.target.value)} data-testid="input-rapido-nombre" /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label>Tipo</Label>
-              <Select value={tipo} onValueChange={(v) => { const t = v as "producto" | "servicio"; setTipo(t); setUnidad(unidadesPara(t)[0]); }}>
-                <SelectTrigger data-testid="select-rapido-tipo"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="producto">Producto físico</SelectItem><SelectItem value="servicio">Servicio</SelectItem></SelectContent>
+            <div className="space-y-1.5"><Label>Bodega *</Label>
+              <Select value={bodegaId} onValueChange={setBodegaId} disabled={bodegas.length === 0}>
+                <SelectTrigger data-testid="select-rapido-bodega"><SelectValue placeholder={bodegas.length === 0 ? "Sin bodegas activas" : "Elegir bodega"} /></SelectTrigger>
+                <SelectContent>{bodegas.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.localNombre} → {b.nombre}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5"><Label>Unidad</Label>
               <Select value={unidad} onValueChange={setUnidad}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{unidadesPara(tipo).map((u) => <SelectItem key={u} value={u}>{capitalizar(u)}</SelectItem>)}</SelectContent>
+                <SelectContent>{UNIDADES_PRODUCTO.map((u) => <SelectItem key={u} value={u}>{capitalizar(u)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
@@ -73,7 +75,7 @@ export function ProductoRapidoDialog({ open, onOpenChange, codigo, moneda, onCre
             <div className="space-y-1.5"><Label>Costo ({moneda}) *</Label><Input type="number" min="0" step="any" value={costo} onChange={(e) => setCosto(e.target.value)} className="font-mono" data-testid="input-rapido-costo" /></div>
             <div className="space-y-1.5"><Label>Precio venta ({moneda})</Label><Input type="number" min="0" step="any" value={precio} onChange={(e) => setPrecio(e.target.value)} className="font-mono" data-testid="input-rapido-precio" /></div>
           </div>
-          {tipo === "servicio" && <p className="text-xs text-amber-700">Los servicios no suman stock al recibir la compra.</p>}
+          <p className="text-[11px] text-muted-foreground">Se crea como producto físico con stock 0 en la bodega elegida. Para servicios, créalos desde Inventario.</p>
           {error && <p className="text-sm text-red-600" data-testid="text-rapido-error">{error}</p>}
         </div>
         <DialogFooter>

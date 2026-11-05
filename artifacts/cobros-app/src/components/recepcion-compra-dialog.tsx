@@ -39,7 +39,10 @@ export function RecepcionCompraDialog({ compra, open, onOpenChange, onRecibida }
 
   const cambios = preview?.cambiosCostos ?? [];
   const pendientes = cambios.filter((c) => decisiones[c.productoId] === undefined).length;
-  const fmt = (n: number) => formatMoney(n, compra.moneda, compra.decimales);
+  // Preserve fractional historical costs in the approval prompt even if the
+  // new invoice uses whole amounts, so old/new costs never appear identical.
+  const fmt = (n: number) => formatMoney(n, compra.moneda,
+    Math.round(n * 10 ** compra.decimales) / 10 ** compra.decimales === n ? compra.decimales : 2);
   const lineasStock = itemsDe(compra).filter((i) => i.productoId != null && i.tipoProducto !== "servicio").length;
   const lineasSinStock = compra.items.length - lineasStock;
 

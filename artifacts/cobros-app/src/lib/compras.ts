@@ -42,12 +42,12 @@ export const lineaLibreCompra = (): LineaCompra => ({
 export const esFisico = (l: Pick<LineaCompra, "productoId" | "tipoProducto">) => l.productoId != null && l.tipoProducto !== "servicio";
 
 export function subtotalLineaCompra(l: LineaCompra, d: number) {
-  return roundTo((Number(l.cantidad) || 0) * (Number(l.precioUnitario) || 0), d);
+  return roundTo((Number(l.cantidad) || 0) * roundTo(Number(l.precioUnitario) || 0, d), d);
 }
 
 export function totalesCompra(lineas: LineaCompra[], d: number, ivaPct: number) {
   const subtotal = roundTo(lineas.reduce((s, l) => s + subtotalLineaCompra(l, d), 0), d);
-  const iva = roundTo(subtotal * ivaPct / 100, d);
+  const iva = roundTo(subtotal * roundTo(ivaPct, 2) / 100, d);
   return { subtotal, iva, total: roundTo(subtotal + iva, d) };
 }
 

@@ -417,7 +417,7 @@ export default function CompraFormPage() {
       </div>
 
       <ProveedorDialog open={provOpen} onOpenChange={setProvOpen} onSaved={(p) => setProveedorId(String(p.id))} />
-      <ProductoRapidoDialog open={rapido !== null} onOpenChange={(o) => { if (!o) setRapido(null); }} codigo={rapido ?? ""} moneda={moneda} onCreated={(p) => { agregarProducto(p); toast({ title: "Producto creado", description: p.nombre }); }} />
+      <ProductoRapidoDialog open={rapido !== null} onOpenChange={(o) => { if (!o) setRapido(null); }} codigo={rapido ?? ""} moneda={moneda} bodegas={bodegas} bodegaSugerida={bodegaGlobal} onCreated={(p) => { agregarProducto(p); toast({ title: "Producto creado", description: p.nombre }); }} />
       {guardada && (
         <RecepcionCompraDialog compra={guardada} open={recepcionOpen} onOpenChange={setRecepcionOpen}
           onRecibida={(r) => { toast({ title: "Recepción confirmada", description: `Factura ${r.numeroFactura} recibida.` }); navigate(`/compras/${r.id}`); }} />

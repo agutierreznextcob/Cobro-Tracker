@@ -117,7 +117,7 @@ export default function CompraDetailPage() {
         </Card>
         <div className="space-y-4">
           <Card className="shadow-sm overflow-hidden border-primary/20">
-            <div className="bg-primary/5 p-5 space-y-2 text-sm">
+            <div className="bg-primary/5 p-5 pr-20 sm:pr-5 space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{fmt(c.subtotal)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">IVA ({c.porcentajeIva}%)</span><span className="font-mono">{fmt(c.montoIva)}</span></div>
               <div className="flex items-baseline justify-between border-t border-primary/20 pt-3"><span className="font-semibold">Total</span><span className="font-mono text-2xl font-bold text-primary" data-testid="text-total-compra">{fmt(c.total)}</span></div>

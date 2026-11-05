@@ -87,7 +87,7 @@ export default function ComprasPage() {
       ) : (
         <div className="rounded-xl border bg-card overflow-hidden">
           <div className="hidden md:grid grid-cols-[120px_1fr_100px_120px_80px_110px_140px] gap-3 px-4 py-2.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b bg-muted/30">
-            <span>N° factura</span><span>Proveedor</span><span>Fecha</span><span>Estado</span><span>Origen</span><span>Recibidos</span><span className="text-right">Total</span>
+            <span>N° factura</span><span>Proveedor</span><span>Fecha</span><span>Estado</span><span>Origen</span><span>Ítems recibidos</span><span className="text-right">Total</span>
           </div>
           {compras.map((c) => (
             <button key={c.id} type="button" onClick={() => navigate(`/compras/${c.id}`)} className="w-full grid grid-cols-2 md:grid-cols-[120px_1fr_100px_120px_80px_110px_140px] gap-x-3 gap-y-1 px-4 py-3 text-left text-sm border-b last:border-0 hover:bg-muted/40 transition-colors items-center" data-testid={`row-compra-${c.id}`}>
@@ -96,7 +96,7 @@ export default function ComprasPage() {
               <span className="text-muted-foreground">{formatDateOnly(c.fechaEmision)}</span>
               <span><EstadoCompraBadge estado={c.estado} /></span>
               <span className="text-xs text-muted-foreground" data-testid={`text-origen-${c.id}`}>{ORIGEN_COMPRA[c.origen] ?? c.origen}</span>
-              <span className="text-xs font-mono" data-testid={`text-recibidos-${c.id}`}>{c.itemsRecibidos} / {c.items.length}</span>
+              <span className="text-xs font-mono" title="Líneas de productos ingresadas a inventario; no incluye servicios ni ítems libres" data-testid={`text-recibidos-${c.id}`}>{c.itemsRecibidos}</span>
               <span className="font-mono font-semibold text-right tabular-nums col-span-2 md:col-span-1">{formatMoney(c.total, c.moneda, c.decimales)}</span>
             </button>
           ))}
