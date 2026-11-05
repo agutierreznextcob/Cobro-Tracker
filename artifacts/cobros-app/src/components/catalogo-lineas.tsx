@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatMoney, monedaDe, roundTo } from "@/lib/format";
-import { estadoVisual, formatQty } from "@/lib/inventario";
+import { estadoVisual, formatQty, precioNetoDe } from "@/lib/inventario";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScanLookup } from "@/components/barcode-scanner";
 import { useToast } from "@/hooks/use-toast";
@@ -29,7 +29,7 @@ export function precioLinea(precio: string | number, decimales = 0) {
 }
 
 export function lineaDesdeProducto(p: Producto, decimales = 0): LineaCatalogo {
-  return { productoId: p.id, nombre: p.nombre, tipo: p.tipo as "producto" | "servicio", cantidad: "1", precioUnitario: String(precioLinea(p.precioUnitario, decimales)), stockActual: p.stockActual ?? null, bodegaId: "", ubicaciones: p.ubicaciones ?? [] };
+  return { productoId: p.id, nombre: p.nombre, tipo: p.tipo as "producto" | "servicio", cantidad: "1", precioUnitario: String(precioLinea(precioNetoDe(p), decimales)), stockActual: p.stockActual ?? null, bodegaId: "", ubicaciones: p.ubicaciones ?? [] };
 }
 
 export const MAX_LINEAS = 100;
@@ -129,7 +129,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
                         {p.tipo === "servicio" ? "Servicio" : `Stock ${formatQty(p.stockActual ?? 0)}`}
                       </span>
                     </span>
-                    <span className="font-mono text-xs shrink-0">{formatCurrency(p.precioUnitario)}</span>
+                    <span className="shrink-0 text-right"><span className="block font-mono text-xs">{formatCurrency(precioNetoDe(p))}</span><span className="block text-[10px] uppercase tracking-wide text-muted-foreground">neto unit.</span></span>
                   </button>
                 );
               })}
@@ -143,7 +143,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
       {lineas.length > 0 && (
         <div className="space-y-2">
           <div className="hidden sm:grid grid-cols-[1fr_80px_120px_100px_32px] gap-2 px-1 text-[11px] uppercase tracking-wider text-muted-foreground">
-            <span>Ítem</span><span>Cant.</span><span>Precio unit.</span><span className="text-right">Subtotal</span><span />
+            <span>Ítem</span><span>Cant.</span><span>Precio unit. neto</span><span className="text-right">Subtotal</span><span />
           </div>
           {lineas.map((l, i) => {
             const cant = Number(l.cantidad) || 0;

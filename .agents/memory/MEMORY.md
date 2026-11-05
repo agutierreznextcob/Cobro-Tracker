@@ -47,4 +47,5 @@
 - [Superadmin = libro de ingresos](superadmin-ledger.md) — módulo Cobros del superadmin muestra pagos de suscripción; seed borra sus cobros; pagos_suscripcion con UNIQUE user+período (idempotencia obligatoria).
 - [OpenAPI date coercion](openapi-date-coercion.md) — Orval Zod coerces both date and date-time inputs to Date objects; route handlers must not assume validated values remain strings.
 - [Inventario y pagos](inventario-stock.md) — pagos confirmados pueden dejar stock negativo; salidas manuales no. No revertir ventas automáticamente; catálogo compartido por organización.
-- [Compras y recepción](compras-recepcion.md) — admin/supervisor reciben; costos con decisión explícita; recepción atómica sin duplicar stock; SII solo preparación futura.
+- [Compras y recepción](compras-recepcion.md) — admin/supervisor reciben; costos netos automáticos sin preguntar; recepción atómica sin duplicar stock; SII futuro.
+- [IVA y PVP de inventario](inventario-precios.md) — márgenes sobre neto, precio final IVA incluido, historial de costos y compras sin cambiar venta vigente.

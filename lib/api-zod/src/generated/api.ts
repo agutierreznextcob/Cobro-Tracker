@@ -365,7 +365,7 @@ export const RecibirCompraBody = zod.object({
   "productoId": zod.number(),
   "actualizar": zod.boolean(),
   "costoAnterior": zod.number()
-}))
+})).optional()
 })
 
 export const RecibirCompraResponse = zod.object({
@@ -1272,6 +1272,11 @@ export const getBodegaResponseOneOneNombreMax = 200;
 
 export const getBodegaResponseOneOneDescripcionMax = 1000;
 
+export const getBodegaResponseTwoProductosItemOnePorcentajeIvaPrecioMin = 0;
+export const getBodegaResponseTwoProductosItemOnePorcentajeIvaPrecioMax = 100;
+
+export const getBodegaResponseTwoProductosItemOnePvpProveedorMin = 0;
+
 export const getBodegaResponseTwoProductosItemOneNombreMax = 200;
 
 export const getBodegaResponseTwoProductosItemOneCodigoInternoMax = 80;
@@ -1302,6 +1307,12 @@ export const GetBodegaResponse = zod.object({
   "stockTotal": zod.number()
 })).and(zod.object({
   "productos": zod.array(zod.object({
+  "incluyeIvaPrecio": zod.boolean().optional(),
+  "porcentajeIvaPrecio": zod.number().min(getBodegaResponseTwoProductosItemOnePorcentajeIvaPrecioMin).max(getBodegaResponseTwoProductosItemOnePorcentajeIvaPrecioMax).optional(),
+  "pvpProveedor": zod.number().min(getBodegaResponseTwoProductosItemOnePvpProveedorMin).nullish(),
+  "pvpIncluyeIva": zod.boolean().optional(),
+  "fuentePrecio": zod.enum(['manual', 'calculado', 'pvp']).optional().describe('Acción de guardado; no altera precio de venta durante recepciones.'),
+  "actualizadoEn": zod.string().optional().describe('Versión del producto leído; evita sobrescribir costos actualizados por otra sesión.'),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(getBodegaResponseTwoProductosItemOneNombreMax),
   "codigoInterno": zod.string().max(getBodegaResponseTwoProductosItemOneCodigoInternoMax).optional(),
@@ -1334,6 +1345,12 @@ export const GetBodegaResponse = zod.object({
   "activo": zod.boolean(),
   "stockCritico": zod.number(),
   "precioCalculado": zod.number().nullable(),
+  "precioUnitarioNeto": zod.number().optional(),
+  "precioCalculadoNeto": zod.number().optional(),
+  "ivaPrecioCalculado": zod.number().optional(),
+  "pvpNeto": zod.number().nullish(),
+  "pvpMargen": zod.number().nullish(),
+  "pvpUtilidad": zod.number().nullish(),
   "utilidad": zod.number(),
   "margenReal": zod.number(),
   "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
@@ -1356,6 +1373,11 @@ export const UpdateStockCriticoBodegaBody = zod.object({
   "stockCritico": zod.number().min(updateStockCriticoBodegaBodyStockCriticoMin)
 })
 
+export const updateStockCriticoBodegaResponseOnePorcentajeIvaPrecioMin = 0;
+export const updateStockCriticoBodegaResponseOnePorcentajeIvaPrecioMax = 100;
+
+export const updateStockCriticoBodegaResponseOnePvpProveedorMin = 0;
+
 export const updateStockCriticoBodegaResponseOneNombreMax = 200;
 
 export const updateStockCriticoBodegaResponseOneCodigoInternoMax = 80;
@@ -1375,6 +1397,12 @@ export const updateStockCriticoBodegaResponseOneFactorFactibilidadMax = 2;
 
 
 export const UpdateStockCriticoBodegaResponse = zod.object({
+  "incluyeIvaPrecio": zod.boolean().optional(),
+  "porcentajeIvaPrecio": zod.number().min(updateStockCriticoBodegaResponseOnePorcentajeIvaPrecioMin).max(updateStockCriticoBodegaResponseOnePorcentajeIvaPrecioMax).optional(),
+  "pvpProveedor": zod.number().min(updateStockCriticoBodegaResponseOnePvpProveedorMin).nullish(),
+  "pvpIncluyeIva": zod.boolean().optional(),
+  "fuentePrecio": zod.enum(['manual', 'calculado', 'pvp']).optional().describe('Acción de guardado; no altera precio de venta durante recepciones.'),
+  "actualizadoEn": zod.string().optional().describe('Versión del producto leído; evita sobrescribir costos actualizados por otra sesión.'),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(updateStockCriticoBodegaResponseOneNombreMax),
   "codigoInterno": zod.string().max(updateStockCriticoBodegaResponseOneCodigoInternoMax).optional(),
@@ -1407,6 +1435,12 @@ export const UpdateStockCriticoBodegaResponse = zod.object({
   "activo": zod.boolean(),
   "stockCritico": zod.number(),
   "precioCalculado": zod.number().nullable(),
+  "precioUnitarioNeto": zod.number().optional(),
+  "precioCalculadoNeto": zod.number().optional(),
+  "ivaPrecioCalculado": zod.number().optional(),
+  "pvpNeto": zod.number().nullish(),
+  "pvpMargen": zod.number().nullish(),
+  "pvpUtilidad": zod.number().nullish(),
   "utilidad": zod.number(),
   "margenReal": zod.number(),
   "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
@@ -1414,6 +1448,11 @@ export const UpdateStockCriticoBodegaResponse = zod.object({
   "actualizadoEn": zod.string()
 }))
 
+
+export const listInventarioResponseOnePorcentajeIvaPrecioMin = 0;
+export const listInventarioResponseOnePorcentajeIvaPrecioMax = 100;
+
+export const listInventarioResponseOnePvpProveedorMin = 0;
 
 export const listInventarioResponseOneNombreMax = 200;
 
@@ -1434,6 +1473,12 @@ export const listInventarioResponseOneFactorFactibilidadMax = 2;
 
 
 export const ListInventarioResponseItem = zod.object({
+  "incluyeIvaPrecio": zod.boolean().optional(),
+  "porcentajeIvaPrecio": zod.number().min(listInventarioResponseOnePorcentajeIvaPrecioMin).max(listInventarioResponseOnePorcentajeIvaPrecioMax).optional(),
+  "pvpProveedor": zod.number().min(listInventarioResponseOnePvpProveedorMin).nullish(),
+  "pvpIncluyeIva": zod.boolean().optional(),
+  "fuentePrecio": zod.enum(['manual', 'calculado', 'pvp']).optional().describe('Acción de guardado; no altera precio de venta durante recepciones.'),
+  "actualizadoEn": zod.string().optional().describe('Versión del producto leído; evita sobrescribir costos actualizados por otra sesión.'),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(listInventarioResponseOneNombreMax),
   "codigoInterno": zod.string().max(listInventarioResponseOneCodigoInternoMax).optional(),
@@ -1466,6 +1511,12 @@ export const ListInventarioResponseItem = zod.object({
   "activo": zod.boolean(),
   "stockCritico": zod.number(),
   "precioCalculado": zod.number().nullable(),
+  "precioUnitarioNeto": zod.number().optional(),
+  "precioCalculadoNeto": zod.number().optional(),
+  "ivaPrecioCalculado": zod.number().optional(),
+  "pvpNeto": zod.number().nullish(),
+  "pvpMargen": zod.number().nullish(),
+  "pvpUtilidad": zod.number().nullish(),
   "utilidad": zod.number(),
   "margenReal": zod.number(),
   "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
@@ -1474,6 +1525,11 @@ export const ListInventarioResponseItem = zod.object({
 }))
 export const ListInventarioResponse = zod.array(ListInventarioResponseItem)
 
+
+export const createProductoBodyPorcentajeIvaPrecioMin = 0;
+export const createProductoBodyPorcentajeIvaPrecioMax = 100;
+
+export const createProductoBodyPvpProveedorMin = 0;
 
 export const createProductoBodyNombreMax = 200;
 
@@ -1494,6 +1550,12 @@ export const createProductoBodyFactorFactibilidadMax = 2;
 
 
 export const CreateProductoBody = zod.object({
+  "incluyeIvaPrecio": zod.boolean().optional(),
+  "porcentajeIvaPrecio": zod.number().min(createProductoBodyPorcentajeIvaPrecioMin).max(createProductoBodyPorcentajeIvaPrecioMax).optional(),
+  "pvpProveedor": zod.number().min(createProductoBodyPvpProveedorMin).nullish(),
+  "pvpIncluyeIva": zod.boolean().optional(),
+  "fuentePrecio": zod.enum(['manual', 'calculado', 'pvp']).optional().describe('Acción de guardado; no altera precio de venta durante recepciones.'),
+  "actualizadoEn": zod.string().optional().describe('Versión del producto leído; evita sobrescribir costos actualizados por otra sesión.'),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(createProductoBodyNombreMax),
   "codigoInterno": zod.string().max(createProductoBodyCodigoInternoMax).optional(),
@@ -1528,6 +1590,11 @@ export const GetProductoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const getProductoResponseOnePorcentajeIvaPrecioMin = 0;
+export const getProductoResponseOnePorcentajeIvaPrecioMax = 100;
+
+export const getProductoResponseOnePvpProveedorMin = 0;
+
 export const getProductoResponseOneNombreMax = 200;
 
 export const getProductoResponseOneCodigoInternoMax = 80;
@@ -1547,6 +1614,12 @@ export const getProductoResponseOneFactorFactibilidadMax = 2;
 
 
 export const GetProductoResponse = zod.object({
+  "incluyeIvaPrecio": zod.boolean().optional(),
+  "porcentajeIvaPrecio": zod.number().min(getProductoResponseOnePorcentajeIvaPrecioMin).max(getProductoResponseOnePorcentajeIvaPrecioMax).optional(),
+  "pvpProveedor": zod.number().min(getProductoResponseOnePvpProveedorMin).nullish(),
+  "pvpIncluyeIva": zod.boolean().optional(),
+  "fuentePrecio": zod.enum(['manual', 'calculado', 'pvp']).optional().describe('Acción de guardado; no altera precio de venta durante recepciones.'),
+  "actualizadoEn": zod.string().optional().describe('Versión del producto leído; evita sobrescribir costos actualizados por otra sesión.'),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(getProductoResponseOneNombreMax),
   "codigoInterno": zod.string().max(getProductoResponseOneCodigoInternoMax).optional(),
@@ -1579,6 +1652,12 @@ export const GetProductoResponse = zod.object({
   "activo": zod.boolean(),
   "stockCritico": zod.number(),
   "precioCalculado": zod.number().nullable(),
+  "precioUnitarioNeto": zod.number().optional(),
+  "precioCalculadoNeto": zod.number().optional(),
+  "ivaPrecioCalculado": zod.number().optional(),
+  "pvpNeto": zod.number().nullish(),
+  "pvpMargen": zod.number().nullish(),
+  "pvpUtilidad": zod.number().nullish(),
   "utilidad": zod.number(),
   "margenReal": zod.number(),
   "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
@@ -1590,6 +1669,11 @@ export const GetProductoResponse = zod.object({
 export const UpdateProductoParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const updateProductoBodyPorcentajeIvaPrecioMin = 0;
+export const updateProductoBodyPorcentajeIvaPrecioMax = 100;
+
+export const updateProductoBodyPvpProveedorMin = 0;
 
 export const updateProductoBodyNombreMax = 200;
 
@@ -1610,6 +1694,12 @@ export const updateProductoBodyFactorFactibilidadMax = 2;
 
 
 export const UpdateProductoBody = zod.object({
+  "incluyeIvaPrecio": zod.boolean().optional(),
+  "porcentajeIvaPrecio": zod.number().min(updateProductoBodyPorcentajeIvaPrecioMin).max(updateProductoBodyPorcentajeIvaPrecioMax).optional(),
+  "pvpProveedor": zod.number().min(updateProductoBodyPvpProveedorMin).nullish(),
+  "pvpIncluyeIva": zod.boolean().optional(),
+  "fuentePrecio": zod.enum(['manual', 'calculado', 'pvp']).optional().describe('Acción de guardado; no altera precio de venta durante recepciones.'),
+  "actualizadoEn": zod.string().optional().describe('Versión del producto leído; evita sobrescribir costos actualizados por otra sesión.'),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(updateProductoBodyNombreMax),
   "codigoInterno": zod.string().max(updateProductoBodyCodigoInternoMax).optional(),
@@ -1631,6 +1721,11 @@ export const UpdateProductoBody = zod.object({
   "factorFactibilidad": zod.number().min(1).max(updateProductoBodyFactorFactibilidadMax).nullish()
 })
 
+export const updateProductoResponseOnePorcentajeIvaPrecioMin = 0;
+export const updateProductoResponseOnePorcentajeIvaPrecioMax = 100;
+
+export const updateProductoResponseOnePvpProveedorMin = 0;
+
 export const updateProductoResponseOneNombreMax = 200;
 
 export const updateProductoResponseOneCodigoInternoMax = 80;
@@ -1650,6 +1745,12 @@ export const updateProductoResponseOneFactorFactibilidadMax = 2;
 
 
 export const UpdateProductoResponse = zod.object({
+  "incluyeIvaPrecio": zod.boolean().optional(),
+  "porcentajeIvaPrecio": zod.number().min(updateProductoResponseOnePorcentajeIvaPrecioMin).max(updateProductoResponseOnePorcentajeIvaPrecioMax).optional(),
+  "pvpProveedor": zod.number().min(updateProductoResponseOnePvpProveedorMin).nullish(),
+  "pvpIncluyeIva": zod.boolean().optional(),
+  "fuentePrecio": zod.enum(['manual', 'calculado', 'pvp']).optional().describe('Acción de guardado; no altera precio de venta durante recepciones.'),
+  "actualizadoEn": zod.string().optional().describe('Versión del producto leído; evita sobrescribir costos actualizados por otra sesión.'),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(updateProductoResponseOneNombreMax),
   "codigoInterno": zod.string().max(updateProductoResponseOneCodigoInternoMax).optional(),
@@ -1682,12 +1783,37 @@ export const UpdateProductoResponse = zod.object({
   "activo": zod.boolean(),
   "stockCritico": zod.number(),
   "precioCalculado": zod.number().nullable(),
+  "precioUnitarioNeto": zod.number().optional(),
+  "precioCalculadoNeto": zod.number().optional(),
+  "ivaPrecioCalculado": zod.number().optional(),
+  "pvpNeto": zod.number().nullish(),
+  "pvpMargen": zod.number().nullish(),
+  "pvpUtilidad": zod.number().nullish(),
   "utilidad": zod.number(),
   "margenReal": zod.number(),
   "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
   "creadoEn": zod.string(),
   "actualizadoEn": zod.string()
 }))
+
+
+export const ListHistorialCostosParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListHistorialCostosResponseItem = zod.object({
+  "id": zod.number(),
+  "productoId": zod.number(),
+  "fecha": zod.string(),
+  "costoAnterior": zod.number().nullable(),
+  "costoNuevo": zod.number(),
+  "origen": zod.enum(['manual', 'compra']),
+  "compraId": zod.number().nullable(),
+  "numeroFactura": zod.string().nullable(),
+  "moneda": zod.string(),
+  "decimales": zod.number()
+})
+export const ListHistorialCostosResponse = zod.array(ListHistorialCostosResponseItem)
 
 
 export const ListMovimientosStockParams = zod.object({

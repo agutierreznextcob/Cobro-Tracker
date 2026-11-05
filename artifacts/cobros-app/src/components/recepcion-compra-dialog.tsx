@@ -7,13 +7,13 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
-import { apiErrorMessage } from "@/lib/inventario";
+import { apiErrorMessage, invalidateInventario, invalidateNotificaciones } from "@/lib/inventario";
 import { errorStatus, invalidateCompras, itemsDe } from "@/lib/compras";
-import { AlertTriangle, ArrowRight, Loader2, PackageCheck, RotateCw } from "lucide-react";
+import { ArrowRight, Info, Loader2, PackageCheck, RotateCw } from "lucide-react";
 
 /**
- * Loads the receipt preview, asks an explicit yes/no for every changed cost and posts the receipt.
- * On 409 the preview is reloaded and decisions reset; nothing is retried automatically.
+ * Loads the receipt preview, shows (read-only) which product costs will be updated automatically
+ * and posts the receipt with only the preview version. On 409 the preview is reloaded.
  */
 export function RecepcionCompraDialog({ compra, open, onOpenChange, onRecibida }: {
   compra: Pick<Compra, "id" | "numeroFactura" | "moneda" | "decimales" | "items">; open: boolean; onOpenChange: (o: boolean) => void; onRecibida: (c: Compra) => void;
@@ -24,12 +24,11 @@ export function RecepcionCompraDialog({ compra, open, onOpenChange, onRecibida }
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [decisiones, setDecisiones] = useState<Record<number, boolean | undefined>>({});
   const idRef = useRef(compra.id);
   idRef.current = compra.id;
 
   const cargar = async () => {
-    setCargando(true); setError(null); setDecisiones({});
+    setCargando(true); setError(null);
     try { setPreview(await previewRecepcionCompra(idRef.current)); }
     catch (err) { setPreview(null); setError(apiErrorMessage(err, "No se pudo preparar la recepción.")); }
     finally { setCargando(false); }
@@ -38,29 +37,27 @@ export function RecepcionCompraDialog({ compra, open, onOpenChange, onRecibida }
   useEffect(() => { if (open) { setAviso(null); cargar(); } }, [open, compra.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cambios = preview?.cambiosCostos ?? [];
-  const pendientes = cambios.filter((c) => decisiones[c.productoId] === undefined).length;
-  // Preserve fractional historical costs in the approval prompt even if the
-  // new invoice uses whole amounts, so old/new costs never appear identical.
+  // Preserve fractional historical costs so old/new never appear identical.
   const fmt = (n: number) => formatMoney(n, compra.moneda,
     Math.round(n * 10 ** compra.decimales) / 10 ** compra.decimales === n ? compra.decimales : 2);
   const lineasStock = itemsDe(compra).filter((i) => i.productoId != null && i.tipoProducto !== "servicio").length;
   const lineasSinStock = compra.items.length - lineasStock;
 
   const confirmar = async () => {
-    if (!preview || pendientes > 0) return;
+    if (!preview) return;
     setError(null);
     try {
-      const res = await recibir.mutateAsync({ id: compra.id, data: {
-        updatedAt: preview.updatedAt,
-        decisiones: cambios.map((c) => ({ productoId: c.productoId, actualizar: decisiones[c.productoId] === true, costoAnterior: c.costoAnterior })),
-      } });
+      const res = await recibir.mutateAsync({ id: compra.id, data: { updatedAt: preview.updatedAt } });
       qc.setQueryData(getGetCompraQueryKey(res.id), res);
       invalidateCompras(qc, true);
+      invalidateInventario(qc);
+      cambios.forEach((c) => invalidateInventario(qc, c.productoId));
+      invalidateNotificaciones(qc);
       onRecibida(res);
       onOpenChange(false);
     } catch (err) {
       if (errorStatus(err) === 409) {
-        setAviso("La compra o los costos cambiaron mientras revisabas. Cargamos los valores actuales: revisa y decide nuevamente.");
+        setAviso("La compra o los costos cambiaron mientras revisabas. Cargamos los valores actuales.");
         await cargar();
       } else {
         setError(apiErrorMessage(err, "No se pudo confirmar la recepción."));
@@ -82,7 +79,7 @@ export function RecepcionCompraDialog({ compra, open, onOpenChange, onRecibida }
         {aviso && <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="text-recepcion-conflicto">{aviso}</div>}
 
         {cargando ? (
-          <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="h-16 rounded-md bg-muted animate-pulse" />)}</div>
+          <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="h-12 rounded-md bg-muted animate-pulse" />)}</div>
         ) : !preview ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800 space-y-2">
             <p>{error ?? "No se pudo preparar la recepción."}</p>
@@ -91,21 +88,24 @@ export function RecepcionCompraDialog({ compra, open, onOpenChange, onRecibida }
         ) : cambios.length === 0 ? (
           <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">Ningún costo cambia respecto al registrado en inventario.</p>
         ) : (
-          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-            <p className="text-sm font-medium flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 text-amber-600" />Cambios de costo: decide uno por uno</p>
-            {cambios.map((c) => {
-              const d = decisiones[c.productoId];
-              return (
-                <div key={c.productoId} className="rounded-lg border p-3 space-y-2" data-testid={`card-cambio-costo-${c.productoId}`}>
-                  <p className="text-sm">El precio de costo de <strong>{c.nombre}</strong> cambió de <span className="font-mono">{fmt(c.costoAnterior)}</span> <ArrowRight className="inline h-3 w-3" /> <span className="font-mono font-semibold">{fmt(c.costoNuevo)}</span>. ¿Actualizar?</p>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant={d === true ? "default" : "outline"} onClick={() => setDecisiones((s) => ({ ...s, [c.productoId]: true }))} data-testid={`button-actualizar-costo-${c.productoId}`}>Sí, actualizar costo</Button>
-                    <Button size="sm" variant={d === false ? "secondary" : "outline"} onClick={() => setDecisiones((s) => ({ ...s, [c.productoId]: false }))} data-testid={`button-mantener-costo-${c.productoId}`}>No, mantener {fmt(c.costoAnterior)}</Button>
-                  </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Costos que se actualizarán automáticamente ({cambios.length})</p>
+            <div className="rounded-lg border divide-y max-h-[40vh] overflow-y-auto">
+              {cambios.map((c) => (
+                <div key={c.productoId} className="flex items-center justify-between gap-3 px-3 py-2 text-sm" data-testid={`row-cambio-costo-${c.productoId}`}>
+                  <span className="min-w-0 truncate font-medium">{c.nombre}</span>
+                  <span className="shrink-0 font-mono text-xs tabular-nums">
+                    <span className="text-muted-foreground line-through">{fmt(c.costoAnterior)}</span>
+                    <ArrowRight className="inline h-3 w-3 mx-1" />
+                    <span className="font-semibold">{fmt(c.costoNuevo)}</span>
+                  </span>
                 </div>
-              );
-            })}
-            <p className="text-[11px] text-muted-foreground">Si actualizas, se recalcula el precio sugerido según el margen configurado. El precio de venta vigente no cambia.</p>
+              ))}
+            </div>
+            <div className="flex gap-2 rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">
+              <Info className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+              <p>Los costos netos se toman de esta factura y quedan en el historial de cada producto. Se mantiene el margen configurado, el precio sugerido se recalcula y recibirás una notificación por cada cambio.</p>
+            </div>
           </div>
         )}
 
@@ -113,9 +113,9 @@ export function RecepcionCompraDialog({ compra, open, onOpenChange, onRecibida }
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={recibir.isPending}>Cancelar</Button>
-          <Button onClick={confirmar} disabled={!preview || cargando || pendientes > 0 || recibir.isPending} data-testid="button-confirmar-recepcion-final">
+          <Button onClick={confirmar} disabled={!preview || cargando || recibir.isPending} data-testid="button-confirmar-recepcion-final">
             {recibir.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {pendientes > 0 ? `Decide ${pendientes} cambio${pendientes === 1 ? "" : "s"}` : "Confirmar recepción"}
+            Confirmar recepción
           </Button>
         </DialogFooter>
       </DialogContent>

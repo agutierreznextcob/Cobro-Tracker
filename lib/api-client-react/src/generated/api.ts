@@ -107,6 +107,7 @@ import type {
   GetSaludCarteraHistorialParams,
   GetSugerenciaWorkflowParams,
   HealthStatus,
+  HistorialCosto,
   ImportarClientesInput,
   ImportarClientesResult,
   IndicadorEconomico,
@@ -2797,6 +2798,77 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getUpdateProductoMutationOptions(options));
     }
+
+export const getListHistorialCostosUrl = (id: number,) => {
+
+
+
+
+  return `/api/inventario/${id}/costos`
+}
+
+export const listHistorialCostos = async (id: number, options?: RequestInit): Promise<HistorialCosto[]> => {
+
+  return customFetch<HistorialCosto[]>(getListHistorialCostosUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListHistorialCostosQueryKey = (id: number,) => {
+    return [
+    `/api/inventario/${id}/costos`
+    ] as const;
+    }
+
+
+export const getListHistorialCostosQueryOptions = <TData = Awaited<ReturnType<typeof listHistorialCostos>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHistorialCostos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListHistorialCostosQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHistorialCostos>>> = ({ signal }) => listHistorialCostos(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHistorialCostos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListHistorialCostosQueryResult = NonNullable<Awaited<ReturnType<typeof listHistorialCostos>>>
+export type ListHistorialCostosQueryError = ErrorType<unknown>
+
+
+
+export function useListHistorialCostos<TData = Awaited<ReturnType<typeof listHistorialCostos>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHistorialCostos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListHistorialCostosQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListMovimientosStockUrl = (id: number,) => {
 

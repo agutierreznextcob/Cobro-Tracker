@@ -13,10 +13,10 @@ let server: http.Server | undefined;
 try {
   await admin.connect();
   await admin.query(`create schema "${schema}"`);
-  for (const table of ["productos", "movimientos_stock", "cobros", "users", "organizaciones", "locales", "bodegas", "stock_por_bodega"]) {
+  for (const table of ["productos", "movimientos_stock", "cobros", "users", "organizaciones", "locales", "bodegas", "stock_por_bodega", "historial_costos", "preferencias"]) {
     await admin.query(`create table "${schema}"."${table}" (like public."${table}" including all)`);
   }
-  for (const table of ["productos", "movimientos_stock", "cobros", "organizaciones", "locales", "bodegas", "stock_por_bodega"]) {
+  for (const table of ["productos", "movimientos_stock", "cobros", "organizaciones", "locales", "bodegas", "stock_por_bodega", "historial_costos"]) {
     await admin.query(`create sequence "${schema}"."${table}_seq"`);
     await admin.query(`alter table "${schema}"."${table}" alter column id set default nextval('"${schema}"."${table}_seq"')`);
   }
@@ -71,6 +71,39 @@ try {
   assert.equal(productoValues(fractionalProduct, 1).precioCalculado, "14.3");
   assert.equal(productoValues(fractionalProduct, 2).precioCalculado, "14.29");
   assert.equal(productoValues(fractionalProduct, 0).precioUnitario, "14");
+  const { calcularPrecios } = await import("../src/lib/inventario-precios");
+  const pricing = { costo: 600, tipo: "producto" as const, metodo: "margen" as const, margen: 20, incluyeIva: true, iva: 19, pvp: 1190, pvpIncluyeIva: true };
+  assert.deepEqual([calcularPrecios(pricing, 0).neto, calcularPrecios(pricing, 0).montoIva, calcularPrecios(pricing, 0).final], [750, 143, 893]);
+  assert.equal(calcularPrecios(pricing, 2).final, 892.5);
+  assert.equal(calcularPrecios({ ...pricing, iva: 21 }, 2).final, 907.5);
+  assert.equal(calcularPrecios(pricing, 2).pvpNeto, 1000);
+  assert.equal(calcularPrecios(pricing, 2).pvpMargen, 40);
+  assert.equal(calcularPrecios(pricing, 2).pvpUtilidad, 400);
+  const taxInput = { ...input, costoUnitario: 600, margenPorcentaje: 20, precioUnitario: 1, stockActual: 0,
+    incluyeIvaPrecio: true, porcentajeIvaPrecio: 19, fuentePrecio: "calculado", pvpProveedor: 1190, pvpIncluyeIva: true };
+  const taxProduct = await api("POST", "", taxInput);
+  assert.equal(taxProduct.status, 201, JSON.stringify(taxProduct));
+  assert.equal(taxProduct.data.precioUnitario, 893, "Server derives tax-inclusive final");
+  assert.equal(taxProduct.data.precioCalculadoNeto, 750);
+  assert.equal(taxProduct.data.ivaPrecioCalculado, 143);
+  const pvpProduct = await api("PATCH", `/${taxProduct.data.id}`, { ...taxInput, fuentePrecio: "pvp", costoUnitario: 800, actualizadoEn: taxProduct.data.actualizadoEn });
+  assert.equal(pvpProduct.status, 200, JSON.stringify(pvpProduct));
+  assert.equal(pvpProduct.data.precioUnitario, 1190);
+  assert.equal(pvpProduct.data.precioUnitarioNeto, 1000);
+  assert.equal(pvpProduct.data.margenReal, 20);
+  assert.equal(pvpProduct.data.utilidad, 200);
+  const costEntries = await api("GET", `/${taxProduct.data.id}/costos`);
+  assert.equal(costEntries.data.length, 2);
+  assert.equal(costEntries.data[0].costoAnterior, 600);
+  assert.equal(costEntries.data[0].costoNuevo, 800);
+  assert.equal(costEntries.data[0].origen, "manual");
+  assert.equal((await api("PATCH", `/${taxProduct.data.id}`, { ...taxInput, actualizadoEn: taxProduct.data.actualizadoEn })).status, 409);
+  assert.equal((await api("GET", `/${taxProduct.data.id}/costos`)).data.length, 2, "Stale edit changes no history");
+  actor = outsider;
+  assert.equal((await api("GET", `/${taxProduct.data.id}/costos`)).status, 404);
+  actor = owner;
+  await db.delete((await import("@workspace/db")).historialCostosTable).where(eq((await import("@workspace/db")).historialCostosTable.productoId, taxProduct.data.id));
+  await db.delete(productosTable).where(eq(productosTable.id, taxProduct.data.id));
   const svc = await api("POST", "", { ...input, nombre: "Servicio test", tipo: "servicio", tarifaHora: 10000, tiempoEstimadoHoras: 2, factorFactibilidad: 1.5, precioUnitario: 30000 });
   assert.equal(svc.status, 201);
   assert.equal(svc.data.stockActual, null);

@@ -174,7 +174,7 @@ export type CompraRecepcionInputDecisionesItem = {
 
 export interface CompraRecepcionInput {
   updatedAt: string;
-  decisiones: CompraRecepcionInputDecisionesItem[];
+  decisiones?: CompraRecepcionInputDecisionesItem[];
 }
 
 export type IndicadorEconomicoCodigo = typeof IndicadorEconomicoCodigo[keyof typeof IndicadorEconomicoCodigo];
@@ -1753,6 +1753,18 @@ export interface CobroInput {
   fechaVencimiento?: string;
 }
 
+/**
+ * Acción de guardado; no altera precio de venta durante recepciones.
+ */
+export type ProductoInputFuentePrecio = typeof ProductoInputFuentePrecio[keyof typeof ProductoInputFuentePrecio];
+
+
+export const ProductoInputFuentePrecio = {
+  manual: 'manual',
+  calculado: 'calculado',
+  pvp: 'pvp',
+} as const;
+
 export type ProductoInputMoneda = typeof ProductoInputMoneda[keyof typeof ProductoInputMoneda];
 
 
@@ -1780,6 +1792,22 @@ export const ProductoInputMetodoCalculo = {
 } as const;
 
 export interface ProductoInput {
+  incluyeIvaPrecio?: boolean;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  porcentajeIvaPrecio?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  pvpProveedor?: number | null;
+  pvpIncluyeIva?: boolean;
+  /** Acción de guardado; no altera precio de venta durante recepciones. */
+  fuentePrecio?: ProductoInputFuentePrecio;
+  /** Versión del producto leído; evita sobrescribir costos actualizados por otra sesión. */
+  actualizadoEn?: string;
   moneda?: ProductoInputMoneda;
   /**
      * @minLength 1
@@ -1844,12 +1872,45 @@ export type Producto = ProductoInput & ({
   activo: boolean;
   stockCritico: number;
   precioCalculado: number | null;
+  precioUnitarioNeto?: number;
+  precioCalculadoNeto?: number;
+  ivaPrecioCalculado?: number;
+  /** @nullable */
+  pvpNeto?: number | null;
+  /** @nullable */
+  pvpMargen?: number | null;
+  /** @nullable */
+  pvpUtilidad?: number | null;
   utilidad: number;
   margenReal: number;
   estadoStock: ProductoEstadoStock;
   creadoEn: string;
   actualizadoEn: string;
 });
+
+export type HistorialCostoOrigen = typeof HistorialCostoOrigen[keyof typeof HistorialCostoOrigen];
+
+
+export const HistorialCostoOrigen = {
+  manual: 'manual',
+  compra: 'compra',
+} as const;
+
+export interface HistorialCosto {
+  id: number;
+  productoId: number;
+  fecha: string;
+  /** @nullable */
+  costoAnterior: number | null;
+  costoNuevo: number;
+  origen: HistorialCostoOrigen;
+  /** @nullable */
+  compraId: number | null;
+  /** @nullable */
+  numeroFactura: string | null;
+  moneda: string;
+  decimales: number;
+}
 
 export type MovimientoStockInputTipo = typeof MovimientoStockInputTipo[keyof typeof MovimientoStockInputTipo];
 

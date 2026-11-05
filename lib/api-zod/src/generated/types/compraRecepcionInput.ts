@@ -9,5 +9,5 @@ import type { CompraRecepcionInputDecisionesItem } from './compraRecepcionInputD
 
 export interface CompraRecepcionInput {
   updatedAt: string;
-  decisiones: CompraRecepcionInputDecisionesItem[];
+  decisiones?: CompraRecepcionInputDecisionesItem[];
 }

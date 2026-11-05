@@ -4,6 +4,7 @@ import {
   getGetInventarioResumenQueryKey,
   getGetProductoQueryKey,
   getListMovimientosStockQueryKey,
+  getListHistorialCostosQueryKey,
   type Producto,
   type StockUbicacion,
 } from "@workspace/api-client-react";
@@ -104,5 +105,36 @@ export function invalidateInventario(qc: QueryClient, id?: number) {
   if (id) {
     qc.invalidateQueries({ queryKey: getGetProductoQueryKey(id) });
     qc.invalidateQueries({ queryKey: getListMovimientosStockQueryKey(id) });
+    qc.invalidateQueries({ queryKey: getListHistorialCostosQueryKey(id) });
   }
 }
+
+/** Bell notifications (list and unread counters). */
+export function invalidateNotificaciones(qc: QueryClient) {
+  qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/notificaciones") });
+}
+
+/**
+ * Net (tax-exclusive) unit price to use when a catalog item enters a NEW document line.
+ * Products with incluyeIvaPrecio store a gross retail price; documents add IVA themselves,
+ * so using the gross amount would charge IVA twice.
+ */
+export function precioNetoDe(p: Pick<Producto, "precioUnitario" | "precioUnitarioNeto" | "incluyeIvaPrecio" | "porcentajeIvaPrecio">): number {
+  if (typeof p.precioUnitarioNeto === "number" && Number.isFinite(p.precioUnitarioNeto)) return p.precioUnitarioNeto;
+  if (p.incluyeIvaPrecio) return p.precioUnitario / (1 + (p.porcentajeIvaPrecio ?? 19) / 100);
+  return p.precioUnitario;
+}
+
+/** net -> IVA -> final, each step rounded to the global precision (mirrors the server). */
+export function desgloseIva(neto: number, tasa: number, conIva: boolean, decimales = 0) {
+  const n = redondear(neto, decimales);
+  const iva = conIva ? redondear((n * tasa) / 100, decimales) : 0;
+  return { neto: n, iva, final: redondear(n + iva, decimales) };
+}
+
+/** Net equivalent of a price (unrounded, used for margins). */
+export function netoDesde(precio: number, tasa: number, incluyeIva: boolean) {
+  return incluyeIva ? precio / (1 + tasa / 100) : precio;
+}
+
+export { redondear };

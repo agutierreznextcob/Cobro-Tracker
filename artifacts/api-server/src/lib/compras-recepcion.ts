@@ -4,13 +4,16 @@ import { z } from "zod";
 import { compraPorId, CompraError, exigirRecepcion, serializeCompras } from "./compras";
 import { inventarioScope } from "./inventario";
 import { lockInventoryScope, scopedBodegas, ensureStockRow, type InventoryTx } from "./inventario-bodegas";
-import { roundMoney } from "./preferencias";
+import { getPreferenciasNegocio, formatDocumentMoney } from "./preferencias";
+import { registrarCosto } from "./inventario-costos";
+import { calcularPrecios } from "./inventario-precios";
+import { crearNotificacion } from "./notificaciones-service";
 
 const recepcionInput = z.object({
   updatedAt: z.string(),
   decisiones: z.array(z.object({
     productoId: z.number().int().positive(), actualizar: z.boolean(), costoAnterior: z.number().finite().min(0),
-  })).max(200),
+  })).max(200).optional(),
 });
 async function contextoRecepcion(tx: InventoryTx, userId: string, id: number) {
   const { ctx, condition } = await inventarioScope(userId);
@@ -36,20 +39,14 @@ export async function previewRecepcion(userId: string, id: number) {
 }
 export async function recibirCompra(userId: string, id: number, input: unknown) {
   const d = recepcionInput.parse(input);
+  const prefs = await getPreferenciasNegocio(userId);
   return db.transaction(async tx => {
     const { c, ctx, items, products, changes } = await contextoRecepcion(tx, userId, id);
     // Repeat delivery is success, never another stock movement or cost update.
     if (c.estado !== "borrador") return (await serializeCompras([c], ctx, tx))[0];
     if (c.updatedAt.toISOString() !== d.updatedAt) throw new CompraError("La compra cambió. Revisa nuevamente la recepción.", 409);
-    if (new Set(d.decisiones.map(d => d.productoId)).size !== d.decisiones.length) throw new CompraError("Decisiones duplicadas.");
-    for (const change of changes) {
-      const decision = d.decisiones.find(d => d.productoId === change.productoId);
-      if (!decision || decision.costoAnterior !== change.costoAnterior) throw new CompraError("El costo cambió o falta tu decisión. Revisa nuevamente la recepción.", 409);
-    }
-    for (const decision of d.decisiones) {
-      const product = products.find(p => p.id === decision.productoId);
-      if (!product || Number(product.costoUnitario) !== decision.costoAnterior) throw new CompraError("Los costos cambiaron. Revisa nuevamente la recepción.", 409);
-    }
+    // Costs are applied automatically under the same receipt lock. Legacy
+    // decision payloads are accepted but no longer opt out of synchronization.
     const warehouses = await scopedBodegas(userId, tx);
     for (const p of products) {
       if (!p.activo || p.moneda !== c.moneda) throw new CompraError(`Revisa ${p.nombre}: producto inactivo o moneda distinta.`, 409);
@@ -72,13 +69,24 @@ export async function recibirCompra(userId: string, id: number, input: unknown) 
         await tx.update(productosTable).set({ stockActual: total.cantidad, actualizadoEn: new Date() }).where(eq(productosTable.id, p.id));
       }
       const change = changes.find(x => x.productoId === p.id);
-      const updateCost = !!change && !!d.decisiones.find(d => d.productoId === p.id)?.actualizar;
+      const updateCost = !!change;
       if (updateCost) {
-        const margin = Number(p.margenPorcentaje), cost = change!.costoNuevo;
-        const suggested = p.tipo === "servicio" ? cost * Number(p.factorFactibilidad ?? 1)
-          : p.metodoCalculo === "margen" ? cost / (1 - margin / 100) : cost * (1 + margin / 100);
-        if (!Number.isFinite(suggested) || suggested < 0 || suggested >= 1e12) throw new CompraError(`Precio sugerido fuera de rango para ${p.nombre}.`);
-        await tx.update(productosTable).set({ costoUnitario: String(cost), precioCalculado: String(roundMoney(suggested, c.decimales)), actualizadoEn: new Date() }).where(eq(productosTable.id, p.id));
+        const cost = change!.costoNuevo; // Invoice unit costs are NET, regardless of invoice IVA.
+        const prices = calcularPrecios({ costo: cost, tipo: p.tipo, metodo: p.metodoCalculo,
+          margen: Number(p.margenPorcentaje), factor: Number(p.factorFactibilidad ?? 1),
+          incluyeIva: p.incluyeIvaPrecio, iva: Number(p.porcentajeIvaPrecio),
+          pvp: p.pvpProveedor == null ? null : Number(p.pvpProveedor), pvpIncluyeIva: p.pvpIncluyeIva,
+        }, prefs.decimales);
+        await tx.update(productosTable).set({ costoUnitario: String(cost), precioCalculado: String(prices.final),
+          precioCalculadoNeto: String(prices.neto),
+          actualizadoEn: new Date(Math.max(Date.now(), p.actualizadoEn.getTime() + 1)),
+        }).where(eq(productosTable.id, p.id));
+        await registrarCosto(tx, { productoId: p.id, anterior: Number(p.costoUnitario), nuevo: cost, usuarioId: userId,
+          moneda: p.moneda, decimales: c.decimales, compra: { id: c.id, numeroFactura: c.numeroFactura } });
+        await crearNotificacion({
+          eventKey: `compra:${c.id}:costo:${p.id}`, userId, tipo: "inventario_costo", titulo: "Costo de producto actualizado",
+          mensaje: `El costo de ${p.nombre} se actualizó desde la factura Nº ${c.numeroFactura}. Precio sugerido actualizado a ${formatDocumentMoney(prices.final, p.moneda, prefs.decimales)}`,
+        }, tx);
       }
       await tx.update(compraItemsTable).set({ costoAnterior: p.costoUnitario, costoActualizado: updateCost })
         .where(and(eq(compraItemsTable.compraId, c.id), eq(compraItemsTable.productoId, p.id)));

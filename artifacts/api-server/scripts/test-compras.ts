@@ -12,9 +12,10 @@ let server: http.Server | undefined;
 try {
   await admin.connect();
   await admin.query(`create schema "${schema}"`);
-  const tables = ["users", "organizaciones", "preferencias", "proveedores", "compras", "compra_items", "productos", "locales", "bodegas", "stock_por_bodega", "movimientos_stock"];
+  const tables = ["users", "organizaciones", "preferencias", "proveedores", "compras", "compra_items", "productos", "locales", "bodegas", "stock_por_bodega", "movimientos_stock",
+    "historial_costos", "notificaciones", "notificacion_eventos", "notificacion_lecturas"];
   for (const table of tables) await admin.query(`create table "${schema}"."${table}" (like public."${table}" including all)`);
-  for (const table of tables.filter(t => !["users", "preferencias"].includes(t))) {
+  for (const table of tables.filter(t => !["users", "preferencias", "notificacion_eventos", "notificacion_lecturas"].includes(t))) {
     await admin.query(`create sequence "${schema}"."${table}_seq"`);
     await admin.query(`alter table "${schema}"."${table}" alter column id set default nextval('"${schema}"."${table}_seq"')`);
   }
@@ -83,14 +84,22 @@ try {
   assert.equal((await api("POST", "/compras", { ...draft, numeroFactura: "FOREIGN-WH", items: [{ ...draft.items[0], bodegaDestinoId: otherWarehouse.id }] })).status, 400);
   const preview = await api("GET", `/compras/${id}/recepcion`);
   assert.equal(preview.status, 200); assert.equal(preview.data.cambiosCostos.length, 1);
-  const receipt = { updatedAt: preview.data.updatedAt, decisiones: [{ productoId: product.id, actualizar: true, costoAnterior: 10 }] };
-  assert.equal((await api("POST", `/compras/${id}/recepcion`, { ...receipt, decisiones: [] })).status, 409);
+  const receipt = { updatedAt: preview.data.updatedAt };
+  assert.equal((await api("POST", `/compras/${id}/recepcion`, { updatedAt: "stale" })).status, 409);
   const [a, b] = await Promise.all([api("POST", `/compras/${id}/recepcion`, receipt), api("POST", `/compras/${id}/recepcion`, receipt)]);
   assert.equal(a.status, 200, JSON.stringify(a)); assert.equal(b.status, 200, JSON.stringify(b));
   assert.equal(a.data.estado, "recibida"); assert.equal(a.data.itemsRecibidos, 2);
   let [p] = await db.select().from(productosTable).where(eq(productosTable.id, product.id));
   assert.equal(Number(p.stockActual), 5); assert.equal(Number(p.costoUnitario), 20.25);
   assert.equal(Number(p.precioCalculado), 28.93); assert.equal(Number(p.precioUnitario), 25, "Retail price unchanged");
+  const costHistory = await db.select().from(D.historialCostosTable);
+  assert.equal(costHistory.length, 1, "Concurrent receipt adds one cost history row");
+  assert.equal(Number(costHistory[0].costoAnterior), 10);
+  assert.equal(Number(costHistory[0].costoNuevo), 20.25, "Invoice cost is NET, not divided by invoice IVA");
+  assert.equal(costHistory[0].numeroFactura, "TEST-1");
+  const notices = await db.select().from(D.notificacionesTable);
+  assert.equal(notices.length, 1);
+  assert.match(notices[0].mensaje!, /El costo de Producto test se actualizó desde la factura Nº TEST-1\. Precio sugerido actualizado a/);
   const stock = await db.select().from(stockPorBodegaTable);
   assert.equal(Number(stock.find(s => s.bodegaId === warehouseA.id)!.stockActual), 2);
   assert.equal(Number(stock.find(s => s.bodegaId === warehouseB.id)!.stockActual), 3);
@@ -109,16 +118,16 @@ try {
   assert.equal((await api("PATCH", `/compras/${executiveDraft.data.id}`, { ...draft, numeroFactura: "EXEC", updatedAt: executiveDraft.data.updatedAt })).status, 409);
   const reject = await api("GET", `/compras/${executiveDraft.data.id}/recepcion`);
   await db.update(productosTable).set({ costoUnitario: "30" }).where(eq(productosTable.id, product.id));
-  assert.equal((await api("POST", `/compras/${executiveDraft.data.id}/recepcion`, { updatedAt: reject.data.updatedAt, decisiones: [] })).status, 409, "Concurrent cost change must require fresh decision");
-  const rejectNew = await api("GET", `/compras/${executiveDraft.data.id}/recepcion`);
-  assert.equal((await api("POST", `/compras/${executiveDraft.data.id}/recepcion`, { updatedAt: rejectNew.data.updatedAt, decisiones: [{ productoId: product.id, costoAnterior: 30, actualizar: false }] })).status, 200);
+  assert.equal((await api("POST", `/compras/${executiveDraft.data.id}/recepcion`, { updatedAt: reject.data.updatedAt, decisiones: [{ productoId: product.id, costoAnterior: 10, actualizar: false }] })).status, 200, "Costs synchronize automatically even when legacy payload rejects cost update");
   [p] = await db.select().from(productosTable).where(eq(productosTable.id, product.id));
-  assert.equal(Number(p.costoUnitario), 30); assert.equal(Number(p.stockActual), 10);
+  assert.equal(Number(p.costoUnitario), 20.25); assert.equal(Number(p.stockActual), 10);
   const noWarehouse = await api("POST", "/compras", { ...draft, numeroFactura: "NO-WH", items: [{ ...draft.items[0], bodegaDestinoId: null }] });
   const noWhPreview = await api("GET", `/compras/${noWarehouse.data.id}/recepcion`);
   assert.equal((await api("POST", `/compras/${noWarehouse.data.id}/recepcion`, { updatedAt: noWhPreview.data.updatedAt, decisiones: [{ productoId: product.id, costoAnterior: 30, actualizar: true }] })).status, 400);
   [p] = await db.select().from(productosTable).where(eq(productosTable.id, product.id));
-  assert.equal(Number(p.stockActual), 10); assert.equal(Number(p.costoUnitario), 30, "Failed receipt rolls back costs and stock");
+  assert.equal(Number(p.stockActual), 10); assert.equal(Number(p.costoUnitario), 20.25, "Failed receipt rolls back costs and stock");
+  assert.equal((await db.select().from(D.historialCostosTable)).length, 2);
+  assert.equal((await db.select().from(D.notificacionesTable)).length, 2, "Failed receipt writes no notification");
   assert.equal((await api("DELETE", `/compras/${noWarehouse.data.id}`)).status, 204);
   const returnPath = `/compras/${id}/devoluciones`;
   const [lineA, lineB, freeLine] = a.data.items;
@@ -146,7 +155,7 @@ try {
   assert.deepEqual(race.map(r => r.status).sort(), [200, 409], "Distinct simultaneous returns cannot exceed receipt");
   const [afterA] = await db.select().from(productosTable).where(eq(productosTable.id, product.id));
   assert.equal(Number(afterA.stockActual), 8);
-  assert.equal(Number(afterA.costoUnitario), 30);
+  assert.equal(Number(afterA.costoUnitario), 20.25);
   assert.equal(Number(afterA.precioUnitario), 25);
   // Exhaust B in a controlled fixture: a batch that first updates A must roll back entirely.
   const { and } = await import("drizzle-orm");
@@ -173,7 +182,32 @@ try {
   assert.equal(finalDoc.estado, "contabilizada"); assert.equal(finalDoc.total, 127.03);
   assert.equal((await api("DELETE", `/compras/${id}`)).status, 409);
   assert.equal(Number((await db.select().from(productosTable).where(eq(productosTable.id, product.id)))[0].stockActual), 5);
-  console.log("PASS compras + devoluciones: tenant/role guards, partial/full returns, precision, foreign lines, concurrent replay, distinct-key race, exhausted quantities, warehouse shortage, atomic batch rollback, immutable costs/prices/document and history");
+  await db.update(preferenciasTable).set({ decimales: 2 }).where(eq(preferenciasTable.scope, `org:${org.id}`));
+  const [zeroCost] = await db.insert(productosTable).values({ nombre: "Sin costo", tipo: "producto", usuarioId: owner.id, organizationId: org.id,
+    costoUnitario: "0", precioUnitario: "99", margenPorcentaje: "20", stockActual: "0", incluyeIvaPrecio: true, porcentajeIvaPrecio: "19" }).returning();
+  const zeroInvoice = await api("POST", "/compras", { ...draft, numeroFactura: "ZERO-COST", items: [
+    { productoId: zeroCost.id, descripcion: "Sin costo", cantidad: 1, precioUnitario: 800, bodegaDestinoId: warehouseA.id },
+  ] });
+  assert.equal(zeroInvoice.status, 201);
+  const zeroPreview = await api("GET", `/compras/${zeroInvoice.data.id}/recepcion`);
+  assert.equal((await api("POST", `/compras/${zeroInvoice.data.id}/recepcion`, { updatedAt: zeroPreview.data.updatedAt })).status, 200);
+  const [synced] = await db.select().from(productosTable).where(eq(productosTable.id, zeroCost.id));
+  assert.equal(Number(synced.costoUnitario), 800);
+  assert.equal(Number(synced.precioCalculadoNeto), 1000);
+  assert.equal(Number(synced.precioCalculado), 1190, "Automatic suggested price uses stored IVA and margin");
+  assert.equal(Number(synced.precioUnitario), 99, "Cost sync never adopts the suggested retail price");
+  const beforeHistories = (await db.select().from(D.historialCostosTable)).length;
+  const beforeNotifications = (await db.select().from(D.notificacionesTable)).length;
+  const rollbackInvoice = await api("POST", "/compras", { ...draft, numeroFactura: "ROLLBACK-COST", items: [
+    { productoId: product.id, descripcion: "First", cantidad: 1, precioUnitario: 50, bodegaDestinoId: warehouseA.id },
+    { productoId: zeroCost.id, descripcion: "Second", cantidad: 1, precioUnitario: 900, bodegaDestinoId: null },
+  ] });
+  const rollbackPreview = await api("GET", `/compras/${rollbackInvoice.data.id}/recepcion`);
+  assert.equal((await api("POST", `/compras/${rollbackInvoice.data.id}/recepcion`, { updatedAt: rollbackPreview.data.updatedAt })).status, 400);
+  assert.equal((await db.select().from(D.historialCostosTable)).length, beforeHistories);
+  assert.equal((await db.select().from(D.notificacionesTable)).length, beforeNotifications, "Earlier product notification rolls back if later line fails");
+  assert.equal(Number((await db.select().from(productosTable).where(eq(productosTable.id, product.id)))[0].costoUnitario), 20.25);
+  console.log("PASS compras + devoluciones + automatic NET costs, IVA suggested price, zero-cost initialization, no retail change, exactly-once history/notifications and full receipt rollback");
 } finally {
   if (server) await new Promise<void>(resolve => server!.close(() => resolve()));
   if (pool) await pool.end();

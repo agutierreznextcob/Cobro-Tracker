@@ -34,12 +34,13 @@ export const formatoClp = (monto: number) =>
  * in one transaction so retries either write both or neither. Claims survive
  * retention pruning, which makes old events permanently idempotent.
  */
-export async function crearNotificacion(input: NotificacionInput): Promise<boolean> {
+type NotificationTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export async function crearNotificacion(input: NotificacionInput, existingTx?: NotificationTx): Promise<boolean> {
   // A source event can legitimately fan out to several people. Keep that fact
   // distinct in the durable claim while callers continue to supply source keys.
   const claimKey = `${input.userId}:${input.eventKey}`;
   const creadoEn = input.creadoEn ?? new Date();
-  return db.transaction(async (tx) => {
+  const write = async (tx: NotificationTx) => {
     // Serialize all writes for one inbox. This guarantees the physical
     // retention bound even when several producers finish simultaneously.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.userId}))`);
@@ -71,7 +72,8 @@ export async function crearNotificacion(input: NotificacionInput): Promise<boole
           offset 100
         )`);
     return true;
-  });
+  };
+  return existingTx ? write(existingTx) : db.transaction(write);
 }
 
 export async function podarNotificacionesExistentes(userId?: string): Promise<void> {

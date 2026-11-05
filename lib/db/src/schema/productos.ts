@@ -29,6 +29,11 @@ export const productosTable = pgTable("productos", {
   tiempoEstimadoHoras: numeric("tiempo_estimado_horas", { precision: 12, scale: 3 }),
   factorFactibilidad: numeric("factor_factibilidad", { precision: 4, scale: 3 }),
   precioCalculado: numeric("precio_calculado", { precision: 18, scale: 2 }),
+  precioCalculadoNeto: numeric("precio_calculado_neto", { precision: 18, scale: 2 }),
+  incluyeIvaPrecio: boolean("incluye_iva_precio").notNull().default(false),
+  porcentajeIvaPrecio: numeric("porcentaje_iva_precio", { precision: 5, scale: 2 }).notNull().default("19"),
+  pvpProveedor: numeric("pvp_proveedor", { precision: 18, scale: 2 }),
+  pvpIncluyeIva: boolean("pvp_incluye_iva").notNull().default(true),
   creadoEn: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   actualizadoEn: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("productos_org_idx").on(t.organizationId), index("productos_usuario_idx").on(t.usuarioId)]);

@@ -136,7 +136,7 @@ export default function CompraDetailPage() {
       </div>
 
       {!borrador && <CompraDevoluciones compra={c} />}
-      <RecepcionCompraDialog compra={c} open={recepcion} onOpenChange={setRecepcion} onRecibida={() => toast({ title: "Recepción confirmada", description: "Stock ingresado en las bodegas destino." })} />
+      <RecepcionCompraDialog compra={c} open={recepcion} onOpenChange={setRecepcion} onRecibida={() => toast({ title: "Recepción confirmada", description: "Stock ingresado y costos actualizados desde la factura." })} />
 
       <AlertDialog open={confirmDel} onOpenChange={setConfirmDel}>
         <AlertDialogContent>

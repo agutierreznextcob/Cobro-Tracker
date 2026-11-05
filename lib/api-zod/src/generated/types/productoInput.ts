@@ -5,11 +5,28 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+import type { ProductoInputFuentePrecio } from './productoInputFuentePrecio';
 import type { ProductoInputMetodoCalculo } from './productoInputMetodoCalculo';
 import type { ProductoInputMoneda } from './productoInputMoneda';
 import type { ProductoInputTipo } from './productoInputTipo';
 
 export interface ProductoInput {
+  incluyeIvaPrecio?: boolean;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  porcentajeIvaPrecio?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  pvpProveedor?: number | null;
+  pvpIncluyeIva?: boolean;
+  /** Acción de guardado; no altera precio de venta durante recepciones. */
+  fuentePrecio?: ProductoInputFuentePrecio;
+  /** Versión del producto leído; evita sobrescribir costos actualizados por otra sesión. */
+  actualizadoEn?: string;
   moneda?: ProductoInputMoneda;
   /**
      * @minLength 1

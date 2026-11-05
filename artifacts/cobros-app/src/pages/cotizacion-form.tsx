@@ -26,7 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatMoney, roundTo, hoySantiago, monedaDe, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
-import { apiErrorMessage } from "@/lib/inventario";
+import { apiErrorMessage, precioNetoDe } from "@/lib/inventario";
 import {
   descargarPdfCotizacion,
   invalidateCotizaciones,
@@ -132,7 +132,7 @@ export default function CotizacionFormPage() {
   const agregarProducto = (p: Producto) => {
     setLineas((ls) => {
       const base = ls.length === 1 && !ls[0].descripcion.trim() && !ls[0].precioUnitario ? [] : ls;
-      return [...base, { key: nuevaKey(), productoId: p.id, descripcion: p.nombre, cantidad: "1", precioUnitario: String(roundTo(Number(p.precioUnitario) || 0, decimales)), descuentoPorcentaje: "0" }];
+      return [...base, { key: nuevaKey(), productoId: p.id, descripcion: p.nombre, cantidad: "1", precioUnitario: String(roundTo(precioNetoDe(p) || 0, decimales)), descuentoPorcentaje: "0" }];
     });
     setPickerOpen(false);
     setBusqueda("");
@@ -350,7 +350,7 @@ export default function CotizacionFormPage() {
                             <span className="block truncate font-medium">{p.nombre}</span>
                             <span className="text-[11px] text-muted-foreground">{p.tipo === "servicio" ? "Servicio" : "Producto"}{p.codigoInterno ? ` · ${p.codigoInterno}` : ""}</span>
                           </span>
-                          <span className="font-mono text-xs shrink-0">{formatMoney(p.precioUnitario, p.moneda, decimalesPref(prefs))}</span>
+                          <span className="shrink-0 text-right"><span className="block font-mono text-xs">{formatMoney(precioNetoDe(p), p.moneda, decimalesPref(prefs))}</span><span className="block text-[10px] uppercase tracking-wide text-muted-foreground">neto unit.</span></span>
                         </button>
                       ))}
                     </div>
@@ -361,7 +361,7 @@ export default function CotizacionFormPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="hidden md:grid grid-cols-[1fr_76px_120px_70px_110px_32px] gap-2 px-1 text-[11px] uppercase tracking-wider text-muted-foreground">
-                <span>Descripción</span><span>Cant.</span><span>Precio unit.</span><span>Desc. %</span><span className="text-right">Subtotal</span><span />
+                <span>Descripción</span><span>Cant.</span><span>Precio unit. neto</span><span>Desc. %</span><span className="text-right">Subtotal</span><span />
               </div>
               {lineas.length === 0 && (
                 <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">Sin ítems. Agrega desde el catálogo o con una línea libre.</div>

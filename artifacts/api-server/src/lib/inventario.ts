@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getOrgContext } from "./org";
 import { roundMoney } from "./preferencias";
+import { calcularPrecios } from "./inventario-precios";
 
 const money = z.number().finite().min(0).max(1e10).multipleOf(0.01);
 const units = z.number().finite().min(0).max(1e9).multipleOf(0.001);
@@ -34,6 +35,12 @@ export const productoBody = z.object({
   tarifaHora: money.nullable().optional(),
   tiempoEstimadoHoras: units.nullable().optional(),
   factorFactibilidad: z.number().min(1).max(2).multipleOf(0.001).nullable().optional(),
+  incluyeIvaPrecio: z.boolean().optional(),
+  porcentajeIvaPrecio: z.number().finite().min(0).max(100).multipleOf(0.01).optional(),
+  pvpProveedor: money.nullable().optional(),
+  pvpIncluyeIva: z.boolean().optional(),
+  fuentePrecio: z.enum(["manual", "calculado", "pvp"]).default("manual"),
+  actualizadoEn: z.string().optional(),
 }).superRefine((d, ctx) => {
   if (d.tipo === "servicio" && (d.tarifaHora == null || d.tiempoEstimadoHoras == null || d.factorFactibilidad == null)) {
     ctx.addIssue({ code: "custom", message: "Completa tarifa, tiempo y factor del servicio." });
@@ -81,31 +88,43 @@ export async function inventarioScope(userId: string) {
   };
 }
 
-export function productoValues(d: z.infer<typeof productoBody>, decimales = 0) {
+export function productoValues(d: z.infer<typeof productoBody>, decimales = 0, costoServicio?: number) {
   d = { ...d, costoUnitario: roundMoney(d.costoUnitario, decimales), precioUnitario: roundMoney(d.precioUnitario, decimales),
     tarifaHora: d.tarifaHora == null ? d.tarifaHora : roundMoney(d.tarifaHora, decimales) };
   const service = d.tipo === "servicio";
-  const base = service ? d.tarifaHora! * d.tiempoEstimadoHoras! : d.costoUnitario;
-  const calculated = service ? base * d.factorFactibilidad!
-    : d.metodoCalculo === "margen" ? base / (1 - d.margenPorcentaje / 100)
-    : base * (1 + d.margenPorcentaje / 100);
-  if (!Number.isFinite(calculated) || calculated < 0 || calculated > 1e12) throw new Error("Precio sugerido fuera de rango.");
+  const base = service ? costoServicio ?? roundMoney(d.tarifaHora! * d.tiempoEstimadoHoras!, decimales) : d.costoUnitario;
+  const prices = calcularPrecios({ costo: base, tipo: d.tipo, metodo: d.metodoCalculo, margen: d.margenPorcentaje,
+    factor: d.factorFactibilidad ?? 1, incluyeIva: d.incluyeIvaPrecio ?? false, iva: d.porcentajeIvaPrecio ?? 19,
+    pvp: d.pvpProveedor, pvpIncluyeIva: d.pvpIncluyeIva ?? true }, decimales);
+  if (d.fuentePrecio === "pvp" && prices.pvpFinal == null) throw new Error("Ingresa el PVP del proveedor.");
+  const final = d.fuentePrecio === "calculado" ? prices.final : d.fuentePrecio === "pvp" ? prices.pvpFinal! : d.precioUnitario;
   return {
     nombre: d.nombre, descripcion: d.descripcion, tipo: d.tipo,
     sku: d.sku, codigoBarras: d.codigoBarras,
     costoUnitario: String(service ? roundMoney(base, decimales) : d.costoUnitario),
-    precioUnitario: String(d.precioUnitario), margenPorcentaje: String(d.margenPorcentaje),
+    precioUnitario: String(final), margenPorcentaje: String(d.margenPorcentaje),
     metodoCalculo: d.metodoCalculo, stockActual: service ? null : String(d.stockActual ?? 0),
     stockCritico: service ? "0" : String(d.stockCritico), unidadMedida: d.unidadMedida ?? (service ? "hora" : "unidad"), activo: d.activo,
     tarifaHora: service ? String(d.tarifaHora) : null,
     tiempoEstimadoHoras: service ? String(d.tiempoEstimadoHoras) : null,
     factorFactibilidad: service ? String(d.factorFactibilidad) : null,
-    precioCalculado: String(roundMoney(calculated, decimales)),
+    precioCalculado: String(prices.final),
+    precioCalculadoNeto: String(prices.neto),
+    incluyeIvaPrecio: d.incluyeIvaPrecio ?? false,
+    porcentajeIvaPrecio: String(d.porcentajeIvaPrecio ?? 19),
+    pvpProveedor: d.pvpProveedor == null ? null : String(d.pvpProveedor),
+    pvpIncluyeIva: d.pvpIncluyeIva ?? true,
   };
 }
 
 export function serializeProducto(p: Producto) {
   const costo = Number(p.costoUnitario), precio = Number(p.precioUnitario);
+  const iva = Number(p.porcentajeIvaPrecio);
+  const neto = p.incluyeIvaPrecio ? precio / (1 + iva / 100) : precio;
+  const pvp = p.pvpProveedor == null ? null : Number(p.pvpProveedor);
+  const pvpNeto = pvp == null ? null : p.pvpIncluyeIva ? pvp / (1 + iva / 100) : pvp;
+  const sugerido = Number(p.precioCalculado ?? 0);
+  const calculadoNeto = p.precioCalculadoNeto != null ? Number(p.precioCalculadoNeto) : p.incluyeIvaPrecio ? sugerido / (1 + iva / 100) : sugerido;
   const stock = p.stockActual == null ? null : Number(p.stockActual);
   return {
     ...p, codigoInterno: p.codigoInterno || `PROD-${String(p.id).padStart(4, "0")}`, costoUnitario: costo, precioUnitario: precio,
@@ -115,7 +134,11 @@ export function serializeProducto(p: Producto) {
     tiempoEstimadoHoras: p.tiempoEstimadoHoras == null ? null : Number(p.tiempoEstimadoHoras),
     factorFactibilidad: p.factorFactibilidad == null ? null : Number(p.factorFactibilidad),
     precioCalculado: p.precioCalculado == null ? null : Number(p.precioCalculado),
-    utilidad: precio - costo, margenReal: precio > 0 ? ((precio - costo) / precio) * 100 : 0,
+    porcentajeIvaPrecio: iva, pvpProveedor: pvp, precioUnitarioNeto: neto,
+    precioCalculadoNeto: calculadoNeto, ivaPrecioCalculado: sugerido - calculadoNeto,
+    pvpNeto, pvpUtilidad: pvpNeto == null ? null : pvpNeto - costo,
+    pvpMargen: pvpNeto == null || pvpNeto <= 0 ? null : (pvpNeto - costo) / pvpNeto * 100,
+    utilidad: neto - costo, margenReal: neto > 0 ? ((neto - costo) / neto) * 100 : 0,
     estadoStock: stock == null ? "no_aplica" : stock <= 0 ? "agotado" : stock <= Number(p.stockCritico) ? "critico" : "normal",
     creadoEn: p.creadoEn.toISOString(), actualizadoEn: p.actualizadoEn.toISOString(),
   };

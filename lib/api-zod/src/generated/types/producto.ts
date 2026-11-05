@@ -15,6 +15,15 @@ export type Producto = ProductoInput & ({
   activo: boolean;
   stockCritico: number;
   precioCalculado: number | null;
+  precioUnitarioNeto?: number;
+  precioCalculadoNeto?: number;
+  ivaPrecioCalculado?: number;
+  /** @nullable */
+  pvpNeto?: number | null;
+  /** @nullable */
+  pvpMargen?: number | null;
+  /** @nullable */
+  pvpUtilidad?: number | null;
   utilidad: number;
   margenReal: number;
   estadoStock: ProductoEstadoStock;

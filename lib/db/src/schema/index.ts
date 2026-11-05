@@ -6,6 +6,7 @@ export * from "./preferencias";
 export * from "./cotizaciones";
 export * from "./cotizacion-items";
 export * from "./productos";
+export * from "./historial-costos";
 export * from "./locales";
 export * from "./bodegas";
 export * from "./stock-por-bodega";

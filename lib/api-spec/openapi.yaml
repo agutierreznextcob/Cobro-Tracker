@@ -473,6 +473,18 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Producto" }
+  /inventario/{id}/costos:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: listHistorialCostos
+      tags: [inventario]
+      responses:
+        "200":
+          description: Historial inmutable de costos netos del producto
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/HistorialCosto" } }
   /inventario/{id}/movimientos:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer } }
@@ -4096,7 +4108,7 @@ components:
               costoNuevo: { type: number }
     CompraRecepcionInput:
       type: object
-      required: [updatedAt, decisiones]
+      required: [updatedAt]
       properties:
         updatedAt: { type: string }
         decisiones:
@@ -5612,6 +5624,12 @@ components:
       type: object
       required: [nombre, tipo, costoUnitario, precioUnitario]
       properties:
+        incluyeIvaPrecio: { type: boolean }
+        porcentajeIvaPrecio: { type: number, minimum: 0, maximum: 100 }
+        pvpProveedor: { type: [number, "null"], minimum: 0 }
+        pvpIncluyeIva: { type: boolean }
+        fuentePrecio: { type: string, enum: [manual, calculado, pvp], description: "Acción de guardado; no altera precio de venta durante recepciones." }
+        actualizadoEn: { type: string, description: "Versión del producto leído; evita sobrescribir costos actualizados por otra sesión." }
         moneda: { type: string, enum: [CLP, USD, EUR, UF] }
         nombre: { type: string, minLength: 1, maxLength: 200 }
         codigoInterno: { type: string, maxLength: 80 }
@@ -5644,11 +5662,31 @@ components:
             activo: { type: boolean }
             stockCritico: { type: number }
             precioCalculado: { type: number, nullable: true }
+            precioUnitarioNeto: { type: number }
+            precioCalculadoNeto: { type: number }
+            ivaPrecioCalculado: { type: number }
+            pvpNeto: { type: [number, "null"] }
+            pvpMargen: { type: [number, "null"] }
+            pvpUtilidad: { type: [number, "null"] }
             utilidad: { type: number }
             margenReal: { type: number }
             estadoStock: { type: string, enum: [normal, critico, agotado, no_aplica] }
             creadoEn: { type: string }
             actualizadoEn: { type: string }
+    HistorialCosto:
+      type: object
+      required: [id, productoId, fecha, costoAnterior, costoNuevo, origen, compraId, numeroFactura, moneda, decimales]
+      properties:
+        id: { type: integer }
+        productoId: { type: integer }
+        fecha: { type: string }
+        costoAnterior: { type: [number, "null"] }
+        costoNuevo: { type: number }
+        origen: { type: string, enum: [manual, compra] }
+        compraId: { type: [integer, "null"] }
+        numeroFactura: { type: [string, "null"] }
+        moneda: { type: string }
+        decimales: { type: integer }
     MovimientoStockInput:
       type: object
       required: [tipo, cantidad, motivo]
