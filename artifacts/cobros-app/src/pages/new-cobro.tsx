@@ -168,7 +168,7 @@ export default function NewCobro() {
 
   const onSubmit = async (values: FormValues) => {
     if (advancedInFlight.current || !prefsListas) return;
-    if (usaLineas && (!lineasValidas(lineas) || totalItems < 1)) {
+    if (usaLineas && (!lineasValidas(lineas) || totalItems <= 0)) {
       toast({ title: "Revisa los ítems", description: "Cada ítem necesita cantidad mayor a 0 y precio válido, y el total debe ser mayor a $0.", variant: "destructive" });
       return;
     }
