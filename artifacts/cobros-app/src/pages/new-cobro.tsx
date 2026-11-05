@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { formatMoney, roundTo, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
-import { usePreferencias } from "@/hooks/use-preferencias";
+import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 import { TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
 import { Loader2, ArrowLeft, Users, Lock } from "lucide-react";
 import { Link } from "wouter";
@@ -80,10 +80,13 @@ export default function NewCobro() {
   const advancedInFlight = useRef(false);
   const templateAttempt = useRef<{ key: string; id: number } | null>(null);
   const [canalesIniciales, setCanalesIniciales] = useState<Array<"email" | "whatsapp">>([]);
+  const { prefs, listo: prefsListas } = usePreferencias();
+  // Precision always follows the current preference (refetched on mount); it
+  // is not editable here and never derived from the currency.
+  const decimalesEfectivos = decimalesPref(prefs);
   const [lineas, setLineas] = useState<LineaCatalogo[]>([]);
-  const [decimalesDoc, setDecimalesDoc] = useState(0);
   const usaLineas = lineas.length > 0;
-  const totalItems = totalLineas(lineas, modoAvanzado === "individual" ? decimalesDoc : undefined);
+  const totalItems = totalLineas(lineas, decimalesEfectivos);
   const [resultadosEntrega, setResultadosEntrega] = useState<Array<{ cobroId?: number; canal: string; estado: string; detalle?: string; waUrl?: string }>>([]);
   // Trial/demo/admin users inherit NextCob features even if a historical plan
   // field says Starter; server endpoints remain the source of enforcement.
@@ -93,7 +96,6 @@ export default function NewCobro() {
   // Document currency: defaults come from org preferences for NEW cobros only.
   // Bulk/recurring creation is still CLP-only on the server, so those modes
   // force CLP explicitly.
-  const { prefs, listo: prefsListas } = usePreferencias();
   const [monedaDoc, setMonedaDoc] = useState<Moneda>("CLP");
   const [ivaDoc, setIvaDoc] = useState("19");
   const prefsAplicadas = useRef(false);
@@ -101,11 +103,9 @@ export default function NewCobro() {
     if (!prefsListas || prefsAplicadas.current) return;
     prefsAplicadas.current = true;
     setMonedaDoc(prefs.moneda as Moneda);
-    setDecimalesDoc(prefs.decimales);
     setIvaDoc(String(prefs.porcentajeIva));
   }, [prefsListas, prefs]);
   const monedaEfectiva: Moneda = modoAvanzado === "individual" ? monedaDoc : "CLP";
-  const decimalesEfectivos = modoAvanzado === "individual" ? decimalesDoc : 0;
   const ivaPct = modoAvanzado === "individual" ? Math.min(100, Math.max(0, Number(ivaDoc) || 0)) : 19;
   const formatCurrency = (n: number) => formatMoney(n, monedaEfectiva, decimalesEfectivos);
   const cambiarMoneda = (m: Moneda) => {
@@ -118,8 +118,6 @@ export default function NewCobro() {
       toast({ title: "Ítems quitados", description: "Los ítems del catálogo deben tener la misma moneda del cobro." });
     }
     setMonedaDoc(m);
-    if (m === "CLP") setDecimalesDoc(0);
-    else if (decimalesDoc === 0) setDecimalesDoc(2);
   };
 
   const form = useForm<FormValues>({
@@ -169,12 +167,12 @@ export default function NewCobro() {
   }, [permiteIva]);
 
   const onSubmit = async (values: FormValues) => {
-    if (advancedInFlight.current) return;
+    if (advancedInFlight.current || !prefsListas) return;
     if (usaLineas && (!lineasValidas(lineas) || totalItems < 1)) {
       toast({ title: "Revisa los ítems", description: "Cada ítem necesita cantidad mayor a 0 y precio válido, y el total debe ser mayor a $0.", variant: "destructive" });
       return;
     }
-    const itemsInventario = usaLineas ? lineasPayload(lineas) : undefined;
+    const itemsInventario = usaLineas ? lineasPayload(lineas, decimalesEfectivos) : undefined;
     const montoFinal = usaLineas ? totalItems : roundTo(values.monto, decimalesEfectivos);
     if (!(montoFinal > 0)) {
       toast({ title: "Monto inválido", description: "El monto debe ser mayor a 0.", variant: "destructive" });
@@ -236,7 +234,7 @@ export default function NewCobro() {
           if (!Number.isInteger(workflowId) || workflowId! <= 0) throw new Error("Workflow inválido.");
         }
         const advancedPayload = {
-          itemsInventario, moneda: "CLP", decimales: 0, monto: montoFinal, tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
+          itemsInventario, moneda: "CLP", decimales: decimalesEfectivos, monto: montoFinal, tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
           descripcion: values.descripcion, referencia: values.referencia || undefined,
           responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
            automatizacion, workflowId, canalesIniciales,
@@ -409,22 +407,13 @@ export default function NewCobro() {
                     </p>
                   </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
                     <label className="text-xs font-medium">Moneda</label>
                     <Select value={monedaEfectiva} onValueChange={(v) => cambiarMoneda(v as Moneda)} disabled={modoAvanzado !== "individual"}>
                       <SelectTrigger data-testid="select-moneda-cobro"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {MONEDAS.map((m) => <SelectItem key={m} value={m}>{m} · {MONEDA_INFO[m].nombre}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Decimales</label>
-                    <Select value={String(decimalesEfectivos)} onValueChange={(v) => { if (["0", "1", "2"].includes(v)) setDecimalesDoc(Number(v)); }} disabled={modoAvanzado !== "individual"}>
-                      <SelectTrigger data-testid="select-decimales-cobro"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {[0, 1, 2].map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -438,9 +427,9 @@ export default function NewCobro() {
                 )}
               </div>
 
-              {monedaEfectiva !== "CLP" && <EquivalenciaCLP monto={usaLineas ? totalItems : totalNum} moneda={monedaEfectiva} testId="equivalencia-clp-cobro" />}
+              {monedaEfectiva !== "CLP" && <EquivalenciaCLP monto={usaLineas ? totalItems : totalNum} moneda={monedaEfectiva} decimales={decimalesEfectivos} testId="equivalencia-clp-cobro" />}
 
-              <CatalogoLineas lineas={lineas} onChange={setLineas} incluyeIva={permiteIva && !!incluyeIvaWatch} moneda={monedaEfectiva} decimales={modoAvanzado === "individual" ? decimalesDoc : undefined} />
+              <CatalogoLineas lineas={lineas} onChange={setLineas} incluyeIva={permiteIva && !!incluyeIvaWatch} moneda={monedaEfectiva} decimales={decimalesEfectivos} />
 
               <FormField
                 control={form.control}
@@ -810,7 +799,7 @@ export default function NewCobro() {
               <div className="flex justify-end pt-4 border-t border-border/50">
                 <Button
                   type="submit"
-                  disabled={createCobro.isPending || asignarWorkflow.isPending || creandoAvanzado}
+                  disabled={!prefsListas || createCobro.isPending || asignarWorkflow.isPending || creandoAvanzado}
                   className="min-w-32"
                 >
                   {createCobro.isPending || asignarWorkflow.isPending || creandoAvanzado ? (

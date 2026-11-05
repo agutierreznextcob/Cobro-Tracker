@@ -81,7 +81,9 @@ export async function inventarioScope(userId: string) {
   };
 }
 
-export function productoValues(d: z.infer<typeof productoBody>) {
+export function productoValues(d: z.infer<typeof productoBody>, decimales = 0) {
+  d = { ...d, costoUnitario: roundMoney(d.costoUnitario, decimales), precioUnitario: roundMoney(d.precioUnitario, decimales),
+    tarifaHora: d.tarifaHora == null ? d.tarifaHora : roundMoney(d.tarifaHora, decimales) };
   const service = d.tipo === "servicio";
   const base = service ? d.tarifaHora! * d.tiempoEstimadoHoras! : d.costoUnitario;
   const calculated = service ? base * d.factorFactibilidad!
@@ -91,14 +93,14 @@ export function productoValues(d: z.infer<typeof productoBody>) {
   return {
     nombre: d.nombre, descripcion: d.descripcion, tipo: d.tipo,
     sku: d.sku, codigoBarras: d.codigoBarras,
-    costoUnitario: String(service ? Math.round(base * 100) / 100 : d.costoUnitario),
+    costoUnitario: String(service ? roundMoney(base, decimales) : d.costoUnitario),
     precioUnitario: String(d.precioUnitario), margenPorcentaje: String(d.margenPorcentaje),
     metodoCalculo: d.metodoCalculo, stockActual: service ? null : String(d.stockActual ?? 0),
     stockCritico: service ? "0" : String(d.stockCritico), unidadMedida: d.unidadMedida ?? (service ? "hora" : "unidad"), activo: d.activo,
     tarifaHora: service ? String(d.tarifaHora) : null,
     tiempoEstimadoHoras: service ? String(d.tiempoEstimadoHoras) : null,
     factorFactibilidad: service ? String(d.factorFactibilidad) : null,
-    precioCalculado: String(Math.round(calculated)),
+    precioCalculado: String(roundMoney(calculated, decimales)),
   };
 }
 
@@ -120,7 +122,7 @@ export function serializeProducto(p: Producto) {
 }
 
 export async function resolveItemsInventario(userId: string, input: unknown, monto: unknown, moneda = "CLP", decimales = 0): Promise<ItemInventarioSnapshot[]> {
-  const items = itemsInventarioBody.parse(input);
+  const items = itemsInventarioBody.parse(input).map(i => ({ ...i, precioUnitario: roundMoney(i.precioUnitario, decimales) }));
   if (!items.length) return [];
   const ids = items.map(i => i.productoId);
   if (new Set(ids).size !== ids.length) throw new Error("No repitas un producto; modifica su cantidad.");
@@ -135,7 +137,7 @@ export async function resolveItemsInventario(userId: string, input: unknown, mon
       throw new Error("La bodega seleccionada no está disponible para este producto.");
     }
   }
-  const total = roundMoney(items.reduce((sum, i) => sum + i.cantidad * i.precioUnitario, 0), decimales);
+  const total = roundMoney(items.reduce((sum, i) => sum + roundMoney(i.cantidad * i.precioUnitario, decimales), 0), decimales);
   if (total !== Number(monto)) throw new Error("El monto debe coincidir con la suma de los ítems del catálogo (antes de IVA).");
   return items.map(i => {
     const p = rows.find(p => p.id === i.productoId)!;

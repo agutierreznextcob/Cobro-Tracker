@@ -23,34 +23,43 @@ export type LineaCatalogo = {
   ubicaciones?: StockUbicacion[];
 };
 
-export function lineaDesdeProducto(p: Producto): LineaCatalogo {
-  return { productoId: p.id, nombre: p.nombre, tipo: p.tipo as "producto" | "servicio", cantidad: "1", precioUnitario: String(p.precioUnitario), stockActual: p.stockActual ?? null, bodegaId: "", ubicaciones: p.ubicaciones ?? [] };
+/** Unit price rounded to the effective precision before any multiplication (mirrors the server). */
+export function precioLinea(precio: string | number, decimales = 0) {
+  return roundTo(Number(precio) || 0, decimales);
+}
+
+export function lineaDesdeProducto(p: Producto, decimales = 0): LineaCatalogo {
+  return { productoId: p.id, nombre: p.nombre, tipo: p.tipo as "producto" | "servicio", cantidad: "1", precioUnitario: String(precioLinea(p.precioUnitario, decimales)), stockActual: p.stockActual ?? null, bodegaId: "", ubicaciones: p.ubicaciones ?? [] };
 }
 
 export const MAX_LINEAS = 100;
 
-export function totalLineas(lineas: LineaCatalogo[], decimales?: number) {
-  if (decimales == null) return Math.round(lineas.reduce((s, l) => s + (Number(l.cantidad) || 0) * (Number(l.precioUnitario) || 0), 0));
+/** Line amount rounded to the document precision (mirrors the server). */
+export function subtotalLineaCatalogo(l: LineaCatalogo, decimales = 0) {
+  return roundTo((Number(l.cantidad) || 0) * precioLinea(l.precioUnitario, decimales), decimales);
+}
+
+export function totalLineas(lineas: LineaCatalogo[], decimales = 0) {
   // Round each line to the document decimals, then sum.
-  return roundTo(lineas.reduce((s, l) => s + roundTo((Number(l.cantidad) || 0) * (Number(l.precioUnitario) || 0), decimales), 0), decimales);
+  return roundTo(lineas.reduce((s, l) => s + subtotalLineaCatalogo(l, decimales), 0), decimales);
 }
 
 export function lineasValidas(lineas: LineaCatalogo[]) {
   return lineas.every((l) => Number(l.cantidad) > 0 && Number(l.precioUnitario) >= 0 && l.precioUnitario.trim() !== "");
 }
 
-export function lineasPayload(lineas: LineaCatalogo[]) {
+export function lineasPayload(lineas: LineaCatalogo[], decimales = 0) {
   return lineas.map((l) => ({
     productoId: l.productoId,
     cantidad: Number(l.cantidad),
-    precioUnitario: Number(l.precioUnitario),
+    precioUnitario: precioLinea(l.precioUnitario, decimales),
     ...(l.tipo === "producto" && l.bodegaId ? { bodegaId: Number(l.bodegaId) } : {}),
   }));
 }
 
 export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", decimales }: { lineas: LineaCatalogo[]; onChange: (l: LineaCatalogo[]) => void; incluyeIva: boolean; moneda?: string; decimales?: number }) {
   const mon = monedaDe(moneda);
-  const formatCurrency = (n: number) => formatMoney(n, mon, decimales ?? (mon === "CLP" ? 0 : 2));
+  const formatCurrency = (n: number) => formatMoney(n, mon, decimales ?? 0);
   // No exchange conversion: only catalog items priced in the document currency can be added.
   const mismaMoneda = (p: Producto) => monedaDe(p.moneda) === mon;
   const { data: productos, isLoading, isError, refetch } = useListInventario({ query: { queryKey: getListInventarioQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
@@ -67,7 +76,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
       onChange(lineas.map((l, j) => (j === i ? { ...l, cantidad: String((Number(l.cantidad) || 0) + 1) } : l)));
     } else {
       if (lineas.length >= MAX_LINEAS) { toast({ title: "Límite de ítems alcanzado", variant: "destructive" }); return; }
-      onChange([...lineas, lineaDesdeProducto(p)]);
+      onChange([...lineas, lineaDesdeProducto(p, decimales ?? 0)]);
     }
   };
 
@@ -110,7 +119,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
                 return (
                   <button key={p.id} type="button"
                     onClick={() => {
-                      onChange([...lineas, lineaDesdeProducto(p)]);
+                      onChange([...lineas, lineaDesdeProducto(p, decimales ?? 0)]);
                       setOpen(false); setQ("");
                     }}
                     className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted">
@@ -155,7 +164,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
                 <Input type="number" min="0" step="any" value={l.cantidad} onChange={(e) => update(i, { cantidad: e.target.value })} className="h-8 font-mono col-span-1" />
                 <div className="relative"><span className="absolute left-2 top-1.5 text-xs text-muted-foreground">{mon === "CLP" ? "$" : ""}</span>
                   <Input type="number" min="0" step={decimales ? String(10 ** -decimales) : "1"} value={l.precioUnitario} onChange={(e) => update(i, { precioUnitario: e.target.value })} className="h-8 pl-5 font-mono" /></div>
-                <span className="font-mono text-sm text-right col-span-2 sm:col-span-1">{formatCurrency(cant * (Number(l.precioUnitario) || 0))}</span>
+                <span className="font-mono text-sm text-right col-span-2 sm:col-span-1">{formatCurrency(subtotalLineaCatalogo(l, decimales ?? 0))}</span>
                 {l.tipo === "producto" && bodegas.length > 0 && (
                   <div className="col-span-2 sm:col-span-5">
                     <Select value={l.bodegaId || "auto"} onValueChange={(v) => update(i, { bodegaId: v === "auto" ? "" : v })}>

@@ -66,6 +66,11 @@ try {
   assert.equal(created.data.precioCalculado, 2000);
   assert.equal(created.data.margenReal, 50);
   assert.equal(productoValues(productoBody.parse({ ...input, metodoCalculo: "recargo" })).precioCalculado, "1500");
+  const fractionalProduct = productoBody.parse({ ...input, costoUnitario: 10, precioUnitario: 14.29, margenPorcentaje: 30 });
+  assert.equal(productoValues(fractionalProduct, 0).precioCalculado, "14");
+  assert.equal(productoValues(fractionalProduct, 1).precioCalculado, "14.3");
+  assert.equal(productoValues(fractionalProduct, 2).precioCalculado, "14.29");
+  assert.equal(productoValues(fractionalProduct, 0).precioUnitario, "14");
   const svc = await api("POST", "", { ...input, nombre: "Servicio test", tipo: "servicio", tarifaHora: 10000, tiempoEstimadoHoras: 2, factorFactibilidad: 1.5, precioUnitario: 30000 });
   assert.equal(svc.status, 201);
   assert.equal(svc.data.stockActual, null);

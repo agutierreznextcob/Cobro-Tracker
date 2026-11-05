@@ -44,7 +44,7 @@ function formatFechaHora(d: Date): string {
 
 // Renders a payment receipt ("comprobante de pago") to a PDF Buffer.
 export async function generarComprobantePdf(data: ComprobanteData): Promise<Buffer> {
-  const equivalencia = await equivalenciaClpTexto(data.montoTotal, data.moneda);
+  const equivalencia = await equivalenciaClpTexto(data.montoTotal, data.moneda, data.decimales);
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: "A4", margin: 50 });

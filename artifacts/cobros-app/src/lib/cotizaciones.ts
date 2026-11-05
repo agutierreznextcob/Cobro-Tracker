@@ -28,16 +28,18 @@ export type LineaCot = {
 };
 
 /** Line subtotal rounded to the document decimals. */
-export function subtotalLinea(l: Pick<LineaCot, "cantidad" | "precioUnitario" | "descuentoPorcentaje">, dec: number) {
+export function subtotalLinea(l: Pick<LineaCot, "cantidad" | "precioUnitario" | "descuentoPorcentaje">, dec: number, redondearPrecio = true) {
   const c = Number(l.cantidad) || 0;
-  const p = Number(l.precioUnitario) || 0;
+  // New documents: unit price rounded to the precision before multiplying.
+  // Existing documents keep their stored unit price (redondearPrecio=false).
+  const p = redondearPrecio ? roundTo(Number(l.precioUnitario) || 0, dec) : Number(l.precioUnitario) || 0;
   const d = Math.min(100, Math.max(0, Number(l.descuentoPorcentaje) || 0));
   return roundTo(c * p * (1 - d / 100), dec);
 }
 
 /** Lines rounded first, then summed, then IVA on the rounded subtotal. */
-export function totalesCot(lineas: LineaCot[], dec: number, ivaPct: number) {
-  const subtotal = roundTo(lineas.reduce((s, l) => s + subtotalLinea(l, dec), 0), dec);
+export function totalesCot(lineas: LineaCot[], dec: number, ivaPct: number, redondearPrecio = true) {
+  const subtotal = roundTo(lineas.reduce((s, l) => s + subtotalLinea(l, dec, redondearPrecio), 0), dec);
   const iva = roundTo((subtotal * ivaPct) / 100, dec);
   return { subtotal, iva, total: roundTo(subtotal + iva, dec) };
 }

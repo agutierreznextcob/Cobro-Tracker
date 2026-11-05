@@ -20,7 +20,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatMoney, monedaDe, roundTo, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
-import { usePreferencias } from "@/hooks/use-preferencias";
+import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 import {
   apiErrorMessage,
   capitalizar,
@@ -96,7 +96,9 @@ export default function InventarioFormPage() {
   useEffect(() => {
     if (!isEdit && prefsListas && !monedaTocada.current) setMoneda(monedaDe(prefs.moneda));
   }, [isEdit, prefsListas, prefs.moneda]);
-  const formatCurrency = (n: number) => formatMoney(n, moneda, moneda === "CLP" ? 0 : 2);
+  // Monetary precision is global (preferences), never currency-derived.
+  const dec = decimalesPref(prefs);
+  const formatCurrency = (n: number) => formatMoney(n, moneda, dec);
 
   const initFor = useRef<number | null>(null);
   useEffect(() => {
@@ -124,11 +126,11 @@ export default function InventarioFormPage() {
     setFactor(producto.factorFactibilidad ?? 1);
   }, [producto, isFetchedAfterMount]);
 
-  const costoN = tipo === "servicio" ? Math.round(num(tarifa) * num(horas) * 100) / 100 : num(costo);
+  const costoN = tipo === "servicio" ? roundTo(roundTo(num(tarifa), dec) * num(horas), dec) : roundTo(num(costo), dec);
   const pctN = num(pct);
   const sugerido = tipo === "producto"
-    ? precioSugerido(Number.isNaN(costoN) ? 0 : costoN, pctN, metodo)
-    : precioServicio(num(tarifa), num(horas), factor);
+    ? precioSugerido(Number.isNaN(costoN) ? 0 : costoN, pctN, metodo, dec)
+    : precioServicio(roundTo(num(tarifa), dec), num(horas), factor, dec);
 
   // Keep price synced with the suggestion until the user types their own.
   useEffect(() => {
@@ -136,14 +138,16 @@ export default function InventarioFormPage() {
   }, [sugerido, precioManual]);
 
   const precioN = num(precio);
-  const real = utilidadDe(Number.isNaN(costoN) ? 0 : costoN, Number.isNaN(precioN) ? 0 : precioN);
+  const real = utilidadDe(Number.isNaN(costoN) ? 0 : costoN, Number.isNaN(precioN) ? 0 : roundTo(precioN, dec));
   const pctInvalido = tipo === "producto" && metodo === "margen" && pctN >= 100;
-  const difiere = sugerido != null && !Number.isNaN(precioN) && Math.round(precioN) !== sugerido;
+  const difiere = sugerido != null && !Number.isNaN(precioN) && roundTo(precioN, dec) !== sugerido;
 
   const pending = createProducto.isPending || updateProducto.isPending;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Precision comes from preferences; never save with the fallback (0) while they load or failed.
+    if (!prefsListas) { toast({ title: "Cargando preferencias", description: "Espera un momento e intenta nuevamente.", variant: "destructive" }); return; }
     if (!nombre.trim()) { toast({ title: "Falta el nombre", variant: "destructive" }); return; }
     if (Number.isNaN(costoN) || costoN < 0) { toast({ title: "Costo inválido", description: "Ingresa un costo de 0 o más.", variant: "destructive" }); return; }
     if (Number.isNaN(precioN) || precioN < 0) { toast({ title: "Precio inválido", variant: "destructive" }); return; }
@@ -162,7 +166,7 @@ export default function InventarioFormPage() {
       descripcion: descripcion.trim() || undefined,
       tipo,
       costoUnitario: costoN,
-      precioUnitario: moneda === "CLP" ? Math.round(precioN) : roundTo(precioN, 2),
+      precioUnitario: roundTo(precioN, dec),
       unidadMedida: unidad.trim() || undefined,
       activo,
     };
@@ -174,7 +178,7 @@ export default function InventarioFormPage() {
       if (!isEdit && hayBodegas) data.bodegaId = Number(bodegaId);
       if (!isEdit) data.stockActual = Math.max(0, num(stockInicial) || 0);
     } else {
-      data.tarifaHora = Number.isNaN(num(tarifa)) ? null : num(tarifa);
+      data.tarifaHora = Number.isNaN(num(tarifa)) ? null : roundTo(num(tarifa), dec);
       data.tiempoEstimadoHoras = Number.isNaN(num(horas)) ? null : num(horas);
       data.factorFactibilidad = factor;
       if (!isEdit) data.stockActual = null;
@@ -439,7 +443,7 @@ export default function InventarioFormPage() {
             </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={pending}>
+          <Button type="submit" className="w-full" disabled={pending || !prefsListas}>
             {pending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</> : isEdit ? "Guardar cambios" : `Crear ${tipo}`}
           </Button>
         </aside>

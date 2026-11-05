@@ -11,6 +11,7 @@ const ITEMS: { codigo: IndicadorEconomico["codigo"]; label: string; dec: number;
 ];
 
 function Item({ label, ind, dec }: { label: string; ind?: IndicadorEconomico; dec: number }) {
+  // dec comes from the org monetary precision preference (falls back to the item default).
   if (!ind) return <span className="whitespace-nowrap"><span className="font-semibold text-foreground/80">{label}</span> <span className="text-muted-foreground">sin dato</span></span>;
   const v = ind.variacion;
   return (
@@ -45,7 +46,7 @@ function useScrolled(): boolean {
   return scrolled;
 }
 
-export function IndicadoresBar() {
+export function IndicadoresBar({ decimales }: { decimales?: number } = {}) {
   const q = useIndicadores();
   const hidden = useScrolled();
   const data = q.data;
@@ -63,10 +64,10 @@ export function IndicadoresBar() {
     const desk = ITEMS.map((it, idx) => (
       <span key={it.codigo} className="inline-flex items-center">
         {idx > 0 && <span className="mx-3.5 h-3 w-px bg-border" aria-hidden />}
-        <Item label={it.label} ind={indicadorPorCodigo(data, it.codigo)} dec={it.dec} />
+        <Item label={it.label} ind={indicadorPorCodigo(data, it.codigo)} dec={decimales ?? it.dec} />
       </span>
     ));
-    const mob = ITEMS.filter((i) => i.mobile).map((it) => <Item key={it.codigo} label={it.label} ind={indicadorPorCodigo(data, it.codigo)} dec={it.dec} />);
+    const mob = ITEMS.filter((i) => i.mobile).map((it) => <Item key={it.codigo} label={it.label} ind={indicadorPorCodigo(data, it.codigo)} dec={decimales ?? it.dec} />);
     content = (
       <>
         <div className="hidden md:flex items-center">{desk}</div>

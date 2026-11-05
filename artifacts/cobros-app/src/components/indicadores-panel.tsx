@@ -11,7 +11,7 @@ const ORDEN = [
   { codigo: "ivp", label: "IVP", dec: 2 },
 ] as const;
 
-export function IndicadoresPanel() {
+export function IndicadoresPanel({ decimales }: { decimales?: number } = {}) {
   const q = useIndicadores();
   const sync = useSincronizarIndicadores();
   const data = q.data;
@@ -37,7 +37,7 @@ export function IndicadoresPanel() {
                   <p className="text-[11px] text-muted-foreground">{ind ? `Valor al ${fmtFechaCorta(ind.fecha)}` : "Sin dato sincronizado"}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-mono tabular-nums">{ind ? fmtCLP(ind.valor, o.dec) : "—"}</p>
+                  <p className="font-mono tabular-nums">{ind ? fmtCLP(ind.valor, decimales ?? o.dec) : "—"}</p>
                   {ind?.variacion != null && ind.variacion !== 0 && (
                     <p className={`inline-flex items-center text-[11px] font-mono ${ind.variacion > 0 ? "text-emerald-700" : "text-red-600"}`}>
                       {ind.variacion > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{fmtPct(ind.variacion)}

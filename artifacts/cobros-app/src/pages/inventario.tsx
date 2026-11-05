@@ -7,8 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatMoney } from "@/lib/format";
 
-// Product prices render in each product's own currency (legacy = CLP).
-const pm = (n: number, moneda?: string | null) => formatMoney(n, moneda, moneda && moneda !== "CLP" ? 2 : 0);
+import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
+
+// Product prices render in each product's own currency (legacy = CLP) with the
+// global monetary precision preference. Saved rows are never rewritten.
+let decInventario = 0;
+const pm = (n: number, moneda?: string | null) => formatMoney(n, moneda, decInventario);
 import { estadoVisual, etiquetaUbicacion, formatPct, formatQty, ubicacionCritica, type EstadoVisual } from "@/lib/inventario";
 import { ScanLookup } from "@/components/barcode-scanner";
 import { EstadoStockBadge, TipoBadge } from "@/components/inventario-badges";
@@ -25,6 +29,8 @@ const FILTROS: { value: Filtro; label: string }[] = [
 ];
 
 export default function InventarioPage() {
+  const { prefs } = usePreferencias();
+  decInventario = decimalesPref(prefs);
   const { data: productos, isLoading, isError, refetch } = useListInventario({ query: { queryKey: getListInventarioQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
   const { data: resumen } = useGetInventarioResumen({ query: { queryKey: getGetInventarioResumenQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
   const [busqueda, setBusqueda] = useState("");

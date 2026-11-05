@@ -1113,7 +1113,7 @@ export default function CobroDetail() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Moneda del documento</p>
                   <p className="font-mono text-sm">{monedaDe(cobro.moneda)} · {cobro.decimales ?? 0} decimales</p>
-                  <EquivalenciaCLP monto={montoACobrar} moneda={monedaDe(cobro.moneda)} compact className="mt-2" testId="equivalencia-clp-cobro" />
+                  <EquivalenciaCLP monto={montoACobrar} moneda={monedaDe(cobro.moneda)} decimales={cobro.decimales ?? 0} compact className="mt-2" testId="equivalencia-clp-cobro" />
                 </div>
               )}
               <div>

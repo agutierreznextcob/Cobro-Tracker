@@ -10,7 +10,7 @@ import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
 import { useLeadsCountPolling } from "@/hooks/use-leads-count-polling";
 import { AiChat } from "@/components/ai-chat";
 import { IndicadoresBar } from "@/components/indicadores-bar";
-import { usePreferencias } from "@/hooks/use-preferencias";
+import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 import { setFormatoFechaGlobal } from "@/lib/format";
 
 // Applies the org date-format preference to the shared date helpers. Only runs
@@ -22,7 +22,7 @@ function usePreferenciasSync(enabled: boolean) {
   const formato = enabled ? data?.formatoFecha ?? null : null;
   setFormatoFechaGlobal(formato);
   useEffect(() => () => setFormatoFechaGlobal(null), []);
-  return formato;
+  return { formato, decimales: enabled && data ? decimalesPref(data) : undefined };
 }
 
 function WebhookPoller() {
@@ -406,7 +406,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { data: subStatus } = useGetSubscriptionStatus();
   // Candados del plan Starter (el trial y las cuentas demo operan como NextCob).
   const esStarter = subStatus?.planEfectivo === "starter";
-  const formatoFecha = usePreferenciasSync(!!subStatus?.hasAccess);
+  const { formato: formatoFecha, decimales: decimalesIndicadores } = usePreferenciasSync(!!subStatus?.hasAccess);
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
 
   const isAdmin = user?.role === "admin";
@@ -623,7 +623,7 @@ export function Layout({ children }: { children: ReactNode }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className={`sticky ${esConsultor ? "top-10" : "top-0"} z-30`}>
-        <IndicadoresBar />
+        <IndicadoresBar decimales={decimalesIndicadores} />
         {/* Mobile top bar */}
         <header className="md:hidden h-14 flex items-center gap-3 px-4 border-b bg-card/95 backdrop-blur">
           <button

@@ -3,7 +3,7 @@ import { and, eq, inArray, desc, type SQL } from "drizzle-orm";
 import { CreateCotizacionBody } from "@workspace/api-zod";
 import { clienteScopeCondition, getOrgContext, type OrgContext } from "./org";
 import { inventarioScope } from "./inventario";
-import { hoySantiago, roundMoney } from "./preferencias";
+import { hoySantiago, roundMoney, getPreferenciasNegocio } from "./preferencias";
 
 export class CotizacionError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -36,10 +36,11 @@ export async function getScopedCotizacion(userId: string, id: number) {
   if (!q) throw new CotizacionError("Cotización no encontrada.", 404);
   return { q, ctx, condition };
 }
-export async function cotizacionValues(userId: string, input: unknown) {
+export async function cotizacionValues(userId: string, input: unknown, precisionExistente?: number) {
   const parsed = CreateCotizacionBody.safeParse(input);
   if (!parsed.success) throw new CotizacionError("Revisa los datos de la cotización.");
   const data = parsed.data;
+  data.decimales = precisionExistente ?? (await getPreferenciasNegocio(userId)).decimales;
   for (const day of [data.fechaEmision, data.fechaVencimiento]) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(Date.parse(day)) || new Date(day).toISOString().slice(0, 10) !== day) {
       throw new CotizacionError("La fecha no es válida.");
@@ -62,8 +63,9 @@ export async function cotizacionValues(userId: string, input: unknown) {
       i.descuentoPorcentaje < 0 || i.descuentoPorcentaje > 100 || !i.descripcion.trim()) {
       throw new CotizacionError("Cantidades, precios o descuentos inválidos. Cantidades: hasta 3 decimales; precios: hasta 2.");
     }
-    const subtotalLinea = roundMoney(i.cantidad * i.precioUnitario * (1 - i.descuentoPorcentaje / 100), data.decimales);
-    return { productoId: i.productoId ?? null, descripcion: i.descripcion.trim(), cantidad: String(i.cantidad), precioUnitario: String(i.precioUnitario), descuentoPorcentaje: String(i.descuentoPorcentaje), subtotalLinea: String(subtotalLinea) };
+    const precio = precisionExistente == null ? roundMoney(i.precioUnitario, data.decimales) : i.precioUnitario;
+    const subtotalLinea = roundMoney(i.cantidad * precio * (1 - i.descuentoPorcentaje / 100), data.decimales);
+    return { productoId: i.productoId ?? null, descripcion: i.descripcion.trim(), cantidad: String(i.cantidad), precioUnitario: String(precio), descuentoPorcentaje: String(i.descuentoPorcentaje), subtotalLinea: String(subtotalLinea) };
   });
   const subtotal = roundMoney(items.reduce((n, i) => n + Number(i.subtotalLinea), 0), data.decimales);
   const montoIva = roundMoney(subtotal * data.porcentajeIva / 100, data.decimales);

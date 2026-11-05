@@ -66,6 +66,7 @@ async function main() {
       "app_config",
       "flow_credenciales",
       "mp_credenciales",
+      "preferencias",
     ]) {
       await adminClient.query(`create table "${schema}"."${table}" (like public."${table}" including all)`);
     }
@@ -201,6 +202,19 @@ async function main() {
       frecuencia: "semanal",
       fechaInicio: futureStart,
     };
+    console.log("== Global decimal precision ==");
+    await adminClient.query(`insert into "${schema}".preferencias (scope, decimales) values ($1, 2)`, [`org:${orgA.id}`]);
+    const individualDecimal = await api(actorA, "POST", "/cobros", { monto: 1500.75, descripcion: "Precision test", decimales: 0 });
+    check("new individual ignores client decimals", individualDecimal.status === 201 && individualDecimal.json.decimales === 2 && individualDecimal.json.monto === 1500.75, individualDecimal);
+    const recurringDecimal = await api(actorA, "POST", "/cobros/recurrentes", {
+      ...baseSchedule, monto: 1500.75, fechaInicio: today, idempotencyKey: randomUUID(),
+    });
+    check("recurring template and first cobro preserve precision", recurringDecimal.status === 201 && recurringDecimal.json.schedule.decimales === 2 && recurringDecimal.json.cobro.decimales === 2 && recurringDecimal.json.cobro.monto === 1500.75, recurringDecimal);
+    await adminClient.query(`update "${schema}".preferencias set decimales = 0 where scope=$1`, [`org:${orgA.id}`]);
+    const individualWhole = await api(actorA, "POST", "/cobros", { monto: 1500.75, descripcion: "Integer test", decimales: 2 });
+    check("OFF overrides client decimals and rounds new amount", individualWhole.status === 201 && individualWhole.json.decimales === 0 && individualWhole.json.monto === 1501, individualWhole);
+    const oldIndividual = await api(actorA, "GET", `/cobros/${individualDecimal.json.id}`);
+    check("existing individual is unchanged after OFF", oldIndividual.status === 200 && oldIndividual.json.decimales === 2 && oldIndividual.json.monto === 1500.75, oldIndividual);
 
     console.log("== Plan and tenant guards ==");
     const starterStatus = await api(actorStarter, "GET", "/subscription/status");

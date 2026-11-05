@@ -35,8 +35,9 @@ router.post("/inventario", async (req, res) => {
   try {
     const { ctx, condition } = await inventarioScope(req.user!.id);
     validarUnidad(parsed.data.tipo, parsed.data.unidadMedida);
-    const values = productoValues(parsed.data);
-    const moneda = parsed.data.moneda ?? (await getPreferenciasNegocio(req.user!.id)).moneda;
+    const prefs = await getPreferenciasNegocio(req.user!.id);
+    const values = productoValues(parsed.data, prefs.decimales);
+    const moneda = parsed.data.moneda ?? prefs.moneda;
     const p = await db.transaction(async tx => {
       await lockInventoryScope(tx, ctx, req.user!.id);
       const warehouses = await scopedBodegas(req.user!.id, tx);
@@ -74,6 +75,7 @@ router.patch("/inventario/:id", async (req, res) => {
   if (!parsed.success || !Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Datos del producto inválidos." }); return; }
   const { condition, ctx } = await inventarioScope(req.user!.id);
   try {
+    const prefs = await getPreferenciasNegocio(req.user!.id);
     const p = await db.transaction(async tx => {
       await lockInventoryScope(tx, ctx, req.user!.id);
       const [current] = await tx.select().from(productosTable).where(and(condition, eq(productosTable.id, id))).for("update");
@@ -81,7 +83,7 @@ router.patch("/inventario/:id", async (req, res) => {
       if (parsed.data.moneda && parsed.data.moneda !== current.moneda) throw new Error("No puedes cambiar la moneda de un producto existente.");
       if (current.tipo !== parsed.data.tipo) throw new Error("No se puede cambiar el tipo de un registro existente.");
       validarUnidad(parsed.data.tipo, parsed.data.unidadMedida, current.unidadMedida);
-      const { stockActual: _ignored, ...values } = productoValues(parsed.data);
+      const { stockActual: _ignored, ...values } = productoValues(parsed.data, prefs.decimales);
       if (req.body.stockCritico === undefined) values.stockCritico = current.stockCritico;
       const code = parsed.data.codigoInterno || current.codigoInterno || `PROD-${String(id).padStart(4, "0")}`;
       await validateInternalCode(tx, condition, code, id);

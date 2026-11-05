@@ -51,6 +51,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 import { formatCurrency, formatMoney, monedaDe, MONEDAS, type Moneda } from "@/lib/format";
 import {
   TIPO_DOCUMENTO_VALUES,
@@ -126,6 +127,7 @@ const compactCLP = (v: number) =>
   new Intl.NumberFormat("es-CL", { notation: "compact", maximumFractionDigits: 1 }).format(v);
 
 export default function Informes() {
+  const { prefs: prefsInformes } = usePreferencias();
   const [preset, setPreset] = useState<PresetKey>("1m");
   const [customDesde, setCustomDesde] = useState("");
   const [customHasta, setCustomHasta] = useState("");
@@ -365,6 +367,10 @@ export default function Informes() {
   }, [filtered]);
 
   const proyeccionRecurrente = reporteRecurrentes?.proyeccion30Dias ?? 0;
+  // Schedules snapshot their own precision; the projection uses the widest of
+  // schedule data and the current global setting so decimals are never truncated.
+  const decRecurrente = (r: object) => Number((r as { decimales?: number | null }).decimales ?? 0) || 0;
+  const decProyeccion = Math.max(decimalesPref(prefsInformes), ...recurrentes.map(decRecurrente));
 
   async function exportRecurrentes() {
     setExportandoRecurrentes(true);
@@ -981,14 +987,14 @@ export default function Informes() {
               {recurrentesError && <Card className="p-4 text-sm text-destructive">No se pudo cargar la programación. <Button variant="outline" onClick={() => refetchRecurrentes()}>Reintentar</Button></Card>}
               <Card className="p-5">
                 <p className="text-sm font-semibold">Proyección de ingresos futuros</p>
-                <p className="mt-2 text-2xl font-bold">{formatCurrency(proyeccionRecurrente)}</p>
-                <p className="text-xs text-muted-foreground">En los próximos 30 días se generarán {formatCurrency(proyeccionRecurrente)} en cobros recurrentes programados. No corresponde a ingresos garantizados ni recibidos.</p>
+                <p className="mt-2 text-2xl font-bold">{formatMoney(proyeccionRecurrente, "CLP", decProyeccion)}</p>
+                <p className="text-xs text-muted-foreground">En los próximos 30 días se generarán {formatMoney(proyeccionRecurrente, "CLP", decProyeccion)} en cobros recurrentes programados. No corresponde a ingresos garantizados ni recibidos.</p>
               </Card>
               <div className="flex justify-end"><Button onClick={exportRecurrentes} disabled={!recurrentes.length || exportandoRecurrentes} className="gap-2"><Download className="h-4 w-4" />{exportandoRecurrentes ? "Preparando Excel…" : "Descargar Excel"}</Button></div>
               {errorExportRecurrentes && <p role="alert" className="text-sm text-destructive">{errorExportRecurrentes}</p>}
               <Card className="overflow-hidden">
                 <Table><TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead className="text-right">Monto</TableHead><TableHead>Frecuencia</TableHead><TableHead>Próxima generación</TableHead></TableRow></TableHeader>
-                  <TableBody>{recurrentes.length ? recurrentes.map((r) => <TableRow key={r.id}><TableCell>{r.clienteNombre}</TableCell><TableCell className="text-right font-mono">{formatCurrency(r.monto)}</TableCell><TableCell className="capitalize">{r.frecuencia}</TableCell><TableCell>{r.proximaGeneracion}</TableCell></TableRow>) : <TableRow><TableCell colSpan={4} className="h-24 text-center text-sm text-muted-foreground">No hay cobros recurrentes activos.</TableCell></TableRow>}</TableBody>
+                  <TableBody>{recurrentes.length ? recurrentes.map((r) => <TableRow key={r.id}><TableCell>{r.clienteNombre}</TableCell><TableCell className="text-right font-mono">{formatMoney(r.monto, "CLP", decRecurrente(r))}</TableCell><TableCell className="capitalize">{r.frecuencia}</TableCell><TableCell>{r.proximaGeneracion}</TableCell></TableRow>) : <TableRow><TableCell colSpan={4} className="h-24 text-center text-sm text-muted-foreground">No hay cobros recurrentes activos.</TableCell></TableRow>}</TableBody>
                 </Table>
               </Card>
             </>

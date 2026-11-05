@@ -7,6 +7,7 @@
  */
 
 export interface CobroRecurrenteSchedule {
+  decimales?: number;
   id: number;
   clienteNombre: string;
   monto: number;

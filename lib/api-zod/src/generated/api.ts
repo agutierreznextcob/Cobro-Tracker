@@ -1845,6 +1845,7 @@ export const CreateCobroBody = zod.object({
  */
 export const ListCobrosRecurrentesResponse = zod.object({
   "schedules": zod.array(zod.object({
+  "decimales": zod.number().optional(),
   "id": zod.number(),
   "clienteNombre": zod.string(),
   "monto": zod.number(),

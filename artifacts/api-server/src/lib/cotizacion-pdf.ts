@@ -4,7 +4,7 @@ import { formatDocumentMoney } from "./preferencias";
 import type { serializeCotizacion } from "./cotizaciones";
 
 export async function cotizacionPdf(q: Awaited<ReturnType<typeof serializeCotizacion>>, negocio: string, formatoFecha = "DD/MM/YYYY"): Promise<Buffer> {
-  const equivalencia = await equivalenciaClpTexto(q.total, q.moneda);
+  const equivalencia = await equivalenciaClpTexto(q.total, q.moneda, q.decimales);
   const doc = new PDFDocument({ size: "A4", margin: 48, info: { Title: q.numeroCotizacion, Author: negocio } });
   const chunks: Buffer[] = [];
   const result = new Promise<Buffer>((resolve, reject) => {

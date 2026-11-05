@@ -69,10 +69,11 @@ try {
     { productoId: product.id, descripcion: "Producto", cantidad: 2, precioUnitario: 10, descuentoPorcentaje: 10 },
     { descripcion: "Servicio libre", cantidad: 1, precioUnitario: 5.25, descuentoPorcentaje: 0 },
   ] };
-  const created = await api("POST", "/cotizaciones", input);
+  const created = await api("POST", "/cotizaciones", { ...input, decimales: 0 });
   assert.equal(created.status, 201, JSON.stringify(created));
   const id = created.data.id;
   assert.equal(created.data.total, 25.58);
+  assert.equal(created.data.decimales, 2, "Server preference overrides requested precision");
   assert.equal(created.data.numeroCotizacion, "PRES-0001");
   assert.equal(created.data.clienteDireccion, "Dirección ficticia");
   assert.equal((await api("POST", `/cotizaciones/${id}/convertir`)).status, 409);
@@ -80,8 +81,19 @@ try {
   assert.equal((await api("GET", `/cotizaciones/${id}`)).status, 404);
   assert.equal((await api("GET", "/cotizaciones")).data.length, 0);
   actor = owner;
+  await api("PUT", "/configuracion/preferencias", { ...prefs, decimales: 0 });
   assert.equal((await api("PATCH", `/cotizaciones/${id}`, { ...input, moneda: "EUR" })).status, 400);
-  assert.equal((await api("PATCH", `/cotizaciones/${id}`, { ...input, notas: "Editada" })).status, 200);
+  const edited = await api("PATCH", `/cotizaciones/${id}`, { ...input, decimales: 0, notas: "Editada" });
+  assert.equal(edited.status, 200);
+  assert.equal(edited.data.total, 25.58);
+  assert.equal(edited.data.decimales, 2, "Existing quote keeps original precision despite preference change");
+  const whole = await api("POST", "/cotizaciones", input);
+  assert.equal(whole.data.decimales, 0);
+  assert.equal(whole.data.total, 25);
+  await api("PUT", "/configuracion/preferencias", { ...prefs, decimales: 1 });
+  const tenths = await api("POST", "/cotizaciones", input);
+  assert.equal(tenths.data.decimales, 1);
+  assert.equal(tenths.data.total, 25.6);
   const pdf = await fetch(`${base}/cotizaciones/${id}/pdf`);
   assert.equal(pdf.status, 200);
   assert.equal(Buffer.from(await pdf.arrayBuffer()).subarray(0, 4).toString(), "%PDF");

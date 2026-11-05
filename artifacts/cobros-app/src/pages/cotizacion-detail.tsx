@@ -211,7 +211,7 @@ export default function CotizacionDetailPage() {
                 <div className="flex justify-between"><dt className="text-muted-foreground">Subtotal</dt><dd className="font-mono tabular-nums">{fmt(c.subtotal)}</dd></div>
                 <div className="flex justify-between"><dt className="text-muted-foreground">IVA ({c.porcentajeIva}%)</dt><dd className="font-mono tabular-nums">{fmt(c.montoIva)}</dd></div>
                 <div className="flex items-baseline justify-between border-t pt-2"><dt className="font-semibold">Total</dt><dd className="font-mono text-xl font-bold text-primary tabular-nums" data-testid="text-total-cotizacion">{fmt(c.total)}</dd></div>
-                {c.moneda !== "CLP" && <EquivalenciaCLP monto={c.total} moneda={c.moneda} compact testId="equivalencia-clp-cotizacion" />}
+                {c.moneda !== "CLP" && <EquivalenciaCLP monto={c.total} moneda={c.moneda} decimales={c.decimales ?? 0} compact testId="equivalencia-clp-cotizacion" />}
               </dl>
             </div>
 

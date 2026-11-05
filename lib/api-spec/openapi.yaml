@@ -5107,6 +5107,7 @@ components:
       type: object
       required: [id, clienteNombre, monto, frecuencia, proximaGeneracion, activo]
       properties:
+        decimales: { type: integer }
         id: { type: integer }
         clienteNombre: { type: string }
         monto: { type: number }

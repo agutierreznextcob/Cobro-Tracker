@@ -7,6 +7,10 @@ El usuario eligió moneda por documento, no un cambio global del símbolo. Las p
 **Why:** cambiar el símbolo no convierte montos y puede producir cobros incorrectos.
 **How to apply:** nunca sumar monedas diferentes ni aplicar la moneda preferida a documentos existentes. Los informes heredados agregan CLP explícitamente; los informes por moneda y el portal separan importes.
 
+El usuario confirmó que los documentos existentes conservan sus importes y precisión al cambiar «Habilitar decimales». La precisión de nuevos documentos se configura solo en Preferencias (OFF=0; ON=1 o 2), independiente de la moneda.
+**Why:** redondear históricos altera saldos, pagos y documentos ya emitidos; el usuario eligió conservarlos explícitamente.
+**How to apply:** derivar precisión en servidor para documentos nuevos; preservar la guardada al editar, convertir y generar PDF. Las programaciones recurrentes conservan la precisión de su plantilla. Inventario e indicadores usan la preferencia sin modificar cantidades de stock ni tasas de origen.
+
 Los adaptadores actuales de Flow y MercadoPago cobran en CLP entero. Los documentos en otras monedas o con decimales se pagan manualmente hasta implementar soporte específico del proveedor.
 **Why:** los adaptadores existentes redondean y fijan CLP; enviarlos directamente alteraría el importe.
 **How to apply:** conservar validación de servidor además de ocultar las acciones incompatibles en la interfaz. Los cobros masivos y recurrentes siguen siendo CLP; no habilitar otros tipos de moneda sin actualizar también sus programaciones y entregas.

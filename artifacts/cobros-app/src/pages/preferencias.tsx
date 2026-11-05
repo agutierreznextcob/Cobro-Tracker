@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { IndicadoresPanel } from "@/components/indicadores-panel";
 import { formatMoney, formatFechaPref, hoySantiago, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
 import { apiErrorMessage } from "@/lib/inventario";
@@ -142,7 +143,7 @@ export default function PreferenciasPage() {
             {MONEDAS.map((m: Moneda) => {
               const sel = f.moneda === m;
               return (
-                <button key={m} type="button" disabled={bloqueado} onClick={() => { set("moneda", m); if (m === "CLP") set("decimales", 0); else if (f.decimales === 0) set("decimales", 2); }}
+                <button key={m} type="button" disabled={bloqueado} onClick={() => set("moneda", m)}
                   data-testid={`option-moneda-${m}`}
                   className={`rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed ${sel ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border/70 hover:bg-secondary/50"}`}>
                   <p className="font-mono text-lg font-bold">{MONEDA_INFO[m].simbolo}</p>
@@ -154,16 +155,22 @@ export default function PreferenciasPage() {
           </div>
         </Seccion>
 
-        <Seccion titulo="Decimales en cobros" desc="Cada línea se redondea a estos decimales antes de sumar y calcular IVA. No afecta cantidades de stock.">
-          <div className="space-y-2">
-            <Segmento value={f.decimales} disabled={bloqueado} testId="option-decimales" onChange={(v) => set("decimales", v)} options={[0, 1, 2].map((d) => ({ value: d, label: `${d}` }))} />
+        <Seccion titulo="Decimales" desc="Precisión de montos en cobros, cotizaciones e inventario nuevos. Cada línea se redondea antes de sumar y calcular IVA. Los documentos existentes conservan la suya. No afecta cantidades de stock ni porcentajes.">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Switch id="switch-decimales" checked={f.decimales > 0} disabled={bloqueado} onCheckedChange={(on) => set("decimales", on ? 2 : 0)} data-testid="switch-habilitar-decimales" />
+              <Label htmlFor="switch-decimales" className="text-sm">Habilitar decimales</Label>
+            </div>
+            {f.decimales > 0 && (
+              <Segmento value={f.decimales} disabled={bloqueado} testId="option-decimales" onChange={(v) => set("decimales", v)} options={[1, 2].map((d) => ({ value: d, label: `${d} decimal${d === 1 ? "" : "es"}` }))} />
+            )}
             <p className="text-xs text-muted-foreground">Ejemplo: <span className="font-mono text-foreground">{formatMoney(ejemplo, f.moneda, f.decimales)}</span></p>
             {f.moneda === "CLP" && f.decimales > 0 && <p className="text-xs text-amber-700">Los cobros CLP con decimales no pueden generar links de Flow ni MercadoPago.</p>}
           </div>
         </Seccion>
 
         <Seccion titulo="Indicadores económicos" desc="Valores guardados en NextCob (fuente mindicador.cl). Se usan como equivalencia referencial en CLP para documentos en UF, USD o EUR.">
-          <IndicadoresPanel />
+          <IndicadoresPanel decimales={f.decimales} />
         </Seccion>
 
         <Seccion titulo="IVA por defecto" desc="Porcentaje sugerido en cotizaciones y cobros afectos. Editable en cada documento.">

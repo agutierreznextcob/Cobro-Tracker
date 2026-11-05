@@ -17,7 +17,7 @@ import {
   type Producto,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { usePreferencias } from "@/hooks/use-preferencias";
+import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatMoney, hoySantiago, monedaDe, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
+import { formatMoney, roundTo, hoySantiago, monedaDe, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
 import { apiErrorMessage } from "@/lib/inventario";
 import {
   descargarPdfCotizacion,
@@ -67,7 +67,9 @@ export default function CotizacionFormPage() {
   const [fechaEmision, setFechaEmision] = useState(() => hoySantiago());
   const [fechaVencimiento, setFechaVencimiento] = useState(() => hoySantiago(30));
   const [moneda, setMoneda] = useState<Moneda>("CLP");
-  const [decimales, setDecimales] = useState(0);
+  // Stored precision of an existing quote; new quotes follow the current preference.
+  const [decimalesGuardados, setDecimalesGuardados] = useState<number | null>(null);
+  const decimales = isEdit || savedId ? (decimalesGuardados ?? decimalesPref(prefs)) : decimalesPref(prefs);
   const [iva, setIva] = useState("19");
   const [notas, setNotas] = useState("");
   const [lineas, setLineas] = useState<LineaCot[]>([lineaLibre()]);
@@ -81,7 +83,6 @@ export default function CotizacionFormPage() {
     if (isEdit || !prefsListas || prefsAplicadas.current) return;
     prefsAplicadas.current = true;
     setMoneda(monedaDe(prefs.moneda));
-    setDecimales(prefs.decimales);
     setIva(String(prefs.porcentajeIva));
   }, [isEdit, prefsListas, prefs]);
 
@@ -95,7 +96,7 @@ export default function CotizacionFormPage() {
     setFechaEmision(cot.fechaEmision.slice(0, 10));
     setFechaVencimiento(cot.fechaVencimiento.slice(0, 10));
     setMoneda(monedaDe(cot.moneda));
-    setDecimales(cot.decimales);
+    setDecimalesGuardados(cot.decimales ?? 0);
     setIva(String(cot.porcentajeIva));
     setNotas(cot.notas ?? "");
     setLineas(
@@ -113,7 +114,9 @@ export default function CotizacionFormPage() {
   const clientes = clientesQ.data ?? [];
   const cliente = clientes.find((c) => String(c.id) === clienteId) as (typeof clientes)[number] & { direccion?: string | null } | undefined;
   const ivaPct = Math.min(100, Math.max(0, Number(iva) || 0));
-  const tot = totalesCot(lineas, decimales, ivaPct);
+  // Existing quotes keep stored unit prices untouched (no-op edits stay no-op).
+  const redondearPrecio = !isEdit;
+  const tot = totalesCot(lineas, decimales, ivaPct, redondearPrecio);
   const fmt = (n: number) => formatMoney(n, moneda, decimales);
 
   const productosMoneda = useMemo(() => {
@@ -129,7 +132,7 @@ export default function CotizacionFormPage() {
   const agregarProducto = (p: Producto) => {
     setLineas((ls) => {
       const base = ls.length === 1 && !ls[0].descripcion.trim() && !ls[0].precioUnitario ? [] : ls;
-      return [...base, { key: nuevaKey(), productoId: p.id, descripcion: p.nombre, cantidad: "1", precioUnitario: String(p.precioUnitario), descuentoPorcentaje: "0" }];
+      return [...base, { key: nuevaKey(), productoId: p.id, descripcion: p.nombre, cantidad: "1", precioUnitario: String(roundTo(Number(p.precioUnitario) || 0, decimales)), descuentoPorcentaje: "0" }];
     });
     setPickerOpen(false);
     setBusqueda("");
@@ -146,11 +149,10 @@ export default function CotizacionFormPage() {
       toast({ title: "Ítems del catálogo quitados", description: "Solo se pueden usar productos con precio en la moneda del documento." });
     }
     setMoneda(m);
-    if (m === "CLP") setDecimales(0);
-    else if (decimales === 0) setDecimales(2);
   };
 
   const validar = (): CotizacionInput | null => {
+    if (!isEdit && !savedId && !prefsListas) { toast({ title: "Cargando preferencias", description: "Intenta nuevamente en un momento." }); return null; }
     if (!clienteId) { toast({ title: "Elige un cliente", variant: "destructive" }); return null; }
     if (!fechaEmision || !fechaVencimiento) { toast({ title: "Completa las fechas", variant: "destructive" }); return null; }
     if (fechaVencimiento < fechaEmision) { toast({ title: "Fechas inválidas", description: "El vencimiento no puede ser anterior a la emisión.", variant: "destructive" }); return null; }
@@ -176,7 +178,7 @@ export default function CotizacionFormPage() {
         productoId: l.productoId,
         descripcion: l.descripcion.trim(),
         cantidad: Number(l.cantidad),
-        precioUnitario: Number(l.precioUnitario),
+        precioUnitario: redondearPrecio ? roundTo(Number(l.precioUnitario), decimales) : Number(l.precioUnitario),
         descuentoPorcentaje: Number(l.descuentoPorcentaje) || 0,
       })),
     };
@@ -188,6 +190,7 @@ export default function CotizacionFormPage() {
       ? await actualizar.mutateAsync({ id: savedId, data })
       : await crear.mutateAsync({ data });
     setSavedId(res.id);
+    setDecimalesGuardados(res.decimales ?? 0);
     qc.setQueryData(getGetCotizacionQueryKey(res.id), res);
     invalidateCotizaciones(qc, res.id);
     return res;
@@ -347,7 +350,7 @@ export default function CotizacionFormPage() {
                             <span className="block truncate font-medium">{p.nombre}</span>
                             <span className="text-[11px] text-muted-foreground">{p.tipo === "servicio" ? "Servicio" : "Producto"}{p.codigoInterno ? ` · ${p.codigoInterno}` : ""}</span>
                           </span>
-                          <span className="font-mono text-xs shrink-0">{formatMoney(p.precioUnitario, p.moneda, p.moneda && p.moneda !== "CLP" ? 2 : 0)}</span>
+                          <span className="font-mono text-xs shrink-0">{formatMoney(p.precioUnitario, p.moneda, decimalesPref(prefs))}</span>
                         </button>
                       ))}
                     </div>
@@ -372,7 +375,7 @@ export default function CotizacionFormPage() {
                   <Input type="number" min="0" step="any" value={l.cantidad} onChange={(e) => update(l.key, { cantidad: e.target.value })} className="h-8 font-mono" aria-label="Cantidad" data-testid={`input-item-cantidad-${i}`} />
                   <Input type="number" min="0" step={decimales ? String(10 ** -decimales) : "1"} value={l.precioUnitario} onChange={(e) => update(l.key, { precioUnitario: e.target.value })} className="h-8 font-mono" placeholder="0" aria-label="Precio unitario" data-testid={`input-item-precio-${i}`} />
                   <Input type="number" min="0" max="100" step="any" value={l.descuentoPorcentaje} onChange={(e) => update(l.key, { descuentoPorcentaje: e.target.value })} className="h-8 font-mono" aria-label="Descuento %" data-testid={`input-item-descuento-${i}`} />
-                  <span className="font-mono text-sm text-right tabular-nums">{fmt(subtotalLinea(l, decimales))}</span>
+                  <span className="font-mono text-sm text-right tabular-nums">{fmt(subtotalLinea(l, decimales, redondearPrecio))}</span>
                   <Button type="button" variant="ghost" size="icon" className="h-8 w-8 justify-self-end text-muted-foreground hover:text-red-600" onClick={() => setLineas((ls) => ls.filter((x) => x.key !== l.key))} aria-label="Quitar ítem" data-testid={`button-quitar-item-${i}`}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               ))}
@@ -394,7 +397,7 @@ export default function CotizacionFormPage() {
           <Card className="shadow-sm">
             <CardHeader className="pb-3"><CardTitle className="text-base">Moneda e impuestos</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className={`grid gap-3 ${isEdit ? "grid-cols-2" : "grid-cols-1"}`}>
                 <div className="space-y-1.5">
                   <Label className="flex items-center gap-1 text-xs">Moneda{isEdit && <Lock className="h-3 w-3 text-muted-foreground" />}</Label>
                   <Select value={moneda} onValueChange={(v) => cambiarMoneda(v as Moneda)} disabled={isEdit}>
@@ -402,19 +405,16 @@ export default function CotizacionFormPage() {
                     <SelectContent>{MONEDAS.map((m) => <SelectItem key={m} value={m}>{m} · {MONEDA_INFO[m].simbolo}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Decimales</Label>
-                  <Select value={String(decimales)} onValueChange={(v) => setDecimales(Number(v))}>
-                    <SelectTrigger data-testid="select-decimales-cotizacion"><SelectValue /></SelectTrigger>
-                    <SelectContent>{[0, 1, 2].map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+                {isEdit && <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1 text-xs">Decimales<Lock className="h-3 w-3 text-muted-foreground" /></Label>
+                  <p className="h-10 flex items-center rounded-md border bg-muted/30 px-3 font-mono text-sm" data-testid="text-decimales-cotizacion">{decimales}</p>
+                </div>}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">IVA %</Label>
                 <Input type="number" min="0" max="100" step="0.01" value={iva} onChange={(e) => setIva(e.target.value)} className="font-mono" data-testid="input-iva-cotizacion" />
               </div>
-              <p className="text-[11px] text-muted-foreground">{isEdit ? "La moneda queda fija una vez creada la cotización." : "Valores por defecto según tus preferencias. La moneda queda fija al guardar."}</p>
+              <p className="text-[11px] text-muted-foreground">{isEdit ? "La moneda y los decimales quedan fijos una vez creada la cotización." : "Valores por defecto según tus preferencias. Los decimales se definen en Configuración."}</p>
             </CardContent>
           </Card>
 
@@ -426,16 +426,16 @@ export default function CotizacionFormPage() {
                 <span className="font-semibold">Total</span>
                 <span className="font-mono text-2xl font-bold text-primary tabular-nums" data-testid="text-total">{fmt(tot.total)}</span>
               </div>
-              {moneda !== "CLP" && <EquivalenciaCLP monto={tot.total} moneda={moneda} compact testId="equivalencia-clp-cotizacion" />}
+              {moneda !== "CLP" && <EquivalenciaCLP monto={tot.total} moneda={moneda} decimales={decimales} compact testId="equivalencia-clp-cotizacion" />}
             </div>
             <div className="p-4 space-y-2 border-t">
-              <Button className="w-full" onClick={() => ejecutar("guardar")} disabled={ocupado} data-testid="button-guardar-borrador">
+              <Button className="w-full" onClick={() => ejecutar("guardar")} disabled={ocupado || (!isEdit && !savedId && !prefsListas)} data-testid="button-guardar-borrador">
                 {accion === "guardar" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}Guardar borrador
               </Button>
-              <Button className="w-full" variant="outline" onClick={() => ejecutar("enviar")} disabled={ocupado} data-testid="button-enviar-cotizacion">
+              <Button className="w-full" variant="outline" onClick={() => ejecutar("enviar")} disabled={ocupado || (!isEdit && !savedId && !prefsListas)} data-testid="button-enviar-cotizacion">
                 {accion === "enviar" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}Guardar y enviar al cliente
               </Button>
-              <Button className="w-full" variant="ghost" onClick={() => ejecutar("pdf")} disabled={ocupado} data-testid="button-descargar-pdf">
+              <Button className="w-full" variant="ghost" onClick={() => ejecutar("pdf")} disabled={ocupado || (!isEdit && !savedId && !prefsListas)} data-testid="button-descargar-pdf">
                 {accion === "pdf" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}Guardar y descargar PDF
               </Button>
               <p className="text-[11px] text-muted-foreground text-center pt-1">Enviar y PDF guardan el borrador primero.</p>

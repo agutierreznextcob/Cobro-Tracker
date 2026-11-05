@@ -28,3 +28,9 @@ export function usePreferencias(opts?: { enabled?: boolean }) {
   });
   return { ...q, prefs: q.data ?? PREFERENCIAS_DEFAULT, listo: !!q.data };
 }
+
+/** Global monetary precision (0, 1 or 2) for NEW documents and inventory. */
+export function decimalesPref(p: Pick<Preferencias, "decimales"> | null | undefined): number {
+  const d = Number(p?.decimales);
+  return d === 1 || d === 2 ? d : 0;
+}

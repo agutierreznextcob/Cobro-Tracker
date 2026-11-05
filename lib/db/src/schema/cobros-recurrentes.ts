@@ -15,6 +15,7 @@ export const frecuenciaCobroRecurrenteEnum = pgEnum("frecuencia_cobro_recurrente
 // A sweep locks this row before emitting a cycle, which is the idempotency
 // boundary even when two application instances sweep concurrently.
 export const cobrosRecurrentesTable = pgTable("cobros_recurrentes", {
+  decimales: integer("decimales").notNull().default(0),
   itemsInventario: jsonb("items_inventario").$type<ItemInventarioSnapshot[]>().notNull().default([]),
   id: serial("id").primaryKey(),
   organizationId: integer("organization_id"),

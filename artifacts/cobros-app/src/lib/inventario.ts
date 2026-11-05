@@ -46,13 +46,15 @@ export function buscarPorCodigo(productos: Producto[], code: string): Producto[]
 export type MetodoCalculo = "margen" | "recargo";
 
 /** Suggested price from cost and percentage. Returns null when not computable. */
-export function precioSugerido(costo: number, pct: number, metodo: MetodoCalculo): number | null {
+const redondear = (n: number, d: number) => { const f = 10 ** d; return Math.round((n + Number.EPSILON) * f) / f; };
+
+export function precioSugerido(costo: number, pct: number, metodo: MetodoCalculo, decimales = 0): number | null {
   if (!Number.isFinite(costo) || !Number.isFinite(pct) || costo < 0 || pct < 0) return null;
   if (metodo === "margen") {
     if (pct >= 100) return null;
-    return Math.round(costo / (1 - pct / 100));
+    return redondear(costo / (1 - pct / 100), decimales);
   }
-  return Math.round(costo * (1 + pct / 100));
+  return redondear(costo * (1 + pct / 100), decimales);
 }
 
 export function utilidadDe(costo: number, precio: number) {
@@ -62,9 +64,9 @@ export function utilidadDe(costo: number, precio: number) {
   return { utilidad, margen, recargo };
 }
 
-export function precioServicio(tarifa: number, horas: number, factor: number) {
+export function precioServicio(tarifa: number, horas: number, factor: number, decimales = 0) {
   if (![tarifa, horas, factor].every(Number.isFinite)) return 0;
-  return Math.round(tarifa * horas * factor);
+  return redondear(tarifa * horas * factor, decimales);
 }
 
 export function formatPct(n: number) {

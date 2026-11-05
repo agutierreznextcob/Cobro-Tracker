@@ -56,12 +56,12 @@ export async function sincronizarIndicadores(manual = false) {
     return rows;
   });
 }
-export async function equivalenciaClpTexto(monto: number, moneda = "CLP"): Promise<string | null> {
+export async function equivalenciaClpTexto(monto: number, moneda = "CLP", decimales = 0): Promise<string | null> {
   const codigo = ({ USD: "dolar", EUR: "euro", UF: "uf" } as Record<string, string>)[moneda];
   if (!codigo) return null;
   const [r] = await db.select().from(indicadoresEconomicosTable).where(eq(indicadoresEconomicosTable.codigo, codigo));
   if (!r) return "Equivalencia en CLP no disponible: aún no hay indicador sincronizado.";
-  return `Equivalencia referencial: ${formatDocumentMoney(monto * Number(r.valor), "CLP", 0)}. Tipo de cambio: ${formatDocumentMoney(Number(r.valor), "CLP", 2)} por ${moneda}, fecha ${r.fecha}. No modifica el monto del documento.`;
+  return `Equivalencia referencial: ${formatDocumentMoney(monto * Number(r.valor), "CLP", decimales)}. Tipo de cambio: ${formatDocumentMoney(Number(r.valor), "CLP", decimales)} por ${moneda}, fecha ${r.fecha}. No modifica el monto del documento.`;
 }
 export function startIndicadoresScheduler() {
   const tick = async () => {

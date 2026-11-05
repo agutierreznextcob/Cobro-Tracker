@@ -44,8 +44,8 @@ router.get("/cotizaciones/:id", action(async (req, res) => {
   res.json(await serializeCotizacion(q));
 }));
 router.patch("/cotizaciones/:id", action(async (req, res) => {
-  const { condition } = await getScopedCotizacion(req.user!.id, Number(req.params.id));
-  const { values, items } = await cotizacionValues(req.user!.id, req.body);
+  const { condition, q: original } = await getScopedCotizacion(req.user!.id, Number(req.params.id));
+  const { values, items } = await cotizacionValues(req.user!.id, req.body, original.decimales);
   const q = await db.transaction(async tx => {
     const [current] = await tx.select().from(cotizacionesTable).where(condition).for("update");
     if (!current) throw new CotizacionError("Cotización no encontrada.", 404);

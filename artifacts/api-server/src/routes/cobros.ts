@@ -266,8 +266,9 @@ cobrosRouter.post(["/cobros", "/cobros/masivo", "/cobros/recurrentes"], async (r
     const prefs = await getPreferenciasNegocio(req.user!.id);
     const individual = req.path === "/cobros";
     const moneda = individual ? req.body.moneda ?? prefs.moneda : "CLP";
-    const decimales = individual ? req.body.decimales ?? prefs.decimales : 0;
-    if (individual) { req.body.moneda = moneda; req.body.decimales = decimales; }
+    const decimales = prefs.decimales;
+    if (individual) req.body.moneda = moneda;
+    req.body.decimales = decimales;
     req.body.itemsInventario = await resolveItemsInventario(req.user!.id, req.body.itemsInventario, req.body.monto, moneda, decimales);
     next();
   } catch (err) {
@@ -301,7 +302,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
     const ctx = user ? await getOrgContext(user.id) : null;
     const prefs = await getPreferenciasNegocio(user!.id);
     const moneda = parsed.data.moneda ?? prefs.moneda;
-    const decimales = parsed.data.decimales ?? prefs.decimales;
+    const decimales = req.body.decimales; // Set by the server-side preferences middleware.
     const porcentajeIva = parsed.data.porcentajeIva ?? prefs.porcentajeIva;
 
     // Determine who the cobro is assigned to. Org admins may assign a cobro to
@@ -409,7 +410,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
 
 const CobroAvanzadoBaseBody = z.object({
   itemsInventario: itemsInventarioBody,
-  monto: z.number().int().positive(),
+  monto: z.number().finite().positive().max(9999999999.99),
   descripcion: z.string().min(1).max(255),
   tipoDocumento: z.enum(["factura_afecta", "factura_exenta", "boleta_afecta", "boleta_exenta", "sin_documento"]).default("sin_documento"),
   incluyeIva: z.boolean().optional(),
@@ -516,7 +517,8 @@ cobrosRouter.post("/cobros/recurrentes", requirePlanFeature("cobros_recurrentes"
     const automation = await resolverAutomatizacion(req.user!.id, ctx, d.automatizacion, d.workflowId);
     const reminderSnapshot = await snapshotRecordatorios(responsableId, d.automatizacion);
     const incluyeIva = tipoDocumentoPermiteIva(d.tipoDocumento) && d.incluyeIva === true;
-    const montos = computeMontoConIva(d.monto, incluyeIva);
+    const decimales = req.body.decimales;
+    const montos = computeMontoConIva(d.monto, incluyeIva, 19, decimales);
     const hoy = fechaHoySantiago();
     const scopedKey = scopedIdempotencyKey(req.user!.id, d.idempotencyKey);
     const requestHash = idempotencyFingerprint(d);
@@ -532,6 +534,7 @@ cobrosRouter.post("/cobros/recurrentes", requirePlanFeature("cobros_recurrentes"
       }
       const startsNow = d.fechaInicio <= hoy;
       const [schedule] = await tx.insert(cobrosRecurrentesTable).values({
+        decimales,
         itemsInventario: req.body.itemsInventario,
         organizationId: ctx.organizationId,
         responsableId, responsableNombre, clienteId: cliente.id, clienteNombre: cliente.nombre,
@@ -548,6 +551,7 @@ cobrosRouter.post("/cobros/recurrentes", requirePlanFeature("cobros_recurrentes"
       }).returning();
       if (!startsNow) return { schedule, cobro: null, reused: false };
       const [cobro] = await tx.insert(cobrosTable).values({
+        decimales,
         itemsInventario: req.body.itemsInventario,
         monto: String(montos.montoFinal), montoNeto: montos.montoNeto != null ? String(montos.montoNeto) : null,
         montoIva: montos.montoIva != null ? String(montos.montoIva) : null, incluyeIva, tipoDocumento: d.tipoDocumento,
@@ -598,7 +602,7 @@ cobrosRouter.post("/cobros/recurrentes", requirePlanFeature("cobros_recurrentes"
       }
       if (d.canalesIniciales.includes("whatsapp")) {
         const phone = cliente.telefono;
-        const mensaje = `Hola ${responseCobro.clienteNombre || "cliente"}, tienes un cobro pendiente de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(montoACobrar(responseCobro)))} por "${responseCobro.descripcion}".${linkPago ? ` Puedes pagar aquí: ${linkPago}` : ""}`;
+        const mensaje = `Hola ${responseCobro.clienteNombre || "cliente"}, tienes un cobro pendiente de ${formatDocumentMoney(montoACobrar(responseCobro), responseCobro.moneda, responseCobro.decimales)} por "${responseCobro.descripcion}".${linkPago ? ` Puedes pagar aquí: ${linkPago}` : ""}`;
         if (!phone || !sanitizePhone(phone)) deliveryResults.push({ canal: "whatsapp", estado: "fallido", detalle: "Sin teléfono válido." });
         else if (!isWhatsAppConfigured()) {
           const waUrl = `https://wa.me/${sanitizePhone(phone)}?text=${encodeURIComponent(mensaje)}`;
@@ -665,7 +669,8 @@ cobrosRouter.post("/cobros/masivo", requirePlanFeature("cobros_masivos"), async 
     const automation = await resolverAutomatizacion(req.user!.id, ctx, d.automatizacion, d.workflowId);
     const reminderSnapshot = await snapshotRecordatorios(responsableId, d.automatizacion);
     const incluyeIva = tipoDocumentoPermiteIva(d.tipoDocumento) && d.incluyeIva === true;
-    const montos = computeMontoConIva(d.monto, incluyeIva);
+    const decimales = req.body.decimales;
+    const montos = computeMontoConIva(d.monto, incluyeIva, 19, decimales);
     const scopedKey = scopedIdempotencyKey(req.user!.id, d.idempotencyKey);
     const loteId = `batch:${scopedKey}`;
     const requestHash = idempotencyFingerprint({ ...d, clienteIds: ids.sort((a, b) => a - b) });
@@ -679,6 +684,7 @@ cobrosRouter.post("/cobros/masivo", requirePlanFeature("cobros_masivos"), async 
         return { created: existing, reused: true };
       }
       const created = await tx.insert(cobrosTable).values(clientes.map((cliente) => ({
+        decimales,
       itemsInventario: req.body.itemsInventario,
       monto: String(montos.montoFinal), montoNeto: montos.montoNeto != null ? String(montos.montoNeto) : null,
       montoIva: montos.montoIva != null ? String(montos.montoIva) : null, incluyeIva, tipoDocumento: d.tipoDocumento,
@@ -733,7 +739,7 @@ cobrosRouter.post("/cobros/masivo", requirePlanFeature("cobros_masivos"), async 
         try {
           const cliente = clientes.find((c) => c.id === cobro.clienteId);
           const phone = cliente?.telefono ?? null;
-          const mensaje = `Hola ${deliveryCobro.clienteNombre || "cliente"}, tienes un cobro pendiente de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(montoACobrar(deliveryCobro)))} por "${deliveryCobro.descripcion}".${linkPago ? ` Puedes pagar aquí: ${linkPago}` : ""}`;
+          const mensaje = `Hola ${deliveryCobro.clienteNombre || "cliente"}, tienes un cobro pendiente de ${formatDocumentMoney(montoACobrar(deliveryCobro), deliveryCobro.moneda, deliveryCobro.decimales)} por "${deliveryCobro.descripcion}".${linkPago ? ` Puedes pagar aquí: ${linkPago}` : ""}`;
           if (!phone || !sanitizePhone(phone)) {
             deliveryResults.push({ cobroId: cobro.id, canal: "whatsapp", estado: "fallido", detalle: "Sin teléfono válido." });
           } else if (!isWhatsAppConfigured()) {
