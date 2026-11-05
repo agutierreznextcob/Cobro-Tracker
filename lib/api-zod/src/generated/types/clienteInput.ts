@@ -7,6 +7,7 @@
  */
 
 export interface ClienteInput {
+  direccion?: string;
   /** @minLength 1 */
   nombre: string;
   empresa?: string;

@@ -1,3 +1,4 @@
+import { formatDocumentMoney, roundMoney } from "./preferencias";
 import {
   db,
   cobrosTable,
@@ -261,6 +262,7 @@ async function ejecutarAccion(
         if (cfg.mensaje && cfg.mensaje.trim()) {
           result = await sendWorkflowEmail(
             {
+              moneda: cobro.moneda, decimales: cobro.decimales,
               emailPagador: cobro.emailPagador,
               clienteNombre: cobro.clienteNombre,
               asunto: cfg.asunto || "",
@@ -280,6 +282,7 @@ async function ejecutarAccion(
             : 0;
           result = await sendSecuenciaRecordatorioEmail(
             {
+              moneda: cobro.moneda, decimales: cobro.decimales,
               emailPagador: cobro.emailPagador,
               clienteNombre: cobro.clienteNombre,
               descripcion: cobro.descripcion,
@@ -310,11 +313,7 @@ async function ejecutarAccion(
             .where(eq(clientesTable.id, cobro.clienteId));
           telefono = cliente?.telefono ?? null;
         }
-        const monto = new Intl.NumberFormat("es-CL", {
-          style: "currency",
-          currency: "CLP",
-          maximumFractionDigits: 0,
-        }).format(Math.round(montoACobrar(cobro)));
+        const monto = formatDocumentMoney(montoACobrar(cobro), cobro.moneda, cobro.decimales);
         const nombre = cobro.clienteNombre || "cliente";
         let mensaje =
           cfg.mensaje && cfg.mensaje.trim()
@@ -395,11 +394,7 @@ async function ejecutarAccion(
         if (destinatarios.length === 0) {
           return { ok: false, detalle: "No hay administradores para notificar." };
         }
-        const monto = new Intl.NumberFormat("es-CL", {
-          style: "currency",
-          currency: "CLP",
-          maximumFractionDigits: 0,
-        }).format(Math.round(montoACobrar(cobro)));
+        const monto = formatDocumentMoney(montoACobrar(cobro), cobro.moneda, cobro.decimales);
         const notificaciones: PersistedWorkflowNotification[] = destinatarios.map((userId) => ({
             eventKey: `workflow:admin:${cobro.id}:${step.id}:${userId}`, userId,
             cobroId: cobro.id,
@@ -430,8 +425,8 @@ async function ejecutarAccion(
         const montoOriginal = Number(cobro.monto);
         const descuentoAbsoluto =
           tipo === "porcentaje"
-            ? Math.round((montoOriginal * valor) / 100)
-            : Math.round(valor);
+            ? roundMoney((montoOriginal * valor) / 100, cobro.decimales)
+            : roundMoney(valor, cobro.decimales);
         if (descuentoAbsoluto <= 0 || descuentoAbsoluto >= montoOriginal) {
           return { ok: false, detalle: "El descuento resultante es inválido." };
         }

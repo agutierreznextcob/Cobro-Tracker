@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { resolveCobroEmailOptions, type CobroEmailOptions } from "./cobro-email-options";
+import { formatDocumentMoney } from "./preferencias";
 
 // Escapes HTML-special characters so untrusted text can be safely interpolated
 // into email HTML bodies without injecting markup.
@@ -13,6 +14,24 @@ function escapeHtml(value: string): string {
 }
 
 let resend: Resend | null = null;
+
+export async function sendCotizacionEmail(data: {
+  id: number; version: string; numero: string; email: string; cliente: string;
+  total: number; moneda: string; decimales: number; vencimiento: string;
+  remitente: { nombre?: string | null; email?: string | null }; pdf: Buffer;
+}): Promise<void> {
+  const client = getResend();
+  if (!client) throw new Error("El servicio de correo no está configurado.");
+  const amount = formatDocumentMoney(data.total, data.moneda, data.decimales);
+  const { error } = await client.emails.send({
+    ...buildRemitente(data.remitente),
+    to: [data.email],
+    subject: `Cotización ${data.numero} — ${amount}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#161616"><h1>Cotización ${escapeHtml(data.numero)}</h1><p>Hola ${escapeHtml(data.cliente)},</p><p>Adjuntamos tu cotización por <strong>${escapeHtml(amount)}</strong>.</p><p>Válida hasta ${escapeHtml(data.vencimiento)}.</p><p>Responde este correo para aceptar la cotización o realizar consultas.</p><p>${escapeHtml(data.remitente.nombre || "NextCob")}</p></div>`,
+    attachments: [{ filename: `${data.numero.replace(/[^A-Za-z0-9_-]/g, "_")}.pdf`, content: data.pdf }],
+  }, { idempotencyKey: `cotizacion-${data.id}-${data.version}` });
+  if (error) throw new Error("No se pudo enviar la cotización. Intenta nuevamente.");
+}
 
 function getResend(): Resend | null {
   if (!process.env.RESEND_API_KEY) {
@@ -147,6 +166,8 @@ function buildEmailHtml(opts: {
 }
 
 export interface CobrosEmailData {
+  moneda?: string;
+  decimales?: number;
   cobroId?: number;
   fechaVencimiento?: string | null;
   emailPagador: string;
@@ -169,7 +190,7 @@ export function buildCobroNoticeHtml(
   data: Pick<CobrosEmailData, "clienteNombre" | "descripcion" | "monto" | "comercioNombre">,
   options: CobroEmailOptions,
 ): string {
-  const monto = formatCLP(data.monto);
+  const monto = options.moneda ? formatDocumentMoney(data.monto, options.moneda, options.decimales) : formatCLP(data.monto);
   const nombre = escapeHtml(data.clienteNombre || "cliente");
   const comercio = escapeHtml(data.comercioNombre);
   const concepto = escapeHtml(data.descripcion);
@@ -209,12 +230,12 @@ export async function sendPaymentLinkEmail(data: Omit<CobrosEmailData, "linkPago
     return { ok: false, error: "RESEND_API_KEY no está configurado." };
   }
 
-  const montoFormato = formatCLP(data.monto);
   const nombre = data.clienteNombre || "cliente";
 
   const options = data.cobroId
     ? await resolveCobroEmailOptions(data.cobroId, log ?? { warn: () => {} })
     : { fechaVencimiento: data.fechaVencimiento };
+  const montoFormato = formatDocumentMoney(data.monto, options.moneda, options.decimales);
   const { error } = await client.emails.send({
     ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
     to: [data.emailPagador],
@@ -254,12 +275,12 @@ export async function sendAvisoManualEmail(
     return { ok: false, error: "RESEND_API_KEY no está configurado." };
   }
 
-  const montoFormato = formatCLP(data.monto);
   const nombre = data.clienteNombre || "cliente";
 
   const options = data.cobroId
     ? await resolveCobroEmailOptions(data.cobroId, log ?? { warn: () => {} })
     : { datosBancariosHtml: data.datosBancariosHtml, fechaVencimiento: data.fechaVencimiento };
+  const montoFormato = formatDocumentMoney(data.monto, options.moneda, options.decimales);
 
   const { error } = await client.emails.send({
     ...buildRemitente({ nombre: data.remitenteNombre, email: data.remitenteEmail }),
@@ -575,6 +596,8 @@ export async function sendResetPasswordEmail(
 }
 
 export interface SecuenciaRecordatorioData {
+  moneda?: string;
+  decimales?: number;
   emailPagador: string;
   clienteNombre: string | null;
   descripcion: string;
@@ -599,7 +622,7 @@ export async function sendSecuenciaRecordatorioEmail(
     return { ok: false, error: "RESEND_API_KEY no está configurado." };
   }
 
-  const montoFormato = formatCLP(data.monto);
+  const montoFormato = formatDocumentMoney(data.monto, data.moneda, data.decimales);
   const nombre = data.clienteNombre || "cliente";
   const d = data.diasVencido;
 
@@ -726,7 +749,7 @@ export async function sendRecordatorioEmail(data: CobrosEmailData, log?: { warn:
     return { ok: false, error: "RESEND_API_KEY no está configurado." };
   }
 
-  const montoFormato = formatCLP(data.monto);
+  const montoFormato = formatDocumentMoney(data.monto, data.moneda, data.decimales);
   const nombre = data.clienteNombre || "cliente";
 
   const { error } = await client.emails.send({
@@ -823,6 +846,8 @@ export async function sendLeadNotificationEmail(
 }
 
 export interface ComprobanteEmailData {
+  moneda?: string;
+  decimales?: number;
   emailDestino: string;
   clienteNombre: string;
   empresa: string;
@@ -846,7 +871,7 @@ export async function sendComprobanteEmail(
     return { ok: false, error: "RESEND_API_KEY no está configurado." };
   }
 
-  const montoFormato = formatCLP(data.montoTotal);
+  const montoFormato = formatDocumentMoney(data.montoTotal, data.moneda, data.decimales);
   const nombre = data.clienteNombre || "cliente";
 
   const { error } = await client.emails.send({
@@ -936,6 +961,8 @@ export async function sendPortalEmail(
 }
 
 export interface WorkflowEmailData {
+  moneda?: string;
+  decimales?: number;
   emailPagador: string;
   clienteNombre: string | null;
   asunto: string;
@@ -962,7 +989,7 @@ export async function sendWorkflowEmail(
     return { ok: false, error: "RESEND_API_KEY no está configurado." };
   }
 
-  const montoFormato = formatCLP(data.monto);
+  const montoFormato = formatDocumentMoney(data.monto, data.moneda, data.decimales);
   const nombre = data.clienteNombre || "cliente";
   const tieneLink = !!data.linkPago;
   const responderUrl = tieneLink

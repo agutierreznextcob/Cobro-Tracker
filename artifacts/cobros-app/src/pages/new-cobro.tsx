@@ -14,16 +14,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { formatCurrency } from "@/lib/format";
+import { formatMoney, roundTo, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
+import { usePreferencias } from "@/hooks/use-preferencias";
 import { TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
 import { Loader2, ArrowLeft, Users, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { CatalogoLineas, lineasPayload, lineasValidas, totalLineas, type LineaCatalogo } from "@/components/catalogo-lineas";
 
-const IVA_RATE = 0.19;
 
 const formSchema = z.object({
-  monto: z.coerce.number().int("El monto debe ser un número entero").min(1, "El monto debe ser mayor a $0"),
+  monto: z.coerce.number().positive("El monto debe ser mayor a 0"),
   tipoDocumento: z.enum(TIPO_DOCUMENTO_VALUES),
   incluyeIva: z.boolean().default(false),
   descripcion: z.string().min(1, "La descripción es obligatoria").max(255),
@@ -80,13 +80,46 @@ export default function NewCobro() {
   const templateAttempt = useRef<{ key: string; id: number } | null>(null);
   const [canalesIniciales, setCanalesIniciales] = useState<Array<"email" | "whatsapp">>([]);
   const [lineas, setLineas] = useState<LineaCatalogo[]>([]);
+  const [decimalesDoc, setDecimalesDoc] = useState(0);
   const usaLineas = lineas.length > 0;
-  const totalItems = totalLineas(lineas);
+  const totalItems = totalLineas(lineas, modoAvanzado === "individual" ? decimalesDoc : undefined);
   const [resultadosEntrega, setResultadosEntrega] = useState<Array<{ cobroId?: number; canal: string; estado: string; detalle?: string; waUrl?: string }>>([]);
   // Trial/demo/admin users inherit NextCob features even if a historical plan
   // field says Starter; server endpoints remain the source of enforcement.
   const planUser = user as (typeof user & { subscriptionStatus?: string; plan?: string }) | null;
   const nextCob = user?.role === "admin" || user?.esDemo || planUser?.subscriptionStatus === "prueba" || planUser?.plan !== "starter";
+
+  // Document currency: defaults come from org preferences for NEW cobros only.
+  // Bulk/recurring creation is still CLP-only on the server, so those modes
+  // force CLP explicitly.
+  const { prefs, listo: prefsListas } = usePreferencias();
+  const [monedaDoc, setMonedaDoc] = useState<Moneda>("CLP");
+  const [ivaDoc, setIvaDoc] = useState("19");
+  const prefsAplicadas = useRef(false);
+  useEffect(() => {
+    if (!prefsListas || prefsAplicadas.current) return;
+    prefsAplicadas.current = true;
+    setMonedaDoc(prefs.moneda as Moneda);
+    setDecimalesDoc(prefs.decimales);
+    setIvaDoc(String(prefs.porcentajeIva));
+  }, [prefsListas, prefs]);
+  const monedaEfectiva: Moneda = modoAvanzado === "individual" ? monedaDoc : "CLP";
+  const decimalesEfectivos = modoAvanzado === "individual" ? decimalesDoc : 0;
+  const ivaPct = modoAvanzado === "individual" ? Math.min(100, Math.max(0, Number(ivaDoc) || 0)) : 19;
+  const formatCurrency = (n: number) => formatMoney(n, monedaEfectiva, decimalesEfectivos);
+  const cambiarMoneda = (m: Moneda) => {
+    // Radix's hidden native select can emit "" while its value is synced
+    // inside a form. It is not a currency change.
+    if (!(MONEDAS as readonly string[]).includes(m)) return;
+    if (m === monedaDoc) return;
+    if (lineas.length > 0) {
+      setLineas([]);
+      toast({ title: "Ítems quitados", description: "Los ítems del catálogo deben tener la misma moneda del cobro." });
+    }
+    setMonedaDoc(m);
+    if (m === "CLP") setDecimalesDoc(0);
+    else if (decimalesDoc === 0) setDecimalesDoc(2);
+  };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -111,7 +144,7 @@ export default function NewCobro() {
   const permiteIva = tipoDocumentoPermiteIva(tipoDocumentoWatch);
   const incluyeIvaWatch = form.watch("incluyeIva");
   const netoNum = Number(montoWatch) || 0;
-  const ivaNum = incluyeIvaWatch ? Math.round(netoNum * IVA_RATE) : 0;
+  const ivaNum = incluyeIvaWatch ? roundTo(netoNum * ivaPct / 100, decimalesEfectivos) : 0;
   const totalNum = incluyeIvaWatch ? netoNum + ivaNum : netoNum;
 
   // Catalog lines drive the (neto) amount; keep the form field synchronized.
@@ -141,9 +174,16 @@ export default function NewCobro() {
       return;
     }
     const itemsInventario = usaLineas ? lineasPayload(lineas) : undefined;
-    const montoFinal = usaLineas ? totalItems : values.monto;
+    const montoFinal = usaLineas ? totalItems : roundTo(values.monto, decimalesEfectivos);
+    if (!(montoFinal > 0)) {
+      toast({ title: "Monto inválido", description: "El monto debe ser mayor a 0.", variant: "destructive" });
+      return;
+    }
     const payload: CobroInput = {
       itemsInventario,
+      moneda: monedaEfectiva as CobroInput["moneda"],
+      decimales: decimalesEfectivos,
+      porcentajeIva: ivaPct,
       monto: montoFinal,
       tipoDocumento: values.tipoDocumento,
       incluyeIva: permiteIva ? values.incluyeIva : false,
@@ -195,7 +235,7 @@ export default function NewCobro() {
           if (!Number.isInteger(workflowId) || workflowId! <= 0) throw new Error("Workflow inválido.");
         }
         const advancedPayload = {
-          itemsInventario, monto: montoFinal, tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
+          itemsInventario, moneda: "CLP", decimales: 0, monto: montoFinal, tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
           descripcion: values.descripcion, referencia: values.referencia || undefined,
           responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
            automatizacion, workflowId, canalesIniciales,
@@ -309,13 +349,13 @@ export default function NewCobro() {
                       <FormLabel>{incluyeIvaWatch ? "Monto neto (sin IVA)" : "Monto"}</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                          <span className="absolute left-3 top-2.5 text-muted-foreground text-xs">{MONEDA_INFO[monedaEfectiva].simbolo}</span>
                           <Input
                             type="number"
-                            step="1"
-                            min="1"
+                            step={decimalesEfectivos ? String(10 ** -decimalesEfectivos) : "1"}
+                            min="0"
                             placeholder="0"
-                            className="pl-7 font-mono"
+                            className="pl-10 font-mono"
                             {...field}
                             readOnly={usaLineas}
                             disabled={usaLineas}
@@ -357,7 +397,47 @@ export default function NewCobro() {
                 />
               </div>
 
-              <CatalogoLineas lineas={lineas} onChange={setLineas} incluyeIva={permiteIva && !!incluyeIvaWatch} />
+              <div className="rounded-lg border border-border/60 p-4 space-y-3" data-testid="section-moneda-documento">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Moneda del documento</p>
+                    <p className="text-xs text-muted-foreground">
+                      {modoAvanzado === "individual"
+                        ? "Por defecto según tus preferencias. Queda fija en este cobro."
+                        : "Los cobros recurrentes y masivos se emiten por ahora solo en CLP."}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Moneda</label>
+                    <Select value={monedaEfectiva} onValueChange={(v) => cambiarMoneda(v as Moneda)} disabled={modoAvanzado !== "individual"}>
+                      <SelectTrigger data-testid="select-moneda-cobro"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {MONEDAS.map((m) => <SelectItem key={m} value={m}>{m} · {MONEDA_INFO[m].nombre}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Decimales</label>
+                    <Select value={String(decimalesEfectivos)} onValueChange={(v) => { if (["0", "1", "2"].includes(v)) setDecimalesDoc(Number(v)); }} disabled={modoAvanzado !== "individual"}>
+                      <SelectTrigger data-testid="select-decimales-cobro"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {[0, 1, 2].map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">IVA %</label>
+                    <Input type="number" min="0" max="100" step="0.01" value={modoAvanzado === "individual" ? ivaDoc : "19"} disabled={modoAvanzado !== "individual"} onChange={(e) => setIvaDoc(e.target.value)} className="font-mono" data-testid="input-iva-cobro" />
+                  </div>
+                </div>
+                {(monedaEfectiva !== "CLP" || decimalesEfectivos > 0) && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400">Flow y MercadoPago solo cobran CLP sin decimales: este cobro no podrá generar links de pago.</p>
+                )}
+              </div>
+
+              <CatalogoLineas lineas={lineas} onChange={setLineas} incluyeIva={permiteIva && !!incluyeIvaWatch} moneda={monedaEfectiva} decimales={modoAvanzado === "individual" ? decimalesDoc : undefined} />
 
               <FormField
                 control={form.control}
@@ -431,7 +511,7 @@ export default function NewCobro() {
                     <FormItem className="rounded-lg border border-border/60 p-4 space-y-3">
                       <div className="flex items-center justify-between gap-4">
                         <div className="space-y-0.5">
-                          <FormLabel className="text-sm">Incluir IVA (19%)</FormLabel>
+                          <FormLabel className="text-sm">Incluir IVA ({ivaPct}%)</FormLabel>
                           <FormDescription>
                             Si lo activas, el monto ingresado es el neto y se agrega el IVA al total a cobrar.
                           </FormDescription>
@@ -448,7 +528,7 @@ export default function NewCobro() {
                           <span className="font-mono">{formatCurrency(netoNum)}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">IVA (19%)</span>
+                          <span className="text-muted-foreground">IVA ({ivaPct}%)</span>
                           <span className="font-mono">{formatCurrency(ivaNum)}</span>
                         </div>
                         <div className="flex items-center justify-between pt-1.5 border-t border-border/60">

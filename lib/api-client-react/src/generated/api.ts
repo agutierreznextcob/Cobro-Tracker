@@ -65,6 +65,9 @@ import type {
   CobrosSummary,
   CompletarPerfilInput,
   ComprobanteTransferencia,
+  Cotizacion,
+  CotizacionEstadoInput,
+  CotizacionInput,
   DashboardMetricas,
   DatosBancariosInput,
   DatosBancariosStatus,
@@ -137,6 +140,7 @@ import type {
   PackUsuariosInput,
   PagoSuscripcion,
   PortalData,
+  Preferencias,
   ProWaitlistInput,
   Producto,
   ProductoInput,
@@ -190,6 +194,680 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getGetPreferenciasUrl = () => {
+
+
+
+
+  return `/api/configuracion/preferencias`
+}
+
+export const getPreferencias = async ( options?: RequestInit): Promise<Preferencias> => {
+
+  return customFetch<Preferencias>(getGetPreferenciasUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPreferenciasQueryKey = () => {
+    return [
+    `/api/configuracion/preferencias`
+    ] as const;
+    }
+
+
+export const getGetPreferenciasQueryOptions = <TData = Awaited<ReturnType<typeof getPreferencias>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPreferencias>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPreferenciasQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPreferencias>>> = ({ signal }) => getPreferencias({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPreferencias>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPreferenciasQueryResult = NonNullable<Awaited<ReturnType<typeof getPreferencias>>>
+export type GetPreferenciasQueryError = ErrorType<unknown>
+
+
+
+export function useGetPreferencias<TData = Awaited<ReturnType<typeof getPreferencias>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPreferencias>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPreferenciasQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSavePreferenciasUrl = () => {
+
+
+
+
+  return `/api/configuracion/preferencias`
+}
+
+export const savePreferencias = async (preferencias: Preferencias, options?: RequestInit): Promise<Preferencias> => {
+
+  return customFetch<Preferencias>(getSavePreferenciasUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      preferencias,)
+  }
+);}
+
+
+
+
+export const getSavePreferenciasMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePreferencias>>, TError,{data: BodyType<Preferencias>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof savePreferencias>>, TError,{data: BodyType<Preferencias>}, TContext> => {
+
+const mutationKey = ['savePreferencias'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof savePreferencias>>, {data: BodyType<Preferencias>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  savePreferencias(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SavePreferenciasMutationResult = NonNullable<Awaited<ReturnType<typeof savePreferencias>>>
+    export type SavePreferenciasMutationBody = BodyType<Preferencias>
+    export type SavePreferenciasMutationError = ErrorType<unknown>
+
+    export const useSavePreferencias = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePreferencias>>, TError,{data: BodyType<Preferencias>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof savePreferencias>>,
+        TError,
+        {data: BodyType<Preferencias>},
+        TContext
+      > => {
+      return useMutation(getSavePreferenciasMutationOptions(options));
+    }
+
+export const getListCotizacionesUrl = () => {
+
+
+
+
+  return `/api/cotizaciones`
+}
+
+export const listCotizaciones = async ( options?: RequestInit): Promise<Cotizacion[]> => {
+
+  return customFetch<Cotizacion[]>(getListCotizacionesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCotizacionesQueryKey = () => {
+    return [
+    `/api/cotizaciones`
+    ] as const;
+    }
+
+
+export const getListCotizacionesQueryOptions = <TData = Awaited<ReturnType<typeof listCotizaciones>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCotizaciones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCotizacionesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCotizaciones>>> = ({ signal }) => listCotizaciones({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCotizaciones>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCotizacionesQueryResult = NonNullable<Awaited<ReturnType<typeof listCotizaciones>>>
+export type ListCotizacionesQueryError = ErrorType<unknown>
+
+
+
+export function useListCotizaciones<TData = Awaited<ReturnType<typeof listCotizaciones>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCotizaciones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCotizacionesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCotizacionUrl = () => {
+
+
+
+
+  return `/api/cotizaciones`
+}
+
+export const createCotizacion = async (cotizacionInput: CotizacionInput, options?: RequestInit): Promise<Cotizacion> => {
+
+  return customFetch<Cotizacion>(getCreateCotizacionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cotizacionInput,)
+  }
+);}
+
+
+
+
+export const getCreateCotizacionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCotizacion>>, TError,{data: BodyType<CotizacionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCotizacion>>, TError,{data: BodyType<CotizacionInput>}, TContext> => {
+
+const mutationKey = ['createCotizacion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCotizacion>>, {data: BodyType<CotizacionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCotizacion(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCotizacionMutationResult = NonNullable<Awaited<ReturnType<typeof createCotizacion>>>
+    export type CreateCotizacionMutationBody = BodyType<CotizacionInput>
+    export type CreateCotizacionMutationError = ErrorType<unknown>
+
+    export const useCreateCotizacion = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCotizacion>>, TError,{data: BodyType<CotizacionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCotizacion>>,
+        TError,
+        {data: BodyType<CotizacionInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCotizacionMutationOptions(options));
+    }
+
+export const getGetCotizacionUrl = (id: number,) => {
+
+
+
+
+  return `/api/cotizaciones/${id}`
+}
+
+export const getCotizacion = async (id: number, options?: RequestInit): Promise<Cotizacion> => {
+
+  return customFetch<Cotizacion>(getGetCotizacionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCotizacionQueryKey = (id: number,) => {
+    return [
+    `/api/cotizaciones/${id}`
+    ] as const;
+    }
+
+
+export const getGetCotizacionQueryOptions = <TData = Awaited<ReturnType<typeof getCotizacion>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCotizacion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCotizacionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCotizacion>>> = ({ signal }) => getCotizacion(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCotizacion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCotizacionQueryResult = NonNullable<Awaited<ReturnType<typeof getCotizacion>>>
+export type GetCotizacionQueryError = ErrorType<unknown>
+
+
+
+export function useGetCotizacion<TData = Awaited<ReturnType<typeof getCotizacion>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCotizacion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCotizacionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateCotizacionUrl = (id: number,) => {
+
+
+
+
+  return `/api/cotizaciones/${id}`
+}
+
+export const updateCotizacion = async (id: number,
+    cotizacionInput: CotizacionInput, options?: RequestInit): Promise<Cotizacion> => {
+
+  return customFetch<Cotizacion>(getUpdateCotizacionUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cotizacionInput,)
+  }
+);}
+
+
+
+
+export const getUpdateCotizacionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCotizacion>>, TError,{id: number;data: BodyType<CotizacionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCotizacion>>, TError,{id: number;data: BodyType<CotizacionInput>}, TContext> => {
+
+const mutationKey = ['updateCotizacion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCotizacion>>, {id: number;data: BodyType<CotizacionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCotizacion(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCotizacionMutationResult = NonNullable<Awaited<ReturnType<typeof updateCotizacion>>>
+    export type UpdateCotizacionMutationBody = BodyType<CotizacionInput>
+    export type UpdateCotizacionMutationError = ErrorType<unknown>
+
+    export const useUpdateCotizacion = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCotizacion>>, TError,{id: number;data: BodyType<CotizacionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCotizacion>>,
+        TError,
+        {id: number;data: BodyType<CotizacionInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateCotizacionMutationOptions(options));
+    }
+
+export const getSendCotizacionUrl = (id: number,) => {
+
+
+
+
+  return `/api/cotizaciones/${id}/enviar`
+}
+
+export const sendCotizacion = async (id: number, options?: RequestInit): Promise<Cotizacion> => {
+
+  return customFetch<Cotizacion>(getSendCotizacionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSendCotizacionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendCotizacion>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendCotizacion>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['sendCotizacion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendCotizacion>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  sendCotizacion(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendCotizacionMutationResult = NonNullable<Awaited<ReturnType<typeof sendCotizacion>>>
+
+    export type SendCotizacionMutationError = ErrorType<unknown>
+
+    export const useSendCotizacion = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendCotizacion>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendCotizacion>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSendCotizacionMutationOptions(options));
+    }
+
+export const getSetCotizacionEstadoUrl = (id: number,) => {
+
+
+
+
+  return `/api/cotizaciones/${id}/estado`
+}
+
+export const setCotizacionEstado = async (id: number,
+    cotizacionEstadoInput: CotizacionEstadoInput, options?: RequestInit): Promise<Cotizacion> => {
+
+  return customFetch<Cotizacion>(getSetCotizacionEstadoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cotizacionEstadoInput,)
+  }
+);}
+
+
+
+
+export const getSetCotizacionEstadoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCotizacionEstado>>, TError,{id: number;data: BodyType<CotizacionEstadoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setCotizacionEstado>>, TError,{id: number;data: BodyType<CotizacionEstadoInput>}, TContext> => {
+
+const mutationKey = ['setCotizacionEstado'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setCotizacionEstado>>, {id: number;data: BodyType<CotizacionEstadoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setCotizacionEstado(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetCotizacionEstadoMutationResult = NonNullable<Awaited<ReturnType<typeof setCotizacionEstado>>>
+    export type SetCotizacionEstadoMutationBody = BodyType<CotizacionEstadoInput>
+    export type SetCotizacionEstadoMutationError = ErrorType<unknown>
+
+    export const useSetCotizacionEstado = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCotizacionEstado>>, TError,{id: number;data: BodyType<CotizacionEstadoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setCotizacionEstado>>,
+        TError,
+        {id: number;data: BodyType<CotizacionEstadoInput>},
+        TContext
+      > => {
+      return useMutation(getSetCotizacionEstadoMutationOptions(options));
+    }
+
+export const getConvertirCotizacionUrl = (id: number,) => {
+
+
+
+
+  return `/api/cotizaciones/${id}/convertir`
+}
+
+export const convertirCotizacion = async (id: number, options?: RequestInit): Promise<Cotizacion> => {
+
+  return customFetch<Cotizacion>(getConvertirCotizacionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getConvertirCotizacionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof convertirCotizacion>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof convertirCotizacion>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['convertirCotizacion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof convertirCotizacion>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  convertirCotizacion(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConvertirCotizacionMutationResult = NonNullable<Awaited<ReturnType<typeof convertirCotizacion>>>
+
+    export type ConvertirCotizacionMutationError = ErrorType<unknown>
+
+    export const useConvertirCotizacion = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof convertirCotizacion>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof convertirCotizacion>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getConvertirCotizacionMutationOptions(options));
+    }
+
+export const getDownloadCotizacionPdfUrl = (id: number,) => {
+
+
+
+
+  return `/api/cotizaciones/${id}/pdf`
+}
+
+export const downloadCotizacionPdf = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadCotizacionPdfUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadCotizacionPdfQueryKey = (id: number,) => {
+    return [
+    `/api/cotizaciones/${id}/pdf`
+    ] as const;
+    }
+
+
+export const getDownloadCotizacionPdfQueryOptions = <TData = Awaited<ReturnType<typeof downloadCotizacionPdf>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadCotizacionPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadCotizacionPdfQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadCotizacionPdf>>> = ({ signal }) => downloadCotizacionPdf(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadCotizacionPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadCotizacionPdfQueryResult = NonNullable<Awaited<ReturnType<typeof downloadCotizacionPdf>>>
+export type DownloadCotizacionPdfQueryError = ErrorType<unknown>
+
+
+
+export function useDownloadCotizacionPdf<TData = Awaited<ReturnType<typeof downloadCotizacionPdf>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadCotizacionPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadCotizacionPdfQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 

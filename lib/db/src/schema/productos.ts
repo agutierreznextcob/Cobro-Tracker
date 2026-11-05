@@ -11,6 +11,7 @@ export const productosTable = pgTable("productos", {
   organizationId: integer("organization_id"),
   usuarioId: text("usuario_id").notNull(),
   nombre: text("nombre").notNull(),
+  moneda: text("moneda").notNull().default("CLP"),
   codigoInterno: text("codigo_interno"),
   sku: text("sku").notNull().default(""),
   codigoBarras: text("codigo_barras").notNull().default(""),

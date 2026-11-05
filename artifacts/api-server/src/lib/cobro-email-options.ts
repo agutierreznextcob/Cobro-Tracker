@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { buildDatosBancariosHtml, getDatosBancariosUsuario } from "./datos-bancarios";
 
 export interface CobroEmailOptions {
+  moneda?: string;
+  decimales?: number;
   linkPago?: string | null;
   proveedor?: "Flow" | "MercadoPago";
   datosBancariosHtml?: string | null;
@@ -17,7 +19,7 @@ export async function resolveCobroEmailOptions(
 ): Promise<CobroEmailOptions> {
   const [cobro] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, cobroId));
   if (!cobro) throw new Error("No se encontró el cobro para preparar su correo.");
-  if (!cobro.responsableId) return { fechaVencimiento: cobro.fechaVencimiento };
+  if (!cobro.responsableId) return { fechaVencimiento: cobro.fechaVencimiento, moneda: cobro.moneda, decimales: cobro.decimales };
   const [flow, mp, banco] = await Promise.all([
     db.select({ userId: flowCredencialesTable.userId }).from(flowCredencialesTable)
       .where(eq(flowCredencialesTable.userId, cobro.responsableId)),
@@ -36,6 +38,7 @@ export async function resolveCobroEmailOptions(
     ? prepared.flowLinkPago
     : mp.length && prepared.mpPaymentLinkUrl ? prepared.mpPaymentLinkUrl : null;
   return {
+    moneda: cobro.moneda, decimales: cobro.decimales,
     linkPago,
     proveedor: linkPago ? (linkPago === prepared.flowLinkPago ? "Flow" : "MercadoPago") : undefined,
     datosBancariosHtml: banco ? buildDatosBancariosHtml(banco) : null,

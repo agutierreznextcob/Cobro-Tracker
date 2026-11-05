@@ -8,6 +8,7 @@ export const clientesTable = pgTable("clientes", {
   // Optional company/organization the contact belongs to.
   empresa: text("empresa"),
   rut: text("rut"),
+  direccion: text("direccion"),
   email: text("email"),
   telefono: text("telefono"),
   userId: text("user_id").notNull(),

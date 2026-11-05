@@ -66,6 +66,7 @@ const clienteSchema = z.object({
       /^\+56\s?9\s?\d{4}\s?\d{4}$/,
       "Formato inválido — usa +56 9 1234 5678"
     ),
+  direccion: z.string().max(300).optional(),
 });
 type ClienteForm = z.infer<typeof clienteSchema>;
 
@@ -76,12 +77,12 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
 
   const form = useForm<ClienteForm>({
     resolver: zodResolver(clienteSchema),
-    defaultValues: { nombre: "", empresa: "", rut: "", email: "", telefono: "" },
+    defaultValues: { nombre: "", empresa: "", rut: "", email: "", telefono: "", direccion: "" },
   });
 
   const onSubmit = (values: ClienteForm) => {
     createCliente.mutate(
-      { data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut, email: values.email, telefono: values.telefono } },
+      { data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut, email: values.email, telefono: values.telefono, direccion: values.direccion?.trim() || undefined } },
       {
         onSuccess: () => {
           toast({ title: "Cliente creado", description: "El cliente fue creado exitosamente." });
@@ -171,6 +172,19 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
                     <FormLabel>Teléfono *</FormLabel>
                     <FormControl>
                       <Input placeholder="+56 9 1234 5678" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="direccion"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Dirección (opcional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Av. Providencia 1234, Of. 502, Providencia" data-testid="input-direccion" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

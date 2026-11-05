@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProductoInputMetodoCalculo } from './productoInputMetodoCalculo';
+import type { ProductoInputMoneda } from './productoInputMoneda';
 import type { ProductoInputTipo } from './productoInputTipo';
 
 export interface ProductoInput {
+  moneda?: ProductoInputMoneda;
   /**
      * @minLength 1
      * @maxLength 200

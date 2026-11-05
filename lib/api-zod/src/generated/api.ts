@@ -8,6 +8,610 @@
 import * as zod from 'zod';
 
 
+export const getPreferenciasResponseDecimalesMin = 0;
+export const getPreferenciasResponseDecimalesMax = 2;
+
+export const getPreferenciasResponsePorcentajeIvaMin = 0;
+export const getPreferenciasResponsePorcentajeIvaMax = 100;
+
+export const getPreferenciasResponsePrefijoCobroMax = 16;
+
+export const getPreferenciasResponsePrefijoCotizacionMax = 16;
+
+
+
+export const GetPreferenciasResponse = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(getPreferenciasResponseDecimalesMin).max(getPreferenciasResponseDecimalesMax),
+  "porcentajeIva": zod.number().min(getPreferenciasResponsePorcentajeIvaMin).max(getPreferenciasResponsePorcentajeIvaMax),
+  "formatoFecha": zod.enum(['DD/MM/YYYY', 'MM/DD/YYYY']),
+  "prefijoCobro": zod.string().min(1).max(getPreferenciasResponsePrefijoCobroMax),
+  "prefijoCotizacion": zod.string().min(1).max(getPreferenciasResponsePrefijoCotizacionMax)
+})
+
+
+export const savePreferenciasBodyDecimalesMin = 0;
+export const savePreferenciasBodyDecimalesMax = 2;
+
+export const savePreferenciasBodyPorcentajeIvaMin = 0;
+export const savePreferenciasBodyPorcentajeIvaMax = 100;
+
+export const savePreferenciasBodyPrefijoCobroMax = 16;
+
+export const savePreferenciasBodyPrefijoCotizacionMax = 16;
+
+
+
+export const SavePreferenciasBody = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(savePreferenciasBodyDecimalesMin).max(savePreferenciasBodyDecimalesMax),
+  "porcentajeIva": zod.number().min(savePreferenciasBodyPorcentajeIvaMin).max(savePreferenciasBodyPorcentajeIvaMax),
+  "formatoFecha": zod.enum(['DD/MM/YYYY', 'MM/DD/YYYY']),
+  "prefijoCobro": zod.string().min(1).max(savePreferenciasBodyPrefijoCobroMax),
+  "prefijoCotizacion": zod.string().min(1).max(savePreferenciasBodyPrefijoCotizacionMax)
+})
+
+export const savePreferenciasResponseDecimalesMin = 0;
+export const savePreferenciasResponseDecimalesMax = 2;
+
+export const savePreferenciasResponsePorcentajeIvaMin = 0;
+export const savePreferenciasResponsePorcentajeIvaMax = 100;
+
+export const savePreferenciasResponsePrefijoCobroMax = 16;
+
+export const savePreferenciasResponsePrefijoCotizacionMax = 16;
+
+
+
+export const SavePreferenciasResponse = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(savePreferenciasResponseDecimalesMin).max(savePreferenciasResponseDecimalesMax),
+  "porcentajeIva": zod.number().min(savePreferenciasResponsePorcentajeIvaMin).max(savePreferenciasResponsePorcentajeIvaMax),
+  "formatoFecha": zod.enum(['DD/MM/YYYY', 'MM/DD/YYYY']),
+  "prefijoCobro": zod.string().min(1).max(savePreferenciasResponsePrefijoCobroMax),
+  "prefijoCotizacion": zod.string().min(1).max(savePreferenciasResponsePrefijoCotizacionMax)
+})
+
+
+export const listCotizacionesResponseOneDecimalesMin = 0;
+export const listCotizacionesResponseOneDecimalesMax = 2;
+
+export const listCotizacionesResponseOnePorcentajeIvaMin = 0;
+export const listCotizacionesResponseOnePorcentajeIvaMax = 100;
+
+export const listCotizacionesResponseOneNotasMax = 5000;
+
+export const listCotizacionesResponseOneItemsItemDescripcionMax = 1000;
+
+export const listCotizacionesResponseOneItemsItemCantidadExclusiveMin = 0;
+
+export const listCotizacionesResponseOneItemsItemPrecioUnitarioMin = 0;
+
+export const listCotizacionesResponseOneItemsItemDescuentoPorcentajeMin = 0;
+export const listCotizacionesResponseOneItemsItemDescuentoPorcentajeMax = 100;
+
+export const listCotizacionesResponseOneItemsMax = 100;
+
+export const listCotizacionesResponseTwoItemsItemOneDescripcionMax = 1000;
+
+export const listCotizacionesResponseTwoItemsItemOneCantidadExclusiveMin = 0;
+
+export const listCotizacionesResponseTwoItemsItemOnePrecioUnitarioMin = 0;
+
+export const listCotizacionesResponseTwoItemsItemOneDescuentoPorcentajeMin = 0;
+export const listCotizacionesResponseTwoItemsItemOneDescuentoPorcentajeMax = 100;
+
+
+
+export const ListCotizacionesResponseItem = zod.object({
+  "clienteId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaVencimiento": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(listCotizacionesResponseOneDecimalesMin).max(listCotizacionesResponseOneDecimalesMax),
+  "porcentajeIva": zod.number().min(listCotizacionesResponseOnePorcentajeIvaMin).max(listCotizacionesResponseOnePorcentajeIvaMax),
+  "notas": zod.string().max(listCotizacionesResponseOneNotasMax),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(listCotizacionesResponseOneItemsItemDescripcionMax),
+  "cantidad": zod.number().gt(listCotizacionesResponseOneItemsItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(listCotizacionesResponseOneItemsItemPrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(listCotizacionesResponseOneItemsItemDescuentoPorcentajeMin).max(listCotizacionesResponseOneItemsItemDescuentoPorcentajeMax)
+})).min(1).max(listCotizacionesResponseOneItemsMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "numeroCotizacion": zod.string(),
+  "clienteNombre": zod.string(),
+  "clienteRut": zod.string().nullish(),
+  "clienteEmail": zod.string().nullish(),
+  "clienteDireccion": zod.string().nullish(),
+  "estado": zod.enum(['borrador', 'enviada', 'aceptada', 'rechazada', 'vencida']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "cobroId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(listCotizacionesResponseTwoItemsItemOneDescripcionMax),
+  "cantidad": zod.number().gt(listCotizacionesResponseTwoItemsItemOneCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(listCotizacionesResponseTwoItemsItemOnePrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(listCotizacionesResponseTwoItemsItemOneDescuentoPorcentajeMin).max(listCotizacionesResponseTwoItemsItemOneDescuentoPorcentajeMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number()
+}))).optional()
+}))
+export const ListCotizacionesResponse = zod.array(ListCotizacionesResponseItem)
+
+
+export const createCotizacionBodyDecimalesMin = 0;
+export const createCotizacionBodyDecimalesMax = 2;
+
+export const createCotizacionBodyPorcentajeIvaMin = 0;
+export const createCotizacionBodyPorcentajeIvaMax = 100;
+
+export const createCotizacionBodyNotasMax = 5000;
+
+export const createCotizacionBodyItemsItemDescripcionMax = 1000;
+
+export const createCotizacionBodyItemsItemCantidadExclusiveMin = 0;
+
+export const createCotizacionBodyItemsItemPrecioUnitarioMin = 0;
+
+export const createCotizacionBodyItemsItemDescuentoPorcentajeMin = 0;
+export const createCotizacionBodyItemsItemDescuentoPorcentajeMax = 100;
+
+export const createCotizacionBodyItemsMax = 100;
+
+
+
+export const CreateCotizacionBody = zod.object({
+  "clienteId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaVencimiento": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(createCotizacionBodyDecimalesMin).max(createCotizacionBodyDecimalesMax),
+  "porcentajeIva": zod.number().min(createCotizacionBodyPorcentajeIvaMin).max(createCotizacionBodyPorcentajeIvaMax),
+  "notas": zod.string().max(createCotizacionBodyNotasMax),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(createCotizacionBodyItemsItemDescripcionMax),
+  "cantidad": zod.number().gt(createCotizacionBodyItemsItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(createCotizacionBodyItemsItemPrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(createCotizacionBodyItemsItemDescuentoPorcentajeMin).max(createCotizacionBodyItemsItemDescuentoPorcentajeMax)
+})).min(1).max(createCotizacionBodyItemsMax)
+})
+
+
+export const GetCotizacionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getCotizacionResponseOneDecimalesMin = 0;
+export const getCotizacionResponseOneDecimalesMax = 2;
+
+export const getCotizacionResponseOnePorcentajeIvaMin = 0;
+export const getCotizacionResponseOnePorcentajeIvaMax = 100;
+
+export const getCotizacionResponseOneNotasMax = 5000;
+
+export const getCotizacionResponseOneItemsItemDescripcionMax = 1000;
+
+export const getCotizacionResponseOneItemsItemCantidadExclusiveMin = 0;
+
+export const getCotizacionResponseOneItemsItemPrecioUnitarioMin = 0;
+
+export const getCotizacionResponseOneItemsItemDescuentoPorcentajeMin = 0;
+export const getCotizacionResponseOneItemsItemDescuentoPorcentajeMax = 100;
+
+export const getCotizacionResponseOneItemsMax = 100;
+
+export const getCotizacionResponseTwoItemsItemOneDescripcionMax = 1000;
+
+export const getCotizacionResponseTwoItemsItemOneCantidadExclusiveMin = 0;
+
+export const getCotizacionResponseTwoItemsItemOnePrecioUnitarioMin = 0;
+
+export const getCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMin = 0;
+export const getCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax = 100;
+
+
+
+export const GetCotizacionResponse = zod.object({
+  "clienteId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaVencimiento": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(getCotizacionResponseOneDecimalesMin).max(getCotizacionResponseOneDecimalesMax),
+  "porcentajeIva": zod.number().min(getCotizacionResponseOnePorcentajeIvaMin).max(getCotizacionResponseOnePorcentajeIvaMax),
+  "notas": zod.string().max(getCotizacionResponseOneNotasMax),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(getCotizacionResponseOneItemsItemDescripcionMax),
+  "cantidad": zod.number().gt(getCotizacionResponseOneItemsItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(getCotizacionResponseOneItemsItemPrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(getCotizacionResponseOneItemsItemDescuentoPorcentajeMin).max(getCotizacionResponseOneItemsItemDescuentoPorcentajeMax)
+})).min(1).max(getCotizacionResponseOneItemsMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "numeroCotizacion": zod.string(),
+  "clienteNombre": zod.string(),
+  "clienteRut": zod.string().nullish(),
+  "clienteEmail": zod.string().nullish(),
+  "clienteDireccion": zod.string().nullish(),
+  "estado": zod.enum(['borrador', 'enviada', 'aceptada', 'rechazada', 'vencida']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "cobroId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(getCotizacionResponseTwoItemsItemOneDescripcionMax),
+  "cantidad": zod.number().gt(getCotizacionResponseTwoItemsItemOneCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(getCotizacionResponseTwoItemsItemOnePrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(getCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMin).max(getCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number()
+}))).optional()
+}))
+
+
+export const UpdateCotizacionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateCotizacionBodyDecimalesMin = 0;
+export const updateCotizacionBodyDecimalesMax = 2;
+
+export const updateCotizacionBodyPorcentajeIvaMin = 0;
+export const updateCotizacionBodyPorcentajeIvaMax = 100;
+
+export const updateCotizacionBodyNotasMax = 5000;
+
+export const updateCotizacionBodyItemsItemDescripcionMax = 1000;
+
+export const updateCotizacionBodyItemsItemCantidadExclusiveMin = 0;
+
+export const updateCotizacionBodyItemsItemPrecioUnitarioMin = 0;
+
+export const updateCotizacionBodyItemsItemDescuentoPorcentajeMin = 0;
+export const updateCotizacionBodyItemsItemDescuentoPorcentajeMax = 100;
+
+export const updateCotizacionBodyItemsMax = 100;
+
+
+
+export const UpdateCotizacionBody = zod.object({
+  "clienteId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaVencimiento": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(updateCotizacionBodyDecimalesMin).max(updateCotizacionBodyDecimalesMax),
+  "porcentajeIva": zod.number().min(updateCotizacionBodyPorcentajeIvaMin).max(updateCotizacionBodyPorcentajeIvaMax),
+  "notas": zod.string().max(updateCotizacionBodyNotasMax),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(updateCotizacionBodyItemsItemDescripcionMax),
+  "cantidad": zod.number().gt(updateCotizacionBodyItemsItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(updateCotizacionBodyItemsItemPrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(updateCotizacionBodyItemsItemDescuentoPorcentajeMin).max(updateCotizacionBodyItemsItemDescuentoPorcentajeMax)
+})).min(1).max(updateCotizacionBodyItemsMax)
+})
+
+export const updateCotizacionResponseOneDecimalesMin = 0;
+export const updateCotizacionResponseOneDecimalesMax = 2;
+
+export const updateCotizacionResponseOnePorcentajeIvaMin = 0;
+export const updateCotizacionResponseOnePorcentajeIvaMax = 100;
+
+export const updateCotizacionResponseOneNotasMax = 5000;
+
+export const updateCotizacionResponseOneItemsItemDescripcionMax = 1000;
+
+export const updateCotizacionResponseOneItemsItemCantidadExclusiveMin = 0;
+
+export const updateCotizacionResponseOneItemsItemPrecioUnitarioMin = 0;
+
+export const updateCotizacionResponseOneItemsItemDescuentoPorcentajeMin = 0;
+export const updateCotizacionResponseOneItemsItemDescuentoPorcentajeMax = 100;
+
+export const updateCotizacionResponseOneItemsMax = 100;
+
+export const updateCotizacionResponseTwoItemsItemOneDescripcionMax = 1000;
+
+export const updateCotizacionResponseTwoItemsItemOneCantidadExclusiveMin = 0;
+
+export const updateCotizacionResponseTwoItemsItemOnePrecioUnitarioMin = 0;
+
+export const updateCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMin = 0;
+export const updateCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax = 100;
+
+
+
+export const UpdateCotizacionResponse = zod.object({
+  "clienteId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaVencimiento": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(updateCotizacionResponseOneDecimalesMin).max(updateCotizacionResponseOneDecimalesMax),
+  "porcentajeIva": zod.number().min(updateCotizacionResponseOnePorcentajeIvaMin).max(updateCotizacionResponseOnePorcentajeIvaMax),
+  "notas": zod.string().max(updateCotizacionResponseOneNotasMax),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(updateCotizacionResponseOneItemsItemDescripcionMax),
+  "cantidad": zod.number().gt(updateCotizacionResponseOneItemsItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(updateCotizacionResponseOneItemsItemPrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(updateCotizacionResponseOneItemsItemDescuentoPorcentajeMin).max(updateCotizacionResponseOneItemsItemDescuentoPorcentajeMax)
+})).min(1).max(updateCotizacionResponseOneItemsMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "numeroCotizacion": zod.string(),
+  "clienteNombre": zod.string(),
+  "clienteRut": zod.string().nullish(),
+  "clienteEmail": zod.string().nullish(),
+  "clienteDireccion": zod.string().nullish(),
+  "estado": zod.enum(['borrador', 'enviada', 'aceptada', 'rechazada', 'vencida']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "cobroId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(updateCotizacionResponseTwoItemsItemOneDescripcionMax),
+  "cantidad": zod.number().gt(updateCotizacionResponseTwoItemsItemOneCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(updateCotizacionResponseTwoItemsItemOnePrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(updateCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMin).max(updateCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number()
+}))).optional()
+}))
+
+
+export const SendCotizacionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const sendCotizacionResponseOneDecimalesMin = 0;
+export const sendCotizacionResponseOneDecimalesMax = 2;
+
+export const sendCotizacionResponseOnePorcentajeIvaMin = 0;
+export const sendCotizacionResponseOnePorcentajeIvaMax = 100;
+
+export const sendCotizacionResponseOneNotasMax = 5000;
+
+export const sendCotizacionResponseOneItemsItemDescripcionMax = 1000;
+
+export const sendCotizacionResponseOneItemsItemCantidadExclusiveMin = 0;
+
+export const sendCotizacionResponseOneItemsItemPrecioUnitarioMin = 0;
+
+export const sendCotizacionResponseOneItemsItemDescuentoPorcentajeMin = 0;
+export const sendCotizacionResponseOneItemsItemDescuentoPorcentajeMax = 100;
+
+export const sendCotizacionResponseOneItemsMax = 100;
+
+export const sendCotizacionResponseTwoItemsItemOneDescripcionMax = 1000;
+
+export const sendCotizacionResponseTwoItemsItemOneCantidadExclusiveMin = 0;
+
+export const sendCotizacionResponseTwoItemsItemOnePrecioUnitarioMin = 0;
+
+export const sendCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMin = 0;
+export const sendCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax = 100;
+
+
+
+export const SendCotizacionResponse = zod.object({
+  "clienteId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaVencimiento": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(sendCotizacionResponseOneDecimalesMin).max(sendCotizacionResponseOneDecimalesMax),
+  "porcentajeIva": zod.number().min(sendCotizacionResponseOnePorcentajeIvaMin).max(sendCotizacionResponseOnePorcentajeIvaMax),
+  "notas": zod.string().max(sendCotizacionResponseOneNotasMax),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(sendCotizacionResponseOneItemsItemDescripcionMax),
+  "cantidad": zod.number().gt(sendCotizacionResponseOneItemsItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(sendCotizacionResponseOneItemsItemPrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(sendCotizacionResponseOneItemsItemDescuentoPorcentajeMin).max(sendCotizacionResponseOneItemsItemDescuentoPorcentajeMax)
+})).min(1).max(sendCotizacionResponseOneItemsMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "numeroCotizacion": zod.string(),
+  "clienteNombre": zod.string(),
+  "clienteRut": zod.string().nullish(),
+  "clienteEmail": zod.string().nullish(),
+  "clienteDireccion": zod.string().nullish(),
+  "estado": zod.enum(['borrador', 'enviada', 'aceptada', 'rechazada', 'vencida']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "cobroId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(sendCotizacionResponseTwoItemsItemOneDescripcionMax),
+  "cantidad": zod.number().gt(sendCotizacionResponseTwoItemsItemOneCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(sendCotizacionResponseTwoItemsItemOnePrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(sendCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMin).max(sendCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number()
+}))).optional()
+}))
+
+
+export const SetCotizacionEstadoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SetCotizacionEstadoBody = zod.object({
+  "estado": zod.enum(['aceptada', 'rechazada'])
+})
+
+export const setCotizacionEstadoResponseOneDecimalesMin = 0;
+export const setCotizacionEstadoResponseOneDecimalesMax = 2;
+
+export const setCotizacionEstadoResponseOnePorcentajeIvaMin = 0;
+export const setCotizacionEstadoResponseOnePorcentajeIvaMax = 100;
+
+export const setCotizacionEstadoResponseOneNotasMax = 5000;
+
+export const setCotizacionEstadoResponseOneItemsItemDescripcionMax = 1000;
+
+export const setCotizacionEstadoResponseOneItemsItemCantidadExclusiveMin = 0;
+
+export const setCotizacionEstadoResponseOneItemsItemPrecioUnitarioMin = 0;
+
+export const setCotizacionEstadoResponseOneItemsItemDescuentoPorcentajeMin = 0;
+export const setCotizacionEstadoResponseOneItemsItemDescuentoPorcentajeMax = 100;
+
+export const setCotizacionEstadoResponseOneItemsMax = 100;
+
+export const setCotizacionEstadoResponseTwoItemsItemOneDescripcionMax = 1000;
+
+export const setCotizacionEstadoResponseTwoItemsItemOneCantidadExclusiveMin = 0;
+
+export const setCotizacionEstadoResponseTwoItemsItemOnePrecioUnitarioMin = 0;
+
+export const setCotizacionEstadoResponseTwoItemsItemOneDescuentoPorcentajeMin = 0;
+export const setCotizacionEstadoResponseTwoItemsItemOneDescuentoPorcentajeMax = 100;
+
+
+
+export const SetCotizacionEstadoResponse = zod.object({
+  "clienteId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaVencimiento": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(setCotizacionEstadoResponseOneDecimalesMin).max(setCotizacionEstadoResponseOneDecimalesMax),
+  "porcentajeIva": zod.number().min(setCotizacionEstadoResponseOnePorcentajeIvaMin).max(setCotizacionEstadoResponseOnePorcentajeIvaMax),
+  "notas": zod.string().max(setCotizacionEstadoResponseOneNotasMax),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(setCotizacionEstadoResponseOneItemsItemDescripcionMax),
+  "cantidad": zod.number().gt(setCotizacionEstadoResponseOneItemsItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(setCotizacionEstadoResponseOneItemsItemPrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(setCotizacionEstadoResponseOneItemsItemDescuentoPorcentajeMin).max(setCotizacionEstadoResponseOneItemsItemDescuentoPorcentajeMax)
+})).min(1).max(setCotizacionEstadoResponseOneItemsMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "numeroCotizacion": zod.string(),
+  "clienteNombre": zod.string(),
+  "clienteRut": zod.string().nullish(),
+  "clienteEmail": zod.string().nullish(),
+  "clienteDireccion": zod.string().nullish(),
+  "estado": zod.enum(['borrador', 'enviada', 'aceptada', 'rechazada', 'vencida']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "cobroId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(setCotizacionEstadoResponseTwoItemsItemOneDescripcionMax),
+  "cantidad": zod.number().gt(setCotizacionEstadoResponseTwoItemsItemOneCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(setCotizacionEstadoResponseTwoItemsItemOnePrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(setCotizacionEstadoResponseTwoItemsItemOneDescuentoPorcentajeMin).max(setCotizacionEstadoResponseTwoItemsItemOneDescuentoPorcentajeMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number()
+}))).optional()
+}))
+
+
+export const ConvertirCotizacionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const convertirCotizacionResponseOneDecimalesMin = 0;
+export const convertirCotizacionResponseOneDecimalesMax = 2;
+
+export const convertirCotizacionResponseOnePorcentajeIvaMin = 0;
+export const convertirCotizacionResponseOnePorcentajeIvaMax = 100;
+
+export const convertirCotizacionResponseOneNotasMax = 5000;
+
+export const convertirCotizacionResponseOneItemsItemDescripcionMax = 1000;
+
+export const convertirCotizacionResponseOneItemsItemCantidadExclusiveMin = 0;
+
+export const convertirCotizacionResponseOneItemsItemPrecioUnitarioMin = 0;
+
+export const convertirCotizacionResponseOneItemsItemDescuentoPorcentajeMin = 0;
+export const convertirCotizacionResponseOneItemsItemDescuentoPorcentajeMax = 100;
+
+export const convertirCotizacionResponseOneItemsMax = 100;
+
+export const convertirCotizacionResponseTwoItemsItemOneDescripcionMax = 1000;
+
+export const convertirCotizacionResponseTwoItemsItemOneCantidadExclusiveMin = 0;
+
+export const convertirCotizacionResponseTwoItemsItemOnePrecioUnitarioMin = 0;
+
+export const convertirCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMin = 0;
+export const convertirCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax = 100;
+
+
+
+export const ConvertirCotizacionResponse = zod.object({
+  "clienteId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaVencimiento": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "decimales": zod.number().min(convertirCotizacionResponseOneDecimalesMin).max(convertirCotizacionResponseOneDecimalesMax),
+  "porcentajeIva": zod.number().min(convertirCotizacionResponseOnePorcentajeIvaMin).max(convertirCotizacionResponseOnePorcentajeIvaMax),
+  "notas": zod.string().max(convertirCotizacionResponseOneNotasMax),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(convertirCotizacionResponseOneItemsItemDescripcionMax),
+  "cantidad": zod.number().gt(convertirCotizacionResponseOneItemsItemCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(convertirCotizacionResponseOneItemsItemPrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(convertirCotizacionResponseOneItemsItemDescuentoPorcentajeMin).max(convertirCotizacionResponseOneItemsItemDescuentoPorcentajeMax)
+})).min(1).max(convertirCotizacionResponseOneItemsMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "numeroCotizacion": zod.string(),
+  "clienteNombre": zod.string(),
+  "clienteRut": zod.string().nullish(),
+  "clienteEmail": zod.string().nullish(),
+  "clienteDireccion": zod.string().nullish(),
+  "estado": zod.enum(['borrador', 'enviada', 'aceptada', 'rechazada', 'vencida']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "cobroId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string().min(1).max(convertirCotizacionResponseTwoItemsItemOneDescripcionMax),
+  "cantidad": zod.number().gt(convertirCotizacionResponseTwoItemsItemOneCantidadExclusiveMin),
+  "precioUnitario": zod.number().min(convertirCotizacionResponseTwoItemsItemOnePrecioUnitarioMin),
+  "descuentoPorcentaje": zod.number().min(convertirCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMin).max(convertirCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax)
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number()
+}))).optional()
+}))
+
+
+export const DownloadCotizacionPdfParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
 export const listLocalesResponseOneNombreMax = 200;
 
 export const listLocalesResponseOneDireccionMax = 500;
@@ -165,6 +769,7 @@ export const GetBodegaResponse = zod.object({
   "stockTotal": zod.number()
 })).and(zod.object({
   "productos": zod.array(zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(getBodegaResponseTwoProductosItemOneNombreMax),
   "codigoInterno": zod.string().max(getBodegaResponseTwoProductosItemOneCodigoInternoMax).optional(),
   "sku": zod.string().max(getBodegaResponseTwoProductosItemOneSkuMax).optional(),
@@ -237,6 +842,7 @@ export const updateStockCriticoBodegaResponseOneFactorFactibilidadMax = 2;
 
 
 export const UpdateStockCriticoBodegaResponse = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(updateStockCriticoBodegaResponseOneNombreMax),
   "codigoInterno": zod.string().max(updateStockCriticoBodegaResponseOneCodigoInternoMax).optional(),
   "sku": zod.string().max(updateStockCriticoBodegaResponseOneSkuMax).optional(),
@@ -295,6 +901,7 @@ export const listInventarioResponseOneFactorFactibilidadMax = 2;
 
 
 export const ListInventarioResponseItem = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(listInventarioResponseOneNombreMax),
   "codigoInterno": zod.string().max(listInventarioResponseOneCodigoInternoMax).optional(),
   "sku": zod.string().max(listInventarioResponseOneSkuMax).optional(),
@@ -354,6 +961,7 @@ export const createProductoBodyFactorFactibilidadMax = 2;
 
 
 export const CreateProductoBody = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(createProductoBodyNombreMax),
   "codigoInterno": zod.string().max(createProductoBodyCodigoInternoMax).optional(),
   "sku": zod.string().max(createProductoBodySkuMax).optional(),
@@ -406,6 +1014,7 @@ export const getProductoResponseOneFactorFactibilidadMax = 2;
 
 
 export const GetProductoResponse = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(getProductoResponseOneNombreMax),
   "codigoInterno": zod.string().max(getProductoResponseOneCodigoInternoMax).optional(),
   "sku": zod.string().max(getProductoResponseOneSkuMax).optional(),
@@ -468,6 +1077,7 @@ export const updateProductoBodyFactorFactibilidadMax = 2;
 
 
 export const UpdateProductoBody = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(updateProductoBodyNombreMax),
   "codigoInterno": zod.string().max(updateProductoBodyCodigoInternoMax).optional(),
   "sku": zod.string().max(updateProductoBodySkuMax).optional(),
@@ -507,6 +1117,7 @@ export const updateProductoResponseOneFactorFactibilidadMax = 2;
 
 
 export const UpdateProductoResponse = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
   "nombre": zod.string().min(1).max(updateProductoResponseOneNombreMax),
   "codigoInterno": zod.string().max(updateProductoResponseOneCodigoInternoMax).optional(),
   "sku": zod.string().max(updateProductoResponseOneSkuMax).optional(),
@@ -799,6 +1410,7 @@ export const ListClientesResponse = zod.array(ListClientesResponseItem)
 
 
 export const CreateClienteBody = zod.object({
+  "direccion": zod.string().optional(),
   "nombre": zod.string().min(1),
   "empresa": zod.string().optional(),
   "rut": zod.string().optional(),
@@ -863,6 +1475,11 @@ export const GetClienteResponse = zod.object({
   "portalEnviadoEn": zod.coerce.date().nullish(),
   "portalEnviadoCanal": zod.string().nullish(),
   "cobros": zod.array(zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
+  "porcentajeIva": zod.number().optional(),
+  "numeroDocumento": zod.string().nullish(),
+  "cotizacionId": zod.number().nullish(),
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
   "bodegaId": zod.number().nullish(),
@@ -937,6 +1554,7 @@ export const UpdateClienteParams = zod.object({
 
 
 export const UpdateClienteBody = zod.object({
+  "direccion": zod.string().optional(),
   "nombre": zod.string().min(1),
   "empresa": zod.string().optional(),
   "rut": zod.string().optional(),
@@ -945,6 +1563,7 @@ export const UpdateClienteBody = zod.object({
 })
 
 export const UpdateClienteResponse = zod.object({
+  "direccion": zod.string().nullish(),
   "id": zod.number(),
   "nombre": zod.string(),
   "empresa": zod.string().nullish(),
@@ -1104,6 +1723,11 @@ export const listCobrosResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{
 
 
 export const ListCobrosResponseItem = zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
+  "porcentajeIva": zod.number().optional(),
+  "numeroDocumento": zod.string().nullish(),
+  "cotizacionId": zod.number().nullish(),
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
   "bodegaId": zod.number().nullish(),
@@ -1149,6 +1773,12 @@ export const ListCobrosResponse = zod.array(ListCobrosResponseItem)
 /**
  * @summary Create a new cobro
  */
+export const createCobroBodyDecimalesMin = 0;
+export const createCobroBodyDecimalesMax = 2;
+
+export const createCobroBodyPorcentajeIvaMin = 0;
+export const createCobroBodyPorcentajeIvaMax = 100;
+
 
 export const createCobroBodyItemsInventarioItemCantidadExclusiveMin = 0;
 
@@ -1163,6 +1793,9 @@ export const createCobroBodyFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-
 
 
 export const CreateCobroBody = zod.object({
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).optional(),
+  "decimales": zod.number().min(createCobroBodyDecimalesMin).max(createCobroBodyDecimalesMax).optional(),
+  "porcentajeIva": zod.number().min(createCobroBodyPorcentajeIvaMin).max(createCobroBodyPorcentajeIvaMax).optional(),
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
   "bodegaId": zod.number().nullish(),
@@ -1320,6 +1953,11 @@ export const getCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}
 
 
 export const GetCobroResponse = zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
+  "porcentajeIva": zod.number().optional(),
+  "numeroDocumento": zod.string().nullish(),
+  "cotizacionId": zod.number().nullish(),
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
   "bodegaId": zod.number().nullish(),
@@ -1395,6 +2033,11 @@ export const updateCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d
 
 
 export const UpdateCobroResponse = zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
+  "porcentajeIva": zod.number().optional(),
+  "numeroDocumento": zod.string().nullish(),
+  "cotizacionId": zod.number().nullish(),
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
   "bodegaId": zod.number().nullish(),
@@ -1480,6 +2123,11 @@ export const ajustarMontoResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\
 
 
 export const AjustarMontoResponse = zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
+  "porcentajeIva": zod.number().optional(),
+  "numeroDocumento": zod.string().nullish(),
+  "cotizacionId": zod.number().nullish(),
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
   "bodegaId": zod.number().nullish(),
@@ -2088,6 +2736,11 @@ export const aplicarDescuentoResponseFechaVencimientoRegExp = new RegExp('^\\d{4
 
 
 export const AplicarDescuentoResponse = zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
+  "porcentajeIva": zod.number().optional(),
+  "numeroDocumento": zod.string().nullish(),
+  "cotizacionId": zod.number().nullish(),
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
   "bodegaId": zod.number().nullish(),
@@ -3038,6 +3691,8 @@ export const GetPortalDeudorResponse = zod.object({
   "empresa": zod.string().describe('Name of the business collecting the debt'),
   "clienteNombre": zod.string(),
   "pendientes": zod.array(zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
   "id": zod.number(),
   "descripcion": zod.string(),
   "montoACobrar": zod.number().describe('Net amount to charge after discount'),
@@ -3047,6 +3702,8 @@ export const GetPortalDeudorResponse = zod.object({
   "linkPago": zod.string().nullish().describe('Existing Flow or MercadoPago payment URL, if any')
 })),
   "pagados": zod.array(zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
   "id": zod.number(),
   "descripcion": zod.string(),
   "montoACobrar": zod.number().describe('Net amount to charge after discount'),
@@ -3541,6 +4198,11 @@ export const asignarWorkflowResponseFechaVencimientoRegExp = new RegExp('^\\d{4}
 
 
 export const AsignarWorkflowResponse = zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
+  "porcentajeIva": zod.number().optional(),
+  "numeroDocumento": zod.string().nullish(),
+  "cotizacionId": zod.number().nullish(),
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
   "bodegaId": zod.number().nullish(),
@@ -3598,6 +4260,11 @@ export const desasignarWorkflowResponseFechaVencimientoRegExp = new RegExp('^\\d
 
 
 export const DesasignarWorkflowResponse = zod.object({
+  "moneda": zod.string().optional(),
+  "decimales": zod.number().optional(),
+  "porcentajeIva": zod.number().optional(),
+  "numeroDocumento": zod.string().nullish(),
+  "cotizacionId": zod.number().nullish(),
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
   "bodegaId": zod.number().nullish(),

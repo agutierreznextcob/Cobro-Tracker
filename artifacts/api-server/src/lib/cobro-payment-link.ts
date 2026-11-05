@@ -67,6 +67,10 @@ export async function asegurarLinkPagoCobro(
   cobro: Cobro,
   log: Log,
 ): Promise<CobroConLink> {
+  // The existing Flow/MP integrations are CLP-only. Never silently convert.
+  if (cobro.moneda !== "CLP" || cobro.decimales !== 0) {
+    return { cobro, linkPago: null, portalUrl: null };
+  }
   const existing = cobro.flowLinkPago ?? cobro.mpPaymentLinkUrl;
   if (existing) return { cobro, linkPago: existing, portalUrl: null };
   const baseUrl = getPublicBaseUrl();

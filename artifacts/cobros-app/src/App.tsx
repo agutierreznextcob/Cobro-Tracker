@@ -43,6 +43,10 @@ import LocalNuevoPage from "@/pages/local-nuevo";
 import LocalDetailPage from "@/pages/local-detail";
 import BodegaNuevaPage from "@/pages/bodega-nueva";
 import BodegaDetailPage from "@/pages/bodega-detail";
+import CotizacionesPage from "@/pages/cotizaciones";
+import CotizacionFormPage from "@/pages/cotizacion-form";
+import CotizacionDetailPage from "@/pages/cotizacion-detail";
+import PreferenciasPage from "@/pages/preferencias";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -278,6 +282,41 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <BodegaDetailPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/cotizaciones">
+        <AuthGate>
+          <Layout>
+            <CotizacionesPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/cotizaciones/nueva">
+        <AuthGate>
+          <Layout>
+            <CotizacionFormPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/cotizaciones/:id/editar">
+        <AuthGate>
+          <Layout>
+            <CotizacionFormPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/cotizaciones/:id">
+        <AuthGate>
+          <Layout>
+            <CotizacionDetailPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/configuracion/preferencias">
+        <AuthGate>
+          <Layout>
+            <PreferenciasPage />
           </Layout>
         </AuthGate>
       </Route>

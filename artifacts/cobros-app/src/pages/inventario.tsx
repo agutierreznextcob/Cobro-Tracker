@@ -5,7 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
+
+// Product prices render in each product's own currency (legacy = CLP).
+const pm = (n: number, moneda?: string | null) => formatMoney(n, moneda, moneda && moneda !== "CLP" ? 2 : 0);
 import { estadoVisual, etiquetaUbicacion, formatPct, formatQty, ubicacionCritica, type EstadoVisual } from "@/lib/inventario";
 import { ScanLookup } from "@/components/barcode-scanner";
 import { EstadoStockBadge, TipoBadge } from "@/components/inventario-badges";
@@ -98,7 +101,7 @@ export default function InventarioPage() {
               <button type="button" onClick={() => setSel(null)} className="text-muted-foreground hover:text-foreground" aria-label="Cerrar detalle"><X className="h-4 w-4" /></button>
             </div>
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-              <span><span className="text-muted-foreground">Precio </span><span className="font-mono font-semibold">{formatCurrency(seleccionado.precioUnitario)}</span></span>
+              <span><span className="text-muted-foreground">Precio </span><span className="font-mono font-semibold">{pm(seleccionado.precioUnitario, seleccionado.moneda)}</span></span>
               {seleccionado.tipo === "producto" && <span><span className="text-muted-foreground">Stock total </span><span className="font-mono font-semibold">{formatQty(seleccionado.stockActual ?? 0)} {seleccionado.unidadMedida || "unidad"}</span></span>}
               <EstadoStockBadge estado={estadoVisual(seleccionado)} />
             </div>
@@ -197,11 +200,11 @@ export default function InventarioPage() {
                             {p.codigoBarras && <div className="text-muted-foreground">{p.codigoBarras}</div>}
                           </TableCell>
                           <TableCell><TipoBadge tipo={p.tipo} /></TableCell>
-                          <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatCurrency(p.costoUnitario)}</TableCell>
-                          <TableCell className="text-right font-mono font-medium">{formatCurrency(p.precioUnitario)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-muted-foreground">{pm(p.costoUnitario, p.moneda)}</TableCell>
+                          <TableCell className="text-right font-mono font-medium">{pm(p.precioUnitario, p.moneda)}</TableCell>
                           <TableCell className="text-right">
                             <div className={`font-mono text-sm font-semibold ${p.utilidad < 0 ? "text-red-600" : "text-emerald-700"}`}>{formatPct(p.margenReal)}</div>
-                            <div className="text-xs text-muted-foreground font-mono">{formatCurrency(p.utilidad)}</div>
+                            <div className="text-xs text-muted-foreground font-mono">{pm(p.utilidad, p.moneda)}</div>
                           </TableCell>
                           <TableCell className="text-right font-mono">
                             {p.tipo === "servicio" ? <span className="text-muted-foreground/50">—</span> : (

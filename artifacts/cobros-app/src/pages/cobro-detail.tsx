@@ -71,7 +71,7 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { formatCurrency, formatDate, formatDateOnly } from "@/lib/format";
+import { formatMoney, formatDate, formatDateOnly, monedaDe, roundTo } from "@/lib/format";
 import { tipoDocumentoLabel, TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva, type TipoDocumento } from "@/lib/tipo-documento";
 import { StatusBadge } from "@/components/status-badge";
 import { GestionesSection } from "@/components/gestiones-section";
@@ -114,7 +114,7 @@ import { CobroUpdateEstado, type CobroUpdate, type CobroUpdateTipoDocumento } fr
 const IVA_RATE = 0.19;
 
 const editFormSchema = z.object({
-  monto: z.coerce.number().int("El monto debe ser un número entero").min(1, "El monto debe ser mayor a $0"),
+  monto: z.coerce.number().positive("El monto debe ser mayor a 0"),
   tipoDocumento: z.enum(TIPO_DOCUMENTO_VALUES),
   incluyeIva: z.boolean().default(false),
   descripcion: z.string().min(1, "La descripción es obligatoria").max(255),
@@ -177,6 +177,18 @@ export default function CobroDetail() {
   const { data: cobro, isLoading } = useGetCobro(id, {
     query: { enabled: !!id, queryKey: getGetCobroQueryKey(id) },
   });
+  // Each cobro renders in its own document currency/decimals (historical = CLP).
+  const formatCurrency = (n: number) => formatMoney(n, cobro?.moneda, cobro?.decimales);
+  // Amounts typed by the user respect the document decimals (CLP legacy = 0).
+  const docDec = cobro?.decimales ?? 0;
+  const rd = (n: number) => roundTo(n, docDec);
+  // Percentages are never thousand-separated: "12.5" and "12,5" both mean 12.5%.
+  const parsePct = (raw: string) => parseFloat(raw.trim().replace(",", "."));
+  const parseMonto = (raw: string) => {
+    const t = raw.trim();
+    if (docDec > 0 && !t.includes(",")) return parseFloat(t);
+    return parseFloat(t.replace(/\./g, "").replace(",", "."));
+  };
   const updateCobro = useUpdateCobro();
   const generarFlowLink = useGenerarFlowLink();
   const generarMpLink = useGenerarMpLink();
@@ -235,7 +247,7 @@ export default function CobroDetail() {
   };
 
   const handleAplicarDescuento = () => {
-    const valorNum = parseFloat(descuentoValor.replace(/\./g, "").replace(",", "."));
+    const valorNum = descuentoTipo === "porcentaje" ? parsePct(descuentoValor) : rd(parseMonto(descuentoValor));
     if (!valorNum || valorNum <= 0) {
       toast({ title: "Valor inválido", description: "Ingresa un valor de descuento mayor a 0.", variant: "destructive" });
       return;
@@ -483,7 +495,7 @@ export default function CobroDetail() {
   const editIncluyeIva = editForm.watch("incluyeIva");
   const editMonto = editForm.watch("monto");
   const editNeto = Number(editMonto) || 0;
-  const editIva = editIncluyeIva ? Math.round(editNeto * IVA_RATE) : 0;
+  const editIva = editIncluyeIva ? rd(editNeto * ((cobro?.porcentajeIva ?? IVA_RATE * 100) / 100)) : 0;
   const editTotal = editIncluyeIva ? editNeto + editIva : editNeto;
 
   useEffect(() => {
@@ -509,7 +521,7 @@ export default function CobroDetail() {
 
   const onEditSubmit = (values: EditFormValues) => {
     const data: CobroUpdate = {
-      monto: values.monto,
+      monto: rd(values.monto),
       tipoDocumento: values.tipoDocumento as CobroUpdateTipoDocumento,
       incluyeIva: editPermiteIva ? values.incluyeIva : false,
       descripcion: values.descripcion,
@@ -571,13 +583,13 @@ export default function CobroDetail() {
   const [ajusteMotivoInput, setAjusteMotivoInput] = useState("");
 
   const openAjustarDialog = () => {
-    setAjusteMontoInput(String(Math.round(montoACobrar)));
+    setAjusteMontoInput(String(rd(montoACobrar)));
     setAjusteMotivoInput("");
     setShowAjustarDialog(true);
   };
 
   const handleAjustarMonto = () => {
-    const montoNum = Math.round(parseFloat(ajusteMontoInput.replace(/\./g, "").replace(",", ".")));
+    const montoNum = rd(parseMonto(ajusteMontoInput));
     if (!montoNum || montoNum <= 0) {
       toast({ title: "Monto inválido", description: "Ingresa un monto válido.", variant: "destructive" });
       return;
@@ -586,7 +598,7 @@ export default function CobroDetail() {
       toast({ title: "Monto insuficiente", description: `El nuevo monto no puede ser menor a lo ya pagado (${formatCurrency(totalAbonado)}).`, variant: "destructive" });
       return;
     }
-    if (montoNum >= Math.round(montoACobrar)) {
+    if (montoNum >= rd(montoACobrar)) {
       toast({ title: "Monto inválido", description: `El nuevo monto debe ser menor al monto actual (${formatCurrency(montoACobrar)}).`, variant: "destructive" });
       return;
     }
@@ -615,7 +627,7 @@ export default function CobroDetail() {
   };
 
   const handleCrearAbono = () => {
-    const montoNum = parseFloat(abonoMonto.replace(/\./g, "").replace(",", "."));
+    const montoNum = rd(parseMonto(abonoMonto));
     if (!montoNum || montoNum <= 0) {
       toast({ title: "Monto inválido", description: "Ingresa un monto válido.", variant: "destructive" });
       return;
@@ -699,7 +711,7 @@ export default function CobroDetail() {
 
   const handleAvisarWhatsApp = () => {
     if (!cobro) return;
-    const monto = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(cobro.monto));
+    const monto = formatCurrency(cobro.monto);
     const nombre = cobro.clienteNombre || "cliente";
     let msg = `Hola ${nombre}, tienes un cobro pendiente de ${monto} por concepto de "${cobro.descripcion}".`;
     if (datosBancarios?.configurado) {
@@ -981,7 +993,7 @@ export default function CobroDetail() {
 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Cobro #{cobro.id}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{cobro.numeroDocumento || `Cobro #${cobro.id}`}</h1>
           <p className="text-muted-foreground mt-1">Creado el {formatDate(cobro.creadoEn)}</p>
         </div>
 
@@ -1080,6 +1092,28 @@ export default function CobroDetail() {
                 </p>
                 <p className="font-mono text-sm">{cobro.referencia || "No especificada"}</p>
               </div>
+              {cobro.numeroDocumento && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
+                    <Hash className="h-3.5 w-3.5" /> N° de documento
+                  </p>
+                  <p className="font-mono text-sm" data-testid="text-numero-documento">{cobro.numeroDocumento}</p>
+                </div>
+              )}
+              {cobro.cotizacionId && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5" /> Cotización de origen
+                  </p>
+                  <Link href={`/cotizaciones/${cobro.cotizacionId}`} className="text-sm text-primary hover:underline" data-testid="link-cotizacion-origen">Ver cotización</Link>
+                </div>
+              )}
+              {monedaDe(cobro.moneda) !== "CLP" && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Moneda del documento</p>
+                  <p className="font-mono text-sm">{monedaDe(cobro.moneda)} · {cobro.decimales ?? 0} decimales</p>
+                </div>
+              )}
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5" /> Última actualización
@@ -1140,7 +1174,7 @@ export default function CobroDetail() {
                         </span>
                       </div>
                       <div className="flex items-baseline justify-between">
-                        <span className="text-xs text-muted-foreground">IVA (19%)</span>
+                        <span className="text-xs text-muted-foreground">IVA ({cobro.porcentajeIva ?? 19}%)</span>
                         <span className="text-sm font-mono text-muted-foreground">
                           {formatCurrency(cobro.montoIva ?? 0)}
                         </span>
@@ -1177,7 +1211,7 @@ export default function CobroDetail() {
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">IVA (19%)</span>
+                    <span className="text-xs text-muted-foreground">IVA ({cobro.porcentajeIva ?? 19}%)</span>
                     <span className="text-sm font-mono text-muted-foreground">
                       {formatCurrency(cobro.montoIva ?? 0)}
                     </span>
@@ -1270,12 +1304,12 @@ export default function CobroDetail() {
                   </div>
 
                   {(() => {
-                    const v = parseFloat(descuentoValor.replace(/\./g, "").replace(",", "."));
+                    const v = descuentoTipo === "porcentaje" ? parsePct(descuentoValor) : parseMonto(descuentoValor);
                     if (!v || v <= 0) return null;
                     const desc =
                       descuentoTipo === "porcentaje"
-                        ? Math.round((cobro.monto * v) / 100)
-                        : Math.round(v);
+                        ? rd((cobro.monto * v) / 100)
+                        : rd(v);
                     const final = cobro.monto - desc;
                     return (
                       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm space-y-1">
@@ -1341,6 +1375,24 @@ export default function CobroDetail() {
             </div>
           )}
 
+          {(monedaDe(cobro.moneda) !== "CLP" || (cobro.decimales ?? 0) > 0) ? (
+            <Card className="shadow-sm border-border/50" data-testid="card-pagos-no-disponibles">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Link2 className="h-4 w-4 text-muted-foreground" />
+                  Links de pago
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {monedaDe(cobro.moneda) !== "CLP"
+                    ? `Este cobro está en ${monedaDe(cobro.moneda)}. Flow y MercadoPago solo procesan pagos en CLP enteros, por lo que no es posible generar links de pago para este documento.`
+                    : "Este cobro usa decimales. Flow y MercadoPago solo procesan montos CLP enteros, por lo que no es posible generar links de pago para este documento."}{" "}Registra los pagos manualmente.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+          <>
           {/* Flow payment card */}
           <Card className="shadow-sm border-border/50">
             <CardHeader className="pb-3">
@@ -1628,6 +1680,8 @@ export default function CobroDetail() {
               )}
             </CardContent>
           </Card>
+          </>
+          )}
 
           {/* Communication card — only for pending cobros with payment link (Flow or MercadoPago) */}
           {isPendiente && (hasFlowLink || hasMpLink) && (
@@ -2556,13 +2610,13 @@ export default function CobroDetail() {
                       <FormLabel>{editIncluyeIva ? "Monto neto (sin IVA)" : "Monto"}</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                          <span className="absolute left-3 top-2.5 text-muted-foreground">{monedaDe(cobro.moneda) === "CLP" ? "$" : monedaDe(cobro.moneda)}</span>
                           <Input
                             type="number"
-                            step="1"
-                            min="1"
+                            step={docDec ? String(10 ** -docDec) : "1"}
+                            min="0"
                             placeholder="0"
-                            className="pl-7 font-mono"
+                            className="pl-10 font-mono"
                             {...field}
                           />
                         </div>
@@ -2620,7 +2674,7 @@ export default function CobroDetail() {
                     <FormItem className="rounded-lg border border-border/60 p-4 space-y-3">
                       <div className="flex items-center justify-between gap-4">
                         <div className="space-y-0.5">
-                          <FormLabel className="text-sm">Incluir IVA (19%)</FormLabel>
+                          <FormLabel className="text-sm">Incluir IVA ({cobro.porcentajeIva ?? 19}%)</FormLabel>
                           <FormDescription>
                             Si lo activas, el monto ingresado es el neto y se agrega el IVA al total a cobrar.
                           </FormDescription>
@@ -2637,7 +2691,7 @@ export default function CobroDetail() {
                             <span className="font-mono">{formatCurrency(editNeto)}</span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">IVA (19%)</span>
+                            <span className="text-muted-foreground">IVA ({cobro.porcentajeIva ?? 19}%)</span>
                             <span className="font-mono">{formatCurrency(editIva)}</span>
                           </div>
                           <div className="flex items-center justify-between pt-1.5 border-t border-border/60">

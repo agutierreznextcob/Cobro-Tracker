@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatMoney, formatShortDate } from "@/lib/format";
 import { tipoDocumentoLabelCorto } from "@/lib/tipo-documento";
 import { StatusBadge } from "@/components/status-badge";
 import { ScoreBadge, SCORE_META } from "@/components/score-badge";
@@ -343,12 +343,14 @@ function CobrosListNormal() {
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {tipoDocumentoLabelCorto(cobro.tipoDocumento)}
+                    {cobro.numeroDocumento && <span className="block font-mono text-[10px] text-foreground/70">{cobro.numeroDocumento}</span>}
+                    {cobro.cotizacionId && <span className="block text-[10px] text-primary">desde cotización</span>}
                   </TableCell>
                   <TableCell>
                     <MetodoBadge flowLinkPago={cobro.flowLinkPago} mpPaymentLinkUrl={cobro.mpPaymentLinkUrl} />
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold text-sm whitespace-nowrap">
-                    {formatCurrency(cobro.monto)}
+                    {formatMoney(cobro.monto, cobro.moneda, cobro.decimales)}
                   </TableCell>
                   <TableCell>
                     <ArrowRight className="h-4 w-4 text-muted-foreground/40" />

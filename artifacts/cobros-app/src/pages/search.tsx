@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatShortDate, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { Link } from "wouter";
 import { Search, X, User, SlidersHorizontal, Download } from "lucide-react";
@@ -275,7 +275,7 @@ export default function SearchPage() {
                       {formatShortDate(cobro.creadoEn)}
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
-                      {formatCurrency(cobro.monto)}
+                      {formatMoney(cobro.monto, cobro.moneda, cobro.decimales)}
                     </TableCell>
                   </TableRow>
                 );

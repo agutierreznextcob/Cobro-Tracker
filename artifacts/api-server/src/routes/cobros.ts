@@ -38,6 +38,7 @@ import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
 import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
 import { itemsInventarioBody, resolveItemsInventario } from "../lib/inventario";
+import { getPreferenciasNegocio, roundMoney, formatDocumentMoney } from "../lib/preferencias";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro, fechaHoySantiago, ensureUserDefaults } from "../lib/recordatorios";
 import { emitirComprobante } from "../lib/comprobante-service";
@@ -76,11 +77,13 @@ function montoACobrar(cobro: Pick<Cobro, "monto" | "montoDescuento">): number {
 function computeMontoConIva(
   montoEntrada: number,
   aplicaIva: boolean,
+  porcentajeIva = 19,
+  decimales = 0,
 ): { montoFinal: number; montoNeto: number | null; montoIva: number | null } {
-  if (!aplicaIva) return { montoFinal: montoEntrada, montoNeto: null, montoIva: null };
-  const montoNeto = Math.round(montoEntrada);
-  const montoIva = Math.round(montoNeto * 0.19);
-  return { montoFinal: montoNeto + montoIva, montoNeto, montoIva };
+  if (!aplicaIva) return { montoFinal: roundMoney(montoEntrada, decimales), montoNeto: null, montoIva: null };
+  const montoNeto = roundMoney(montoEntrada, decimales);
+  const montoIva = roundMoney(montoNeto * porcentajeIva / 100, decimales);
+  return { montoFinal: roundMoney(montoNeto + montoIva, decimales), montoNeto, montoIva };
 }
 
 function serializeAjuste(a: CobroAjuste) {
@@ -107,6 +110,8 @@ function serializeCobro(cobro: Cobro, abonado?: number) {
     abonado === undefined ? undefined : terminal ? 0 : Math.max(aCobrar - abonado, 0);
   return {
     ...cobro,
+    numeroDocumento: cobro.numeroDocumento ?? `COB-${String(cobro.id).padStart(4, "0")}`,
+    porcentajeIva: Number(cobro.porcentajeIva),
     monto: Number(cobro.monto),
     montoDescuento: cobro.montoDescuento != null ? Number(cobro.montoDescuento) : null,
     montoACobrar: aCobrar,
@@ -207,6 +212,22 @@ cobrosRouter.use((req, res, next) => {
 });
 cobrosRouter.use(requireSubscription);
 
+// Existing provider adapters use CLP integer amounts; reject unsupported
+// documents before any external request or pending abono can be created.
+cobrosRouter.post(["/cobros/:id/flow-link", "/cobros/:id/mp-link", "/cobros/:id/abonos"], async (req, res, next) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || !(await userMayAccessCobroId(req.user!.id, id))) { res.status(404).json({ error: "Cobro no encontrado" }); return; }
+  const [c] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, id));
+  const manual = req.path.endsWith("/abonos") && req.body.metodo === "manual";
+  if (!manual && (c.moneda !== "CLP" || c.decimales !== 0)) {
+    res.status(400).json({ error: "Flow y MercadoPago solo están habilitados para cobros en CLP sin decimales. Registra el pago manualmente en la moneda del documento." }); return;
+  }
+  if (manual && (typeof req.body.monto !== "number" || roundMoney(req.body.monto, c.decimales) !== req.body.monto)) {
+    res.status(400).json({ error: `El abono debe usar ${c.decimales} decimales y la moneda ${c.moneda}.` }); return;
+  }
+  next();
+});
+
 cobrosRouter.get("/cobros", async (req, res) => {
   const estado = req.query.estado as string | undefined;
   const metodo = req.query.metodo as string | undefined;
@@ -242,7 +263,12 @@ cobrosRouter.get("/cobros", async (req, res) => {
 
 cobrosRouter.post(["/cobros", "/cobros/masivo", "/cobros/recurrentes"], async (req, res, next) => {
   try {
-    req.body.itemsInventario = await resolveItemsInventario(req.user!.id, req.body.itemsInventario, req.body.monto);
+    const prefs = await getPreferenciasNegocio(req.user!.id);
+    const individual = req.path === "/cobros";
+    const moneda = individual ? req.body.moneda ?? prefs.moneda : "CLP";
+    const decimales = individual ? req.body.decimales ?? prefs.decimales : 0;
+    if (individual) { req.body.moneda = moneda; req.body.decimales = decimales; }
+    req.body.itemsInventario = await resolveItemsInventario(req.user!.id, req.body.itemsInventario, req.body.monto, moneda, decimales);
     next();
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : "Ítems de catálogo inválidos." });
@@ -273,6 +299,10 @@ cobrosRouter.post("/cobros", async (req, res) => {
 
   try {
     const ctx = user ? await getOrgContext(user.id) : null;
+    const prefs = await getPreferenciasNegocio(user!.id);
+    const moneda = parsed.data.moneda ?? prefs.moneda;
+    const decimales = parsed.data.decimales ?? prefs.decimales;
+    const porcentajeIva = parsed.data.porcentajeIva ?? prefs.porcentajeIva;
 
     // Determine who the cobro is assigned to. Org admins may assign a cobro to
     // any member of their organization; supervisors only to members of their
@@ -326,19 +356,21 @@ cobrosRouter.post("/cobros", async (req, res) => {
     // IVA (Chilean VAT 19%). When enabled, the entered `monto` is the NETO; the
     // server computes IVA and total so CLP integer rounding stays server-side.
     // The charged amount (`monto` column) is always the total to charge.
-    let montoFinal = monto;
+    let montoFinal = roundMoney(monto, decimales);
     let montoNeto: number | null = null;
     let montoIva: number | null = null;
     if (incluyeIva) {
-      montoNeto = Math.round(monto);
-      montoIva = Math.round(montoNeto * 0.19);
-      montoFinal = montoNeto + montoIva;
+      montoNeto = roundMoney(monto, decimales);
+      montoIva = roundMoney(montoNeto * porcentajeIva / 100, decimales);
+      montoFinal = roundMoney(montoNeto + montoIva, decimales);
     }
+    if (!Number.isFinite(montoFinal) || montoFinal <= 0 || montoFinal >= 1e10) { res.status(400).json({ error: "Monto fuera de rango." }); return; }
 
     const [cobro] = await db
       .insert(cobrosTable)
       .values({
         itemsInventario: req.body.itemsInventario,
+        moneda, decimales, porcentajeIva: String(porcentajeIva),
         monto: String(montoFinal),
         incluyeIva,
         montoNeto: montoNeto != null ? String(montoNeto) : null,
@@ -356,6 +388,8 @@ cobrosRouter.post("/cobros", async (req, res) => {
         fechaVencimiento: fechaVencimiento ?? null,
       })
       .returning();
+    cobro.numeroDocumento = `${prefs.prefijoCobro}${String(cobro.id).padStart(4, "0")}`;
+    await db.update(cobrosTable).set({ numeroDocumento: cobro.numeroDocumento }).where(eq(cobrosTable.id, cobro.id));
 
     // Seed the user's default reminder sequence onto cobros that have a due date.
     if (cobro.fechaVencimiento && user?.id) {
@@ -767,13 +801,13 @@ cobrosRouter.post("/cobros/recordatorios/masivo", requirePlanFeature("recordator
             results.push({ cobroId: cobro.id, canal, estado: "fallido", detalle: "Sin email del pagador." });
             await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "email", notas: "Recordatorio masivo fallido: sin email del pagador" });
           } else {
-            const r = await sendRecordatorioEmail({ emailPagador: cobro.emailPagador, clienteNombre: cobro.clienteNombre, descripcion: cobro.descripcion, monto: saldoRecordatorio, linkPago: linkPago ?? "", comercioNombre: cobro.responsableNombre || "NextCob", remitenteNombre: remitente.nombre || cobro.responsableNombre, remitenteEmail: remitente.email }, req.log);
+            const r = await sendRecordatorioEmail({ moneda: cobro.moneda, decimales: cobro.decimales, emailPagador: cobro.emailPagador, clienteNombre: cobro.clienteNombre, descripcion: cobro.descripcion, monto: saldoRecordatorio, linkPago: linkPago ?? "", comercioNombre: cobro.responsableNombre || "NextCob", remitenteNombre: remitente.nombre || cobro.responsableNombre, remitenteEmail: remitente.email }, req.log);
             await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "email", notas: r.ok ? "Recordatorio masivo enviado por email" : `Recordatorio masivo fallido por email: ${r.error ?? "sin detalle"}` });
             results.push({ cobroId: cobro.id, canal, estado: r.ok ? "enviado" : "fallido", detalle: r.error });
           }
         } else {
           const [cliente] = cobro.clienteId ? await db.select({ telefono: clientesTable.telefono }).from(clientesTable).where(eq(clientesTable.id, cobro.clienteId)) : [undefined];
-          const mensaje = `Hola ${cobro.clienteNombre || "cliente"}, tienes un cobro pendiente de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(saldoRecordatorio))} por "${cobro.descripcion}".${linkPago ? ` Puedes pagar aquí: ${linkPago}` : ""}`;
+          const mensaje = `Hola ${cobro.clienteNombre || "cliente"}, tienes un cobro pendiente de ${formatDocumentMoney(saldoRecordatorio, cobro.moneda, cobro.decimales)} por "${cobro.descripcion}".${linkPago ? ` Puedes pagar aquí: ${linkPago}` : ""}`;
           if (cliente?.telefono && sanitizePhone(cliente.telefono) && isWhatsAppConfigured()) {
             const r = await sendWhatsAppMensaje({ telefono: cliente.telefono, mensaje }, req.log);
             await db.insert(seguimientosCobranzaTable).values({ cobroId: cobro.id, tipo: "whatsapp", notas: r.ok ? "Recordatorio masivo enviado automáticamente por WhatsApp" : `Recordatorio masivo fallido por WhatsApp: ${r.error ?? "sin detalle"}` });
@@ -836,7 +870,7 @@ cobrosRouter.get("/cobros/stats/summary", async (req, res) => {
   const responsable = typeof req.query.responsable === "string" ? req.query.responsable : undefined;
   try {
     const ctx = await getOrgContext(userId);
-    const scope = cobroScopeCondition(ctx, userId, responsable);
+    const scope = and(cobroScopeCondition(ctx, userId, responsable), eq(cobrosTable.moneda, "CLP"));
     const rows = await db
       .select({
         estado: cobrosTable.estado,
@@ -970,7 +1004,7 @@ cobrosRouter.post("/cobros/:id/descuentos", async (req, res) => {
     }
 
     const descuentoAbsoluto =
-      tipo === "porcentaje" ? Math.round((montoOriginal * valor) / 100) : Math.round(valor);
+      tipo === "porcentaje" ? roundMoney((montoOriginal * valor) / 100, cobro.decimales) : roundMoney(valor, cobro.decimales);
 
     if (descuentoAbsoluto <= 0) {
       res.status(400).json({ error: "El descuento debe ser mayor a 0." });
@@ -1105,7 +1139,7 @@ cobrosRouter.post("/cobros/:id/ajustar-monto", async (req, res) => {
         .where(and(eq(pagosParciales.cobroId, cobro.id), eq(pagosParciales.estado, "confirmado")));
       const totalPagado = sumRow?.total ?? 0;
 
-      const { montoFinal, montoNeto, montoIva } = computeMontoConIva(montoEntrada, cobro.incluyeIva);
+      const { montoFinal, montoNeto, montoIva } = computeMontoConIva(montoEntrada, cobro.incluyeIva, Number(cobro.porcentajeIva), cobro.decimales);
 
       if (montoFinal < totalPagado) {
         return {
@@ -1218,6 +1252,9 @@ cobrosRouter.delete("/cobros/:id", async (req, res) => {
         .for("update");
       if (!cobro) {
         return { ok: false, status: 404, error: "Cobro no encontrado" };
+      }
+      if (cobro.cotizacionId != null) {
+        return { ok: false, status: 409, error: "Este cobro está vinculado a una cotización. Cancélalo en lugar de eliminarlo para conservar la referencia." };
       }
       if (cobro.estado === "pagado") {
         return { ok: false, status: 400, error: "No puedes eliminar un cobro pagado." };
@@ -1462,6 +1499,7 @@ cobrosRouter.post("/cobros/:id/recordatorio-email", async (req, res) => {
 
     const remitente = await getRemitenteContacto(cobro.responsableId);
     const result = await sendRecordatorioEmail({
+      moneda: cobro.moneda, decimales: cobro.decimales,
       emailPagador: cobro.emailPagador,
       clienteNombre: cobro.clienteNombre,
       descripcion: cobro.descripcion,
@@ -1706,7 +1744,7 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
     // Recompute the charged total and IVA breakdown from the entered amount, reset
     // any prior discount (it was relative to the old total) and invalidate existing
     // payment links (the client must generate new ones for the new amount).
-    const { montoFinal, montoNeto, montoIva } = computeMontoConIva(montoInput, effectiveIncluyeIva);
+    const { montoFinal, montoNeto, montoIva } = computeMontoConIva(montoInput, effectiveIncluyeIva, Number(current.porcentajeIva), current.decimales);
     updates.monto = String(montoFinal);
     updates.incluyeIva = effectiveIncluyeIva;
     updates.montoNeto = montoNeto != null ? String(montoNeto) : null;
@@ -1726,7 +1764,7 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
         : current.incluyeIva && current.montoIva != null
           ? Number(current.monto) - Number(current.montoIva)
           : Number(current.monto);
-    const { montoFinal, montoNeto, montoIva } = computeMontoConIva(netoActual, effectiveIncluyeIva);
+    const { montoFinal, montoNeto, montoIva } = computeMontoConIva(netoActual, effectiveIncluyeIva, Number(current.porcentajeIva), current.decimales);
     updates.incluyeIva = effectiveIncluyeIva;
     updates.montoNeto = montoNeto != null ? String(montoNeto) : null;
     updates.montoIva = montoIva != null ? String(montoIva) : null;
@@ -1802,7 +1840,7 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
       if (cobro.responsableId) await crearNotificacion({
         eventKey: `cobro:${cobro.id}:pagado`, userId: cobro.responsableId, cobroId: cobro.id,
         tipo: "pago",
-        titulo: `💰 ${cobro.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}`,
+        titulo: `${cobro.clienteNombre || "Cliente"} pagó ${formatDocumentMoney(montoACobrar(cobro), cobro.moneda, cobro.decimales)}`,
       });
     } else if (bodyParsed.data.estado === "fallido" && cobro.responsableId) {
       await crearNotificacion({
@@ -1810,7 +1848,7 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
         userId: cobro.responsableId,
         cobroId: cobro.id,
         tipo: "pago_fallido",
-        titulo: `❌ Pago fallido de ${cobro.clienteNombre || "Cliente"} por ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}`,
+        titulo: `Pago fallido de ${cobro.clienteNombre || "Cliente"} por ${formatDocumentMoney(montoACobrar(cobro), cobro.moneda, cobro.decimales)}`,
       });
     }
 
@@ -1889,7 +1927,7 @@ cobrosRouter.get("/dashboard/metrics", async (req, res) => {
 
   try {
     const ctx = await getOrgContext(userId);
-    const scope = cobroScopeCondition(ctx, userId, undefined);
+    const scope = and(cobroScopeCondition(ctx, userId, undefined), eq(cobrosTable.moneda, "CLP"));
     const confirmedPaymentConditions = [
       scope,
       eq(pagosParciales.estado, "confirmado"),
@@ -2000,7 +2038,7 @@ cobrosRouter.get("/dashboard/salud-cartera", async (req, res) => {
   const userId = req.user!.id;
   try {
     const ctx = await getOrgContext(userId);
-    const scope = cobroScopeCondition(ctx, userId, undefined);
+    const scope = and(cobroScopeCondition(ctx, userId, undefined), eq(cobrosTable.moneda, "CLP"));
 
     // Business-day boundaries in Chile time (fechaVencimiento is a date-only
     // string; classifying with server-local/UTC midnight would roll the day at
@@ -2410,8 +2448,8 @@ cobrosRouter.post("/cobros/:id/abonos", async (req, res) => {
       const abonoConfirmado = transicion.abono!;
       if (cobro.responsableId) await crearNotificacion(
         estadoTrasAbono === "pagado"
-          ? { eventKey: `cobro:${cobro.id}:pagado`, userId: cobro.responsableId, cobroId: cobro.id, tipo: "pago", titulo: `💰 ${cobro.clienteNombre || "Cliente"} pagó ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(Number(cobro.monto) - Number(cobro.montoDescuento ?? 0)))}` }
-          : { eventKey: `abono:${abono.id}:confirmado`, userId: cobro.responsableId, cobroId: cobro.id, tipo: "abono", titulo: `💛 ${cobro.clienteNombre || "Cliente"} realizó un abono de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(monto))}` },
+          ? { eventKey: `cobro:${cobro.id}:pagado`, userId: cobro.responsableId, cobroId: cobro.id, tipo: "pago", titulo: `${cobro.clienteNombre || "Cliente"} pagó ${formatDocumentMoney(montoACobrar(cobro), cobro.moneda, cobro.decimales)}` }
+          : { eventKey: `abono:${abono.id}:confirmado`, userId: cobro.responsableId, cobroId: cobro.id, tipo: "abono", titulo: `${cobro.clienteNombre || "Cliente"} realizó un abono de ${formatDocumentMoney(monto, cobro.moneda, cobro.decimales)}` },
       );
       if (estadoTrasAbono === "pagado") {
         void emitirComprobante(cobro.id, { metodo: "manual" }, req.log);

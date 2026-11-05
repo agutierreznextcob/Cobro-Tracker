@@ -60,7 +60,7 @@ export default function GestionHoyPage() {
     return (
       <div className="mx-auto max-w-6xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Qué hacer hoy</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Qué hacer hoy<span className="ml-2 align-middle rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground" data-testid="label-importes-clp">Importes en CLP</span></h1>
         </div>
         <Card className="border-dashed bg-destructive/10 border-destructive/20">
           <CardContent className="flex flex-col items-center justify-center p-12 text-center text-destructive">
@@ -102,7 +102,7 @@ export default function GestionHoyPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Qué hacer hoy</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Qué hacer hoy<span className="ml-2 align-middle rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground" data-testid="label-importes-clp">Importes en CLP</span></h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Tu cockpit de cobranza para hoy. Resuelve tus compromisos y atiende las sugerencias automáticas.
         </p>
@@ -117,7 +117,7 @@ export default function GestionHoyPage() {
             <div>
               <h3 className="font-semibold text-emerald-800 dark:text-emerald-300">Oportunidad de recuperación</h3>
               <p className="text-sm text-emerald-700/80 dark:text-emerald-400/80">
-                Esta semana podrías recuperar hasta <strong>{formatCurrency(recuperacionPotencialSemanal)}</strong> si contactas a {clientesSugeridos === 1 ? 'este cliente sugerido' : `estos ${clientesSugeridos} clientes sugeridos`}.
+                Esta semana podrías recuperar hasta <strong>{formatCurrency(recuperacionPotencialSemanal)} (CLP)</strong> si contactas a {clientesSugeridos === 1 ? 'este cliente sugerido' : `estos ${clientesSugeridos} clientes sugeridos`}.
               </p>
             </div>
           </CardContent>

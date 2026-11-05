@@ -5,6 +5,7 @@ import { requireSubscription } from "../middlewares/requireSubscription";
 import { inventarioScope, productoBody, productoValues, movimientoBody, validarUnidad } from "../lib/inventario";
 import { enrichProductos, lockInventoryScope, scopedBodegas, validateInternalCode } from "../lib/inventario-bodegas";
 import { registrarMovimiento } from "../lib/inventario-movimientos";
+import { getPreferenciasNegocio } from "../lib/preferencias";
 
 const router = Router();
 router.use("/inventario", (req, res, next) => {
@@ -35,13 +36,14 @@ router.post("/inventario", async (req, res) => {
     const { ctx, condition } = await inventarioScope(req.user!.id);
     validarUnidad(parsed.data.tipo, parsed.data.unidadMedida);
     const values = productoValues(parsed.data);
+    const moneda = parsed.data.moneda ?? (await getPreferenciasNegocio(req.user!.id)).moneda;
     const p = await db.transaction(async tx => {
       await lockInventoryScope(tx, ctx, req.user!.id);
       const warehouses = await scopedBodegas(req.user!.id, tx);
       const bodegaId = parsed.data.bodegaId ?? null;
       if (values.tipo === "producto" && warehouses.length && !warehouses.some(w => w.bodega.id === bodegaId)) throw new Error("Selecciona una bodega válida para el stock inicial.");
       if (bodegaId && (values.tipo !== "producto" || !warehouses.some(w => w.bodega.id === bodegaId))) throw new Error("Bodega no válida.");
-      const [p] = await tx.insert(productosTable).values({ ...values, organizationId: ctx.organizationId, usuarioId: req.user!.id }).returning();
+      const [p] = await tx.insert(productosTable).values({ ...values, moneda, organizationId: ctx.organizationId, usuarioId: req.user!.id }).returning();
       const code = parsed.data.codigoInterno || `PROD-${String(p.id).padStart(4, "0")}`;
       await validateInternalCode(tx, condition, code, p.id);
       await tx.update(productosTable).set({ codigoInterno: code }).where(eq(productosTable.id, p.id));
@@ -76,6 +78,7 @@ router.patch("/inventario/:id", async (req, res) => {
       await lockInventoryScope(tx, ctx, req.user!.id);
       const [current] = await tx.select().from(productosTable).where(and(condition, eq(productosTable.id, id))).for("update");
       if (!current) return null;
+      if (parsed.data.moneda && parsed.data.moneda !== current.moneda) throw new Error("No puedes cambiar la moneda de un producto existente.");
       if (current.tipo !== parsed.data.tipo) throw new Error("No se puede cambiar el tipo de un registro existente.");
       validarUnidad(parsed.data.tipo, parsed.data.unidadMedida, current.unidadMedida);
       const { stockActual: _ignored, ...values } = productoValues(parsed.data);

@@ -362,7 +362,7 @@ async function prioridadClientes(ctx: Awaited<ReturnType<typeof getOrgContext>>,
   const clientes = await db.select({ id: clientesTable.id, nombre: clientesTable.nombre }).from(clientesTable).where(
     clienteScopeCondition(ctx, userId),
   );
-  const scope = cobroScopeCondition(ctx, userId);
+  const scope = and(cobroScopeCondition(ctx, userId), eq(cobrosTable.moneda, "CLP"))!;
   const [scores, abiertos] = await Promise.all([
     computeClienteScores(clientes.map((c) => c.id), scope),
     db.select({ id: cobrosTable.id, clienteId: cobrosTable.clienteId, fechaVencimiento: cobrosTable.fechaVencimiento })
@@ -539,7 +539,7 @@ gestionesRouter.get("/gestion/hoy", async (req, res) => {
 gestionesRouter.get("/gestiones/metricas", requirePlanFeature("informes_avanzados"), async (req, res) => {
   const userId = req.user!.id;
   const ctx = await getOrgContext(userId);
-  const scope = cobroScopeCondition(ctx, userId);
+  const scope = and(cobroScopeCondition(ctx, userId), eq(cobrosTable.moneda, "CLP"))!;
 
   try {
     const rows = await db

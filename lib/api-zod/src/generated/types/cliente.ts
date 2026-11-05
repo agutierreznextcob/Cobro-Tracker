@@ -7,6 +7,8 @@
  */
 
 export interface Cliente {
+  /** @nullable */
+  direccion?: string | null;
   id: number;
   nombre: string;
   /** @nullable */

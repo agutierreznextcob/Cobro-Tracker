@@ -2,7 +2,11 @@ import { useParams } from "wouter";
 import { useRef, useState } from "react";
 import { useGetPortalDeudor, useSubirComprobantePortal } from "@workspace/api-client-react";
 import type { PortalCobro } from "@workspace/api-client-react";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatShortDate, formatMoney, formatTotalesPorMoneda } from "@/lib/format";
+
+// Portal cobros carry their own currency/decimals (legacy = CLP).
+type ConMoneda = { moneda?: string | null; decimales?: number | null };
+const fmtDoc = (c: object, n: number) => formatMoney(n, (c as ConMoneda).moneda, (c as ConMoneda).decimales);
 import { Building2, CheckCircle2, Clock, AlertTriangle, ExternalLink, Receipt, Upload, Loader2, FileCheck2 } from "lucide-react";
 
 const MAX_COMPROBANTE_CHARS = 1_500_000;
@@ -147,7 +151,7 @@ export default function PortalPage() {
     );
   }
 
-  const totalPendiente = data.pendientes.reduce((acc, c) => acc + c.saldo, 0);
+  const totalPendiente = formatTotalesPorMoneda(data.pendientes as Array<(typeof data.pendientes)[number] & ConMoneda>, (c) => c.saldo);
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -168,7 +172,7 @@ export default function PortalPage() {
             <div className="mt-5 rounded-xl bg-white/10 backdrop-blur px-4 py-3">
               <p className="text-xs text-white/70">Total por pagar</p>
               <p className="text-3xl font-bold tracking-tight mt-0.5">
-                {formatCurrency(totalPendiente)}
+                {totalPendiente}
               </p>
             </div>
           )}
@@ -201,10 +205,10 @@ export default function PortalPage() {
                   </div>
                   <div className="flex items-center justify-between gap-4 sm:justify-end shrink-0">
                     <div className="text-right">
-                      <p className="font-mono font-semibold text-lg">{formatCurrency(c.saldo)}</p>
+                      <p className="font-mono font-semibold text-lg">{fmtDoc(c, c.saldo)}</p>
                       {c.saldo !== c.montoACobrar && (
                         <p className="text-[11px] text-muted-foreground">
-                          de {formatCurrency(c.montoACobrar)}
+                          de {fmtDoc(c, c.montoACobrar)}
                         </p>
                       )}
                     </div>
@@ -251,7 +255,7 @@ export default function PortalPage() {
                     </div>
                   </div>
                   <p className="font-mono text-sm text-muted-foreground shrink-0">
-                    {formatCurrency(c.montoACobrar)}
+                    {fmtDoc(c, c.montoACobrar)}
                   </p>
                 </div>
               ))}

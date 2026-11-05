@@ -1,4 +1,6 @@
 import { Router, type IRouter } from "express";
+import cotizacionesRouter from "./cotizaciones";
+import preferenciasRouter from "./preferencias";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import cobrosRouter from "./cobros";
@@ -68,6 +70,8 @@ router.use(encuestasRouter);
 // Must come before cobrosRouter's blanket auth middleware.
 router.use(organizationRouter);
 router.use(inventarioRouter);
+router.use(cotizacionesRouter);
+router.use(preferenciasRouter);
 router.use(localesRouter);
 router.use(cobrosRouter);
 // workflowsRouter and tareasRouter self-guard with their own auth middleware.

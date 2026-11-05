@@ -15,10 +15,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/status-badge";
 import { ScoreBadge, SCORE_META } from "@/components/score-badge";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatCurrency, formatShortDate, formatMoney, formatTotalesPorMoneda } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, Send, Link2, Copy, Check, Gauge, TrendingUp, Minus, TrendingDown, RefreshCw, ShieldAlert, Zap, CalendarClock, Percent, PhoneCall } from "lucide-react";
+import { ArrowLeft, Edit2, Loader2, Mail, Phone, FileText, Clock, CheckCircle2, Send, Link2, Copy, Check, Gauge, TrendingUp, Minus, TrendingDown, RefreshCw, ShieldAlert, Zap, CalendarClock, Percent, PhoneCall, MapPin } from "lucide-react";
 
 function formatFechaCorta(ymd: string): string {
   const [y, m, d] = ymd.split("-").map(Number);
@@ -39,10 +39,11 @@ const editSchema = z.object({
   rut: z.string().max(20).optional(),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   telefono: z.string().max(30).optional(),
+  direccion: z.string().max(300).optional(),
 });
 type EditForm = z.infer<typeof editSchema>;
 
-function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nombre: string; empresa?: string | null; rut?: string | null; email?: string | null; telefono?: string | null }; onUpdated: () => void }) {
+function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nombre: string; empresa?: string | null; rut?: string | null; email?: string | null; telefono?: string | null; direccion?: string | null }; onUpdated: () => void }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const updateCliente = useUpdateCliente();
@@ -55,12 +56,13 @@ function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nomb
       rut: cliente.rut ?? "",
       email: cliente.email ?? "",
       telefono: cliente.telefono ?? "",
+      direccion: cliente.direccion ?? "",
     },
   });
 
   const onSubmit = (values: EditForm) => {
     updateCliente.mutate(
-      { id: cliente.id, data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut || undefined, email: values.email || undefined, telefono: values.telefono || undefined } },
+      { id: cliente.id, data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut || undefined, email: values.email || undefined, telefono: values.telefono || undefined, direccion: values.direccion?.trim() ?? "" } },
       {
         onSuccess: () => {
           toast({ title: "Cliente actualizado" });
@@ -120,6 +122,13 @@ function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nomb
                 <FormItem>
                   <FormLabel>Teléfono</FormLabel>
                   <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="direccion" render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Dirección</FormLabel>
+                  <FormControl><Input placeholder="Calle, número, comuna" data-testid="input-edit-direccion" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -417,7 +426,6 @@ export default function ClienteDetailPage() {
   const cobros = data.cobros ?? [];
   const pagados = cobros.filter((c) => c.estado === "pagado");
   const pendientes = cobros.filter((c) => c.estado === "pendiente");
-  const montoTotal = pagados.reduce((acc, c) => acc + Number(c.monto), 0);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -428,7 +436,7 @@ export default function ClienteDetailPage() {
         </Link>
         <div className="flex items-center gap-2">
           <EnviarPortalDialog cliente={data} onChanged={handleUpdated} />
-          <EditClienteDialog cliente={data} onUpdated={handleUpdated} />
+          <EditClienteDialog cliente={data as typeof data & { direccion?: string | null }} onUpdated={handleUpdated} />
         </div>
       </div>
 
@@ -453,6 +461,12 @@ export default function ClienteDetailPage() {
                   <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     <Phone className="h-3.5 w-3.5" />
                     <span>{data.telefono}</span>
+                  </div>
+                )}
+                {(data as { direccion?: string | null }).direccion && (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground" data-testid="text-cliente-direccion">
+                    <MapPin className="h-3.5 w-3.5" />
+                    <span>{(data as { direccion?: string | null }).direccion}</span>
                   </div>
                 )}
               </div>
@@ -485,7 +499,7 @@ export default function ClienteDetailPage() {
                   <ScoreBadge score={data.scoreDetalle.score} categoria={data.scoreDetalle.categoria} />
                   <p className="text-xs text-muted-foreground mt-2">
                     {data.scoreDetalle.totalCobros} cobro{data.scoreDetalle.totalCobros !== 1 ? "s" : ""} ·{" "}
-                    {formatCurrency(data.scoreDetalle.totalPendiente)} pendiente
+                    {formatCurrency(data.scoreDetalle.totalPendiente)} pendiente (CLP)
                   </p>
                 </div>
               </div>
@@ -609,7 +623,7 @@ export default function ClienteDetailPage() {
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <span className="text-sm">Recaudado</span>
             </div>
-            <p className="text-2xl font-bold font-mono text-green-700">{formatCurrency(montoTotal)}</p>
+            <p className="text-2xl font-bold font-mono text-green-700">{formatTotalesPorMoneda(pagados, (c) => Number(c.monto))}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{pagados.length} pagados</p>
           </CardContent>
         </Card>
@@ -621,7 +635,7 @@ export default function ClienteDetailPage() {
             </div>
             <p className="text-2xl font-bold font-mono">{pendientes.length}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {pendientes.length > 0 ? formatCurrency(pendientes.reduce((a, c) => a + Number(c.monto), 0)) : "—"}
+              {pendientes.length > 0 ? formatTotalesPorMoneda(pendientes, (c) => Number(c.monto)) : "—"}
             </p>
           </CardContent>
         </Card>
@@ -656,7 +670,7 @@ export default function ClienteDetailPage() {
                       </Link>
                     </TableCell>
                     <TableCell><StatusBadge status={cobro.estado} /></TableCell>
-                    <TableCell className="text-right font-mono font-medium">{formatCurrency(cobro.monto)}</TableCell>
+                    <TableCell className="text-right font-mono font-medium">{formatMoney(cobro.monto, cobro.moneda, cobro.decimales)}</TableCell>
                   </TableRow>
                 ))
               )}

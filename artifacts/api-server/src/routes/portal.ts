@@ -131,6 +131,7 @@ portalRouter.get("/public/portal/:token", async (req, res) => {
 
       if (c.estado === "pagado") {
         pagados.push({
+          moneda: c.moneda, decimales: c.decimales,
           id: c.id,
           descripcion: c.descripcion,
           montoACobrar,
@@ -147,6 +148,7 @@ portalRouter.get("/public/portal/:token", async (req, res) => {
       else if (c.fechaVencimiento && c.fechaVencimiento < hoy) estado = "vencido";
 
       pendientes.push({
+        moneda: c.moneda, decimales: c.decimales,
         id: c.id,
         descripcion: c.descripcion,
         montoACobrar,

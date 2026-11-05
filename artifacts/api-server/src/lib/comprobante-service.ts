@@ -165,6 +165,7 @@ export async function emitirComprobante(
     const quienCobra = cobro.responsableNombre || remitente.nombre || empresa;
 
     const pdf = await generarComprobantePdf({
+      moneda: cobro.moneda, decimales: cobro.decimales, porcentajeIva: Number(cobro.porcentajeIva),
       numero,
       fecha: new Date(),
       clienteNombre: clienteNombre || "Cliente",
@@ -180,6 +181,7 @@ export async function emitirComprobante(
 
     const result = await sendComprobanteEmail(
       {
+        moneda: cobro.moneda, decimales: cobro.decimales,
         emailDestino,
         clienteNombre: clienteNombre || "Cliente",
         empresa,

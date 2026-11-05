@@ -60,7 +60,7 @@ export default function ClientesPrioritariosPage() {
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Star className="h-7 w-7 text-primary" />
             Clientes Prioritarios
-          </h1>
+          <span className="ml-2 align-middle rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground" data-testid="label-importes-clp">Importes en CLP</span></h1>
         </div>
         <Card className="border-dashed bg-destructive/10 border-destructive/20">
           <CardContent className="flex flex-col items-center justify-center p-12 text-center text-destructive">
@@ -81,7 +81,7 @@ export default function ClientesPrioritariosPage() {
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <Star className="h-7 w-7 text-primary" />
           Clientes Prioritarios
-        </h1>
+        <span className="ml-2 align-middle rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground" data-testid="label-importes-clp">Importes en CLP</span></h1>
         <p className="text-muted-foreground mt-1 text-sm max-w-3xl">
           Clientes con saldo pendiente ordenados por prioridad de cobranza (peor score y mayor riesgo primero).
         </p>
@@ -221,7 +221,7 @@ export default function ClientesPrioritariosPage() {
 
                   <div className="mt-auto pt-4 flex items-center justify-between">
                     <div className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
-                      <TrendingDown className="h-3 w-3" /> Monto en riesgo: {formatCurrency(c.prioridad)}
+                      <TrendingDown className="h-3 w-3" /> Monto en riesgo: {formatCurrency(c.prioridad)} CLP
                     </div>
                     <Button size="sm" asChild>
                       <Link href={`/clientes/${c.clienteId}`}>

@@ -4,7 +4,7 @@ import { useListInventario, getListInventarioQueryKey, useListBodegas, getListBo
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatCurrency } from "@/lib/format";
+import { formatMoney, monedaDe, roundTo } from "@/lib/format";
 import { estadoVisual, formatQty } from "@/lib/inventario";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScanLookup } from "@/components/barcode-scanner";
@@ -29,8 +29,10 @@ export function lineaDesdeProducto(p: Producto): LineaCatalogo {
 
 export const MAX_LINEAS = 100;
 
-export function totalLineas(lineas: LineaCatalogo[]) {
-  return Math.round(lineas.reduce((s, l) => s + (Number(l.cantidad) || 0) * (Number(l.precioUnitario) || 0), 0));
+export function totalLineas(lineas: LineaCatalogo[], decimales?: number) {
+  if (decimales == null) return Math.round(lineas.reduce((s, l) => s + (Number(l.cantidad) || 0) * (Number(l.precioUnitario) || 0), 0));
+  // Round each line to the document decimals, then sum.
+  return roundTo(lineas.reduce((s, l) => s + roundTo((Number(l.cantidad) || 0) * (Number(l.precioUnitario) || 0), decimales), 0), decimales);
 }
 
 export function lineasValidas(lineas: LineaCatalogo[]) {
@@ -46,7 +48,11 @@ export function lineasPayload(lineas: LineaCatalogo[]) {
   }));
 }
 
-export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: LineaCatalogo[]; onChange: (l: LineaCatalogo[]) => void; incluyeIva: boolean }) {
+export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", decimales }: { lineas: LineaCatalogo[]; onChange: (l: LineaCatalogo[]) => void; incluyeIva: boolean; moneda?: string; decimales?: number }) {
+  const mon = monedaDe(moneda);
+  const formatCurrency = (n: number) => formatMoney(n, mon, decimales ?? (mon === "CLP" ? 0 : 2));
+  // No exchange conversion: only catalog items priced in the document currency can be added.
+  const mismaMoneda = (p: Producto) => monedaDe(p.moneda) === mon;
   const { data: productos, isLoading, isError, refetch } = useListInventario({ query: { queryKey: getListInventarioQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
   const { data: bodegas = [] } = useListBodegas({ query: { queryKey: getListBodegasQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
   const [open, setOpen] = useState(false);
@@ -55,6 +61,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: Linea
 
   const agregarEscaneado = (p: Producto) => {
     if (!p.activo) { toast({ title: "Ítem archivado", description: `${p.nombre} no está disponible para cobros.`, variant: "destructive" }); return; }
+    if (!mismaMoneda(p)) { toast({ title: "Moneda distinta", description: `${p.nombre} tiene precio en ${monedaDe(p.moneda)} y este cobro es en ${mon}.`, variant: "destructive" }); return; }
     const i = lineas.findIndex((l) => l.productoId === p.id);
     if (i >= 0) {
       onChange(lineas.map((l, j) => (j === i ? { ...l, cantidad: String((Number(l.cantidad) || 0) + 1) } : l)));
@@ -67,11 +74,11 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: Linea
   const disponibles = useMemo(() => {
     const usados = new Set(lineas.map((l) => l.productoId));
     const s = q.trim().toLowerCase();
-    return (productos ?? []).filter((p) => p.activo && !usados.has(p.id) && (!s || p.nombre.toLowerCase().includes(s))).slice(0, 50);
-  }, [productos, lineas, q]);
+    return (productos ?? []).filter((p) => p.activo && mismaMoneda(p) && !usados.has(p.id) && (!s || p.nombre.toLowerCase().includes(s))).slice(0, 50);
+  }, [productos, lineas, q, mon]);
 
   const update = (i: number, patch: Partial<LineaCatalogo>) => onChange(lineas.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-  const total = totalLineas(lineas);
+  const total = totalLineas(lineas, decimales);
 
   return (
     <div className="rounded-lg border border-border/60 p-4 space-y-3">
@@ -96,7 +103,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: Linea
                 <div className="p-3 text-center text-sm">No se pudo cargar el catálogo. <button type="button" className="text-primary underline" onClick={() => refetch()}>Reintentar</button></div>
               ) : disponibles.length === 0 ? (
                 <div className="p-3 text-center text-sm text-muted-foreground">
-                  {(productos ?? []).some((p) => p.activo) ? "Sin coincidencias." : <>Tu catálogo está vacío. <Link href="/inventario/nuevo" className="text-primary underline">Crear ítem</Link></>}
+                  {(productos ?? []).some((p) => p.activo && mismaMoneda(p)) ? "Sin coincidencias." : (productos ?? []).some((p) => p.activo) ? `No hay ítems con precio en ${mon}.` : <>Tu catálogo está vacío. <Link href="/inventario/nuevo" className="text-primary underline">Crear ítem</Link></>}
                 </div>
               ) : disponibles.map((p) => {
                 const e = estadoVisual(p);
@@ -146,8 +153,8 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: Linea
                 </div>
                 <Button type="button" variant="ghost" size="icon" className="h-8 w-8 sm:order-last text-muted-foreground hover:text-red-600" onClick={() => onChange(lineas.filter((_, j) => j !== i))} aria-label="Quitar"><Trash2 className="h-4 w-4" /></Button>
                 <Input type="number" min="0" step="any" value={l.cantidad} onChange={(e) => update(i, { cantidad: e.target.value })} className="h-8 font-mono col-span-1" />
-                <div className="relative"><span className="absolute left-2 top-1.5 text-xs text-muted-foreground">$</span>
-                  <Input type="number" min="0" step="1" value={l.precioUnitario} onChange={(e) => update(i, { precioUnitario: e.target.value })} className="h-8 pl-5 font-mono" /></div>
+                <div className="relative"><span className="absolute left-2 top-1.5 text-xs text-muted-foreground">{mon === "CLP" ? "$" : ""}</span>
+                  <Input type="number" min="0" step={decimales ? String(10 ** -decimales) : "1"} value={l.precioUnitario} onChange={(e) => update(i, { precioUnitario: e.target.value })} className="h-8 pl-5 font-mono" /></div>
                 <span className="font-mono text-sm text-right col-span-2 sm:col-span-1">{formatCurrency(cant * (Number(l.precioUnitario) || 0))}</span>
                 {l.tipo === "producto" && bodegas.length > 0 && (
                   <div className="col-span-2 sm:col-span-5">

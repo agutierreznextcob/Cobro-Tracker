@@ -19,7 +19,8 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/format";
+import { formatMoney, monedaDe, roundTo, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
+import { usePreferencias } from "@/hooks/use-preferencias";
 import {
   apiErrorMessage,
   capitalizar,
@@ -88,11 +89,21 @@ export default function InventarioFormPage() {
   const [horas, setHoras] = useState("");
   const [factor, setFactor] = useState(1);
 
+  // Currency is set at creation (default from preferences) and cannot change later.
+  const { prefs, listo: prefsListas } = usePreferencias();
+  const [moneda, setMoneda] = useState<Moneda>("CLP");
+  const monedaTocada = useRef(false);
+  useEffect(() => {
+    if (!isEdit && prefsListas && !monedaTocada.current) setMoneda(monedaDe(prefs.moneda));
+  }, [isEdit, prefsListas, prefs.moneda]);
+  const formatCurrency = (n: number) => formatMoney(n, moneda, moneda === "CLP" ? 0 : 2);
+
   const initFor = useRef<number | null>(null);
   useEffect(() => {
     if (!producto || !isFetchedAfterMount || initFor.current === producto.id) return;
     initFor.current = producto.id;
     setTipo(producto.tipo as Tipo);
+    setMoneda(monedaDe(producto.moneda));
     setNombre(producto.nombre);
     setDescripcion(producto.descripcion ?? "");
     const u = producto.unidadMedida || (producto.tipo === "servicio" ? "hora" : "unidad");
@@ -151,10 +162,11 @@ export default function InventarioFormPage() {
       descripcion: descripcion.trim() || undefined,
       tipo,
       costoUnitario: costoN,
-      precioUnitario: Math.round(precioN),
+      precioUnitario: moneda === "CLP" ? Math.round(precioN) : roundTo(precioN, 2),
       unidadMedida: unidad.trim() || undefined,
       activo,
     };
+    if (!isEdit) data.moneda = moneda as ProductoInput["moneda"];
     if (tipo === "producto") {
       data.metodoCalculo = metodo;
       data.margenPorcentaje = Number.isNaN(pctN) ? undefined : pctN;
@@ -260,6 +272,14 @@ export default function InventarioFormPage() {
                   <p className="text-[11px] text-muted-foreground">{isEdit ? "Letras, números y guiones." : "Déjalo vacío para generarlo solo."}</p></div>
                 <div className="space-y-1.5"><Label>SKU (opcional)</Label><Input value={sku} maxLength={100} onChange={(e) => setSku(e.target.value)} className="font-mono" data-testid="input-sku" /></div>
                 <div className="space-y-1.5"><Label>Código de barras (opcional)</Label><Input value={codigoBarras} maxLength={100} onChange={(e) => setCodigoBarras(e.target.value)} className="font-mono" placeholder="EAN / UPC" data-testid="input-codigo-barras" /></div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1">Moneda del precio{isEdit && <Lock className="h-3 w-3 text-muted-foreground" />}</Label>
+                <Select value={moneda} onValueChange={(v) => { monedaTocada.current = true; setMoneda(v as Moneda); }} disabled={isEdit}>
+                  <SelectTrigger className="sm:w-72" data-testid="select-moneda-producto"><SelectValue /></SelectTrigger>
+                  <SelectContent>{MONEDAS.map((m) => <SelectItem key={m} value={m}>{m} · {MONEDA_INFO[m].nombre}</SelectItem>)}</SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">{isEdit ? "La moneda no se puede cambiar después de crear el ítem." : "Solo podrás agregarlo a cobros y cotizaciones en esta moneda."}</p>
               </div>
               <div className="space-y-1.5"><Label>Descripción (opcional)</Label><Textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} className="resize-none h-20" /></div>
             </CardContent>

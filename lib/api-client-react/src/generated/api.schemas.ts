@@ -5,6 +5,151 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+export type PreferenciasMoneda = typeof PreferenciasMoneda[keyof typeof PreferenciasMoneda];
+
+
+export const PreferenciasMoneda = {
+  CLP: 'CLP',
+  USD: 'USD',
+  EUR: 'EUR',
+  UF: 'UF',
+} as const;
+
+export type PreferenciasFormatoFecha = typeof PreferenciasFormatoFecha[keyof typeof PreferenciasFormatoFecha];
+
+
+export const PreferenciasFormatoFecha = {
+  'DD/MM/YYYY': 'DD/MM/YYYY',
+  'MM/DD/YYYY': 'MM/DD/YYYY',
+} as const;
+
+export interface Preferencias {
+  moneda: PreferenciasMoneda;
+  /**
+     * @minimum 0
+     * @maximum 2
+     */
+  decimales: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  porcentajeIva: number;
+  formatoFecha: PreferenciasFormatoFecha;
+  /**
+     * @minLength 1
+     * @maxLength 16
+     */
+  prefijoCobro: string;
+  /**
+     * @minLength 1
+     * @maxLength 16
+     */
+  prefijoCotizacion: string;
+}
+
+export interface CotizacionItemInput {
+  /** @nullable */
+  productoId?: number | null;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  descripcion: string;
+  /** @exclusiveMinimum 0 */
+  cantidad: number;
+  /** @minimum 0 */
+  precioUnitario: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  descuentoPorcentaje: number;
+}
+
+export type CotizacionItem = CotizacionItemInput & {
+  id: number;
+  subtotalLinea: number;
+};
+
+export type CotizacionInputMoneda = typeof CotizacionInputMoneda[keyof typeof CotizacionInputMoneda];
+
+
+export const CotizacionInputMoneda = {
+  CLP: 'CLP',
+  USD: 'USD',
+  EUR: 'EUR',
+  UF: 'UF',
+} as const;
+
+export interface CotizacionInput {
+  clienteId: number;
+  fechaEmision: string;
+  fechaVencimiento: string;
+  moneda: CotizacionInputMoneda;
+  /**
+     * @minimum 0
+     * @maximum 2
+     */
+  decimales: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  porcentajeIva: number;
+  /** @maxLength 5000 */
+  notas: string;
+  /**
+     * @minItems 1
+     * @maxItems 100
+     */
+  items: CotizacionItemInput[];
+}
+
+export type CotizacionEstadoInputEstado = typeof CotizacionEstadoInputEstado[keyof typeof CotizacionEstadoInputEstado];
+
+
+export const CotizacionEstadoInputEstado = {
+  aceptada: 'aceptada',
+  rechazada: 'rechazada',
+} as const;
+
+export interface CotizacionEstadoInput {
+  estado: CotizacionEstadoInputEstado;
+}
+
+export type CotizacionEstado = typeof CotizacionEstado[keyof typeof CotizacionEstado];
+
+
+export const CotizacionEstado = {
+  borrador: 'borrador',
+  enviada: 'enviada',
+  aceptada: 'aceptada',
+  rechazada: 'rechazada',
+  vencida: 'vencida',
+} as const;
+
+export type Cotizacion = CotizacionInput & ({
+  id: number;
+  numeroCotizacion: string;
+  clienteNombre: string;
+  /** @nullable */
+  clienteRut?: string | null;
+  /** @nullable */
+  clienteEmail?: string | null;
+  /** @nullable */
+  clienteDireccion?: string | null;
+  estado: CotizacionEstado;
+  subtotal: number;
+  montoIva: number;
+  total: number;
+  /** @nullable */
+  cobroId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  items?: CotizacionItem[];
+});
+
 export interface WorkflowCondiciones {
   /** @nullable */
   montoMin?: number | null;
@@ -767,6 +912,8 @@ export interface HealthStatus {
 }
 
 export interface Cliente {
+  /** @nullable */
+  direccion?: string | null;
   id: number;
   nombre: string;
   /** @nullable */
@@ -873,6 +1020,7 @@ export interface ScoreDetalle {
 }
 
 export interface ClienteInput {
+  direccion?: string;
   /** @minLength 1 */
   nombre: string;
   empresa?: string;
@@ -928,6 +1076,13 @@ export const CobroEstado = {
 } as const;
 
 export interface Cobro {
+  moneda?: string;
+  decimales?: number;
+  porcentajeIva?: number;
+  /** @nullable */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  cotizacionId?: number | null;
   itemsInventario?: ItemInventario[];
   id: number;
   /** Original amount in currency units */
@@ -1340,6 +1495,16 @@ export interface CobrosRecurrentesReport {
   ocurrencias30Dias: CobrosRecurrentesReportOcurrencias30DiasItem[];
 }
 
+export type CobroInputMoneda = typeof CobroInputMoneda[keyof typeof CobroInputMoneda];
+
+
+export const CobroInputMoneda = {
+  CLP: 'CLP',
+  USD: 'USD',
+  EUR: 'EUR',
+  UF: 'UF',
+} as const;
+
 /**
  * Chilean electronic tax document type (DTE). Only "afecta" types may carry IVA. Defaults to sin_documento.
  */
@@ -1355,6 +1520,17 @@ export const CobroInputTipoDocumento = {
 } as const;
 
 export interface CobroInput {
+  moneda?: CobroInputMoneda;
+  /**
+     * @minimum 0
+     * @maximum 2
+     */
+  decimales?: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  porcentajeIva?: number;
   /** @maxItems 100 */
   itemsInventario?: ItemInventario[];
   /**
@@ -1381,6 +1557,16 @@ export interface CobroInput {
   fechaVencimiento?: string;
 }
 
+export type ProductoInputMoneda = typeof ProductoInputMoneda[keyof typeof ProductoInputMoneda];
+
+
+export const ProductoInputMoneda = {
+  CLP: 'CLP',
+  USD: 'USD',
+  EUR: 'EUR',
+  UF: 'UF',
+} as const;
+
 export type ProductoInputTipo = typeof ProductoInputTipo[keyof typeof ProductoInputTipo];
 
 
@@ -1398,6 +1584,7 @@ export const ProductoInputMetodoCalculo = {
 } as const;
 
 export interface ProductoInput {
+  moneda?: ProductoInputMoneda;
   /**
      * @minLength 1
      * @maxLength 200
@@ -2390,6 +2577,8 @@ export const PortalCobroEstado = {
 } as const;
 
 export interface PortalCobro {
+  moneda?: string;
+  decimales?: number;
   id: number;
   descripcion: string;
   /** Net amount to charge after discount */

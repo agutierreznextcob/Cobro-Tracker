@@ -2,6 +2,7 @@ import { db, productosTable, type Producto, type ItemInventarioSnapshot } from "
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getOrgContext } from "./org";
+import { roundMoney } from "./preferencias";
 
 const money = z.number().finite().min(0).max(1e10).multipleOf(0.01);
 const units = z.number().finite().min(0).max(1e9).multipleOf(0.001);
@@ -15,6 +16,7 @@ export function validarUnidad(tipo: "producto" | "servicio", unidad: string | un
   }
 }
 export const productoBody = z.object({
+  moneda: z.enum(["CLP", "USD", "EUR", "UF"]).optional(),
   nombre: z.string().trim().min(1).max(200),
   codigoInterno: z.string().trim().max(80).regex(/^[a-zA-Z0-9-]*$/, "El código interno solo admite letras, números y guiones.").optional(),
   sku: z.string().trim().max(120).default(""),
@@ -117,7 +119,7 @@ export function serializeProducto(p: Producto) {
   };
 }
 
-export async function resolveItemsInventario(userId: string, input: unknown, monto: unknown): Promise<ItemInventarioSnapshot[]> {
+export async function resolveItemsInventario(userId: string, input: unknown, monto: unknown, moneda = "CLP", decimales = 0): Promise<ItemInventarioSnapshot[]> {
   const items = itemsInventarioBody.parse(input);
   if (!items.length) return [];
   const ids = items.map(i => i.productoId);
@@ -125,6 +127,7 @@ export async function resolveItemsInventario(userId: string, input: unknown, mon
   const { condition } = await inventarioScope(userId);
   const rows = await db.select().from(productosTable).where(and(condition, inArray(productosTable.id, ids), eq(productosTable.activo, true)));
   if (rows.length !== ids.length) throw new Error("Uno o más productos no están disponibles en tu catálogo.");
+  if (rows.some(p => p.moneda !== moneda)) throw new Error("Los productos deben tener la misma moneda que el cobro. No se convierten precios automáticamente.");
   const { scopedBodegas } = await import("./inventario-bodegas");
   const warehouses = await scopedBodegas(userId);
   for (const item of items) {
@@ -132,7 +135,7 @@ export async function resolveItemsInventario(userId: string, input: unknown, mon
       throw new Error("La bodega seleccionada no está disponible para este producto.");
     }
   }
-  const total = Math.round(items.reduce((sum, i) => sum + i.cantidad * i.precioUnitario, 0));
+  const total = roundMoney(items.reduce((sum, i) => sum + i.cantidad * i.precioUnitario, 0), decimales);
   if (total !== Number(monto)) throw new Error("El monto debe coincidir con la suma de los ítems del catálogo (antes de IVA).");
   return items.map(i => {
     const p = rows.find(p => p.id === i.productoId)!;

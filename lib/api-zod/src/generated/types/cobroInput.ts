@@ -5,10 +5,22 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+import type { CobroInputMoneda } from './cobroInputMoneda';
 import type { CobroInputTipoDocumento } from './cobroInputTipoDocumento';
 import type { ItemInventario } from './itemInventario';
 
 export interface CobroInput {
+  moneda?: CobroInputMoneda;
+  /**
+     * @minimum 0
+     * @maximum 2
+     */
+  decimales?: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  porcentajeIva?: number;
   /** @maxItems 100 */
   itemsInventario?: ItemInventario[];
   /**

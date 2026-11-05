@@ -1,3 +1,4 @@
+- [Cotizaciones y moneda](cotizaciones-moneda.md) — moneda por documento confirmada por el usuario; no relabelar históricos; proveedores actuales CLP entero y aceptación registrada por el negocio.
 - [Admin role & access bypass](admin-role.md) — role lives in DB, enriched into /auth/user (not session); admin bypass centralized in computeSubscriptionState; requireAdmin is the real security boundary.
 - [Frontend auth gating](auth-gating.md) — useAuth is mount-time fetch (not shared/TanStack); use ONE useAuth per guard chain or protected content leaks; reload (not query invalidation) to refresh after mutating user state.
 - [Informes reporting page](informes-reporting.md) — Cobros>Informes reuses useListCobros + aggregates client-side (no report endpoint); method pie precedence Flow>MP>Manual; route must precede /cobros/:id.

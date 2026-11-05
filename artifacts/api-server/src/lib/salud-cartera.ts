@@ -54,7 +54,7 @@ export async function calcularBloquesUsuario(
   hoyStr: string = hoySantiagoStr(),
 ): Promise<BloquesSaludCartera> {
   const ctx = await getOrgContext(userId);
-  const scope = cobroScopeCondition(ctx, userId, undefined);
+  const scope = and(cobroScopeCondition(ctx, userId, undefined), eq(cobrosTable.moneda, "CLP"));
   const en7Str = sumarDias(hoyStr, 7);
 
   const abiertos = await db

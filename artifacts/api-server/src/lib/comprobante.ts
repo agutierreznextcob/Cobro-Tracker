@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { formatDocumentMoney } from "./preferencias";
 import { NEXTCOB_LOGO_BASE64 } from "./logo-base64";
 
 const MORADO = "#6C5CE7";
@@ -7,6 +8,9 @@ const GRIS = "#6b7280";
 const LINEA = "#e4e4e7";
 
 export interface ComprobanteData {
+  moneda?: string;
+  decimales?: number;
+  porcentajeIva?: number;
   numero: string;
   fecha: Date;
   clienteNombre: string;
@@ -120,10 +124,10 @@ export function generarComprobantePdf(data: ComprobanteData): Promise<Buffer> {
       const boxTop = y;
       const rows: [string, string, boolean][] = [];
       if (data.montoNeto != null && data.montoIva != null) {
-        rows.push(["Neto", formatCLP(data.montoNeto), false]);
-        rows.push(["IVA (19%)", formatCLP(data.montoIva), false]);
+        rows.push(["Neto", formatDocumentMoney(data.montoNeto, data.moneda, data.decimales), false]);
+        rows.push([`IVA (${data.porcentajeIva ?? 19}%)`, formatDocumentMoney(data.montoIva, data.moneda, data.decimales), false]);
       }
-      rows.push(["Total pagado", formatCLP(data.montoTotal), true]);
+      rows.push(["Total pagado", formatDocumentMoney(data.montoTotal, data.moneda, data.decimales), true]);
 
       const rowH = 24;
       const boxH = rows.length * rowH + 16;

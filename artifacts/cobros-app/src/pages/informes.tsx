@@ -51,7 +51,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatMoney, monedaDe, MONEDAS, type Moneda } from "@/lib/format";
 import {
   TIPO_DOCUMENTO_VALUES,
   TIPO_DOCUMENTO_LABELS,
@@ -155,6 +155,16 @@ export default function Informes() {
 
   const { data: clientesConScore } = useListClientes();
 
+  // Client-side totals never mix currencies: every amount below belongs to the
+  // selected document currency only (legacy cobros = CLP).
+  const [monedaInforme, setMonedaInforme] = useState<Moneda>("CLP");
+  const monedasPresentes = useMemo(() => {
+    const set = new Set<Moneda>(["CLP"]);
+    for (const c of cobros ?? []) set.add(monedaDe(c.moneda));
+    return MONEDAS.filter((m) => set.has(m));
+  }, [cobros]);
+  const fmtSel = (n: number) => formatMoney(n, monedaInforme, monedaInforme === "CLP" ? 0 : 2);
+
   // Estimated recovery: every open cobro weighted by its client's payment
   // probability (fallback 50% for clientes sin probabilidad calculada).
   const recuperacionEstimada = useMemo(() => {
@@ -164,6 +174,7 @@ export default function Informes() {
     let pendienteTotal = 0;
     let esperado = 0;
     for (const c of cobros) {
+      if (monedaDe(c.moneda) !== monedaInforme) continue;
       if (c.estado !== "pendiente" && c.estado !== "parcial") continue;
       const saldo = c.saldo ?? (c.montoACobrar ?? c.monto - (c.montoDescuento ?? 0));
       if (saldo <= 0) continue;
@@ -177,7 +188,7 @@ export default function Informes() {
       esperado,
       pct: Math.round((esperado / pendienteTotal) * 100),
     };
-  }, [cobros, clientesConScore]);
+  }, [cobros, clientesConScore, monedaInforme]);
 
   const minDate = useMemo(() => {
     if (!cobros || cobros.length === 0) return null;
@@ -224,9 +235,10 @@ export default function Informes() {
       const d = parseISO(c.estado === "pagado" ? (c.pagadoEn ?? c.creadoEn) : c.creadoEn);
       if (d < range.desde || d > range.hasta) return false;
       if (filterTipoDoc !== "todos" && tipoDocumentoOf(c) !== filterTipoDoc) return false;
+      if (monedaDe(c.moneda) !== monedaInforme) return false;
       return true;
     });
-  }, [cobros, range, filterTipoDoc]);
+  }, [cobros, range, filterTipoDoc, monedaInforme]);
 
   const gran: Gran = useMemo(() => {
     if (granSel !== "auto") return granSel;
@@ -449,7 +461,7 @@ export default function Informes() {
       ["Informe de cobros — NextCob"],
       ["Período", `${format(range.desde, "dd-MM-yyyy")} a ${format(range.hasta, "dd-MM-yyyy")}`],
       [],
-      ["Total recaudado (CLP)", Math.round(summary.totalRecaudado)],
+      [`Total recaudado (${monedaInforme})`, summary.totalRecaudado],
       ["Cobros pagados", summary.countPagado],
       ["Total de cobros generados", summary.totalCobros],
       ["Ticket promedio (CLP)", Math.round(summary.ticket)],
@@ -591,7 +603,21 @@ export default function Informes() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">Moneda</label>
+            <Select value={monedaInforme} onValueChange={(v) => setMonedaInforme(v as Moneda)}>
+              <SelectTrigger className="h-8 w-[110px] text-xs" data-testid="select-moneda-informe">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monedasPresentes.map((m) => (
+                  <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <p className="text-xs text-muted-foreground ml-auto self-center">
+            <span className="mr-2 rounded bg-secondary px-1.5 py-0.5 font-medium text-foreground" data-testid="label-moneda-informe">Importes en {monedaInforme}</span>
             {format(range.desde, "d MMM yyyy", { locale: es })} —{" "}
             {format(range.hasta, "d MMM yyyy", { locale: es })}
           </p>
@@ -603,13 +629,13 @@ export default function Informes() {
         <SummaryCard
           icon={<TrendingUp className="h-4 w-4" />}
           label="Total recaudado"
-          value={formatCurrency(summary.totalRecaudado)}
+          value={fmtSel(summary.totalRecaudado)}
           accent="text-emerald-600"
         />
         <SummaryCard
           icon={<Receipt className="h-4 w-4" />}
           label="Ticket promedio"
-          value={formatCurrency(summary.ticket)}
+          value={fmtSel(summary.ticket)}
         />
         <SummaryCard
           icon={<Percent className="h-4 w-4" />}
@@ -628,7 +654,7 @@ export default function Informes() {
           icon={<TicketPercent className="h-4 w-4" />}
           label="Cobros con descuento"
           value={String(summary.countConDescuento)}
-          sub={`${formatCurrency(summary.totalDescuento)} descontado`}
+          sub={`${fmtSel(summary.totalDescuento)} descontado`}
           accent="text-amber-600"
         />
         <SummaryCard
@@ -640,8 +666,8 @@ export default function Informes() {
           <SummaryCard
             icon={<Gauge className="h-4 w-4" />}
             label="Probabilidad de recuperación de cartera"
-            value={`${formatCurrency(recuperacionEstimada.esperado)} (${recuperacionEstimada.pct}%)`}
-            sub={`De ${formatCurrency(recuperacionEstimada.pendienteTotal)} pendientes, según probabilidad de pago por cliente`}
+            value={`${fmtSel(recuperacionEstimada.esperado)} (${recuperacionEstimada.pct}%)`}
+            sub={`De ${fmtSel(recuperacionEstimada.pendienteTotal)} pendientes, según probabilidad de pago por cliente`}
             accent="text-primary"
           />
         )}
@@ -679,7 +705,7 @@ export default function Informes() {
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={compactCLP} width={48} />
                 <Tooltip
-                  formatter={(v: number) => [formatCurrency(v), "Recaudado"]}
+                  formatter={(v: number) => [fmtSel(v), "Recaudado"]}
                   contentStyle={{ fontSize: 12, borderRadius: 8 }}
                 />
                 <Bar dataKey="monto" fill="#16a34a" radius={[3, 3, 0, 0]} />
@@ -690,7 +716,7 @@ export default function Informes() {
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={compactCLP} width={48} />
                 <Tooltip
-                  formatter={(v: number) => [formatCurrency(v), "Recaudado"]}
+                  formatter={(v: number) => [fmtSel(v), "Recaudado"]}
                   contentStyle={{ fontSize: 12, borderRadius: 8 }}
                 />
                 <Line
@@ -822,7 +848,7 @@ export default function Informes() {
               <YAxis tick={{ fontSize: 11 }} tickFormatter={compactCLP} width={48} />
               <Tooltip
                 formatter={(v: number, _n, item) => [
-                  `${formatCurrency(v)} · ${item?.payload?.cantidad ?? 0} cobro${(item?.payload?.cantidad ?? 0) !== 1 ? "s" : ""}`,
+                  `${fmtSel(v)} · ${item?.payload?.cantidad ?? 0} cobro${(item?.payload?.cantidad ?? 0) !== 1 ? "s" : ""}`,
                   "Recaudado",
                 ]}
                 contentStyle={{ fontSize: 12, borderRadius: 8 }}
@@ -846,6 +872,7 @@ export default function Informes() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <h2 className="text-sm font-semibold">
               {isSupervisor ? "Rendimiento de mi equipo" : "Rendimiento del equipo"}
+              <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Importes en CLP</span>
             </h2>
             {isOrgAdmin && rendimiento.some((r) => r.orgRole === "supervisor") && (
               <Select value={filtroSupervisor} onValueChange={setFiltroSupervisor}>
@@ -927,7 +954,7 @@ export default function Informes() {
         </TabsContent>
 
         <TabsContent value="cuentas" className="space-y-6 mt-0">
-          <AgingReport cobros={cobros ?? []} isOrgAdmin={isOrgAdmin} loading={isLoading} />
+          <AgingReport moneda={monedaInforme} cobros={(cobros ?? []).filter((c) => monedaDe(c.moneda) === monedaInforme)} isOrgAdmin={isOrgAdmin} loading={isLoading} />
         </TabsContent>
 
         <TabsContent value="ranking" className="space-y-6 mt-0">
@@ -949,7 +976,7 @@ export default function Informes() {
             </Card>
           ) : (
             <>
-              <h2 className="text-lg font-semibold">Cobros recurrentes programados</h2>
+              <h2 className="text-lg font-semibold">Cobros recurrentes programados <span className="ml-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground align-middle">Importes en CLP</span></h2>
               {recurrentesLoading && <p className="text-sm text-muted-foreground">Cargando programación…</p>}
               {recurrentesError && <Card className="p-4 text-sm text-destructive">No se pudo cargar la programación. <Button variant="outline" onClick={() => refetchRecurrentes()}>Reintentar</Button></Card>}
               <Card className="p-5">
@@ -1113,15 +1140,19 @@ function bucketForDays(days: number | null): BucketKey {
 }
 
 function AgingReport({
+  moneda,
   cobros,
   isOrgAdmin,
   loading,
 }: {
+  moneda: Moneda;
   cobros: Cobro[];
   isOrgAdmin: boolean;
   loading: boolean;
 }) {
   const today = useMemo(() => startOfDay(new Date()), []);
+  // Only cobros of one currency reach this report; render in that currency.
+  const formatCurrency = (n: number) => formatMoney(n, moneda, moneda === "CLP" ? 0 : 2);
   // Outstanding balance: prefer backend `saldo` (montoACobrar minus confirmed
   // abonos) so `parcial` cobros are not overstated; fall back when absent.
   const saldoCobrar = (c: Cobro) => c.saldo ?? c.montoACobrar ?? c.monto - (c.montoDescuento ?? 0);
@@ -1230,7 +1261,7 @@ function AgingReport({
         "Días vencido": r.days != null && r.days > 0 ? r.days : 0,
         Antigüedad: AGING_BUCKETS.find((b) => b.key === r.bucket)?.label ?? "",
         Estado: ESTADO_META[r.cobro.estado as Estado]?.label ?? r.cobro.estado,
-        "Saldo (CLP)": Math.round(r.saldo),
+        [`Saldo (${moneda})`]: r.saldo,
         ...(isOrgAdmin ? { "Ejecutivo responsable": r.cobro.responsableNombre ?? "Sin asignar" } : {}),
       }));
     const wsDetalle = XLSX.utils.json_to_sheet(detalle);
@@ -1249,17 +1280,17 @@ function AgingReport({
       ["Cuentas por cobrar — NextCob"],
       ["Generado", format(new Date(), "dd-MM-yyyy")],
       [],
-      ["Total por cobrar (CLP)", Math.round(totalPorCobrar)],
-      ["Total vencido (CLP)", Math.round(totalVencido)],
-      ["Total por vencer (CLP)", Math.round(totalPorVencer)],
+      [`Total por cobrar (${moneda})`, Math.round(totalPorCobrar)],
+      [`Total vencido (${moneda})`, Math.round(totalVencido)],
+      [`Total por vencer (${moneda})`, Math.round(totalPorVencer)],
       [],
-      ["Antigüedad", "Cantidad", "Saldo (CLP)"],
+      ["Antigüedad", "Cantidad", `Saldo (${moneda})`],
       ...bucketData.map((b) => [b.label, b.cantidad, Math.round(b.monto)]),
       [],
-      ["Tipo de documento", "Cantidad", "Saldo (CLP)"],
+      ["Tipo de documento", "Cantidad", `Saldo (${moneda})`],
       ...tipoData.map((t) => [t.label, t.cantidad, Math.round(t.monto)]),
       [],
-      ["Proyección de flujo", "Monto esperado (CLP)"],
+      ["Proyección de flujo", `Monto esperado (${moneda})`],
       ...proyeccion.map((p) => [p.label, Math.round(p.monto)]),
     ];
     const wsResumen = XLSX.utils.aoa_to_sheet(resumenRows);
@@ -1608,8 +1639,8 @@ function RankingClientes() {
               <TableHead className="text-xs w-10">#</TableHead>
               <TableHead className="text-xs">Cliente</TableHead>
               <TableHead className="text-xs">Score</TableHead>
-              <TableHead className="text-xs text-right">Total cobrado</TableHead>
-              <TableHead className="text-xs text-right">Total pendiente</TableHead>
+              <TableHead className="text-xs text-right">Total cobrado (CLP)</TableHead>
+              <TableHead className="text-xs text-right">Total pendiente (CLP)</TableHead>
               <TableHead className="text-xs text-right">Prom. días atraso</TableHead>
             </TableRow>
           </TableHeader>

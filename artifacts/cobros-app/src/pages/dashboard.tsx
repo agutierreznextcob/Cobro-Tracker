@@ -3,7 +3,7 @@ import { useListCobros, useGetDashboardMetrics, useGetInventarioResumen, getGetI
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatCurrency, formatShortDate, formatMoney } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { Link } from "wouter";
 import { ArrowRight, CheckCircle2, Clock, XCircle, ArrowUpRight, User, Filter, TrendingUp, Wallet, AlertCircle, Minus, AlertTriangle, Boxes } from "lucide-react";
@@ -115,7 +115,7 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="shadow-sm border-green-500/20 bg-green-500/5">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium text-green-700">Monto recaudado</CardTitle>
+              <CardTitle className="text-sm font-medium text-green-700">Monto recaudado <span className="ml-1 text-[10px] font-normal text-muted-foreground" data-testid="label-importes-clp">Importes en CLP</span></CardTitle>
               <Wallet className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
@@ -126,7 +126,7 @@ export default function Dashboard() {
 
           <Card className="shadow-sm border-primary/20 bg-primary/5">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">Ticket promedio</CardTitle>
+              <CardTitle className="text-sm font-medium">Ticket promedio <span className="ml-1 text-[10px] font-normal text-muted-foreground">CLP</span></CardTitle>
               <TrendingUp className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
@@ -142,7 +142,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold font-mono text-amber-700">{metrics.pendientesCantidad}</div>
-              <p className="text-xs text-muted-foreground mt-1">{formatCurrency(metrics.pendientesMonto)} por cobrar</p>
+              <p className="text-xs text-muted-foreground mt-1">{formatCurrency(metrics.pendientesMonto)} por cobrar (CLP)</p>
             </CardContent>
           </Card>
 
@@ -308,7 +308,7 @@ export default function Dashboard() {
                       <PasarelaBadge flowLinkPago={cobro.flowLinkPago} mpPaymentLinkUrl={cobro.mpPaymentLinkUrl} />
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
-                      {formatCurrency(cobro.monto)}
+                      {formatMoney(cobro.monto, cobro.moneda, cobro.decimales)}
                     </TableCell>
                   </TableRow>
                 ))

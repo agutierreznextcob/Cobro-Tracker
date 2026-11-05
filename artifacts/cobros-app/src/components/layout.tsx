@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse } from "lucide-react";
+import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus, useGetGestionResumen, getGetGestionResumenQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,6 +9,20 @@ import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
 import { useLeadsCountPolling } from "@/hooks/use-leads-count-polling";
 import { AiChat } from "@/components/ai-chat";
+import { usePreferencias } from "@/hooks/use-preferencias";
+import { setFormatoFechaGlobal } from "@/lib/format";
+
+// Applies the org date-format preference to the shared date helpers. Only runs
+// for accounts with access (the endpoint requires a subscription), so /perfil
+// for expired accounts keeps working. Returns the active format so the content
+// can re-render when it changes.
+function usePreferenciasSync(enabled: boolean) {
+  const { data } = usePreferencias({ enabled });
+  const formato = enabled ? data?.formatoFecha ?? null : null;
+  setFormatoFechaGlobal(formato);
+  useEffect(() => () => setFormatoFechaGlobal(null), []);
+  return formato;
+}
 
 function WebhookPoller() {
   useWebhookPolling();
@@ -183,6 +197,130 @@ function TrialBanner() {
   );
 }
 
+type NavLeaf = { href: string; label: string; icon: typeof Home; feature?: string; match?: (loc: string) => boolean };
+
+// Generic collapsible group (Ventas, Configuración). Starter-locked leaves open
+// the upgrade dialog instead of navigating, same as top-level locked items.
+function NavGroup({
+  id,
+  label,
+  icon: Icon,
+  items,
+  closeMobile,
+  esStarter,
+  setUpgradeFeature,
+}: {
+  id: string;
+  label: string;
+  icon: typeof Home;
+  items: NavLeaf[];
+  closeMobile: () => void;
+  esStarter: boolean;
+  setUpgradeFeature: (f: string) => void;
+}) {
+  const [location] = useLocation();
+  const leafActive = (it: NavLeaf) => (it.match ? it.match(location) : location === it.href);
+  const isActive = items.some(leafActive);
+  const [isOpen, setIsOpen] = useState(() => isActive);
+  useEffect(() => {
+    if (isActive) setIsOpen(true);
+  }, [isActive]);
+
+  return (
+    <div className="space-y-0.5">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        data-testid={`nav-group-${id}`}
+        aria-expanded={isOpen}
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
+          isActive && !isOpen
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <Icon className={`h-4 w-4 shrink-0 ${isActive && !isOpen ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"}`} />
+          <span>{label}</span>
+        </div>
+        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+      {isOpen && (
+        <div className="pl-9 pr-2 py-1 space-y-1">
+          {items.map((item) => {
+            const sub = leafActive(item);
+            const bloqueado = esStarter && !!item.feature;
+            if (bloqueado) {
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => setUpgradeFeature(item.feature!)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground/70 hover:bg-secondary/50"
+                  data-testid={`nav-locked-${item.href.replace(/\//g, "")}`}
+                >
+                  <item.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                  <span>{item.label}</span>
+                  <Lock className="h-3 w-3 ml-auto shrink-0 text-muted-foreground/60" />
+                </button>
+              );
+            }
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={closeMobile}
+                data-testid={`nav-${item.href.replace(/\//g, "-").replace(/^-/, "")}`}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  sub ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                }`}
+              >
+                <item.icon className={`h-3.5 w-3.5 shrink-0 ${sub ? "text-primary" : "text-muted-foreground"}`} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const VENTAS_ITEMS: NavLeaf[] = [
+  { href: "/cobros/nuevo", label: "Nuevo cobro", icon: Plus },
+  {
+    href: "/cobros",
+    label: "Cobros",
+    icon: List,
+    match: (l) => l === "/cobros" || (/^\/cobros\/\d+/.test(l)),
+  },
+  { href: "/cotizaciones", label: "Cotizaciones", icon: FileSignature, match: (l) => l === "/cotizaciones" || l.startsWith("/cotizaciones/") },
+];
+
+const CONFIG_ITEMS: NavLeaf[] = [
+  { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock, feature: "Recordatorios automáticos" },
+  { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes", match: (l) => l === "/workflows" || l.startsWith("/workflows/") },
+  { href: "/configuracion/preferencias", label: "Preferencias", icon: SlidersHorizontal },
+  { href: "/encuestas", label: "Satisfacción", icon: MessageSquare, feature: "Encuestas de satisfacción" },
+];
+
+function MobileBell() {
+  const { data } = useListNotificaciones(
+    { soloNoLeidas: true },
+    { query: { queryKey: getListNotificacionesQueryKey({ soloNoLeidas: true }) } },
+  );
+  const n = data?.length ?? 0;
+  return (
+    <Link href="/notificaciones" className="relative ml-auto p-2 -mr-2 rounded-md text-foreground hover:bg-secondary/80" aria-label="Notificaciones" data-testid="link-mobile-notificaciones">
+      <Bell className="h-5 w-5" />
+      {n > 0 && (
+        <span className="absolute top-0.5 right-0.5 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold flex items-center justify-center">
+          {n > 99 ? "99+" : n}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 function GestionNavGroup({ closeMobile, esStarter, setUpgradeFeature }: { closeMobile: () => void, esStarter: boolean, setUpgradeFeature: (f: string) => void }) {
   const [location, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(() => location.startsWith("/gestion") || location.startsWith("/tareas"));
@@ -267,28 +405,25 @@ export function Layout({ children }: { children: ReactNode }) {
   const { data: subStatus } = useGetSubscriptionStatus();
   // Candados del plan Starter (el trial y las cuentas demo operan como NextCob).
   const esStarter = subStatus?.planEfectivo === "starter";
+  const formatoFecha = usePreferenciasSync(!!subStatus?.hasAccess);
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
 
   const isAdmin = user?.role === "admin";
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
-    { href: "/cobros/nuevo", label: "Nuevo cobro", icon: Plus },
-    { href: "/cobros", label: "Cobros", icon: List },
-    { href: "/cobros/buscar", label: "Buscar", icon: Search },
+    { id: "notificaciones" },
+    { id: "ventas_group" },
     { href: "/clientes", label: "Clientes", icon: Users },
+    { href: "/cobros/buscar", label: "Buscar", icon: Search },
     { href: "/inventario", label: "Inventario", icon: Boxes },
     { href: "/locales", label: "Locales y bodegas", icon: Warehouse },
     { id: "gestion_group" },
-    { id: "notificaciones" },
-    { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock, feature: "Recordatorios automáticos" },
-    { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes" },
-    { href: "/encuestas", label: "Satisfacción", icon: MessageSquare, feature: "Encuestas de satisfacción" },
     { href: "/cobros/informes", label: "Informes", icon: BarChart3 },
-    { href: "/perfil", label: "Perfil", icon: UserCircle },
+    { id: "config_group" },
   ] as Array<
     | { href: string; label: string; icon: typeof Home; feature?: string }
-    | { id: "gestion_group" | "notificaciones" }
+    | { id: "gestion_group" | "notificaciones" | "ventas_group" | "config_group" }
   >;
 
   const displayName = user
@@ -364,6 +499,12 @@ export function Layout({ children }: { children: ReactNode }) {
             if ("id" in item && item.id === "gestion_group") {
               return <GestionNavGroup key="gestion_group" closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
             }
+            if ("id" in item && item.id === "ventas_group") {
+              return <NavGroup key="ventas_group" id="ventas" label="Ventas" icon={ShoppingBag} items={VENTAS_ITEMS} closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
+            }
+            if ("id" in item && item.id === "config_group") {
+              return <NavGroup key="config_group" id="configuracion" label="Configuración" icon={Settings} items={CONFIG_ITEMS} closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
+            }
             if ("id" in item && item.id === "notificaciones") {
               return <NotificacionesNavItem key="notificaciones" location={location} onNavigate={closeMobile} />;
             }
@@ -432,6 +573,20 @@ export function Layout({ children }: { children: ReactNode }) {
               <LeadsNavItem location={location} onNavigate={closeMobile} />
             </div>
           )}
+
+          <div className="pt-3 mt-3 border-t">
+            <Link
+              href="/perfil"
+              onClick={closeMobile}
+              data-testid="nav-perfil"
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${
+                location === "/perfil" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+              }`}
+            >
+              <UserCircle className={`h-4 w-4 shrink-0 ${location === "/perfil" ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"}`} />
+              <span>Perfil</span>
+            </Link>
+          </div>
         </nav>
 
         {/* User footer */}
@@ -484,6 +639,7 @@ export function Layout({ children }: { children: ReactNode }) {
               className="h-7 w-auto"
             />
           </div>
+          <MobileBell />
         </header>
 
         <TrialBanner />

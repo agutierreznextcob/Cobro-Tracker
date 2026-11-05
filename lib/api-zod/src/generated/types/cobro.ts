@@ -10,6 +10,13 @@ import type { CobroTipoDocumento } from './cobroTipoDocumento';
 import type { ItemInventario } from './itemInventario';
 
 export interface Cobro {
+  moneda?: string;
+  decimales?: number;
+  porcentajeIva?: number;
+  /** @nullable */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  cotizacionId?: number | null;
   itemsInventario?: ItemInventario[];
   id: number;
   /** Original amount in currency units */

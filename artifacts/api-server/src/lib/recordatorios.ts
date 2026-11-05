@@ -7,6 +7,7 @@ import {
   recordatoriosEnviadosTable,
   type RecordatorioDefault,
 } from "@workspace/db";
+import { formatDocumentMoney } from "./preferencias";
 import { and, eq, isNotNull, isNull, inArray } from "drizzle-orm";
 import { sendSecuenciaRecordatorioEmail } from "./email";
 import { getRemitenteContacto } from "./org";
@@ -82,11 +83,7 @@ function buildWaMensaje(
   datosBancarios?: DatosBancariosDecrypted | null,
 ): string {
   const nombre = cobro.clienteNombre || "cliente";
-  const monto = new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(Math.round(Number(cobro.monto)));
+  const monto = formatDocumentMoney(Number(cobro.monto), cobro.moneda, cobro.decimales);
   let msg = `Hola ${nombre}, tienes un cobro pendiente de ${monto} por concepto de "${cobro.descripcion}".`;
   if (linkPago) {
     msg += ` Puedes pagar aquí: ${linkPago}`;
@@ -326,6 +323,7 @@ export async function procesarRecordatorios(
           const datosBancarios = linkPago ? null : await datosBancariosDe(cobro.responsableId);
           const result = await sendSecuenciaRecordatorioEmail(
             {
+              moneda: cobro.moneda, decimales: cobro.decimales,
               datosBancariosHtml: datosBancarios ? buildDatosBancariosHtml(datosBancarios) : null,
               emailPagador: cobro.emailPagador,
               clienteNombre: cobro.clienteNombre,

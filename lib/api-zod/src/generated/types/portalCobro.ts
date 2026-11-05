@@ -8,6 +8,8 @@
 import type { PortalCobroEstado } from './portalCobroEstado';
 
 export interface PortalCobro {
+  moneda?: string;
+  decimales?: number;
   id: number;
   descripcion: string;
   /** Net amount to charge after discount */

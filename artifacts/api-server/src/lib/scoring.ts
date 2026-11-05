@@ -145,7 +145,7 @@ export async function computeClienteScores(
   const result = new Map<number, ClienteScore>();
   if (clienteIds.length === 0) return result;
 
-  const cobroConds: SQL[] = [inArray(cobrosTable.clienteId, clienteIds)];
+  const cobroConds: SQL[] = [inArray(cobrosTable.clienteId, clienteIds), eq(cobrosTable.moneda, "CLP")];
   if (cobroScope) cobroConds.push(cobroScope);
 
   const cobros: CobroRow[] = await db
