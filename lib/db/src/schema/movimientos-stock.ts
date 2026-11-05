@@ -1,9 +1,11 @@
+import { comprasTable } from "./compras";
 import { pgTable, serial, integer, text, numeric, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { productosTable } from "./productos";
 import { createInsertSchema } from "drizzle-zod";
 import { bodegasTable } from "./bodegas";
 
 export const movimientosStockTable = pgTable("movimientos_stock", {
+  referenciaCompraId: integer("referencia_compra_id").references(() => comprasTable.id, { onDelete: "restrict" }),
   id: serial("id").primaryKey(),
   productoId: integer("producto_id").notNull().references(() => productosTable.id, { onDelete: "restrict" }),
   tipo: text("tipo").$type<"entrada" | "salida" | "ajuste">().notNull(),

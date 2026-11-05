@@ -220,7 +220,7 @@ export default function InventarioMovimientoPage() {
                         {m.tipo === "entrada" ? <ArrowDownToLine className="h-3.5 w-3.5" /> : m.tipo === "salida" ? <ArrowUpFromLine className="h-3.5 w-3.5" /> : <Scale className="h-3.5 w-3.5" />}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium capitalize">{m.tipo}{m.referenciaCobroId && <> · <Link href={`/cobros/${m.referenciaCobroId}`} className="text-primary hover:underline normal-case">Cobro #{m.referenciaCobroId}</Link></>}</p>
+                        <p className="text-sm font-medium capitalize">{m.tipo}{m.referenciaCobroId && <> · <Link href={`/cobros/${m.referenciaCobroId}`} className="text-primary hover:underline normal-case">Cobro #{m.referenciaCobroId}</Link></>}{m.referenciaCompraId && <> · <Link href={`/compras/${m.referenciaCompraId}`} className="text-primary hover:underline normal-case">Compra #{m.referenciaCompraId}</Link></>}</p>
                         <p className="text-sm text-muted-foreground break-words">{m.motivo}</p>
                         {(m.bodegaOrigenId || m.bodegaDestinoId) && (
                           <p className="text-[11px] text-muted-foreground">

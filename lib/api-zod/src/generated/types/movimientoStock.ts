@@ -8,6 +8,8 @@
 import type { MovimientoStockTipo } from './movimientoStockTipo';
 
 export interface MovimientoStock {
+  /** @nullable */
+  referenciaCompraId?: number | null;
   id: number;
   productoId: number;
   tipo: MovimientoStockTipo;

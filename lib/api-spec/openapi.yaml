@@ -33,6 +33,128 @@ tags:
   - name: encuestas
     description: Client satisfaction surveys
 paths:
+  /proveedores:
+    get:
+      operationId: listProveedores
+      responses:
+        "200":
+          description: Proveedores
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Proveedor" } }
+    post:
+      operationId: createProveedor
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProveedorInput" } }
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Proveedor" } }
+  /proveedores/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: getProveedor
+      responses:
+        "200":
+          description: Historial y estadísticas por moneda, excluyen borradores
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ProveedorDetail" } }
+    patch:
+      operationId: updateProveedor
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProveedorInput" } }
+      responses:
+        "200":
+          description: Actualizado
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Proveedor" } }
+  /compras:
+    get:
+      operationId: listCompras
+      parameters:
+        - { name: proveedorId, in: query, schema: { type: integer } }
+        - { name: estado, in: query, schema: { type: string, enum: [borrador, recibida, contabilizada] } }
+        - { name: desde, in: query, schema: { type: string } }
+        - { name: hasta, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Compras por fecha de emisión
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Compra" } }
+    post:
+      operationId: createCompra
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/CompraInput" } }
+      responses:
+        "201":
+          description: Borrador creado
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Compra" } }
+  /compras/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: getCompra
+      responses:
+        "200":
+          description: Compra y permisos
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Compra" } }
+    patch:
+      operationId: updateCompra
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/CompraInput" } }
+      responses:
+        "200":
+          description: Borrador actualizado
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Compra" } }
+    delete:
+      operationId: deleteCompra
+      responses:
+        "204": { description: Solo se eliminan borradores }
+  /compras/{id}/recepcion:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: previewRecepcionCompra
+      responses:
+        "200":
+          description: Cambios de costo que requieren decisión
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/CompraRecepcionPreview" } }
+    post:
+      operationId: recibirCompra
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/CompraRecepcionInput" } }
+      responses:
+        "200":
+          description: Recepción atómica e idempotente
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Compra" } }
+  /compras/{id}/contabilizar:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      operationId: contabilizarCompra
+      responses:
+        "200":
+          description: Marca de contabilización manual, no comunica con SII
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Compra" } }
   /indicadores:
     get:
       operationId: listIndicadores
@@ -3801,6 +3923,136 @@ paths:
 
 components:
   schemas:
+    ProveedorInput:
+      type: object
+      required: [razonSocial, rut]
+      properties:
+        razonSocial: { type: string }
+        rut: { type: string }
+        giro: { type: string }
+        direccion: { type: string }
+        email: { type: string }
+        telefono: { type: string }
+        contactoNombre: { type: string }
+        activo: { type: boolean }
+    Proveedor:
+      allOf:
+        - { $ref: "#/components/schemas/ProveedorInput" }
+        - type: object
+          required: [id, activo, createdAt]
+          properties:
+            id: { type: integer }
+            activo: { type: boolean }
+            createdAt: { type: string }
+    ProveedorDetail:
+      allOf:
+        - { $ref: "#/components/schemas/Proveedor" }
+        - type: object
+          required: [compras, totales, productosMasComprados]
+          properties:
+            compras: { type: array, items: { $ref: "#/components/schemas/Compra" } }
+            totales:
+              type: array
+              items:
+                type: object
+                required: [moneda, decimales, mesActual, acumulado]
+                properties:
+                  moneda: { type: string }
+                  decimales: { type: integer }
+                  mesActual: { type: number }
+                  acumulado: { type: number }
+            productosMasComprados:
+              type: array
+              items:
+                type: object
+                required: [productoId, descripcion, cantidad]
+                properties:
+                  productoId: { type: integer }
+                  descripcion: { type: string }
+                  cantidad: { type: number }
+    CompraItemInput:
+      type: object
+      required: [descripcion, cantidad, precioUnitario]
+      properties:
+        productoId: { type: [integer, "null"] }
+        descripcion: { type: string }
+        cantidad: { type: number }
+        precioUnitario: { type: number }
+        bodegaDestinoId: { type: [integer, "null"] }
+    CompraInput:
+      type: object
+      required: [numeroFactura, proveedorId, fechaEmision, fechaRecepcion, moneda, porcentajeIva, items]
+      properties:
+        numeroFactura: { type: string }
+        proveedorId: { type: integer }
+        fechaEmision: { type: string }
+        fechaRecepcion: { type: string }
+        moneda: { type: string, enum: [CLP, USD, EUR, UF] }
+        porcentajeIva: { type: number }
+        notas: { type: string }
+        updatedAt: { type: string, description: Required when updating an existing draft }
+        items: { type: array, items: { $ref: "#/components/schemas/CompraItemInput" } }
+    Compra:
+      allOf:
+        - { $ref: "#/components/schemas/CompraInput" }
+        - type: object
+          required: [id, proveedorNombre, estado, subtotal, montoIva, total, decimales, origen, itemsRecibidos, puedeRecibir, createdAt, updatedAt, items]
+          properties:
+            id: { type: integer }
+            proveedorNombre: { type: string }
+            estado: { type: string, enum: [borrador, recibida, contabilizada] }
+            subtotal: { type: number }
+            montoIva: { type: number }
+            total: { type: number }
+            decimales: { type: integer }
+            origen: { type: string, enum: [manual, sii] }
+            siiFolio: { type: [string, "null"] }
+            itemsRecibidos: { type: integer }
+            puedeRecibir: { type: boolean }
+            createdAt: { type: string }
+            updatedAt: { type: string }
+            items:
+              type: array
+              items:
+                allOf:
+                  - { $ref: "#/components/schemas/CompraItemInput" }
+                  - type: object
+                    required: [id, subtotalLinea, tipoProducto, costoActualizado]
+                    properties:
+                      id: { type: integer }
+                      subtotalLinea: { type: number }
+                      tipoProducto: { type: [string, "null"] }
+                      costoActualizado: { type: boolean }
+                      costoAnterior: { type: [number, "null"] }
+    CompraRecepcionPreview:
+      type: object
+      required: [cambiosCostos, updatedAt]
+      properties:
+        updatedAt: { type: string }
+        cambiosCostos:
+          type: array
+          items:
+            type: object
+            required: [productoId, nombre, costoAnterior, costoNuevo]
+            properties:
+              productoId: { type: integer }
+              nombre: { type: string }
+              costoAnterior: { type: number }
+              costoNuevo: { type: number }
+    CompraRecepcionInput:
+      type: object
+      required: [updatedAt, decisiones]
+      properties:
+        updatedAt: { type: string }
+        decisiones:
+          type: array
+          items:
+            type: object
+            required: [productoId, actualizar, costoAnterior]
+            properties:
+              productoId: { type: integer }
+              actualizar: { type: boolean }
+              costoAnterior: { type: number }
     IndicadorEconomico:
       type: object
       required: [codigo, nombre, valor, fecha, updatedAt, variacion, fechaAnterior]
@@ -5355,6 +5607,7 @@ components:
       type: object
       required: [id, productoId, tipo, cantidad, motivo, usuarioId, creadoEn]
       properties:
+        referenciaCompraId: { type: [integer, "null"] }
         id: { type: integer }
         productoId: { type: integer }
         tipo: { type: string, enum: [entrada, salida, ajuste] }

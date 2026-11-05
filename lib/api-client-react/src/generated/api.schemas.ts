@@ -5,6 +5,143 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+export interface ProveedorInput {
+  razonSocial: string;
+  rut: string;
+  giro?: string;
+  direccion?: string;
+  email?: string;
+  telefono?: string;
+  contactoNombre?: string;
+  activo?: boolean;
+}
+
+export type Proveedor = ProveedorInput & {
+  id: number;
+  activo: boolean;
+  createdAt: string;
+};
+
+export type ProveedorDetailTotalesItem = {
+  moneda: string;
+  decimales: number;
+  mesActual: number;
+  acumulado: number;
+};
+
+export type ProveedorDetailProductosMasCompradosItem = {
+  productoId: number;
+  descripcion: string;
+  cantidad: number;
+};
+
+export type CompraInputMoneda = typeof CompraInputMoneda[keyof typeof CompraInputMoneda];
+
+
+export const CompraInputMoneda = {
+  CLP: 'CLP',
+  USD: 'USD',
+  EUR: 'EUR',
+  UF: 'UF',
+} as const;
+
+export interface CompraItemInput {
+  /** @nullable */
+  productoId?: number | null;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  /** @nullable */
+  bodegaDestinoId?: number | null;
+}
+
+export interface CompraInput {
+  numeroFactura: string;
+  proveedorId: number;
+  fechaEmision: string;
+  fechaRecepcion: string;
+  moneda: CompraInputMoneda;
+  porcentajeIva: number;
+  notas?: string;
+  /** Required when updating an existing draft */
+  updatedAt?: string;
+  items: CompraItemInput[];
+}
+
+export type CompraEstado = typeof CompraEstado[keyof typeof CompraEstado];
+
+
+export const CompraEstado = {
+  borrador: 'borrador',
+  recibida: 'recibida',
+  contabilizada: 'contabilizada',
+} as const;
+
+export type CompraOrigen = typeof CompraOrigen[keyof typeof CompraOrigen];
+
+
+export const CompraOrigen = {
+  manual: 'manual',
+  sii: 'sii',
+} as const;
+
+export type CompraItemsItem = CompraItemInput & ({
+  id: number;
+  subtotalLinea: number;
+  /** @nullable */
+  tipoProducto: string | null;
+  costoActualizado: boolean;
+  /** @nullable */
+  costoAnterior?: number | null;
+});
+
+export type Compra = CompraInput & ({
+  id: number;
+  proveedorNombre: string;
+  estado: CompraEstado;
+  subtotal: number;
+  montoIva: number;
+  total: number;
+  decimales: number;
+  origen: CompraOrigen;
+  /** @nullable */
+  siiFolio?: string | null;
+  itemsRecibidos: number;
+  puedeRecibir: boolean;
+  createdAt: string;
+  updatedAt: string;
+  items: CompraItemsItem[];
+});
+
+export type ProveedorDetail = Proveedor & {
+  compras: Compra[];
+  totales: ProveedorDetailTotalesItem[];
+  productosMasComprados: ProveedorDetailProductosMasCompradosItem[];
+};
+
+export type CompraRecepcionPreviewCambiosCostosItem = {
+  productoId: number;
+  nombre: string;
+  costoAnterior: number;
+  costoNuevo: number;
+};
+
+export interface CompraRecepcionPreview {
+  updatedAt: string;
+  cambiosCostos: CompraRecepcionPreviewCambiosCostosItem[];
+}
+
+export type CompraRecepcionInputDecisionesItem = {
+  productoId: number;
+  actualizar: boolean;
+  costoAnterior: number;
+};
+
+export interface CompraRecepcionInput {
+  updatedAt: string;
+  decisiones: CompraRecepcionInputDecisionesItem[];
+}
+
 export type IndicadorEconomicoCodigo = typeof IndicadorEconomicoCodigo[keyof typeof IndicadorEconomicoCodigo];
 
 
@@ -1713,6 +1850,8 @@ export const MovimientoStockTipo = {
 } as const;
 
 export interface MovimientoStock {
+  /** @nullable */
+  referenciaCompraId?: number | null;
   id: number;
   productoId: number;
   tipo: MovimientoStockTipo;
@@ -3160,6 +3299,22 @@ export interface RendimientoEjecutivo {
  * Opaque session token — Bearer <sid>.
  */
 export type AuthorizationSessionHeaderParameter = string;
+
+export type ListComprasParams = {
+proveedorId?: number;
+estado?: ListComprasEstado;
+desde?: string;
+hasta?: string;
+};
+
+export type ListComprasEstado = typeof ListComprasEstado[keyof typeof ListComprasEstado];
+
+
+export const ListComprasEstado = {
+  borrador: 'borrador',
+  recibida: 'recibida',
+  contabilizada: 'contabilizada',
+} as const;
 
 export type GetInventarioResumen200 = {
   criticos: number;

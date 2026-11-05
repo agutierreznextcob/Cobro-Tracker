@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal } from "lucide-react";
+import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal, ShoppingCart, Truck } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus, useGetGestionResumen, getGetGestionResumenQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -295,6 +295,7 @@ const VENTAS_ITEMS: NavLeaf[] = [
     match: (l) => l === "/cobros" || (/^\/cobros\/\d+/.test(l)),
   },
   { href: "/cotizaciones", label: "Cotizaciones", icon: FileSignature, match: (l) => l === "/cotizaciones" || l.startsWith("/cotizaciones/") },
+  { href: "/compras", label: "Compras", icon: ShoppingCart, match: (l) => l === "/compras" || l.startsWith("/compras/") },
 ];
 
 const CONFIG_ITEMS: NavLeaf[] = [
@@ -417,6 +418,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { id: "ventas_group" },
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
+    { href: "/proveedores", label: "Proveedores", icon: Truck },
     { href: "/inventario", label: "Inventario", icon: Boxes },
     { href: "/locales", label: "Locales y bodegas", icon: Warehouse },
     { id: "gestion_group" },

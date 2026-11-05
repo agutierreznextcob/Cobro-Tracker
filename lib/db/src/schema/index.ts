@@ -1,3 +1,6 @@
+export * from "./proveedores";
+export * from "./compras";
+export * from "./compra-items";
 export * from "./indicadores-economicos";
 export * from "./preferencias";
 export * from "./cotizaciones";

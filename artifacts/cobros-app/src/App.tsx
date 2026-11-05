@@ -36,6 +36,12 @@ import EncuestaPublicaPage from "@/pages/encuesta-publica";
 import ConsultorLoginPage from "@/pages/consultor-login";
 import InvitacionPage from "@/pages/invitacion";
 import InventarioPage from "@/pages/inventario";
+import ComprasPage from "@/pages/compras";
+import CompraFormPage from "@/pages/compra-form";
+import CompraDetailPage from "@/pages/compra-detail";
+import ProveedoresPage from "@/pages/proveedores";
+import ProveedorNuevoPage from "@/pages/proveedor-nuevo";
+import ProveedorDetailPage from "@/pages/proveedor-detail";
 import InventarioFormPage from "@/pages/inventario-form";
 import InventarioMovimientoPage from "@/pages/inventario-movimiento";
 import LocalesPage from "@/pages/locales";
@@ -221,6 +227,55 @@ function AppRouter() {
             </Layout>
           </AuthGate>
         )}
+      </Route>
+      <Route path="/compras">
+        <AuthGate>
+          <Layout>
+            <ComprasPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/compras/nueva">
+        <AuthGate>
+          <Layout>
+            <CompraFormPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/compras/:id/editar">
+        <AuthGate>
+          <Layout>
+            <CompraFormPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/compras/:id">
+        <AuthGate>
+          <Layout>
+            <CompraDetailPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/proveedores">
+        <AuthGate>
+          <Layout>
+            <ProveedoresPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/proveedores/nuevo">
+        <AuthGate>
+          <Layout>
+            <ProveedorNuevoPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/proveedores/:id">
+        <AuthGate>
+          <Layout>
+            <ProveedorDetailPage />
+          </Layout>
+        </AuthGate>
       </Route>
       <Route path="/inventario">
         <AuthGate>

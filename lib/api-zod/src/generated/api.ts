@@ -8,6 +8,462 @@
 import * as zod from 'zod';
 
 
+export const ListProveedoresResponseItem = zod.object({
+  "razonSocial": zod.string(),
+  "rut": zod.string(),
+  "giro": zod.string().optional(),
+  "direccion": zod.string().optional(),
+  "email": zod.string().optional(),
+  "telefono": zod.string().optional(),
+  "contactoNombre": zod.string().optional(),
+  "activo": zod.boolean().optional()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "createdAt": zod.string()
+}))
+export const ListProveedoresResponse = zod.array(ListProveedoresResponseItem)
+
+
+export const CreateProveedorBody = zod.object({
+  "razonSocial": zod.string(),
+  "rut": zod.string(),
+  "giro": zod.string().optional(),
+  "direccion": zod.string().optional(),
+  "email": zod.string().optional(),
+  "telefono": zod.string().optional(),
+  "contactoNombre": zod.string().optional(),
+  "activo": zod.boolean().optional()
+})
+
+
+export const GetProveedorParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetProveedorResponse = zod.object({
+  "razonSocial": zod.string(),
+  "rut": zod.string(),
+  "giro": zod.string().optional(),
+  "direccion": zod.string().optional(),
+  "email": zod.string().optional(),
+  "telefono": zod.string().optional(),
+  "contactoNombre": zod.string().optional(),
+  "activo": zod.boolean().optional()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "createdAt": zod.string()
+})).and(zod.object({
+  "compras": zod.array(zod.object({
+  "numeroFactura": zod.string(),
+  "proveedorId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaRecepcion": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "porcentajeIva": zod.number(),
+  "notas": zod.string().optional(),
+  "updatedAt": zod.string().optional().describe('Required when updating an existing draft'),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}))
+}).and(zod.object({
+  "id": zod.number(),
+  "proveedorNombre": zod.string(),
+  "estado": zod.enum(['borrador', 'recibida', 'contabilizada']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "decimales": zod.number(),
+  "origen": zod.enum(['manual', 'sii']),
+  "siiFolio": zod.string().nullish(),
+  "itemsRecibidos": zod.number(),
+  "puedeRecibir": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number(),
+  "tipoProducto": zod.string().nullable(),
+  "costoActualizado": zod.boolean(),
+  "costoAnterior": zod.number().nullish()
+})))
+}))),
+  "totales": zod.array(zod.object({
+  "moneda": zod.string(),
+  "decimales": zod.number(),
+  "mesActual": zod.number(),
+  "acumulado": zod.number()
+})),
+  "productosMasComprados": zod.array(zod.object({
+  "productoId": zod.number(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number()
+}))
+}))
+
+
+export const UpdateProveedorParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateProveedorBody = zod.object({
+  "razonSocial": zod.string(),
+  "rut": zod.string(),
+  "giro": zod.string().optional(),
+  "direccion": zod.string().optional(),
+  "email": zod.string().optional(),
+  "telefono": zod.string().optional(),
+  "contactoNombre": zod.string().optional(),
+  "activo": zod.boolean().optional()
+})
+
+export const UpdateProveedorResponse = zod.object({
+  "razonSocial": zod.string(),
+  "rut": zod.string(),
+  "giro": zod.string().optional(),
+  "direccion": zod.string().optional(),
+  "email": zod.string().optional(),
+  "telefono": zod.string().optional(),
+  "contactoNombre": zod.string().optional(),
+  "activo": zod.boolean().optional()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "createdAt": zod.string()
+}))
+
+
+export const ListComprasQueryParams = zod.object({
+  "proveedorId": zod.coerce.number().optional(),
+  "estado": zod.enum(['borrador', 'recibida', 'contabilizada']).optional(),
+  "desde": zod.coerce.string().optional(),
+  "hasta": zod.coerce.string().optional()
+})
+
+export const ListComprasResponseItem = zod.object({
+  "numeroFactura": zod.string(),
+  "proveedorId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaRecepcion": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "porcentajeIva": zod.number(),
+  "notas": zod.string().optional(),
+  "updatedAt": zod.string().optional().describe('Required when updating an existing draft'),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}))
+}).and(zod.object({
+  "id": zod.number(),
+  "proveedorNombre": zod.string(),
+  "estado": zod.enum(['borrador', 'recibida', 'contabilizada']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "decimales": zod.number(),
+  "origen": zod.enum(['manual', 'sii']),
+  "siiFolio": zod.string().nullish(),
+  "itemsRecibidos": zod.number(),
+  "puedeRecibir": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number(),
+  "tipoProducto": zod.string().nullable(),
+  "costoActualizado": zod.boolean(),
+  "costoAnterior": zod.number().nullish()
+})))
+}))
+export const ListComprasResponse = zod.array(ListComprasResponseItem)
+
+
+export const CreateCompraBody = zod.object({
+  "numeroFactura": zod.string(),
+  "proveedorId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaRecepcion": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "porcentajeIva": zod.number(),
+  "notas": zod.string().optional(),
+  "updatedAt": zod.string().optional().describe('Required when updating an existing draft'),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}))
+})
+
+
+export const GetCompraParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCompraResponse = zod.object({
+  "numeroFactura": zod.string(),
+  "proveedorId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaRecepcion": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "porcentajeIva": zod.number(),
+  "notas": zod.string().optional(),
+  "updatedAt": zod.string().optional().describe('Required when updating an existing draft'),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}))
+}).and(zod.object({
+  "id": zod.number(),
+  "proveedorNombre": zod.string(),
+  "estado": zod.enum(['borrador', 'recibida', 'contabilizada']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "decimales": zod.number(),
+  "origen": zod.enum(['manual', 'sii']),
+  "siiFolio": zod.string().nullish(),
+  "itemsRecibidos": zod.number(),
+  "puedeRecibir": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number(),
+  "tipoProducto": zod.string().nullable(),
+  "costoActualizado": zod.boolean(),
+  "costoAnterior": zod.number().nullish()
+})))
+}))
+
+
+export const UpdateCompraParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCompraBody = zod.object({
+  "numeroFactura": zod.string(),
+  "proveedorId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaRecepcion": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "porcentajeIva": zod.number(),
+  "notas": zod.string().optional(),
+  "updatedAt": zod.string().optional().describe('Required when updating an existing draft'),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}))
+})
+
+export const UpdateCompraResponse = zod.object({
+  "numeroFactura": zod.string(),
+  "proveedorId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaRecepcion": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "porcentajeIva": zod.number(),
+  "notas": zod.string().optional(),
+  "updatedAt": zod.string().optional().describe('Required when updating an existing draft'),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}))
+}).and(zod.object({
+  "id": zod.number(),
+  "proveedorNombre": zod.string(),
+  "estado": zod.enum(['borrador', 'recibida', 'contabilizada']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "decimales": zod.number(),
+  "origen": zod.enum(['manual', 'sii']),
+  "siiFolio": zod.string().nullish(),
+  "itemsRecibidos": zod.number(),
+  "puedeRecibir": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number(),
+  "tipoProducto": zod.string().nullable(),
+  "costoActualizado": zod.boolean(),
+  "costoAnterior": zod.number().nullish()
+})))
+}))
+
+
+export const DeleteCompraParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const PreviewRecepcionCompraParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PreviewRecepcionCompraResponse = zod.object({
+  "updatedAt": zod.string(),
+  "cambiosCostos": zod.array(zod.object({
+  "productoId": zod.number(),
+  "nombre": zod.string(),
+  "costoAnterior": zod.number(),
+  "costoNuevo": zod.number()
+}))
+})
+
+
+export const RecibirCompraParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RecibirCompraBody = zod.object({
+  "updatedAt": zod.string(),
+  "decisiones": zod.array(zod.object({
+  "productoId": zod.number(),
+  "actualizar": zod.boolean(),
+  "costoAnterior": zod.number()
+}))
+})
+
+export const RecibirCompraResponse = zod.object({
+  "numeroFactura": zod.string(),
+  "proveedorId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaRecepcion": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "porcentajeIva": zod.number(),
+  "notas": zod.string().optional(),
+  "updatedAt": zod.string().optional().describe('Required when updating an existing draft'),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}))
+}).and(zod.object({
+  "id": zod.number(),
+  "proveedorNombre": zod.string(),
+  "estado": zod.enum(['borrador', 'recibida', 'contabilizada']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "decimales": zod.number(),
+  "origen": zod.enum(['manual', 'sii']),
+  "siiFolio": zod.string().nullish(),
+  "itemsRecibidos": zod.number(),
+  "puedeRecibir": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number(),
+  "tipoProducto": zod.string().nullable(),
+  "costoActualizado": zod.boolean(),
+  "costoAnterior": zod.number().nullish()
+})))
+}))
+
+
+export const ContabilizarCompraParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ContabilizarCompraResponse = zod.object({
+  "numeroFactura": zod.string(),
+  "proveedorId": zod.number(),
+  "fechaEmision": zod.string(),
+  "fechaRecepcion": zod.string(),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
+  "porcentajeIva": zod.number(),
+  "notas": zod.string().optional(),
+  "updatedAt": zod.string().optional().describe('Required when updating an existing draft'),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}))
+}).and(zod.object({
+  "id": zod.number(),
+  "proveedorNombre": zod.string(),
+  "estado": zod.enum(['borrador', 'recibida', 'contabilizada']),
+  "subtotal": zod.number(),
+  "montoIva": zod.number(),
+  "total": zod.number(),
+  "decimales": zod.number(),
+  "origen": zod.enum(['manual', 'sii']),
+  "siiFolio": zod.string().nullish(),
+  "itemsRecibidos": zod.number(),
+  "puedeRecibir": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "items": zod.array(zod.object({
+  "productoId": zod.number().nullish(),
+  "descripcion": zod.string(),
+  "cantidad": zod.number(),
+  "precioUnitario": zod.number(),
+  "bodegaDestinoId": zod.number().nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "subtotalLinea": zod.number(),
+  "tipoProducto": zod.string().nullable(),
+  "costoActualizado": zod.boolean(),
+  "costoAnterior": zod.number().nullish()
+})))
+}))
+
+
 export const ListIndicadoresResponseItem = zod.object({
   "codigo": zod.enum(['uf', 'dolar', 'euro', 'utm', 'ivp']),
   "nombre": zod.string(),
@@ -1186,6 +1642,7 @@ export const ListMovimientosStockParams = zod.object({
 })
 
 export const ListMovimientosStockResponseItem = zod.object({
+  "referenciaCompraId": zod.number().nullish(),
   "id": zod.number(),
   "productoId": zod.number(),
   "tipo": zod.enum(['entrada', 'salida', 'ajuste']),
