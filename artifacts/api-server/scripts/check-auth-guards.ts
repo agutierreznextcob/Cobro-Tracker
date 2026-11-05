@@ -21,6 +21,7 @@
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { findUnscopedUses } from "./auth-guard-analysis";
 
 const routesDir = join(dirname(fileURLToPath(import.meta.url)), "../src/routes");
 
@@ -32,7 +33,6 @@ const ALLOWED_BLANKET_GUARD_FILES = new Set([
   "cobros.ts",
   "clientes.ts",
   "liquidaciones.ts",
-  "ai.ts",
   "profile.ts",
   "subscription.ts",
   "workflows.ts",
@@ -84,18 +84,10 @@ if (mountOrder.length === 0) {
 
 const errors: string[] = [];
 
-// Detecta `.use(` sin path (primer argumento no es string literal) en cada router.
+// Acepta prefijos literales o arrays literales no vacíos de prefijos seguros.
+// Lo dinámico/desconocido se trata conservadoramente como no delimitado.
 function hasBlanketUse(file: string): { line: number; text: string }[] {
-  const src = stripComments(readFileSync(join(routesDir, file), "utf8"));
-  const hits: { line: number; text: string }[] = [];
-  const lines = src.split("\n");
-  lines.forEach((line, i) => {
-    const m = line.match(/[\w$]+Router\.use\(\s*(.)/) ?? line.match(/\brouter\.use\(\s*(.)/i);
-    if (m && !["\"", "'", "`"].includes(m[1])) {
-      hits.push({ line: i + 1, text: line.trim() });
-    }
-  });
-  return hits;
+  return findUnscopedUses(readFileSync(join(routesDir, file), "utf8"));
 }
 
 const publicMountPositions = mountOrder
@@ -110,9 +102,9 @@ for (const [idx, file] of mountOrder.entries()) {
   if (blanketUses.length > 0 && !allowed) {
     for (const hit of blanketUses) {
       errors.push(
-        `routes/${file}:${hit.line} — \`.use()\` SIN path en router montado en la cadena /api:\n` +
+        `routes/${file}:${hit.line} — \`.use()\` SIN prefijo seguro verificable en router montado en la cadena /api:\n` +
           `    ${hit.text}\n` +
-          `  Esto intercepta TODAS las rutas montadas después (incluidas las públicas).\n` +
+          `  Puede interceptar las rutas montadas después (incluidas las públicas).\n` +
           `  Delimita el guard por prefijo (p. ej. router.use("/miprefijo", guard), ver gestiones.ts)\n` +
           `  o, si el blanket guard es intencional y el router se monta después de todas las rutas\n` +
           `  públicas, agrégalo a ALLOWED_BLANKET_GUARD_FILES en scripts/check-auth-guards.ts.`,
