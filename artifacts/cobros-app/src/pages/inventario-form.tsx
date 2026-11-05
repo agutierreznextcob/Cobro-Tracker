@@ -6,6 +6,8 @@ import {
   useUpdateProducto,
   useGetProducto,
   getGetProductoQueryKey,
+  useListBodegas,
+  getListBodegasQueryKey,
   type ProductoInput,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -15,10 +17,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
 import {
   apiErrorMessage,
+  capitalizar,
+  CODIGO_RE,
+  etiquetaUbicacion,
+  unidadesPara,
   formatPct,
   formatQty,
   invalidateInventario,
@@ -27,7 +34,7 @@ import {
   utilidadDe,
   type MetodoCalculo,
 } from "@/lib/inventario";
-import { ArrowLeft, ArrowLeftRight, Check, Loader2, Lock, Package, RotateCw, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, Loader2, Lock, Package, RotateCw, Warehouse, Wrench } from "lucide-react";
 
 type Tipo = "producto" | "servicio";
 
@@ -56,7 +63,16 @@ export default function InventarioFormPage() {
     query: { enabled: isEdit, queryKey: getGetProductoQueryKey(id), staleTime: 0, refetchOnMount: "always" },
   });
 
+  const bodegasQ = useListBodegas({ query: { queryKey: getListBodegasQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
+  const bodegas = bodegasQ.data ?? [];
+  const hayBodegas = bodegas.length > 0;
+
   const [tipo, setTipo] = useState<Tipo>("producto");
+  const [codigoInterno, setCodigoInterno] = useState("");
+  const [sku, setSku] = useState("");
+  const [codigoBarras, setCodigoBarras] = useState(() => (isEdit ? "" : new URLSearchParams(window.location.search).get("codigoBarras") ?? ""));
+  const [bodegaId, setBodegaId] = useState("");
+  const [unidadLegacy, setUnidadLegacy] = useState<string | null>(null);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [unidad, setUnidad] = useState("unidad");
@@ -79,7 +95,12 @@ export default function InventarioFormPage() {
     setTipo(producto.tipo as Tipo);
     setNombre(producto.nombre);
     setDescripcion(producto.descripcion ?? "");
-    setUnidad(producto.unidadMedida || "unidad");
+    const u = producto.unidadMedida || (producto.tipo === "servicio" ? "hora" : "unidad");
+    setUnidad(u);
+    setUnidadLegacy(unidadesPara(producto.tipo as Tipo).includes(u) ? null : u);
+    setCodigoInterno(producto.codigoInterno ?? "");
+    setSku(producto.sku ?? "");
+    setCodigoBarras(producto.codigoBarras ?? "");
     setActivo(producto.activo);
     setCosto(String(producto.costoUnitario ?? 0));
     setMetodo((producto.metodoCalculo as MetodoCalculo) ?? "margen");
@@ -118,7 +139,14 @@ export default function InventarioFormPage() {
     if (pctInvalido) { toast({ title: "Margen inválido", description: "El margen debe ser menor a 100%.", variant: "destructive" }); return; }
     if (tipo === "servicio" && (factor < 1 || factor > 2)) { toast({ title: "Factor fuera de rango", variant: "destructive" }); return; }
 
+    if (codigoInterno.trim() && !CODIGO_RE.test(codigoInterno.trim())) { toast({ title: "Código interno inválido", description: "Usa solo letras, números y guiones.", variant: "destructive" }); return; }
+    if (isEdit && !codigoInterno.trim()) { toast({ title: "Falta el código interno", variant: "destructive" }); return; }
+    if (!isEdit && tipo === "producto" && hayBodegas && !bodegaId) { toast({ title: "Elige una bodega", description: "Indica dónde queda el stock inicial.", variant: "destructive" }); return; }
+
     const data: ProductoInput = {
+      codigoInterno: codigoInterno.trim() || undefined,
+      sku: sku.trim(),
+      codigoBarras: codigoBarras.trim(),
       nombre: nombre.trim(),
       descripcion: descripcion.trim() || undefined,
       tipo,
@@ -130,7 +158,8 @@ export default function InventarioFormPage() {
     if (tipo === "producto") {
       data.metodoCalculo = metodo;
       data.margenPorcentaje = Number.isNaN(pctN) ? undefined : pctN;
-      data.stockCritico = Math.max(0, num(stockCritico) || 0);
+      if (!(isEdit && hayBodegas)) data.stockCritico = Math.max(0, num(stockCritico) || 0);
+      if (!isEdit && hayBodegas) data.bodegaId = Number(bodegaId);
       if (!isEdit) data.stockActual = Math.max(0, num(stockInicial) || 0);
     } else {
       data.tarifaHora = Number.isNaN(num(tarifa)) ? null : num(tarifa);
@@ -199,7 +228,7 @@ export default function InventarioFormPage() {
                   const sel = tipo === t;
                   return (
                     <button key={t} type="button" disabled={isEdit}
-                      onClick={() => { setTipo(t); setPrecioManual(false); }}
+                      onClick={() => { setTipo(t); setPrecioManual(false); if (!unidadesPara(t).includes(unidad)) setUnidad(t === "servicio" ? "hora" : "unidad"); }}
                       className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${sel ? "border-primary bg-primary/5" : "border-border/60 hover:bg-secondary/50"} ${isEdit && !sel ? "opacity-40" : ""} disabled:cursor-not-allowed`}>
                       <Icon className={`h-5 w-5 ${sel ? "text-primary" : "text-muted-foreground"}`} />
                       <div>
@@ -213,7 +242,24 @@ export default function InventarioFormPage() {
               {isEdit && <p className="text-xs text-muted-foreground -mt-2">El tipo no se puede cambiar después de crearlo.</p>}
               <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
                 <div className="space-y-1.5"><Label>Nombre</Label><Input value={nombre} maxLength={200} onChange={(e) => setNombre(e.target.value)} placeholder={tipo === "producto" ? "Ej: Cartucho tóner HP 85A" : "Ej: Mantención preventiva"} /></div>
-                <div className="space-y-1.5"><Label>Unidad de medida</Label><Input value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="unidad, kg, hora" /></div>
+                <div className="space-y-1.5"><Label>Unidad de medida</Label>
+                  <Select value={unidad} onValueChange={setUnidad}>
+                    <SelectTrigger data-testid="select-unidad"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {unidadLegacy && unidadLegacy === unidad && !unidadesPara(tipo).includes(unidadLegacy) && (
+                        <SelectItem value={unidadLegacy}>{unidadLegacy} (actual)</SelectItem>
+                      )}
+                      {unidadesPara(tipo).map((u) => <SelectItem key={u} value={u}>{capitalizar(u)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5"><Label>Código interno</Label>
+                  <Input value={codigoInterno} maxLength={50} onChange={(e) => setCodigoInterno(e.target.value.toUpperCase())} className={`font-mono ${codigoInterno && !CODIGO_RE.test(codigoInterno) ? "border-red-500" : ""}`} placeholder={isEdit ? "" : "Automático (PROD-0001)"} data-testid="input-codigo-interno" />
+                  <p className="text-[11px] text-muted-foreground">{isEdit ? "Letras, números y guiones." : "Déjalo vacío para generarlo solo."}</p></div>
+                <div className="space-y-1.5"><Label>SKU (opcional)</Label><Input value={sku} maxLength={100} onChange={(e) => setSku(e.target.value)} className="font-mono" data-testid="input-sku" /></div>
+                <div className="space-y-1.5"><Label>Código de barras (opcional)</Label><Input value={codigoBarras} maxLength={100} onChange={(e) => setCodigoBarras(e.target.value)} className="font-mono" placeholder="EAN / UPC" data-testid="input-codigo-barras" /></div>
               </div>
               <div className="space-y-1.5"><Label>Descripción (opcional)</Label><Textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} className="resize-none h-20" /></div>
             </CardContent>
@@ -288,8 +334,17 @@ export default function InventarioFormPage() {
             <Card className="shadow-sm">
               <CardHeader className="pb-3"><CardTitle className="text-base">Stock</CardTitle></CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2">
+                {!isEdit && hayBodegas && (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label>Bodega donde queda el stock inicial</Label>
+                    <Select value={bodegaId} onValueChange={setBodegaId}>
+                      <SelectTrigger data-testid="select-bodega-inicial"><SelectValue placeholder="Selecciona una bodega" /></SelectTrigger>
+                      <SelectContent>{bodegas.map((b) => <SelectItem key={b.id} value={String(b.id)}>{etiquetaUbicacion({ localNombre: b.localNombre, bodegaNombre: b.nombre })}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-1.5">
-                  <Label>{isEdit ? "Stock actual" : "Stock inicial"}</Label>
+                  <Label>{isEdit ? "Stock actual (total)" : "Stock inicial"}</Label>
                   {isEdit ? (
                     <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 h-10">
                       <span className="font-mono">{formatQty(producto?.stockActual ?? 0)}</span>
@@ -300,11 +355,28 @@ export default function InventarioFormPage() {
                   )}
                   {isEdit && <p className="text-xs text-muted-foreground">El stock solo cambia mediante movimientos o cobros pagados.</p>}
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Stock crítico</Label>
-                  <Input type="number" min="0" step="any" className="font-mono" value={stockCritico} onChange={(e) => setStockCritico(e.target.value)} />
-                  <p className="text-xs text-muted-foreground">Bajo o igual a este nivel se marca en rojo.</p>
-                </div>
+                {isEdit && hayBodegas ? (
+                  <div className="space-y-1.5">
+                    <Label>Stock crítico por bodega</Label>
+                    <div className="rounded-md border divide-y" data-testid="list-ubicaciones-critico">
+                      {(producto?.ubicaciones ?? []).length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-muted-foreground">Sin stock en bodegas todavía.</p>
+                      ) : producto!.ubicaciones!.map((u) => (
+                        <Link key={u.bodegaId} href={`/bodegas/${u.bodegaId}`} className="flex items-center justify-between gap-2 px-3 py-2 text-xs hover:bg-muted/40">
+                          <span className="flex items-center gap-1.5 truncate"><Warehouse className="h-3 w-3 shrink-0" />{etiquetaUbicacion(u)}</span>
+                          <span className="font-mono shrink-0">{formatQty(u.stockActual)} · mín {formatQty(u.stockCritico)}</span>
+                        </Link>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Con bodegas, el umbral se define en cada bodega. Abre una para editarlo.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label>Stock crítico{!isEdit && hayBodegas ? " (en esta bodega)" : ""}</Label>
+                    <Input type="number" min="0" step="any" className="font-mono" value={stockCritico} onChange={(e) => setStockCritico(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Bajo o igual a este nivel se marca en rojo.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

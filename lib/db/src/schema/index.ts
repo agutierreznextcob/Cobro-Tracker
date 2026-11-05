@@ -1,4 +1,7 @@
 export * from "./productos";
+export * from "./locales";
+export * from "./bodegas";
+export * from "./stock-por-bodega";
 export * from "./movimientos-stock";
 export * from "./organizaciones";
 export * from "./invitaciones";

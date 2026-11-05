@@ -10,6 +10,8 @@ import type { ItemInventarioTipo } from './itemInventarioTipo';
 export interface ItemInventario {
   /** @minimum 1 */
   productoId: number;
+  /** @nullable */
+  bodegaId?: number | null;
   /** @exclusiveMinimum 0 */
   cantidad: number;
   /** @minimum 0 */

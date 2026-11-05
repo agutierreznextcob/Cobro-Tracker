@@ -38,6 +38,11 @@ import InvitacionPage from "@/pages/invitacion";
 import InventarioPage from "@/pages/inventario";
 import InventarioFormPage from "@/pages/inventario-form";
 import InventarioMovimientoPage from "@/pages/inventario-movimiento";
+import LocalesPage from "@/pages/locales";
+import LocalNuevoPage from "@/pages/local-nuevo";
+import LocalDetailPage from "@/pages/local-detail";
+import BodegaNuevaPage from "@/pages/bodega-nueva";
+import BodegaDetailPage from "@/pages/bodega-detail";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -238,6 +243,41 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <InventarioMovimientoPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/locales">
+        <AuthGate>
+          <Layout>
+            <LocalesPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/locales/nuevo">
+        <AuthGate>
+          <Layout>
+            <LocalNuevoPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/locales/:id">
+        <AuthGate>
+          <Layout>
+            <LocalDetailPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/bodegas/nueva">
+        <AuthGate>
+          <Layout>
+            <BodegaNuevaPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/bodegas/:id">
+        <AuthGate>
+          <Layout>
+            <BodegaDetailPage />
           </Layout>
         </AuthGate>
       </Route>

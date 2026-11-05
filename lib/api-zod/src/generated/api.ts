@@ -8,7 +8,281 @@
 import * as zod from 'zod';
 
 
+export const listLocalesResponseOneNombreMax = 200;
+
+export const listLocalesResponseOneDireccionMax = 500;
+
+export const listLocalesResponseTwoBodegasItemOneNombreMax = 200;
+
+
+export const listLocalesResponseTwoBodegasItemOneDescripcionMax = 1000;
+
+
+
+export const ListLocalesResponseItem = zod.object({
+  "nombre": zod.string().min(1).max(listLocalesResponseOneNombreMax),
+  "direccion": zod.string().max(listLocalesResponseOneDireccionMax).optional()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "creadoEn": zod.string(),
+  "stockTotal": zod.number(),
+  "bodegas": zod.array(zod.object({
+  "nombre": zod.string().min(1).max(listLocalesResponseTwoBodegasItemOneNombreMax),
+  "localId": zod.number().min(1),
+  "descripcion": zod.string().max(listLocalesResponseTwoBodegasItemOneDescripcionMax).optional()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "creadoEn": zod.string(),
+  "localNombre": zod.string(),
+  "stockTotal": zod.number()
+})))
+}))
+export const ListLocalesResponse = zod.array(ListLocalesResponseItem)
+
+
+export const createLocalBodyNombreMax = 200;
+
+export const createLocalBodyDireccionMax = 500;
+
+
+
+export const CreateLocalBody = zod.object({
+  "nombre": zod.string().min(1).max(createLocalBodyNombreMax),
+  "direccion": zod.string().max(createLocalBodyDireccionMax).optional()
+})
+
+
+export const GetLocalParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getLocalResponseOneNombreMax = 200;
+
+export const getLocalResponseOneDireccionMax = 500;
+
+export const getLocalResponseTwoBodegasItemOneNombreMax = 200;
+
+
+export const getLocalResponseTwoBodegasItemOneDescripcionMax = 1000;
+
+
+
+export const GetLocalResponse = zod.object({
+  "nombre": zod.string().min(1).max(getLocalResponseOneNombreMax),
+  "direccion": zod.string().max(getLocalResponseOneDireccionMax).optional()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "creadoEn": zod.string(),
+  "stockTotal": zod.number(),
+  "bodegas": zod.array(zod.object({
+  "nombre": zod.string().min(1).max(getLocalResponseTwoBodegasItemOneNombreMax),
+  "localId": zod.number().min(1),
+  "descripcion": zod.string().max(getLocalResponseTwoBodegasItemOneDescripcionMax).optional()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "creadoEn": zod.string(),
+  "localNombre": zod.string(),
+  "stockTotal": zod.number()
+})))
+}))
+
+
+export const listBodegasResponseOneNombreMax = 200;
+
+
+export const listBodegasResponseOneDescripcionMax = 1000;
+
+
+
+export const ListBodegasResponseItem = zod.object({
+  "nombre": zod.string().min(1).max(listBodegasResponseOneNombreMax),
+  "localId": zod.number().min(1),
+  "descripcion": zod.string().max(listBodegasResponseOneDescripcionMax).optional()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "creadoEn": zod.string(),
+  "localNombre": zod.string(),
+  "stockTotal": zod.number()
+}))
+export const ListBodegasResponse = zod.array(ListBodegasResponseItem)
+
+
+export const createBodegaBodyNombreMax = 200;
+
+
+export const createBodegaBodyDescripcionMax = 1000;
+
+
+
+export const CreateBodegaBody = zod.object({
+  "nombre": zod.string().min(1).max(createBodegaBodyNombreMax),
+  "localId": zod.number().min(1),
+  "descripcion": zod.string().max(createBodegaBodyDescripcionMax).optional()
+})
+
+
+export const GetBodegaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getBodegaResponseOneOneNombreMax = 200;
+
+
+export const getBodegaResponseOneOneDescripcionMax = 1000;
+
+export const getBodegaResponseTwoProductosItemOneNombreMax = 200;
+
+export const getBodegaResponseTwoProductosItemOneCodigoInternoMax = 80;
+
+export const getBodegaResponseTwoProductosItemOneSkuMax = 120;
+
+export const getBodegaResponseTwoProductosItemOneCodigoBarrasMax = 120;
+
+export const getBodegaResponseTwoProductosItemOneCostoUnitarioMin = 0;
+
+export const getBodegaResponseTwoProductosItemOnePrecioUnitarioMin = 0;
+
+export const getBodegaResponseTwoProductosItemOneStockCriticoMin = 0;
+
+export const getBodegaResponseTwoProductosItemOneFactorFactibilidadMax = 2;
+
+
+
+export const GetBodegaResponse = zod.object({
+  "nombre": zod.string().min(1).max(getBodegaResponseOneOneNombreMax),
+  "localId": zod.number().min(1),
+  "descripcion": zod.string().max(getBodegaResponseOneOneDescripcionMax).optional()
+}).and(zod.object({
+  "id": zod.number(),
+  "activo": zod.boolean(),
+  "creadoEn": zod.string(),
+  "localNombre": zod.string(),
+  "stockTotal": zod.number()
+})).and(zod.object({
+  "productos": zod.array(zod.object({
+  "nombre": zod.string().min(1).max(getBodegaResponseTwoProductosItemOneNombreMax),
+  "codigoInterno": zod.string().max(getBodegaResponseTwoProductosItemOneCodigoInternoMax).optional(),
+  "sku": zod.string().max(getBodegaResponseTwoProductosItemOneSkuMax).optional(),
+  "codigoBarras": zod.string().max(getBodegaResponseTwoProductosItemOneCodigoBarrasMax).optional(),
+  "bodegaId": zod.number().nullish().describe('Bodega inicial al crear un producto.'),
+  "descripcion": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']),
+  "costoUnitario": zod.number().min(getBodegaResponseTwoProductosItemOneCostoUnitarioMin),
+  "precioUnitario": zod.number().min(getBodegaResponseTwoProductosItemOnePrecioUnitarioMin),
+  "margenPorcentaje": zod.number().optional(),
+  "metodoCalculo": zod.enum(['margen', 'recargo']).optional(),
+  "stockActual": zod.number().nullish(),
+  "stockCritico": zod.number().min(getBodegaResponseTwoProductosItemOneStockCriticoMin).optional(),
+  "unidadMedida": zod.string().optional(),
+  "activo": zod.boolean().optional(),
+  "tarifaHora": zod.number().nullish(),
+  "tiempoEstimadoHoras": zod.number().nullish(),
+  "factorFactibilidad": zod.number().min(1).max(getBodegaResponseTwoProductosItemOneFactorFactibilidadMax).nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "ubicaciones": zod.array(zod.object({
+  "bodegaId": zod.number(),
+  "bodegaNombre": zod.string(),
+  "localId": zod.number(),
+  "localNombre": zod.string(),
+  "stockActual": zod.number(),
+  "stockCritico": zod.number()
+})).optional(),
+  "activo": zod.boolean(),
+  "stockCritico": zod.number(),
+  "precioCalculado": zod.number().nullable(),
+  "utilidad": zod.number(),
+  "margenReal": zod.number(),
+  "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
+  "creadoEn": zod.string(),
+  "actualizadoEn": zod.string()
+})))
+}))
+
+
+export const UpdateStockCriticoBodegaParams = zod.object({
+  "id": zod.coerce.number(),
+  "productoId": zod.coerce.number()
+})
+
+export const updateStockCriticoBodegaBodyStockCriticoMin = 0;
+
+
+
+export const UpdateStockCriticoBodegaBody = zod.object({
+  "stockCritico": zod.number().min(updateStockCriticoBodegaBodyStockCriticoMin)
+})
+
+export const updateStockCriticoBodegaResponseOneNombreMax = 200;
+
+export const updateStockCriticoBodegaResponseOneCodigoInternoMax = 80;
+
+export const updateStockCriticoBodegaResponseOneSkuMax = 120;
+
+export const updateStockCriticoBodegaResponseOneCodigoBarrasMax = 120;
+
+export const updateStockCriticoBodegaResponseOneCostoUnitarioMin = 0;
+
+export const updateStockCriticoBodegaResponseOnePrecioUnitarioMin = 0;
+
+export const updateStockCriticoBodegaResponseOneStockCriticoMin = 0;
+
+export const updateStockCriticoBodegaResponseOneFactorFactibilidadMax = 2;
+
+
+
+export const UpdateStockCriticoBodegaResponse = zod.object({
+  "nombre": zod.string().min(1).max(updateStockCriticoBodegaResponseOneNombreMax),
+  "codigoInterno": zod.string().max(updateStockCriticoBodegaResponseOneCodigoInternoMax).optional(),
+  "sku": zod.string().max(updateStockCriticoBodegaResponseOneSkuMax).optional(),
+  "codigoBarras": zod.string().max(updateStockCriticoBodegaResponseOneCodigoBarrasMax).optional(),
+  "bodegaId": zod.number().nullish().describe('Bodega inicial al crear un producto.'),
+  "descripcion": zod.string().optional(),
+  "tipo": zod.enum(['producto', 'servicio']),
+  "costoUnitario": zod.number().min(updateStockCriticoBodegaResponseOneCostoUnitarioMin),
+  "precioUnitario": zod.number().min(updateStockCriticoBodegaResponseOnePrecioUnitarioMin),
+  "margenPorcentaje": zod.number().optional(),
+  "metodoCalculo": zod.enum(['margen', 'recargo']).optional(),
+  "stockActual": zod.number().nullish(),
+  "stockCritico": zod.number().min(updateStockCriticoBodegaResponseOneStockCriticoMin).optional(),
+  "unidadMedida": zod.string().optional(),
+  "activo": zod.boolean().optional(),
+  "tarifaHora": zod.number().nullish(),
+  "tiempoEstimadoHoras": zod.number().nullish(),
+  "factorFactibilidad": zod.number().min(1).max(updateStockCriticoBodegaResponseOneFactorFactibilidadMax).nullish()
+}).and(zod.object({
+  "id": zod.number(),
+  "ubicaciones": zod.array(zod.object({
+  "bodegaId": zod.number(),
+  "bodegaNombre": zod.string(),
+  "localId": zod.number(),
+  "localNombre": zod.string(),
+  "stockActual": zod.number(),
+  "stockCritico": zod.number()
+})).optional(),
+  "activo": zod.boolean(),
+  "stockCritico": zod.number(),
+  "precioCalculado": zod.number().nullable(),
+  "utilidad": zod.number(),
+  "margenReal": zod.number(),
+  "estadoStock": zod.enum(['normal', 'critico', 'agotado', 'no_aplica']),
+  "creadoEn": zod.string(),
+  "actualizadoEn": zod.string()
+}))
+
+
 export const listInventarioResponseOneNombreMax = 200;
+
+export const listInventarioResponseOneCodigoInternoMax = 80;
+
+export const listInventarioResponseOneSkuMax = 120;
+
+export const listInventarioResponseOneCodigoBarrasMax = 120;
 
 export const listInventarioResponseOneCostoUnitarioMin = 0;
 
@@ -22,6 +296,10 @@ export const listInventarioResponseOneFactorFactibilidadMax = 2;
 
 export const ListInventarioResponseItem = zod.object({
   "nombre": zod.string().min(1).max(listInventarioResponseOneNombreMax),
+  "codigoInterno": zod.string().max(listInventarioResponseOneCodigoInternoMax).optional(),
+  "sku": zod.string().max(listInventarioResponseOneSkuMax).optional(),
+  "codigoBarras": zod.string().max(listInventarioResponseOneCodigoBarrasMax).optional(),
+  "bodegaId": zod.number().nullish().describe('Bodega inicial al crear un producto.'),
   "descripcion": zod.string().optional(),
   "tipo": zod.enum(['producto', 'servicio']),
   "costoUnitario": zod.number().min(listInventarioResponseOneCostoUnitarioMin),
@@ -37,6 +315,14 @@ export const ListInventarioResponseItem = zod.object({
   "factorFactibilidad": zod.number().min(1).max(listInventarioResponseOneFactorFactibilidadMax).nullish()
 }).and(zod.object({
   "id": zod.number(),
+  "ubicaciones": zod.array(zod.object({
+  "bodegaId": zod.number(),
+  "bodegaNombre": zod.string(),
+  "localId": zod.number(),
+  "localNombre": zod.string(),
+  "stockActual": zod.number(),
+  "stockCritico": zod.number()
+})).optional(),
   "activo": zod.boolean(),
   "stockCritico": zod.number(),
   "precioCalculado": zod.number().nullable(),
@@ -51,6 +337,12 @@ export const ListInventarioResponse = zod.array(ListInventarioResponseItem)
 
 export const createProductoBodyNombreMax = 200;
 
+export const createProductoBodyCodigoInternoMax = 80;
+
+export const createProductoBodySkuMax = 120;
+
+export const createProductoBodyCodigoBarrasMax = 120;
+
 export const createProductoBodyCostoUnitarioMin = 0;
 
 export const createProductoBodyPrecioUnitarioMin = 0;
@@ -63,6 +355,10 @@ export const createProductoBodyFactorFactibilidadMax = 2;
 
 export const CreateProductoBody = zod.object({
   "nombre": zod.string().min(1).max(createProductoBodyNombreMax),
+  "codigoInterno": zod.string().max(createProductoBodyCodigoInternoMax).optional(),
+  "sku": zod.string().max(createProductoBodySkuMax).optional(),
+  "codigoBarras": zod.string().max(createProductoBodyCodigoBarrasMax).optional(),
+  "bodegaId": zod.number().nullish().describe('Bodega inicial al crear un producto.'),
   "descripcion": zod.string().optional(),
   "tipo": zod.enum(['producto', 'servicio']),
   "costoUnitario": zod.number().min(createProductoBodyCostoUnitarioMin),
@@ -93,6 +389,12 @@ export const GetProductoParams = zod.object({
 
 export const getProductoResponseOneNombreMax = 200;
 
+export const getProductoResponseOneCodigoInternoMax = 80;
+
+export const getProductoResponseOneSkuMax = 120;
+
+export const getProductoResponseOneCodigoBarrasMax = 120;
+
 export const getProductoResponseOneCostoUnitarioMin = 0;
 
 export const getProductoResponseOnePrecioUnitarioMin = 0;
@@ -105,6 +407,10 @@ export const getProductoResponseOneFactorFactibilidadMax = 2;
 
 export const GetProductoResponse = zod.object({
   "nombre": zod.string().min(1).max(getProductoResponseOneNombreMax),
+  "codigoInterno": zod.string().max(getProductoResponseOneCodigoInternoMax).optional(),
+  "sku": zod.string().max(getProductoResponseOneSkuMax).optional(),
+  "codigoBarras": zod.string().max(getProductoResponseOneCodigoBarrasMax).optional(),
+  "bodegaId": zod.number().nullish().describe('Bodega inicial al crear un producto.'),
   "descripcion": zod.string().optional(),
   "tipo": zod.enum(['producto', 'servicio']),
   "costoUnitario": zod.number().min(getProductoResponseOneCostoUnitarioMin),
@@ -120,6 +426,14 @@ export const GetProductoResponse = zod.object({
   "factorFactibilidad": zod.number().min(1).max(getProductoResponseOneFactorFactibilidadMax).nullish()
 }).and(zod.object({
   "id": zod.number(),
+  "ubicaciones": zod.array(zod.object({
+  "bodegaId": zod.number(),
+  "bodegaNombre": zod.string(),
+  "localId": zod.number(),
+  "localNombre": zod.string(),
+  "stockActual": zod.number(),
+  "stockCritico": zod.number()
+})).optional(),
   "activo": zod.boolean(),
   "stockCritico": zod.number(),
   "precioCalculado": zod.number().nullable(),
@@ -137,6 +451,12 @@ export const UpdateProductoParams = zod.object({
 
 export const updateProductoBodyNombreMax = 200;
 
+export const updateProductoBodyCodigoInternoMax = 80;
+
+export const updateProductoBodySkuMax = 120;
+
+export const updateProductoBodyCodigoBarrasMax = 120;
+
 export const updateProductoBodyCostoUnitarioMin = 0;
 
 export const updateProductoBodyPrecioUnitarioMin = 0;
@@ -149,6 +469,10 @@ export const updateProductoBodyFactorFactibilidadMax = 2;
 
 export const UpdateProductoBody = zod.object({
   "nombre": zod.string().min(1).max(updateProductoBodyNombreMax),
+  "codigoInterno": zod.string().max(updateProductoBodyCodigoInternoMax).optional(),
+  "sku": zod.string().max(updateProductoBodySkuMax).optional(),
+  "codigoBarras": zod.string().max(updateProductoBodyCodigoBarrasMax).optional(),
+  "bodegaId": zod.number().nullish().describe('Bodega inicial al crear un producto.'),
   "descripcion": zod.string().optional(),
   "tipo": zod.enum(['producto', 'servicio']),
   "costoUnitario": zod.number().min(updateProductoBodyCostoUnitarioMin),
@@ -166,6 +490,12 @@ export const UpdateProductoBody = zod.object({
 
 export const updateProductoResponseOneNombreMax = 200;
 
+export const updateProductoResponseOneCodigoInternoMax = 80;
+
+export const updateProductoResponseOneSkuMax = 120;
+
+export const updateProductoResponseOneCodigoBarrasMax = 120;
+
 export const updateProductoResponseOneCostoUnitarioMin = 0;
 
 export const updateProductoResponseOnePrecioUnitarioMin = 0;
@@ -178,6 +508,10 @@ export const updateProductoResponseOneFactorFactibilidadMax = 2;
 
 export const UpdateProductoResponse = zod.object({
   "nombre": zod.string().min(1).max(updateProductoResponseOneNombreMax),
+  "codigoInterno": zod.string().max(updateProductoResponseOneCodigoInternoMax).optional(),
+  "sku": zod.string().max(updateProductoResponseOneSkuMax).optional(),
+  "codigoBarras": zod.string().max(updateProductoResponseOneCodigoBarrasMax).optional(),
+  "bodegaId": zod.number().nullish().describe('Bodega inicial al crear un producto.'),
   "descripcion": zod.string().optional(),
   "tipo": zod.enum(['producto', 'servicio']),
   "costoUnitario": zod.number().min(updateProductoResponseOneCostoUnitarioMin),
@@ -193,6 +527,14 @@ export const UpdateProductoResponse = zod.object({
   "factorFactibilidad": zod.number().min(1).max(updateProductoResponseOneFactorFactibilidadMax).nullish()
 }).and(zod.object({
   "id": zod.number(),
+  "ubicaciones": zod.array(zod.object({
+  "bodegaId": zod.number(),
+  "bodegaNombre": zod.string(),
+  "localId": zod.number(),
+  "localNombre": zod.string(),
+  "stockActual": zod.number(),
+  "stockCritico": zod.number()
+})).optional(),
   "activo": zod.boolean(),
   "stockCritico": zod.number(),
   "precioCalculado": zod.number().nullable(),
@@ -214,6 +556,8 @@ export const ListMovimientosStockResponseItem = zod.object({
   "tipo": zod.enum(['entrada', 'salida', 'ajuste']),
   "cantidad": zod.number().describe('Ajustes guardan la diferencia firmada; entradas\/salidas guardan unidades positivas.'),
   "motivo": zod.string(),
+  "bodegaOrigenId": zod.number().nullish(),
+  "bodegaDestinoId": zod.number().nullish(),
   "referenciaCobroId": zod.number().nullish(),
   "usuarioId": zod.string(),
   "creadoEn": zod.string()
@@ -233,7 +577,9 @@ export const createMovimientoStockBodyCantidadMin = 0;
 export const CreateMovimientoStockBody = zod.object({
   "tipo": zod.enum(['entrada', 'salida', 'ajuste']),
   "cantidad": zod.number().min(createMovimientoStockBodyCantidadMin).describe('Entrada\/salida: unidades; ajuste: stock final contado.'),
-  "motivo": zod.string().min(1)
+  "motivo": zod.string().min(1),
+  "bodegaOrigenId": zod.number().nullish(),
+  "bodegaDestinoId": zod.number().nullish()
 })
 
 
@@ -519,6 +865,7 @@ export const GetClienteResponse = zod.object({
   "cobros": zod.array(zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(getClienteResponseCobrosItemItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(getClienteResponseCobrosItemItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -759,6 +1106,7 @@ export const listCobrosResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{
 export const ListCobrosResponseItem = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(listCobrosResponseItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(listCobrosResponseItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -817,6 +1165,7 @@ export const createCobroBodyFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}-
 export const CreateCobroBody = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(createCobroBodyItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(createCobroBodyItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -870,6 +1219,7 @@ export const createCobroRecurrenteBodyOneDescripcionMax = 255;
 export const CreateCobroRecurrenteBody = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(createCobroRecurrenteBodyOneItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(createCobroRecurrenteBodyOneItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -911,6 +1261,7 @@ export const createCobrosMasivosBodyTwoClienteIdsMax = 100;
 export const CreateCobrosMasivosBody = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(createCobrosMasivosBodyOneItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(createCobrosMasivosBodyOneItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -971,6 +1322,7 @@ export const getCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d{2}
 export const GetCobroResponse = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(getCobroResponseItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(getCobroResponseItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -1045,6 +1397,7 @@ export const updateCobroResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\d
 export const UpdateCobroResponse = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(updateCobroResponseItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(updateCobroResponseItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -1129,6 +1482,7 @@ export const ajustarMontoResponseFechaVencimientoRegExp = new RegExp('^\\d{4}-\\
 export const AjustarMontoResponse = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(ajustarMontoResponseItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(ajustarMontoResponseItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -1736,6 +2090,7 @@ export const aplicarDescuentoResponseFechaVencimientoRegExp = new RegExp('^\\d{4
 export const AplicarDescuentoResponse = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(aplicarDescuentoResponseItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(aplicarDescuentoResponseItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -3188,6 +3543,7 @@ export const asignarWorkflowResponseFechaVencimientoRegExp = new RegExp('^\\d{4}
 export const AsignarWorkflowResponse = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(asignarWorkflowResponseItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(asignarWorkflowResponseItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),
@@ -3244,6 +3600,7 @@ export const desasignarWorkflowResponseFechaVencimientoRegExp = new RegExp('^\\d
 export const DesasignarWorkflowResponse = zod.object({
   "itemsInventario": zod.array(zod.object({
   "productoId": zod.number().min(1),
+  "bodegaId": zod.number().nullish(),
   "cantidad": zod.number().gt(desasignarWorkflowResponseItemsInventarioItemCantidadExclusiveMin),
   "precioUnitario": zod.number().min(desasignarWorkflowResponseItemsInventarioItemPrecioUnitarioMin),
   "nombre": zod.string().optional(),

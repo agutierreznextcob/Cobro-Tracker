@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
-import { useListInventario, getListInventarioQueryKey } from "@workspace/api-client-react";
+import { useListInventario, getListInventarioQueryKey, useListBodegas, getListBodegasQueryKey, type Producto, type StockUbicacion } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatCurrency } from "@/lib/format";
 import { estadoVisual, formatQty } from "@/lib/inventario";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScanLookup } from "@/components/barcode-scanner";
+import { useToast } from "@/hooks/use-toast";
 import { Boxes, Plus, Search, Trash2 } from "lucide-react";
 
 export type LineaCatalogo = {
@@ -15,7 +18,14 @@ export type LineaCatalogo = {
   cantidad: string;
   precioUnitario: string;
   stockActual: number | null;
+  /** Bodega id as string; empty/undefined = server picks the bodega with the most stock. */
+  bodegaId?: string;
+  ubicaciones?: StockUbicacion[];
 };
+
+export function lineaDesdeProducto(p: Producto): LineaCatalogo {
+  return { productoId: p.id, nombre: p.nombre, tipo: p.tipo as "producto" | "servicio", cantidad: "1", precioUnitario: String(p.precioUnitario), stockActual: p.stockActual ?? null, bodegaId: "", ubicaciones: p.ubicaciones ?? [] };
+}
 
 export const MAX_LINEAS = 100;
 
@@ -28,13 +38,31 @@ export function lineasValidas(lineas: LineaCatalogo[]) {
 }
 
 export function lineasPayload(lineas: LineaCatalogo[]) {
-  return lineas.map((l) => ({ productoId: l.productoId, cantidad: Number(l.cantidad), precioUnitario: Number(l.precioUnitario) }));
+  return lineas.map((l) => ({
+    productoId: l.productoId,
+    cantidad: Number(l.cantidad),
+    precioUnitario: Number(l.precioUnitario),
+    ...(l.tipo === "producto" && l.bodegaId ? { bodegaId: Number(l.bodegaId) } : {}),
+  }));
 }
 
 export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: LineaCatalogo[]; onChange: (l: LineaCatalogo[]) => void; incluyeIva: boolean }) {
   const { data: productos, isLoading, isError, refetch } = useListInventario({ query: { queryKey: getListInventarioQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
+  const { data: bodegas = [] } = useListBodegas({ query: { queryKey: getListBodegasQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const { toast } = useToast();
+
+  const agregarEscaneado = (p: Producto) => {
+    if (!p.activo) { toast({ title: "Ítem archivado", description: `${p.nombre} no está disponible para cobros.`, variant: "destructive" }); return; }
+    const i = lineas.findIndex((l) => l.productoId === p.id);
+    if (i >= 0) {
+      onChange(lineas.map((l, j) => (j === i ? { ...l, cantidad: String((Number(l.cantidad) || 0) + 1) } : l)));
+    } else {
+      if (lineas.length >= MAX_LINEAS) { toast({ title: "Límite de ítems alcanzado", variant: "destructive" }); return; }
+      onChange([...lineas, lineaDesdeProducto(p)]);
+    }
+  };
 
   const disponibles = useMemo(() => {
     const usados = new Set(lineas.map((l) => l.productoId));
@@ -75,7 +103,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: Linea
                 return (
                   <button key={p.id} type="button"
                     onClick={() => {
-                      onChange([...lineas, { productoId: p.id, nombre: p.nombre, tipo: p.tipo as "producto" | "servicio", cantidad: "1", precioUnitario: String(p.precioUnitario), stockActual: p.stockActual ?? null }]);
+                      onChange([...lineas, lineaDesdeProducto(p)]);
                       setOpen(false); setQ("");
                     }}
                     className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted">
@@ -94,6 +122,8 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: Linea
         </Popover>
       </div>
 
+      <ScanLookup productos={productos} onSelect={agregarEscaneado} testId="scanner-cobro" label="Escanear producto para agregarlo" autoActivate={false} />
+
       {lineas.length > 0 && (
         <div className="space-y-2">
           <div className="hidden sm:grid grid-cols-[1fr_80px_120px_100px_32px] gap-2 px-1 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -101,13 +131,17 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: Linea
           </div>
           {lineas.map((l, i) => {
             const cant = Number(l.cantidad) || 0;
-            const sinStock = l.tipo === "producto" && l.stockActual != null && cant > l.stockActual;
+            const current = productos?.find(p => p.id === l.productoId);
+            const ubic = current?.ubicaciones ?? l.ubicaciones ?? [];
+            const disp = l.bodegaId ? ubic.find((u) => String(u.bodegaId) === l.bodegaId)?.stockActual ?? 0
+              : bodegas.length ? Math.max(...bodegas.map(b => ubic.find(u => u.bodegaId === b.id)?.stockActual ?? 0)) : current?.stockActual ?? l.stockActual;
+            const sinStock = l.tipo === "producto" && disp != null && cant > disp;
             return (
               <div key={l.productoId} className="grid grid-cols-[1fr_32px] sm:grid-cols-[1fr_80px_120px_100px_32px] gap-2 items-center rounded-md bg-muted/30 p-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{l.nombre}</p>
                   <p className={`text-[11px] ${sinStock ? "text-amber-700" : "text-muted-foreground"}`}>
-                    {l.tipo === "servicio" ? "Servicio" : sinStock ? `Stock disponible ${formatQty(l.stockActual ?? 0)}; quedará negativo al pagarse` : "Producto"}
+                    {l.tipo === "servicio" ? "Servicio" : sinStock ? `Stock disponible ${formatQty(disp ?? 0)}; quedará negativo al pagarse` : "Producto"}
                   </p>
                 </div>
                 <Button type="button" variant="ghost" size="icon" className="h-8 w-8 sm:order-last text-muted-foreground hover:text-red-600" onClick={() => onChange(lineas.filter((_, j) => j !== i))} aria-label="Quitar"><Trash2 className="h-4 w-4" /></Button>
@@ -115,6 +149,17 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva }: { lineas: Linea
                 <div className="relative"><span className="absolute left-2 top-1.5 text-xs text-muted-foreground">$</span>
                   <Input type="number" min="0" step="1" value={l.precioUnitario} onChange={(e) => update(i, { precioUnitario: e.target.value })} className="h-8 pl-5 font-mono" /></div>
                 <span className="font-mono text-sm text-right col-span-2 sm:col-span-1">{formatCurrency(cant * (Number(l.precioUnitario) || 0))}</span>
+                {l.tipo === "producto" && bodegas.length > 0 && (
+                  <div className="col-span-2 sm:col-span-5">
+                    <Select value={l.bodegaId || "auto"} onValueChange={(v) => update(i, { bodegaId: v === "auto" ? "" : v })}>
+                      <SelectTrigger className="h-8 text-xs" data-testid={`select-bodega-linea-${l.productoId}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Descontar de la bodega con más stock (automático)</SelectItem>
+                        {bodegas.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.localNombre} → {b.nombre} · {formatQty(ubic.find(u => u.bodegaId === b.id)?.stockActual ?? 0)}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             );
           })}

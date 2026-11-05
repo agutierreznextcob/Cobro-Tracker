@@ -33,6 +33,89 @@ tags:
   - name: encuestas
     description: Client satisfaction surveys
 paths:
+  /locales:
+    get:
+      operationId: listLocales
+      responses:
+        "200":
+          description: Locales del negocio
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Local" } }
+    post:
+      operationId: createLocal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LocalInput" }
+      responses:
+        "201":
+          description: Local creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Local" }
+  /locales/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: getLocal
+      responses:
+        "200":
+          description: Local con bodegas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Local" }
+  /bodegas:
+    get:
+      operationId: listBodegas
+      responses:
+        "200":
+          description: Bodegas del negocio
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Bodega" } }
+    post:
+      operationId: createBodega
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BodegaInput" }
+      responses:
+        "201":
+          description: Bodega creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bodega" }
+  /bodegas/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: getBodega
+      responses:
+        "200":
+          description: Bodega y existencias
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BodegaDetalle" }
+  /bodegas/{id}/productos/{productoId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+      - { name: productoId, in: path, required: true, schema: { type: integer } }
+    patch:
+      operationId: updateStockCriticoBodega
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StockCriticoInput" }
+      responses:
+        "200":
+          description: Umbral actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Producto" }
   /inventario:
     get:
       operationId: listInventario
@@ -4980,6 +5063,7 @@ components:
       required: [productoId, cantidad, precioUnitario]
       properties:
         productoId: { type: integer, minimum: 1 }
+        bodegaId: { type: ["integer", "null"] }
         cantidad: { type: number, exclusiveMinimum: 0 }
         precioUnitario: { type: number, minimum: 0 }
         nombre: { type: string }
@@ -4989,6 +5073,10 @@ components:
       required: [nombre, tipo, costoUnitario, precioUnitario]
       properties:
         nombre: { type: string, minLength: 1, maxLength: 200 }
+        codigoInterno: { type: string, maxLength: 80 }
+        sku: { type: string, maxLength: 120 }
+        codigoBarras: { type: string, maxLength: 120 }
+        bodegaId: { type: ["integer", "null"], description: "Bodega inicial al crear un producto." }
         descripcion: { type: string }
         tipo: { type: string, enum: [producto, servicio] }
         costoUnitario: { type: number, minimum: 0 }
@@ -5009,6 +5097,9 @@ components:
           required: [id, activo, stockCritico, estadoStock, precioCalculado, utilidad, margenReal, creadoEn, actualizadoEn]
           properties:
             id: { type: integer }
+            ubicaciones:
+              type: array
+              items: { $ref: "#/components/schemas/StockUbicacion" }
             activo: { type: boolean }
             stockCritico: { type: number }
             precioCalculado: { type: number, nullable: true }
@@ -5024,6 +5115,8 @@ components:
         tipo: { type: string, enum: [entrada, salida, ajuste] }
         cantidad: { type: number, minimum: 0, description: "Entrada/salida: unidades; ajuste: stock final contado." }
         motivo: { type: string, minLength: 1 }
+        bodegaOrigenId: { type: ["integer", "null"] }
+        bodegaDestinoId: { type: ["integer", "null"] }
     MovimientoStock:
       type: object
       required: [id, productoId, tipo, cantidad, motivo, usuarioId, creadoEn]
@@ -5033,9 +5126,68 @@ components:
         tipo: { type: string, enum: [entrada, salida, ajuste] }
         cantidad: { type: number, description: "Ajustes guardan la diferencia firmada; entradas/salidas guardan unidades positivas." }
         motivo: { type: string }
+        bodegaOrigenId: { type: ["integer", "null"] }
+        bodegaDestinoId: { type: ["integer", "null"] }
         referenciaCobroId: { type: integer, nullable: true }
         usuarioId: { type: string }
         creadoEn: { type: string }
+    LocalInput:
+      type: object
+      required: [nombre]
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        direccion: { type: string, maxLength: 500 }
+    Local:
+      allOf:
+        - $ref: "#/components/schemas/LocalInput"
+        - type: object
+          required: [id, activo, creadoEn, bodegas, stockTotal]
+          properties:
+            id: { type: integer }
+            activo: { type: boolean }
+            creadoEn: { type: string }
+            stockTotal: { type: number }
+            bodegas: { type: array, items: { $ref: "#/components/schemas/Bodega" } }
+    BodegaInput:
+      type: object
+      required: [nombre, localId]
+      properties:
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        localId: { type: integer, minimum: 1 }
+        descripcion: { type: string, maxLength: 1000 }
+    Bodega:
+      allOf:
+        - $ref: "#/components/schemas/BodegaInput"
+        - type: object
+          required: [id, activo, creadoEn, localNombre, stockTotal]
+          properties:
+            id: { type: integer }
+            activo: { type: boolean }
+            creadoEn: { type: string }
+            localNombre: { type: string }
+            stockTotal: { type: number }
+    BodegaDetalle:
+      allOf:
+        - $ref: "#/components/schemas/Bodega"
+        - type: object
+          required: [productos]
+          properties:
+            productos: { type: array, items: { $ref: "#/components/schemas/Producto" } }
+    StockUbicacion:
+      type: object
+      required: [bodegaId, bodegaNombre, localId, localNombre, stockActual, stockCritico]
+      properties:
+        bodegaId: { type: integer }
+        bodegaNombre: { type: string }
+        localId: { type: integer }
+        localNombre: { type: string }
+        stockActual: { type: number }
+        stockCritico: { type: number }
+    StockCriticoInput:
+      type: object
+      required: [stockCritico]
+      properties:
+        stockCritico: { type: number, minimum: 0 }
     AjustarMontoInput:
       type: object
       required: [monto, motivo]

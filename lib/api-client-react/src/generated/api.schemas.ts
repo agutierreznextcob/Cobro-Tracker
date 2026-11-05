@@ -892,6 +892,8 @@ export const ItemInventarioTipo = {
 export interface ItemInventario {
   /** @minimum 1 */
   productoId: number;
+  /** @nullable */
+  bodegaId?: number | null;
   /** @exclusiveMinimum 0 */
   cantidad: number;
   /** @minimum 0 */
@@ -1401,6 +1403,17 @@ export interface ProductoInput {
      * @maxLength 200
      */
   nombre: string;
+  /** @maxLength 80 */
+  codigoInterno?: string;
+  /** @maxLength 120 */
+  sku?: string;
+  /** @maxLength 120 */
+  codigoBarras?: string;
+  /**
+     * Bodega inicial al crear un producto.
+     * @nullable
+     */
+  bodegaId?: number | null;
   descripcion?: string;
   tipo: ProductoInputTipo;
   /** @minimum 0 */
@@ -1433,8 +1446,18 @@ export const ProductoEstadoStock = {
   no_aplica: 'no_aplica',
 } as const;
 
+export interface StockUbicacion {
+  bodegaId: number;
+  bodegaNombre: string;
+  localId: number;
+  localNombre: string;
+  stockActual: number;
+  stockCritico: number;
+}
+
 export type Producto = ProductoInput & ({
   id: number;
+  ubicaciones?: StockUbicacion[];
   activo: boolean;
   stockCritico: number;
   precioCalculado: number | null;
@@ -1463,6 +1486,10 @@ export interface MovimientoStockInput {
   cantidad: number;
   /** @minLength 1 */
   motivo: string;
+  /** @nullable */
+  bodegaOrigenId?: number | null;
+  /** @nullable */
+  bodegaDestinoId?: number | null;
 }
 
 export type MovimientoStockTipo = typeof MovimientoStockTipo[keyof typeof MovimientoStockTipo];
@@ -1481,9 +1508,60 @@ export interface MovimientoStock {
   /** Ajustes guardan la diferencia firmada; entradas/salidas guardan unidades positivas. */
   cantidad: number;
   motivo: string;
+  /** @nullable */
+  bodegaOrigenId?: number | null;
+  /** @nullable */
+  bodegaDestinoId?: number | null;
   referenciaCobroId?: number | null;
   usuarioId: string;
   creadoEn: string;
+}
+
+export interface LocalInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  nombre: string;
+  /** @maxLength 500 */
+  direccion?: string;
+}
+
+export interface BodegaInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  nombre: string;
+  /** @minimum 1 */
+  localId: number;
+  /** @maxLength 1000 */
+  descripcion?: string;
+}
+
+export type Bodega = BodegaInput & {
+  id: number;
+  activo: boolean;
+  creadoEn: string;
+  localNombre: string;
+  stockTotal: number;
+};
+
+export type Local = LocalInput & {
+  id: number;
+  activo: boolean;
+  creadoEn: string;
+  stockTotal: number;
+  bodegas: Bodega[];
+};
+
+export type BodegaDetalle = Bodega & {
+  productos: Producto[];
+};
+
+export interface StockCriticoInput {
+  /** @minimum 0 */
+  stockCritico: number;
 }
 
 export interface AjustarMontoInput {

@@ -14,6 +14,10 @@ export interface MovimientoStock {
   /** Ajustes guardan la diferencia firmada; entradas/salidas guardan unidades positivas. */
   cantidad: number;
   motivo: string;
+  /** @nullable */
+  bodegaOrigenId?: number | null;
+  /** @nullable */
+  bodegaDestinoId?: number | null;
   referenciaCobroId?: number | null;
   usuarioId: string;
   creadoEn: string;

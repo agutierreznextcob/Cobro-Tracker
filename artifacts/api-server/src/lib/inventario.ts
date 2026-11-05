@@ -5,8 +5,21 @@ import { getOrgContext } from "./org";
 
 const money = z.number().finite().min(0).max(1e10).multipleOf(0.01);
 const units = z.number().finite().min(0).max(1e9).multipleOf(0.001);
+export const unidadesPorTipo = {
+  producto: ["unidad", "par", "docena", "caja", "paquete", "kilogramo", "gramo", "litro", "mililitro", "metro", "metro cuadrado", "metro cúbico"],
+  servicio: ["hora", "día", "semana", "mes", "visita", "proyecto", "consulta"],
+};
+export function validarUnidad(tipo: "producto" | "servicio", unidad: string | undefined, anterior?: string) {
+  if (unidad && unidad !== anterior && !unidadesPorTipo[tipo].includes(unidad.toLocaleLowerCase("es"))) {
+    throw new Error("Selecciona una unidad de medida válida para este tipo.");
+  }
+}
 export const productoBody = z.object({
   nombre: z.string().trim().min(1).max(200),
+  codigoInterno: z.string().trim().max(80).regex(/^[a-zA-Z0-9-]*$/, "El código interno solo admite letras, números y guiones.").optional(),
+  sku: z.string().trim().max(120).default(""),
+  codigoBarras: z.string().trim().max(120).default(""),
+  bodegaId: z.number().int().positive().nullable().optional(),
   descripcion: z.string().max(5000).default(""),
   tipo: z.enum(["producto", "servicio"]),
   costoUnitario: money, precioUnitario: money,
@@ -14,7 +27,7 @@ export const productoBody = z.object({
   metodoCalculo: z.enum(["margen", "recargo"]).default("margen"),
   stockActual: units.nullable().optional(),
   stockCritico: units.default(0),
-  unidadMedida: z.string().trim().min(1).max(40).default("unidad"),
+  unidadMedida: z.string().trim().min(1).max(40).optional(),
   activo: z.boolean().default(true),
   tarifaHora: money.nullable().optional(),
   tiempoEstimadoHoras: units.nullable().optional(),
@@ -34,10 +47,23 @@ export const movimientoBody = z.object({
   tipo: z.enum(["entrada", "salida", "ajuste"]),
   cantidad: units,
   motivo: z.string().trim().min(1).max(1000),
-}).refine(d => d.tipo === "ajuste" || d.cantidad > 0, "La cantidad debe ser mayor a cero.");
+  bodegaOrigenId: z.number().int().positive().nullable().optional(),
+  bodegaDestinoId: z.number().int().positive().nullable().optional(),
+}).refine(d => d.tipo === "ajuste" || d.cantidad > 0, "La cantidad debe ser mayor a cero.")
+  .superRefine((d, ctx) => {
+    const motivos = d.tipo === "entrada"
+      ? ["Ingreso por compra", "Movimiento entre bodegas", "Parte de entrada", "Ajuste de inventario", "Devolución de cliente"]
+      : d.tipo === "salida" ? ["Merma", "Consumo interno", "Rebaja de stock", "Movimiento entre bodegas"]
+      : ["Ajuste de inventario"];
+    if (!motivos.includes(d.motivo)) ctx.addIssue({ code: "custom", message: "Motivo no permitido para este movimiento." });
+    if (d.motivo === "Movimiento entre bodegas" && (!d.bodegaOrigenId || !d.bodegaDestinoId || d.bodegaOrigenId === d.bodegaDestinoId)) {
+      ctx.addIssue({ code: "custom", message: "Selecciona bodegas de origen y destino diferentes." });
+    }
+  });
 
 export const itemsInventarioBody = z.array(z.object({
   productoId: z.number().int().positive(),
+  bodegaId: z.number().int().positive().nullable().optional(),
   cantidad: units.refine(n => n > 0),
   precioUnitario: money,
   nombre: z.string().optional(), tipo: z.enum(["producto", "servicio"]).optional(),
@@ -62,10 +88,11 @@ export function productoValues(d: z.infer<typeof productoBody>) {
   if (!Number.isFinite(calculated) || calculated < 0 || calculated > 1e12) throw new Error("Precio sugerido fuera de rango.");
   return {
     nombre: d.nombre, descripcion: d.descripcion, tipo: d.tipo,
+    sku: d.sku, codigoBarras: d.codigoBarras,
     costoUnitario: String(service ? Math.round(base * 100) / 100 : d.costoUnitario),
     precioUnitario: String(d.precioUnitario), margenPorcentaje: String(d.margenPorcentaje),
     metodoCalculo: d.metodoCalculo, stockActual: service ? null : String(d.stockActual ?? 0),
-    stockCritico: service ? "0" : String(d.stockCritico), unidadMedida: d.unidadMedida, activo: d.activo,
+    stockCritico: service ? "0" : String(d.stockCritico), unidadMedida: d.unidadMedida ?? (service ? "hora" : "unidad"), activo: d.activo,
     tarifaHora: service ? String(d.tarifaHora) : null,
     tiempoEstimadoHoras: service ? String(d.tiempoEstimadoHoras) : null,
     factorFactibilidad: service ? String(d.factorFactibilidad) : null,
@@ -77,7 +104,7 @@ export function serializeProducto(p: Producto) {
   const costo = Number(p.costoUnitario), precio = Number(p.precioUnitario);
   const stock = p.stockActual == null ? null : Number(p.stockActual);
   return {
-    ...p, costoUnitario: costo, precioUnitario: precio,
+    ...p, codigoInterno: p.codigoInterno || `PROD-${String(p.id).padStart(4, "0")}`, costoUnitario: costo, precioUnitario: precio,
     margenPorcentaje: Number(p.margenPorcentaje),
     stockActual: stock, stockCritico: Number(p.stockCritico),
     tarifaHora: p.tarifaHora == null ? null : Number(p.tarifaHora),
@@ -98,6 +125,13 @@ export async function resolveItemsInventario(userId: string, input: unknown, mon
   const { condition } = await inventarioScope(userId);
   const rows = await db.select().from(productosTable).where(and(condition, inArray(productosTable.id, ids), eq(productosTable.activo, true)));
   if (rows.length !== ids.length) throw new Error("Uno o más productos no están disponibles en tu catálogo.");
+  const { scopedBodegas } = await import("./inventario-bodegas");
+  const warehouses = await scopedBodegas(userId);
+  for (const item of items) {
+    if (item.bodegaId != null && (rows.find(p => p.id === item.productoId)?.tipo !== "producto" || !warehouses.some(w => w.bodega.id === item.bodegaId))) {
+      throw new Error("La bodega seleccionada no está disponible para este producto.");
+    }
+  }
   const total = Math.round(items.reduce((sum, i) => sum + i.cantidad * i.precioUnitario, 0));
   if (total !== Number(monto)) throw new Error("El monto debe coincidir con la suma de los ítems del catálogo (antes de IVA).");
   return items.map(i => {

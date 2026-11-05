@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useListInventario, useGetInventarioResumen, getListInventarioQueryKey, getGetInventarioResumenQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/format";
-import { estadoVisual, formatPct, formatQty, type EstadoVisual } from "@/lib/inventario";
+import { estadoVisual, etiquetaUbicacion, formatPct, formatQty, ubicacionCritica, type EstadoVisual } from "@/lib/inventario";
+import { ScanLookup } from "@/components/barcode-scanner";
 import { EstadoStockBadge, TipoBadge } from "@/components/inventario-badges";
-import { AlertTriangle, ArrowLeftRight, Ban, Boxes, Package, Pencil, Plus, Search, Wrench, RotateCw } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Ban, Boxes, Package, Pencil, Plus, Search, Wrench, RotateCw, Warehouse, X } from "lucide-react";
 
 type Filtro = "todos" | "producto" | "servicio" | "alerta" | "archivados";
 
@@ -28,6 +29,15 @@ export default function InventarioPage() {
     new URLSearchParams(window.location.search).get("filtro") === "alerta" ? "alerta" : "todos",
   );
 
+  const [sel, setSel] = useState<number | null>(null);
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+  const seleccionado = (productos ?? []).find((p) => p.id === sel) ?? null;
+  useEffect(() => {
+    if (sel == null) return;
+    const t = setTimeout(() => rowRefs.current.get(sel)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    return () => clearTimeout(t);
+  }, [sel]);
+
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     return (productos ?? [])
@@ -39,7 +49,7 @@ export default function InventarioPage() {
         if (filtro === "alerta") return e === "critico" || e === "agotado";
         return true;
       })
-      .filter((p) => !q || `${p.nombre} ${p.descripcion ?? ""}`.toLowerCase().includes(q))
+      .filter((p) => !q || `${p.nombre} ${p.descripcion ?? ""} ${p.codigoInterno ?? ""} ${p.sku ?? ""} ${p.codigoBarras ?? ""}`.toLowerCase().includes(q))
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }, [productos, busqueda, filtro]);
 
@@ -75,6 +85,40 @@ export default function InventarioPage() {
         ))}
       </div>
 
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,420px)_1fr] items-start">
+        <ScanLookup productos={productos} testId="scanner-inventario"
+          onSelect={(p) => { setBusqueda(""); setFiltro(p.activo ? "todos" : "archivados"); setSel(p.id); }} />
+        {seleccionado && (
+          <div className="rounded-xl border border-primary/40 bg-primary/5 p-4 animate-in fade-in slide-in-from-top-1 duration-200" data-testid="panel-producto-escaneado">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold truncate">{seleccionado.nombre}</p>
+                <p className="font-mono text-[11px] text-muted-foreground">{[seleccionado.codigoInterno, seleccionado.sku && `SKU ${seleccionado.sku}`, seleccionado.codigoBarras].filter(Boolean).join(" · ")}</p>
+              </div>
+              <button type="button" onClick={() => setSel(null)} className="text-muted-foreground hover:text-foreground" aria-label="Cerrar detalle"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              <span><span className="text-muted-foreground">Precio </span><span className="font-mono font-semibold">{formatCurrency(seleccionado.precioUnitario)}</span></span>
+              {seleccionado.tipo === "producto" && <span><span className="text-muted-foreground">Stock total </span><span className="font-mono font-semibold">{formatQty(seleccionado.stockActual ?? 0)} {seleccionado.unidadMedida || "unidad"}</span></span>}
+              <EstadoStockBadge estado={estadoVisual(seleccionado)} />
+            </div>
+            {(seleccionado.ubicaciones ?? []).length > 0 && (
+              <ul className="mt-2 space-y-0.5 text-xs">
+                {seleccionado.ubicaciones!.map((u) => (
+                  <li key={u.bodegaId} className={`flex justify-between gap-2 ${ubicacionCritica(u) ? "text-red-700 font-medium" : "text-muted-foreground"}`}>
+                    <span>{etiquetaUbicacion(u)}</span><span className="font-mono">{formatQty(u.stockActual)} · mín {formatQty(u.stockCritico)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-3 flex gap-2">
+              <Button asChild size="sm" variant="outline" className="h-8 bg-background"><Link href={`/inventario/${seleccionado.id}/editar`}><Pencil className="h-3.5 w-3.5 mr-1" />Editar</Link></Button>
+              {seleccionado.tipo === "producto" && <Button asChild size="sm" className="h-8"><Link href={`/inventario/${seleccionado.id}/movimiento`}><ArrowLeftRight className="h-3.5 w-3.5 mr-1" />Movimiento</Link></Button>}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
         <div className="flex items-center gap-1 p-1 bg-muted rounded-lg overflow-x-auto max-w-full">
           {FILTROS.map((f) => (
@@ -91,7 +135,7 @@ export default function InventarioPage() {
         </div>
         <div className="relative md:w-72">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre" className="pl-9" />
+          <Input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o código" className="pl-9" />
         </div>
       </div>
 
@@ -114,11 +158,13 @@ export default function InventarioPage() {
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead>Nombre</TableHead>
+                  <TableHead>Códigos</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Costo</TableHead>
                   <TableHead className="text-right">Precio</TableHead>
                   <TableHead className="text-right">Margen / Utilidad</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
+                  <TableHead>Ubicación</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -127,21 +173,28 @@ export default function InventarioPage() {
                 {isLoading
                   ? [1, 2, 3, 4].map((i) => (
                       <TableRow key={i} className="animate-pulse">
-                        {[40, 16, 16, 16, 20, 10, 20, 16].map((w, j) => (
+                        {[40, 20, 16, 16, 16, 20, 10, 24, 20, 16].map((w, j) => (
                           <TableCell key={j}><div className="h-4 bg-muted rounded" style={{ width: `${w * 4}px` }} /></TableCell>
                         ))}
                       </TableRow>
                     ))
                   : filtrados.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="h-28 text-center text-muted-foreground">Nada coincide con este filtro.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={10} className="h-28 text-center text-muted-foreground">Nada coincide con este filtro.</TableCell></TableRow>
                     ) : filtrados.map((p) => {
                       const e = estadoVisual(p);
                       const alerta = e === "critico" || e === "agotado";
                       return (
-                        <TableRow key={p.id} className={`group ${alerta ? "bg-red-50/50 hover:bg-red-50" : "hover:bg-muted/30"} ${!p.activo ? "opacity-60" : ""}`}>
+                        <TableRow key={p.id} ref={(el) => { if (el) rowRefs.current.set(p.id, el); else rowRefs.current.delete(p.id); }} data-testid={`row-producto-${p.id}`}
+                          onClick={() => setSel(p.id)}
+                          className={`group cursor-pointer ${sel === p.id ? "ring-2 ring-inset ring-primary bg-primary/5" : ""} ${alerta ? "bg-red-50/50 hover:bg-red-50" : "hover:bg-muted/30"} ${!p.activo ? "opacity-60" : ""}`}>
                           <TableCell className="max-w-[260px]">
                             <Link href={`/inventario/${p.id}/editar`} className="font-medium hover:underline">{p.nombre}</Link>
                             {p.descripcion && <p className="text-xs text-muted-foreground truncate">{p.descripcion}</p>}
+                          </TableCell>
+                          <TableCell className="font-mono text-[11px] leading-tight whitespace-nowrap">
+                            <div className="font-semibold">{p.codigoInterno || "—"}</div>
+                            {p.sku && <div className="text-muted-foreground">SKU {p.sku}</div>}
+                            {p.codigoBarras && <div className="text-muted-foreground">{p.codigoBarras}</div>}
                           </TableCell>
                           <TableCell><TipoBadge tipo={p.tipo} /></TableCell>
                           <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatCurrency(p.costoUnitario)}</TableCell>
@@ -154,8 +207,22 @@ export default function InventarioPage() {
                             {p.tipo === "servicio" ? <span className="text-muted-foreground/50">—</span> : (
                               <span className={alerta ? "text-red-700 font-bold" : ""}>
                                 {formatQty(p.stockActual ?? 0)}
-                                <span className="block text-[10px] text-muted-foreground font-sans">{p.unidadMedida || "un"} · mín {formatQty(p.stockCritico)}</span>
+                                <span className="block text-[10px] text-muted-foreground font-sans">{p.unidadMedida || "un"} · {(p.ubicaciones?.length ?? 0) > 0 ? "mín. por bodega" : `mín ${formatQty(p.stockCritico)}`}</span>
                               </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs min-w-[160px]">
+                            {p.tipo === "servicio" || (p.ubicaciones ?? []).length === 0 ? <span className="text-muted-foreground/60">{p.tipo === "servicio" ? "—" : "Stock general"}</span> : (
+                              <ul className="space-y-0.5">
+                                {p.ubicaciones!.map((u) => (
+                                  <li key={u.bodegaId} className="flex items-center gap-1.5">
+                                    <Warehouse className="h-3 w-3 text-muted-foreground shrink-0" />
+                                    <span className="truncate max-w-[150px]">{etiquetaUbicacion(u)}</span>
+                                    <span className="font-mono text-muted-foreground">{formatQty(u.stockActual)}</span>
+                                    {ubicacionCritica(u) && <span className="rounded bg-red-100 px-1 text-[10px] font-semibold text-red-700" data-testid={`badge-critico-${p.id}-${u.bodegaId}`}>{u.stockActual <= 0 ? "Agotado" : "Crítico"}</span>}
+                                  </li>
+                                ))}
+                              </ul>
                             )}
                           </TableCell>
                           <TableCell><EstadoStockBadge estado={e} /></TableCell>

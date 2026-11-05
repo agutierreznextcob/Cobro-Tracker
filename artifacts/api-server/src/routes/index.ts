@@ -21,6 +21,7 @@ import { adminRouter } from "./admin";
 import { organizationRouter } from "./organization";
 import consultorRouter from "./consultor";
 import inventarioRouter from "./inventario";
+import localesRouter from "./locales";
 
 // ORDEN DE MONTAJE: los routers con rutas públicas (portal, leads, chat,
 // webhooks, encuestas) deben ir ANTES de cualquier router con auth "en blanco"
@@ -67,6 +68,7 @@ router.use(encuestasRouter);
 // Must come before cobrosRouter's blanket auth middleware.
 router.use(organizationRouter);
 router.use(inventarioRouter);
+router.use(localesRouter);
 router.use(cobrosRouter);
 // workflowsRouter and tareasRouter self-guard with their own auth middleware.
 router.use(workflowsRouter);

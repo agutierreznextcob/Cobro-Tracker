@@ -7,9 +7,11 @@
  */
 import type { ProductoEstadoStock } from './productoEstadoStock';
 import type { ProductoInput } from './productoInput';
+import type { StockUbicacion } from './stockUbicacion';
 
 export type Producto = ProductoInput & ({
   id: number;
+  ubicaciones?: StockUbicacion[];
   activo: boolean;
   stockCritico: number;
   precioCalculado: number | null;

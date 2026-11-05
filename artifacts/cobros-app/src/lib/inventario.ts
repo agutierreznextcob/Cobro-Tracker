@@ -5,7 +5,43 @@ import {
   getGetProductoQueryKey,
   getListMovimientosStockQueryKey,
   type Producto,
+  type StockUbicacion,
 } from "@workspace/api-client-react";
+
+export const UNIDADES_PRODUCTO = ["unidad", "par", "docena", "caja", "paquete", "kilogramo", "gramo", "litro", "mililitro", "metro", "metro cuadrado", "metro cúbico"] as const;
+export const UNIDADES_SERVICIO = ["hora", "día", "semana", "mes", "visita", "proyecto", "consulta"] as const;
+
+export function unidadesPara(tipo: "producto" | "servicio"): readonly string[] {
+  return tipo === "producto" ? UNIDADES_PRODUCTO : UNIDADES_SERVICIO;
+}
+
+export const capitalizar = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+export const MOTIVO_ENTRE_BODEGAS = "Movimiento entre bodegas";
+export const MOTIVO_AJUSTE = "Ajuste de inventario";
+export const MOTIVO_COBRO = "Cobro";
+
+export const MOTIVOS_ENTRADA = ["Ingreso por compra", MOTIVO_ENTRE_BODEGAS, "Parte de entrada", MOTIVO_AJUSTE, "Devolución de cliente"] as const;
+/** "Cobro" is assigned automatically by the server when a paid charge deducts stock; never manually selectable. */
+export const MOTIVOS_SALIDA = ["Merma", "Consumo interno", "Rebaja de stock", MOTIVO_ENTRE_BODEGAS] as const;
+
+export const CODIGO_RE = /^[A-Za-z0-9-]*$/;
+
+export function ubicacionCritica(u: StockUbicacion) {
+  return u.stockActual <= 0 || u.stockActual <= u.stockCritico;
+}
+
+export function etiquetaUbicacion(u: Pick<StockUbicacion, "localNombre" | "bodegaNombre">) {
+  return `${u.localNombre} → ${u.bodegaNombre}`;
+}
+
+/** Exact (trimmed, case-insensitive) match on barcode, SKU or internal code. */
+export function buscarPorCodigo(productos: Producto[], code: string): Producto[] {
+  const c = code.trim().toLowerCase();
+  if (!c) return [];
+  const eq = (v?: string | null) => !!v && v.trim().toLowerCase() === c;
+  return productos.filter((p) => eq(p.codigoBarras) || eq(p.sku) || eq(p.codigoInterno));
+}
 
 export type MetodoCalculo = "margen" | "recargo";
 
@@ -46,6 +82,7 @@ export function estadoVisual(p: Producto): EstadoVisual {
   if (p.tipo === "servicio") return "servicio";
   const stock = p.stockActual ?? 0;
   if (stock <= 0) return "agotado";
+  if ((p.ubicaciones ?? []).length > 0) return p.ubicaciones!.some(ubicacionCritica) ? "critico" : "normal";
   if (stock <= (p.stockCritico ?? 0)) return "critico";
   return "normal";
 }
@@ -55,7 +92,11 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   return data?.error || data?.message || fallback;
 }
 
+/** Stock-related keys: inventario list/resumen/producto/movimientos plus locales and bodegas (list and detail). */
+const STOCK_KEY_RE = /^\/api\/(inventario|locales|bodegas)/;
+
 export function invalidateInventario(qc: QueryClient, id?: number) {
+  qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && STOCK_KEY_RE.test(q.queryKey[0] as string) });
   qc.invalidateQueries({ queryKey: getListInventarioQueryKey() });
   qc.invalidateQueries({ queryKey: getGetInventarioResumenQueryKey() });
   if (id) {

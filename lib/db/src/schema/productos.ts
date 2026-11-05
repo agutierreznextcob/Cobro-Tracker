@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 
 export type ItemInventarioSnapshot = {
   productoId: number; nombre: string; tipo: "producto" | "servicio";
-  cantidad: number; precioUnitario: number;
+  cantidad: number; precioUnitario: number; bodegaId?: number | null;
 };
 
 export const productosTable = pgTable("productos", {
@@ -11,6 +11,9 @@ export const productosTable = pgTable("productos", {
   organizationId: integer("organization_id"),
   usuarioId: text("usuario_id").notNull(),
   nombre: text("nombre").notNull(),
+  codigoInterno: text("codigo_interno"),
+  sku: text("sku").notNull().default(""),
+  codigoBarras: text("codigo_barras").notNull().default(""),
   descripcion: text("descripcion").notNull().default(""),
   tipo: text("tipo").$type<"producto" | "servicio">().notNull(),
   costoUnitario: numeric("costo_unitario", { precision: 18, scale: 2 }).notNull(),

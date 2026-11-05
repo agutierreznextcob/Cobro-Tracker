@@ -40,6 +40,9 @@ import type {
   AuthUserEnvelope,
   AvisarClienteInput,
   AvisarClienteResult,
+  Bodega,
+  BodegaDetalle,
+  BodegaInput,
   CambiarPlanInput,
   CambiarPlanSubscription200,
   CancelSubscription200,
@@ -117,6 +120,8 @@ import type {
   ListPagosSuscripcionParams,
   ListTareasParams,
   ListWebhookEventosParams,
+  Local,
+  LocalInput,
   LoginInput,
   LogoutSuccess,
   MarcarDemoInput,
@@ -153,6 +158,7 @@ import type {
   SaludCarteraHistorial,
   SeguimientoCobranza,
   StartSubscriptionInput,
+  StockCriticoInput,
   SubirComprobanteInput,
   SubscribeResponse,
   SubscriptionStatus,
@@ -186,6 +192,488 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getListLocalesUrl = () => {
+
+
+
+
+  return `/api/locales`
+}
+
+export const listLocales = async ( options?: RequestInit): Promise<Local[]> => {
+
+  return customFetch<Local[]>(getListLocalesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLocalesQueryKey = () => {
+    return [
+    `/api/locales`
+    ] as const;
+    }
+
+
+export const getListLocalesQueryOptions = <TData = Awaited<ReturnType<typeof listLocales>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLocales>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLocalesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLocales>>> = ({ signal }) => listLocales({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLocales>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLocalesQueryResult = NonNullable<Awaited<ReturnType<typeof listLocales>>>
+export type ListLocalesQueryError = ErrorType<unknown>
+
+
+
+export function useListLocales<TData = Awaited<ReturnType<typeof listLocales>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLocales>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLocalesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateLocalUrl = () => {
+
+
+
+
+  return `/api/locales`
+}
+
+export const createLocal = async (localInput: LocalInput, options?: RequestInit): Promise<Local> => {
+
+  return customFetch<Local>(getCreateLocalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      localInput,)
+  }
+);}
+
+
+
+
+export const getCreateLocalMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLocal>>, TError,{data: BodyType<LocalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createLocal>>, TError,{data: BodyType<LocalInput>}, TContext> => {
+
+const mutationKey = ['createLocal'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createLocal>>, {data: BodyType<LocalInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createLocal(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateLocalMutationResult = NonNullable<Awaited<ReturnType<typeof createLocal>>>
+    export type CreateLocalMutationBody = BodyType<LocalInput>
+    export type CreateLocalMutationError = ErrorType<unknown>
+
+    export const useCreateLocal = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLocal>>, TError,{data: BodyType<LocalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createLocal>>,
+        TError,
+        {data: BodyType<LocalInput>},
+        TContext
+      > => {
+      return useMutation(getCreateLocalMutationOptions(options));
+    }
+
+export const getGetLocalUrl = (id: number,) => {
+
+
+
+
+  return `/api/locales/${id}`
+}
+
+export const getLocal = async (id: number, options?: RequestInit): Promise<Local> => {
+
+  return customFetch<Local>(getGetLocalUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLocalQueryKey = (id: number,) => {
+    return [
+    `/api/locales/${id}`
+    ] as const;
+    }
+
+
+export const getGetLocalQueryOptions = <TData = Awaited<ReturnType<typeof getLocal>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLocal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLocalQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLocal>>> = ({ signal }) => getLocal(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLocal>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLocalQueryResult = NonNullable<Awaited<ReturnType<typeof getLocal>>>
+export type GetLocalQueryError = ErrorType<unknown>
+
+
+
+export function useGetLocal<TData = Awaited<ReturnType<typeof getLocal>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLocal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLocalQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListBodegasUrl = () => {
+
+
+
+
+  return `/api/bodegas`
+}
+
+export const listBodegas = async ( options?: RequestInit): Promise<Bodega[]> => {
+
+  return customFetch<Bodega[]>(getListBodegasUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBodegasQueryKey = () => {
+    return [
+    `/api/bodegas`
+    ] as const;
+    }
+
+
+export const getListBodegasQueryOptions = <TData = Awaited<ReturnType<typeof listBodegas>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBodegas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBodegasQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBodegas>>> = ({ signal }) => listBodegas({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBodegas>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBodegasQueryResult = NonNullable<Awaited<ReturnType<typeof listBodegas>>>
+export type ListBodegasQueryError = ErrorType<unknown>
+
+
+
+export function useListBodegas<TData = Awaited<ReturnType<typeof listBodegas>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBodegas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBodegasQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateBodegaUrl = () => {
+
+
+
+
+  return `/api/bodegas`
+}
+
+export const createBodega = async (bodegaInput: BodegaInput, options?: RequestInit): Promise<Bodega> => {
+
+  return customFetch<Bodega>(getCreateBodegaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bodegaInput,)
+  }
+);}
+
+
+
+
+export const getCreateBodegaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBodega>>, TError,{data: BodyType<BodegaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBodega>>, TError,{data: BodyType<BodegaInput>}, TContext> => {
+
+const mutationKey = ['createBodega'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBodega>>, {data: BodyType<BodegaInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createBodega(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBodegaMutationResult = NonNullable<Awaited<ReturnType<typeof createBodega>>>
+    export type CreateBodegaMutationBody = BodyType<BodegaInput>
+    export type CreateBodegaMutationError = ErrorType<unknown>
+
+    export const useCreateBodega = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBodega>>, TError,{data: BodyType<BodegaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBodega>>,
+        TError,
+        {data: BodyType<BodegaInput>},
+        TContext
+      > => {
+      return useMutation(getCreateBodegaMutationOptions(options));
+    }
+
+export const getGetBodegaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bodegas/${id}`
+}
+
+export const getBodega = async (id: number, options?: RequestInit): Promise<BodegaDetalle> => {
+
+  return customFetch<BodegaDetalle>(getGetBodegaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBodegaQueryKey = (id: number,) => {
+    return [
+    `/api/bodegas/${id}`
+    ] as const;
+    }
+
+
+export const getGetBodegaQueryOptions = <TData = Awaited<ReturnType<typeof getBodega>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBodega>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBodegaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBodega>>> = ({ signal }) => getBodega(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBodega>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBodegaQueryResult = NonNullable<Awaited<ReturnType<typeof getBodega>>>
+export type GetBodegaQueryError = ErrorType<unknown>
+
+
+
+export function useGetBodega<TData = Awaited<ReturnType<typeof getBodega>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBodega>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBodegaQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateStockCriticoBodegaUrl = (id: number,
+    productoId: number,) => {
+
+
+
+
+  return `/api/bodegas/${id}/productos/${productoId}`
+}
+
+export const updateStockCriticoBodega = async (id: number,
+    productoId: number,
+    stockCriticoInput: StockCriticoInput, options?: RequestInit): Promise<Producto> => {
+
+  return customFetch<Producto>(getUpdateStockCriticoBodegaUrl(id,productoId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      stockCriticoInput,)
+  }
+);}
+
+
+
+
+export const getUpdateStockCriticoBodegaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStockCriticoBodega>>, TError,{id: number;productoId: number;data: BodyType<StockCriticoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateStockCriticoBodega>>, TError,{id: number;productoId: number;data: BodyType<StockCriticoInput>}, TContext> => {
+
+const mutationKey = ['updateStockCriticoBodega'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateStockCriticoBodega>>, {id: number;productoId: number;data: BodyType<StockCriticoInput>}> = (props) => {
+          const {id,productoId,data} = props ?? {};
+
+          return  updateStockCriticoBodega(id,productoId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateStockCriticoBodegaMutationResult = NonNullable<Awaited<ReturnType<typeof updateStockCriticoBodega>>>
+    export type UpdateStockCriticoBodegaMutationBody = BodyType<StockCriticoInput>
+    export type UpdateStockCriticoBodegaMutationError = ErrorType<unknown>
+
+    export const useUpdateStockCriticoBodega = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStockCriticoBodega>>, TError,{id: number;productoId: number;data: BodyType<StockCriticoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateStockCriticoBodega>>,
+        TError,
+        {id: number;productoId: number;data: BodyType<StockCriticoInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateStockCriticoBodegaMutationOptions(options));
+    }
 
 export const getListInventarioUrl = () => {
 

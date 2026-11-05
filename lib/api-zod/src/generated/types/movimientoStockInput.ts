@@ -16,4 +16,8 @@ export interface MovimientoStockInput {
   cantidad: number;
   /** @minLength 1 */
   motivo: string;
+  /** @nullable */
+  bodegaOrigenId?: number | null;
+  /** @nullable */
+  bodegaDestinoId?: number | null;
 }

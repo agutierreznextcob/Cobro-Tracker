@@ -14,6 +14,17 @@ export interface ProductoInput {
      * @maxLength 200
      */
   nombre: string;
+  /** @maxLength 80 */
+  codigoInterno?: string;
+  /** @maxLength 120 */
+  sku?: string;
+  /** @maxLength 120 */
+  codigoBarras?: string;
+  /**
+     * Bodega inicial al crear un producto.
+     * @nullable
+     */
+  bodegaId?: number | null;
   descripcion?: string;
   tipo: ProductoInputTipo;
   /** @minimum 0 */
