@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import indicadoresRouter from "./indicadores";
 import cotizacionesRouter from "./cotizaciones";
 import preferenciasRouter from "./preferencias";
 import healthRouter from "./health";
@@ -70,6 +71,7 @@ router.use(encuestasRouter);
 // Must come before cobrosRouter's blanket auth middleware.
 router.use(organizationRouter);
 router.use(inventarioRouter);
+router.use(indicadoresRouter);
 router.use(cotizacionesRouter);
 router.use(preferenciasRouter);
 router.use(localesRouter);

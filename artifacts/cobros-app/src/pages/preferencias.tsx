@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { IndicadoresPanel } from "@/components/indicadores-panel";
 import { formatMoney, formatFechaPref, hoySantiago, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
 import { apiErrorMessage } from "@/lib/inventario";
 import { Info, Loader2, Lock, RotateCw, Save } from "lucide-react";
@@ -159,6 +160,10 @@ export default function PreferenciasPage() {
             <p className="text-xs text-muted-foreground">Ejemplo: <span className="font-mono text-foreground">{formatMoney(ejemplo, f.moneda, f.decimales)}</span></p>
             {f.moneda === "CLP" && f.decimales > 0 && <p className="text-xs text-amber-700">Los cobros CLP con decimales no pueden generar links de Flow ni MercadoPago.</p>}
           </div>
+        </Seccion>
+
+        <Seccion titulo="Indicadores económicos" desc="Valores guardados en NextCob (fuente mindicador.cl). Se usan como equivalencia referencial en CLP para documentos en UF, USD o EUR.">
+          <IndicadoresPanel />
         </Seccion>
 
         <Seccion titulo="IVA por defecto" desc="Porcentaje sugerido en cotizaciones y cobros afectos. Editable en cada documento.">

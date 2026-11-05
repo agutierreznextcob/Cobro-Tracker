@@ -4,6 +4,7 @@ import { logger } from "./lib/logger";
 import { startRecordatoriosScheduler } from "./lib/recordatorios-scheduler";
 import { seedEssentialAccounts } from "./lib/seed";
 import { initializeInventarioTriggers } from "./lib/inventario-triggers";
+import { startIndicadoresScheduler } from "./lib/indicadores";
 
 // node-postgres emits an 'error' event on idle clients when the backend drops a
 // pooled connection (routine in cloud Postgres: idle timeouts, failovers). With
@@ -35,6 +36,7 @@ initializeInventarioTriggers().then(() => app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  startIndicadoresScheduler();
   // Ensure essential accounts (demo + superadmin) exist. Fire-and-forget with a
   // catch so a seed failure logs but never crashes the process / healthcheck.
   seedEssentialAccounts().catch((err) => {

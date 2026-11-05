@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { equivalenciaClpTexto } from "./indicadores";
 import { formatDocumentMoney } from "./preferencias";
 import { NEXTCOB_LOGO_BASE64 } from "./logo-base64";
 
@@ -42,7 +43,8 @@ function formatFechaHora(d: Date): string {
 }
 
 // Renders a payment receipt ("comprobante de pago") to a PDF Buffer.
-export function generarComprobantePdf(data: ComprobanteData): Promise<Buffer> {
+export async function generarComprobantePdf(data: ComprobanteData): Promise<Buffer> {
+  const equivalencia = await equivalenciaClpTexto(data.montoTotal, data.moneda);
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -151,6 +153,11 @@ export function generarComprobantePdf(data: ComprobanteData): Promise<Buffer> {
         ry += rowH;
       }
       y = boxTop + boxH + 24;
+      if (equivalencia) {
+        if (y > 650) { doc.addPage(); y = 50; }
+        doc.fillColor(GRIS).fontSize(9).font("Helvetica").text(equivalencia, left, y, { width: contentWidth });
+        y = doc.y + 20;
+      }
 
       // ---- Optional message ----------------------------------------------
       if (data.mensaje && data.mensaje.trim()) {

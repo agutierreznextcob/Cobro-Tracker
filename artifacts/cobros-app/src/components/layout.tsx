@@ -9,6 +9,7 @@ import { useWebhookPolling } from "@/hooks/use-webhook-polling";
 import { useNotificacionesPolling } from "@/hooks/use-notificaciones-polling";
 import { useLeadsCountPolling } from "@/hooks/use-leads-count-polling";
 import { AiChat } from "@/components/ai-chat";
+import { IndicadoresBar } from "@/components/indicadores-bar";
 import { usePreferencias } from "@/hooks/use-preferencias";
 import { setFormatoFechaGlobal } from "@/lib/format";
 
@@ -621,8 +622,10 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
+        <div className={`sticky ${esConsultor ? "top-10" : "top-0"} z-30`}>
+        <IndicadoresBar />
         {/* Mobile top bar */}
-        <header className="md:hidden sticky top-0 z-30 h-14 flex items-center gap-3 px-4 border-b bg-card/95 backdrop-blur">
+        <header className="md:hidden h-14 flex items-center gap-3 px-4 border-b bg-card/95 backdrop-blur">
           <button
             onClick={() => setMobileOpen(true)}
             className="p-2 -ml-2 rounded-md text-foreground hover:bg-secondary/80 transition-colors"
@@ -641,9 +644,10 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
           <MobileBell />
         </header>
+        </div>
 
         <TrialBanner />
-        <main className="flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-8 overflow-y-auto">
+        <main data-scroll-container className="flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-8 overflow-y-auto">
           {children}
         </main>
       </div>

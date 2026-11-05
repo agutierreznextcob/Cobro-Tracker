@@ -1,3 +1,4 @@
+import { EquivalenciaCLP } from "@/components/equivalencia-clp";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1112,6 +1113,7 @@ export default function CobroDetail() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Moneda del documento</p>
                   <p className="font-mono text-sm">{monedaDe(cobro.moneda)} · {cobro.decimales ?? 0} decimales</p>
+                  <EquivalenciaCLP monto={montoACobrar} moneda={monedaDe(cobro.moneda)} compact className="mt-2" testId="equivalencia-clp-cobro" />
                 </div>
               )}
               <div>

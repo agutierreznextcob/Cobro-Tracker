@@ -1,3 +1,4 @@
+import { EquivalenciaCLP } from "@/components/equivalencia-clp";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -425,6 +426,7 @@ export default function CotizacionFormPage() {
                 <span className="font-semibold">Total</span>
                 <span className="font-mono text-2xl font-bold text-primary tabular-nums" data-testid="text-total">{fmt(tot.total)}</span>
               </div>
+              {moneda !== "CLP" && <EquivalenciaCLP monto={tot.total} moneda={moneda} compact testId="equivalencia-clp-cotizacion" />}
             </div>
             <div className="p-4 space-y-2 border-t">
               <Button className="w-full" onClick={() => ejecutar("guardar")} disabled={ocupado} data-testid="button-guardar-borrador">

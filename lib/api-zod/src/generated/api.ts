@@ -8,6 +8,30 @@
 import * as zod from 'zod';
 
 
+export const ListIndicadoresResponseItem = zod.object({
+  "codigo": zod.enum(['uf', 'dolar', 'euro', 'utm', 'ivp']),
+  "nombre": zod.string(),
+  "valor": zod.number(),
+  "fecha": zod.string(),
+  "updatedAt": zod.string(),
+  "variacion": zod.number().nullable(),
+  "fechaAnterior": zod.string().nullable()
+})
+export const ListIndicadoresResponse = zod.array(ListIndicadoresResponseItem)
+
+
+export const SyncIndicadoresResponseItem = zod.object({
+  "codigo": zod.enum(['uf', 'dolar', 'euro', 'utm', 'ivp']),
+  "nombre": zod.string(),
+  "valor": zod.number(),
+  "fecha": zod.string(),
+  "updatedAt": zod.string(),
+  "variacion": zod.number().nullable(),
+  "fechaAnterior": zod.string().nullable()
+})
+export const SyncIndicadoresResponse = zod.array(SyncIndicadoresResponseItem)
+
+
 export const getPreferenciasResponseDecimalesMin = 0;
 export const getPreferenciasResponseDecimalesMax = 2;
 

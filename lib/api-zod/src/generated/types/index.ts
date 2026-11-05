@@ -144,6 +144,8 @@ export * from './importarClientesInput';
 export * from './importarClientesInputClientesItem';
 export * from './importarClientesResult';
 export * from './importarClientesResultOmitidosItem';
+export * from './indicadorEconomico';
+export * from './indicadorEconomicoCodigo';
 export * from './invitacion';
 export * from './invitacionEstado';
 export * from './invitacionOrgRole';

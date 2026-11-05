@@ -5,6 +5,29 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+export type IndicadorEconomicoCodigo = typeof IndicadorEconomicoCodigo[keyof typeof IndicadorEconomicoCodigo];
+
+
+export const IndicadorEconomicoCodigo = {
+  uf: 'uf',
+  dolar: 'dolar',
+  euro: 'euro',
+  utm: 'utm',
+  ivp: 'ivp',
+} as const;
+
+export interface IndicadorEconomico {
+  codigo: IndicadorEconomicoCodigo;
+  nombre: string;
+  valor: number;
+  fecha: string;
+  updatedAt: string;
+  /** @nullable */
+  variacion: number | null;
+  /** @nullable */
+  fechaAnterior: string | null;
+}
+
 export type PreferenciasMoneda = typeof PreferenciasMoneda[keyof typeof PreferenciasMoneda];
 
 

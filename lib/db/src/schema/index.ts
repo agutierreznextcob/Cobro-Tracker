@@ -1,3 +1,4 @@
+export * from "./indicadores-economicos";
 export * from "./preferencias";
 export * from "./cotizaciones";
 export * from "./cotizacion-items";

@@ -1,8 +1,10 @@
 import PDFDocument from "pdfkit";
+import { equivalenciaClpTexto } from "./indicadores";
 import { formatDocumentMoney } from "./preferencias";
 import type { serializeCotizacion } from "./cotizaciones";
 
 export async function cotizacionPdf(q: Awaited<ReturnType<typeof serializeCotizacion>>, negocio: string, formatoFecha = "DD/MM/YYYY"): Promise<Buffer> {
+  const equivalencia = await equivalenciaClpTexto(q.total, q.moneda);
   const doc = new PDFDocument({ size: "A4", margin: 48, info: { Title: q.numeroCotizacion, Author: negocio } });
   const chunks: Buffer[] = [];
   const result = new Promise<Buffer>((resolve, reject) => {
@@ -37,6 +39,7 @@ export async function cotizacionPdf(q: Awaited<ReturnType<typeof serializeCotiza
   doc.text(`IVA (${q.porcentajeIva}%): ${money(q.montoIva)}`, { align: "right" });
   doc.font("Helvetica-Bold").fontSize(14).text(`Total: ${money(q.total)}`, { align: "right" }).font("Helvetica").fontSize(10).moveDown();
   if (q.notas) { space(70); doc.text("Observaciones").text(q.notas).moveDown(); }
+  if (equivalencia) { space(80); doc.text(equivalencia).moveDown(); }
   space(40);
   doc.fillColor("#666666").fontSize(9).text("Esta cotización no es un documento tributario ni un comprobante de pago.");
   doc.end();

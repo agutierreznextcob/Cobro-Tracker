@@ -33,6 +33,28 @@ tags:
   - name: encuestas
     description: Client satisfaction surveys
 paths:
+  /indicadores:
+    get:
+      operationId: listIndicadores
+      responses:
+        "200":
+          description: Valores almacenados, nunca una consulta externa en tiempo real
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/IndicadorEconomico" }
+  /indicadores/sincronizar:
+    post:
+      operationId: syncIndicadores
+      responses:
+        "200":
+          description: Sincronización terminada
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/IndicadorEconomico" }
   /configuracion/preferencias:
     get:
       operationId: getPreferencias
@@ -3779,6 +3801,17 @@ paths:
 
 components:
   schemas:
+    IndicadorEconomico:
+      type: object
+      required: [codigo, nombre, valor, fecha, updatedAt, variacion, fechaAnterior]
+      properties:
+        codigo: { type: string, enum: [uf, dolar, euro, utm, ivp] }
+        nombre: { type: string }
+        valor: { type: number }
+        fecha: { type: string }
+        updatedAt: { type: string }
+        variacion: { type: [number, "null"] }
+        fechaAnterior: { type: [string, "null"] }
     Preferencias:
       type: object
       required: [moneda, decimales, porcentajeIva, formatoFecha, prefijoCobro, prefijoCotizacion]

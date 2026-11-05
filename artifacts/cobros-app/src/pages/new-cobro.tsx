@@ -1,3 +1,4 @@
+import { EquivalenciaCLP } from "@/components/equivalencia-clp";
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -436,6 +437,8 @@ export default function NewCobro() {
                   <p className="text-xs text-amber-700 dark:text-amber-400">Flow y MercadoPago solo cobran CLP sin decimales: este cobro no podrá generar links de pago.</p>
                 )}
               </div>
+
+              {monedaEfectiva !== "CLP" && <EquivalenciaCLP monto={usaLineas ? totalItems : totalNum} moneda={monedaEfectiva} testId="equivalencia-clp-cobro" />}
 
               <CatalogoLineas lineas={lineas} onChange={setLineas} incluyeIva={permiteIva && !!incluyeIvaWatch} moneda={monedaEfectiva} decimales={modoAvanzado === "individual" ? decimalesDoc : undefined} />
 

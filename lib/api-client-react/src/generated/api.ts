@@ -103,6 +103,7 @@ import type {
   HealthStatus,
   ImportarClientesInput,
   ImportarClientesResult,
+  IndicadorEconomico,
   Invitacion,
   InvitacionPublica,
   InvitarUsuarioInput,
@@ -196,6 +197,141 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getListIndicadoresUrl = () => {
+
+
+
+
+  return `/api/indicadores`
+}
+
+export const listIndicadores = async ( options?: RequestInit): Promise<IndicadorEconomico[]> => {
+
+  return customFetch<IndicadorEconomico[]>(getListIndicadoresUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListIndicadoresQueryKey = () => {
+    return [
+    `/api/indicadores`
+    ] as const;
+    }
+
+
+export const getListIndicadoresQueryOptions = <TData = Awaited<ReturnType<typeof listIndicadores>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIndicadores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListIndicadoresQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listIndicadores>>> = ({ signal }) => listIndicadores({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listIndicadores>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListIndicadoresQueryResult = NonNullable<Awaited<ReturnType<typeof listIndicadores>>>
+export type ListIndicadoresQueryError = ErrorType<unknown>
+
+
+
+export function useListIndicadores<TData = Awaited<ReturnType<typeof listIndicadores>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIndicadores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListIndicadoresQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSyncIndicadoresUrl = () => {
+
+
+
+
+  return `/api/indicadores/sincronizar`
+}
+
+export const syncIndicadores = async ( options?: RequestInit): Promise<IndicadorEconomico[]> => {
+
+  return customFetch<IndicadorEconomico[]>(getSyncIndicadoresUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSyncIndicadoresMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncIndicadores>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof syncIndicadores>>, TError,void, TContext> => {
+
+const mutationKey = ['syncIndicadores'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncIndicadores>>, void> = () => {
+
+
+          return  syncIndicadores(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SyncIndicadoresMutationResult = NonNullable<Awaited<ReturnType<typeof syncIndicadores>>>
+
+    export type SyncIndicadoresMutationError = ErrorType<unknown>
+
+    export const useSyncIndicadores = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncIndicadores>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof syncIndicadores>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSyncIndicadoresMutationOptions(options));
+    }
 
 export const getGetPreferenciasUrl = () => {
 

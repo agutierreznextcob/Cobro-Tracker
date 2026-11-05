@@ -423,3 +423,12 @@
     animation: none;
   }
 }
+
+@keyframes ind-marquee { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 1rem)); } }
+.ind-marquee { animation: ind-marquee 18s linear infinite; }
+.ind-marquee-wrap:hover .ind-marquee { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ind-marquee { animation: none; }
+  .ind-marquee-dup { display: none; }
+  .ind-marquee-wrap { overflow-x: auto; }
+}
