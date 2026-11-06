@@ -19,7 +19,7 @@
  *     (lista blanca obsoleta — mantenerla honesta).
  */
 import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findUnscopedUses } from "./auth-guard-analysis";
 
@@ -48,6 +48,8 @@ const PUBLIC_ROUTER_FILES = new Set([
   "leads.ts",
   "portal.ts",
   "encuestas.ts",
+  "organization.ts",
+  "consultor.ts",
 ]);
 
 function stripComments(src: string): string {
@@ -56,6 +58,7 @@ function stripComments(src: string): string {
     .replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
 }
 
+export function checkAuthGuards(routesDir: string): string[] {
 const indexSrc = stripComments(readFileSync(join(routesDir, "index.ts"), "utf8"));
 
 // Mapa variable importada -> archivo (./cobros -> cobros.ts)
@@ -71,15 +74,13 @@ const mountOrder: string[] = [];
 for (const m of indexSrc.matchAll(/^\s*router\.use\(([\w$]+)\)/gm)) {
   const file = importMap.get(m[1]);
   if (!file) {
-    console.error(`ERROR: routes/index.ts monta "${m[1]}" pero no se pudo resolver su import.`);
-    process.exit(1);
+    return [`ERROR: routes/index.ts monta "${m[1]}" pero no se pudo resolver su import.`];
   }
   mountOrder.push(file);
 }
 
 if (mountOrder.length === 0) {
-  console.error("ERROR: no se detectó ningún montaje en routes/index.ts (¿cambió el formato?).");
-  process.exit(1);
+  return ["ERROR: no se detectó ningún montaje en routes/index.ts (¿cambió el formato?)."];
 }
 
 const errors: string[] = [];
@@ -136,6 +137,11 @@ for (const file of ALLOWED_BLANKET_GUARD_FILES) {
   }
 }
 
+return errors;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+const errors = checkAuthGuards(routesDir);
 if (errors.length > 0) {
   console.error("check-auth-guards: FALLÓ\n");
   for (const e of errors) console.error(`- ${e}\n`);
@@ -143,7 +149,8 @@ if (errors.length > 0) {
 }
 
 console.log(
-  `check-auth-guards: OK — ${mountOrder.length} routers montados, ` +
+  `check-auth-guards: OK — routers montados verificados, ` +
     `${[...ALLOWED_BLANKET_GUARD_FILES].length} con blanket guard permitido, ` +
     `todos montados después de las rutas públicas.`,
 );
+}

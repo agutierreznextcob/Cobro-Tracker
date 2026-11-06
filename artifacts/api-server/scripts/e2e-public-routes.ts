@@ -43,8 +43,9 @@ async function req(method: string, path: string, opts: { json?: unknown; form?: 
 
 /**
  * Cada caso declara el/los status esperados. Todos comparten la invariante
- * dura: NUNCA 401 ni 403 — eso significa que un guard de auth mal ubicado
- * está interceptando la ruta pública.
+ * dura para estos inputs: NUNCA 401 ni 403. El login de consultor puede
+ * devolverlos legítimamente con credenciales incorrectas o tipo admin;
+ * usamos un body vacío, cuyo contrato es 400 antes de consultar credenciales.
  */
 const cases: Array<{
   name: string;
@@ -52,7 +53,16 @@ const cases: Array<{
   path: string;
   opts?: { json?: unknown; form?: Record<string, string> };
   expect: number[];
+  expectBody?: unknown;
 }> = [
+  {
+    name: "POST /consultor/login body vacío → 400 (acceso público de soporte)",
+    method: "POST",
+    path: "/consultor/login",
+    opts: { json: {} },
+    expect: [400],
+    expectBody: { message: "Datos incompletos." },
+  },
   {
     name: "GET /public/portal/:token inválido → 404 (portal del deudor)",
     method: "GET",
@@ -131,6 +141,13 @@ async function main() {
       c.expect.includes(r.status),
       { status: r.status, body: r.text.slice(0, 200) },
     );
+    if (c.expectBody !== undefined) {
+      check(
+        `${c.name} — contrato del body`,
+        r.text === JSON.stringify(c.expectBody),
+        { status: r.status, body: r.text.slice(0, 200) },
+      );
+    }
   }
 
   console.log(failures === 0 ? "\n✅ Todas las rutas públicas OK" : `\n❌ ${failures} fallas`);

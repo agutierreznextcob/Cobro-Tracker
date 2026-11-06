@@ -1,6 +1,41 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { findUnscopedUses } from "./auth-guard-analysis";
+import { checkAuthGuards } from "./check-auth-guards";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const routesDir = join(dirname(fileURLToPath(import.meta.url)), "../src/routes");
+
+test("current router order preserves every public route", () => {
+  assert.deepEqual(checkAuthGuards(routesDir), []);
+});
+
+for (const router of ["organization", "consultor"]) {
+  test(`rejects ${router} mounted after a permitted blanket guard`, () => {
+    const fixture = mkdtempSync(join(tmpdir(), "auth-guard-order-"));
+    try {
+      cpSync(routesDir, fixture, { recursive: true });
+      const indexPath = join(fixture, "index.ts");
+      const mount = `router.use(${router}Router);`;
+      const source = readFileSync(indexPath, "utf8");
+      assert.equal(source.split(mount).length, 2);
+      // Leave all other public routers before cobros: only this router makes
+      // the order unsafe, so an omitted PUBLIC_ROUTER_FILES entry fails here.
+      writeFileSync(indexPath, source.replace(mount, "").replace(
+        "router.use(cobrosRouter);",
+        `router.use(cobrosRouter);\n${mount}`,
+      ));
+      const errors = checkAuthGuards(fixture);
+      assert.equal(errors.length, 1);
+      assert.match(errors[0], new RegExp(`"cobros.ts".*ANTES.*${router}\\.ts`));
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+}
 
 const safe = [
   'router.use("/locales", guard);',
