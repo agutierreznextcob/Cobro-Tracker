@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findUnscopedUses } from "./auth-guard-analysis";
+import { analyzeRouterMounts } from "./router-mount-analysis";
 
 const routesDir = join(dirname(fileURLToPath(import.meta.url)), "../src/routes");
 
@@ -52,38 +53,11 @@ const PUBLIC_ROUTER_FILES = new Set([
   "consultor.ts",
 ]);
 
-function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
-}
-
 export function checkAuthGuards(routesDir: string): string[] {
-const indexSrc = stripComments(readFileSync(join(routesDir, "index.ts"), "utf8"));
-
-// Mapa variable importada -> archivo (./cobros -> cobros.ts)
-const importMap = new Map<string, string>();
-for (const m of indexSrc.matchAll(
-  /import\s+(?:\{\s*([\w$]+)\s*\}|([\w$]+))\s+from\s+["']\.\/([\w-]+)["']/g,
-)) {
-  importMap.set(m[1] ?? m[2], `${m[3]}.ts`);
-}
-
-// Orden de montaje: router.use(xRouter)
-const mountOrder: string[] = [];
-for (const m of indexSrc.matchAll(/^\s*router\.use\(([\w$]+)\)/gm)) {
-  const file = importMap.get(m[1]);
-  if (!file) {
-    return [`ERROR: routes/index.ts monta "${m[1]}" pero no se pudo resolver su import.`];
-  }
-  mountOrder.push(file);
-}
-
-if (mountOrder.length === 0) {
-  return ["ERROR: no se detectó ningún montaje en routes/index.ts (¿cambió el formato?)."];
-}
-
-const errors: string[] = [];
+const { mountOrder, errors } = analyzeRouterMounts(
+  readFileSync(join(routesDir, "index.ts"), "utf8"), routesDir,
+);
+if (errors.length) return errors;
 
 // Acepta prefijos literales o arrays literales no vacíos de prefijos seguros.
 // Lo dinámico/desconocido se trata conservadoramente como no delimitado.
