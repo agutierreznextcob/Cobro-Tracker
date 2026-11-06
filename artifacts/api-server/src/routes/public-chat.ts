@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import Groq from "groq-sdk";
 import { z } from "zod";
+import { DIANA_PRODUCT_CONTEXT } from "../lib/diana-product-context";
 
 const publicChatRouter: IRouter = Router();
 
@@ -55,7 +56,9 @@ function getGroqClient(): Groq {
   return new Groq({ apiKey });
 }
 
-const SYSTEM_COMERCIAL = `Eres Diana, la asistente inteligente de NextCob, una plataforma de gestión de cuentas por cobrar para empresas y profesionales en Chile.
+const SYSTEM_COMERCIAL = `Eres Diana, la asistente inteligente de NextCob, una plataforma de gestión comercial y cobranza para empresas y profesionales en Chile.
+
+${DIANA_PRODUCT_CONTEXT}
 
 Tu personalidad es profesional, cercana y directa: hablas como una ejecutiva chilena experta en cobranza y finanzas.
 
@@ -79,7 +82,7 @@ Reglas:
 - No prometas plazos, descuentos ni condiciones que no estén descritas aquí.
 
 ## Qué es NextCob
-Una herramienta para que negocios y profesionales en Chile cobren a sus clientes sin complicaciones: crear cobros, compartir links de pago, y hacer seguimiento automático del estado de cada cobro, todo desde un panel en tiempo real.
+Una plataforma para gestionar ventas, cobros, cotizaciones, inventario, compras, proveedores, clientes e informes por área. Permite compartir links de pago y hacer seguimiento de los cobros, además de gestionar la satisfacción del cliente y los documentos del negocio.
 
 ## Cómo funciona
 1. Creas un cobro indicando cliente, monto y descripción.

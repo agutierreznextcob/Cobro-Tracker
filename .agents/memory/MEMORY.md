@@ -14,6 +14,7 @@
 - [Leads capture](leads-capture.md) — landing form → lead; PLATFORM-admin-only (not per-org, avoids tenant leak); public route mounted before cobros blanket-auth; escape untrusted input in emails.
 - [Landing public AI chat](landing-public-chat.md) — unauth sales chatbot is its OWN router mounted before auth-gated aiRouter; public LLM endpoints MUST stay rate-limited (in-memory, single-instance only).
 - [Groq reasoning visibility](groq-reasoning-visibility.md) — verify live model availability before switching; disable reasoning at the API and still strip think blocks incrementally in the UI.
+- [Conocimiento de Diana](diana-product-knowledge.md) — consultar el catálogo oficial antes de negar un módulo; separar existencia, permisos y datos disponibles, también en el chat público.
 - [Flow plan pricing & IVA](flow-plan-pricing.md) — platform prices are IVA-inclusive (neto+IVA=total); changing the charged amount REQUIRES bumping PLAN_ID or Flow keeps the old price.
 - [Encuestas post-pago](encuestas-satisfaccion.md) — envío diferido +1h vía barrido claim-TTL con tope de reintentos; un-clic NUNCA muta en GET (prefetch de email), la página pública auto-POSTea.
 - [Reseñas de Google](google-reviews.md) — invitación para todas las calificaciones aprobada; contar clics explícitos y clientes únicos por mes de Chile, no reseñas publicadas.
