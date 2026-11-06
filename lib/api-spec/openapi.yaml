@@ -379,6 +379,19 @@ paths:
           content:
             application/pdf:
               schema: { type: string, format: binary }
+  /cotizaciones/{id}/pdf-enviado:
+    get:
+      operationId: downloadCotizacionPdfEnviado
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Copia exacta del PDF enviado
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Cotización o copia enviada no disponible
   /locales:
     get:
       operationId: listLocales
@@ -4277,6 +4290,8 @@ components:
           properties:
             id: { type: integer }
             numeroCotizacion: { type: string }
+            pdfEnviadoDisponible: { type: boolean }
+            envioPendiente: { type: boolean }
             clienteNombre: { type: string }
             clienteRut: { type: [string, "null"] }
             clienteEmail: { type: [string, "null"] }

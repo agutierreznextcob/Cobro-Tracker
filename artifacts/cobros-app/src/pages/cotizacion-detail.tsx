@@ -89,11 +89,11 @@ export default function CotizacionDetailPage() {
     }
   };
 
-  const pdf = async () => {
+  const pdf = async (enviado = false) => {
     if (!c) return;
     setDescargando(true);
     try {
-      await descargarPdfCotizacion(c);
+      await descargarPdfCotizacion(c, enviado);
     } catch (err) {
       toast({ title: "No se pudo generar el PDF", description: apiErrorMessage(err, "Intenta nuevamente."), variant: "destructive" });
     } finally {
@@ -231,15 +231,16 @@ export default function CotizacionDetailPage() {
         <div className="space-y-4 lg:sticky lg:top-4">
           <Card className="p-4 shadow-sm space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Acciones</p>
-            {c.estado === "borrador" && (
+            {(c.estado === "borrador" || c.envioPendiente) && (
               <>
                 <Button className="w-full" onClick={() => setConfirm("enviar")} disabled={pending || !c.clienteEmail} data-testid="button-enviar">
                   {enviar.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}Enviar al cliente
                 </Button>
                 {!c.clienteEmail && <p className="text-[11px] text-amber-700">Agrega un email al cliente para enviarla.</p>}
-                <Button asChild variant="outline" className="w-full" data-testid="button-editar">
+                {c.envioPendiente && <p className="text-xs text-amber-700">Envío pendiente de confirmar. Reintentar utiliza el mismo documento y no genera un nuevo correo. El borrador queda bloqueado hasta confirmar.</p>}
+                {!c.envioPendiente && <Button asChild variant="outline" className="w-full" data-testid="button-editar">
                   <Link href={`/cotizaciones/${c.id}/editar`}><Pencil className="h-4 w-4 mr-2" />Editar borrador</Link>
-                </Button>
+                </Button>}
               </>
             )}
             {c.estado === "enviada" && (
@@ -270,10 +271,18 @@ export default function CotizacionDetailPage() {
               <Button variant="outline" onClick={() => setPreview(true)} data-testid="button-vista-previa">
                 <Eye className="h-4 w-4 mr-2" />Vista previa
               </Button>
-              <Button variant="ghost" onClick={pdf} disabled={descargando} data-testid="button-pdf">
+              <Button variant="ghost" onClick={() => pdf()} disabled={descargando} data-testid="button-pdf">
                 {descargando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}PDF
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">La vista previa y el PDF actual se regeneran con la identidad vigente del negocio.</p>
+            {c.pdfEnviadoDisponible ? (
+              <Button variant="outline" className="w-full" onClick={() => pdf(true)} disabled={descargando} data-testid="button-pdf-enviado">
+                <Download className="h-4 w-4 mr-2" />Descargar PDF enviado
+              </Button>
+            ) : c.estado !== "borrador" && !c.envioPendiente && (
+              <p className="text-xs text-muted-foreground">No hay copia del PDF enviado. Los envíos anteriores a esta función no tienen copia histórica.</p>
+            )}
             <PdfPreviewDialog open={preview} onOpenChange={setPreview} cargar={() => downloadCotizacionPdf(c.id)} filename={c.numeroCotizacion || `cotizacion-${c.id}`} titulo={`Cotización ${c.numeroCotizacion}`} />
           </Card>
 

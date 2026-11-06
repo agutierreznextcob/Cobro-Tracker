@@ -7,6 +7,7 @@ import { getOrgContext, getRemitenteContacto } from "../lib/org";
 import { getPreferenciasNegocio, hoySantiago } from "../lib/preferencias";
 import { cotizacionPdf } from "../lib/cotizacion-pdf";
 import { sendCotizacionEmail } from "../lib/email";
+import { guardarPdfCotizacion, leerPdfCotizacion } from "../lib/cotizacion-archivo";
 
 const router = Router();
 router.use("/cotizaciones", (req, res, next) => {
@@ -53,6 +54,7 @@ router.patch("/cotizaciones/:id", action(async (req, res) => {
     const [current] = await tx.select().from(cotizacionesTable).where(condition).for("update");
     if (!current) throw new CotizacionError("Cotización no encontrada.", 404);
     assertNotSending(current);
+    if (current.envioPdf) throw new CotizacionError("Hay un envío pendiente de confirmar. Reintenta el envío antes de editar.", 409);
     if (current.estado !== "borrador") throw new CotizacionError("Solo puedes editar un borrador.", 409);
     // Currency is immutable even for drafts: changing defaults never relabels documents.
     if (values.moneda !== current.moneda) throw new CotizacionError("La moneda de un documento existente no puede cambiarse.");
@@ -70,6 +72,13 @@ router.get("/cotizaciones/:id/pdf", action(async (req, res) => {
   const pdf = await cotizacionPdf(await serializeCotizacion(q), sender.nombre || "NextCob", prefs.formatoFecha);
   res.type("application/pdf").set("Content-Disposition", `attachment; filename="${q.numeroCotizacion.replace(/[^A-Za-z0-9_-]/g, "_")}.pdf"`).send(pdf);
 }));
+router.get("/cotizaciones/:id/pdf-enviado", action(async (req, res) => {
+  const { q } = await getScopedCotizacion(req.user!.id, Number(req.params.id));
+  if (!q.enviadoEn || !q.envioPdf) throw new CotizacionError("No hay una copia del PDF enviado. Los envíos anteriores a esta función no tienen copia histórica.", 404);
+  const pdf = await leerPdfCotizacion(q);
+  res.type("application/pdf").set("Cache-Control", "private, no-store")
+    .set("Content-Disposition", `attachment; filename="${q.numeroCotizacion.replace(/[^A-Za-z0-9_-]/g, "_")}-enviada.pdf"`).send(pdf);
+}));
 router.post("/cotizaciones/:id/enviar", action(async (req, res) => {
   const { condition } = await getScopedCotizacion(req.user!.id, Number(req.params.id));
   const claim = new Date();
@@ -78,20 +87,32 @@ router.post("/cotizaciones/:id/enviar", action(async (req, res) => {
     if (!current) throw new CotizacionError("Cotización no encontrada.", 404);
     if (current.enviadoEn) return current; // Repeat clicks/retries never resend.
     assertNotSending(current);
-    if (estadoCotizacion(current) !== "borrador") throw new CotizacionError("Solo puedes enviar un borrador vigente.", 409);
+    if (!current.envioPdf && estadoCotizacion(current) !== "borrador") throw new CotizacionError("Solo puedes enviar un borrador vigente.", 409);
     if (!current.clienteEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(current.clienteEmail)) throw new CotizacionError("El cliente no tiene un email válido. Actualízalo y vuelve a guardar el borrador.");
-    await tx.update(cotizacionesTable).set({ envioEnCurso: claim }).where(condition);
-    return current;
+    // Persist the exact attachment AND email inputs before contacting the provider.
+    // A retry must never regenerate a PDF under the same idempotency key.
+    let archivo = current.envioPdf;
+    if (!archivo) {
+      const remitente = await getRemitenteContacto(current.responsableId);
+      const prefs = await getPreferenciasNegocio(current.responsableId);
+      const pdf = await cotizacionPdf(await serializeCotizacion(current), remitente.nombre || "NextCob", prefs.formatoFecha);
+      const [y, m, d] = current.fechaVencimiento.split("-");
+      archivo = await guardarPdfCotizacion(current, pdf, {
+        id: current.id, version: current.updatedAt.getTime().toString(), numero: current.numeroCotizacion,
+        email: current.clienteEmail!, cliente: current.clienteNombre, total: Number(current.total), moneda: current.moneda,
+        decimales: current.decimales, vencimiento: prefs.formatoFecha === "MM/DD/YYYY" ? `${m}/${d}/${y}` : `${d}/${m}/${y}`, remitente,
+      });
+    }
+    // Resend retains idempotency keys for 24h. Never risk a duplicate beyond it.
+    if (Date.now() - Date.parse(archivo.preparedAt) > 23 * 60 * 60_000)
+      throw new CotizacionError("El envío necesita revisión de soporte antes de volver a intentarlo; no se enviará otro correo para evitar duplicados.", 409);
+    const [claimed] = await tx.update(cotizacionesTable).set({ envioEnCurso: claim, envioPdf: archivo }).where(condition).returning();
+    return claimed;
   });
   if (q.enviadoEn) { res.json(await serializeCotizacion(q)); return; }
   try {
-    const remitente = await getRemitenteContacto(q.responsableId);
-    const prefs = await getPreferenciasNegocio(q.responsableId);
-    const pdf = await cotizacionPdf(await serializeCotizacion(q), remitente.nombre || "NextCob", prefs.formatoFecha);
-    const [y, m, d] = q.fechaVencimiento.split("-");
-    await sendCotizacionEmail({ id: q.id, version: q.updatedAt.getTime().toString(), numero: q.numeroCotizacion,
-      email: q.clienteEmail!, cliente: q.clienteNombre, total: Number(q.total), moneda: q.moneda, decimales: q.decimales,
-      vencimiento: prefs.formatoFecha === "MM/DD/YYYY" ? `${m}/${d}/${y}` : `${d}/${m}/${y}`, remitente, pdf });
+    const pdf = await leerPdfCotizacion(q);
+    await sendCotizacionEmail({ ...q.envioPdf!.email, pdf });
     const [updated] = await db.update(cotizacionesTable).set({ estado: "enviada", enviadoEn: new Date(), envioEnCurso: null, updatedAt: new Date() })
       .where(and(condition, eq(cotizacionesTable.envioEnCurso, claim))).returning();
     if (!updated) throw new CotizacionError("El envío se está conciliando. Actualiza la página.", 409);

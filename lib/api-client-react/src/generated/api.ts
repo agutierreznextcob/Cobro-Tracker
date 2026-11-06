@@ -2319,6 +2319,77 @@ export function useDownloadCotizacionPdf<TData = Awaited<ReturnType<typeof downl
 
 
 
+export const getDownloadCotizacionPdfEnviadoUrl = (id: number,) => {
+
+
+
+
+  return `/api/cotizaciones/${id}/pdf-enviado`
+}
+
+export const downloadCotizacionPdfEnviado = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadCotizacionPdfEnviadoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadCotizacionPdfEnviadoQueryKey = (id: number,) => {
+    return [
+    `/api/cotizaciones/${id}/pdf-enviado`
+    ] as const;
+    }
+
+
+export const getDownloadCotizacionPdfEnviadoQueryOptions = <TData = Awaited<ReturnType<typeof downloadCotizacionPdfEnviado>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadCotizacionPdfEnviado>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadCotizacionPdfEnviadoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadCotizacionPdfEnviado>>> = ({ signal }) => downloadCotizacionPdfEnviado(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadCotizacionPdfEnviado>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadCotizacionPdfEnviadoQueryResult = NonNullable<Awaited<ReturnType<typeof downloadCotizacionPdfEnviado>>>
+export type DownloadCotizacionPdfEnviadoQueryError = ErrorType<void>
+
+
+
+export function useDownloadCotizacionPdfEnviado<TData = Awaited<ReturnType<typeof downloadCotizacionPdfEnviado>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadCotizacionPdfEnviado>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadCotizacionPdfEnviadoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListLocalesUrl = () => {
 
 

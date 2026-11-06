@@ -14,3 +14,7 @@ Cambiar la presentación no cambia importes, moneda, precisión, fechas ni estad
 Los logos son privados, limitados a JPG/PNG de hasta 2 MB al subir, y se copian a una ubicación validada distinta de la URL de carga.
 **Why:** una URL de carga sigue pudiendo sobrescribir el objeto temporal hasta expirar; referenciar ese objeto directamente permitiría sustituir el logo después de validarlo.
 **How to apply:** verificar propiedad por negocio, decodificar y normalizar los bytes antes de guardar la referencia; nunca aceptar una URL externa como logo del PDF. La limpieza futura debe considerar referencias activas de desarrollo y producción antes de borrar archivos compartidos.
+
+Los reintentos de correo deben conservar tanto el adjunto como los demás datos del mensaje; una respuesta fallida puede ser ambigua y no autoriza a crear otro envío.
+**Why:** regenerar con otra identidad bajo la misma clave de idempotencia puede no coincidir con el documento efectivamente aceptado por el proveedor. Su ventana de deduplicación es limitada.
+**How to apply:** distinguir preparación de confirmación; no ofrecer como enviada una copia pendiente ni reconstruir históricos. Fuera de la ventana segura, exigir conciliación en lugar de reenviar a ciegas.

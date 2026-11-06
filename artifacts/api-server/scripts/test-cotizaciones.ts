@@ -12,6 +12,10 @@ let pool: { end(): Promise<void> } | undefined;
 let server: http.Server | undefined;
 const realFetch = globalThis.fetch;
 let emails = 0;
+let failEmail = false;
+let failStorage = false;
+const emailBodies: string[] = [];
+const emailKeys: string[] = [];
 try {
   await admin.connect();
   await admin.query(`create schema "${schema}"`);
@@ -31,11 +35,33 @@ try {
   globalThis.fetch = async (input, init) => {
     if (String(input).startsWith("https://api.resend.com/")) {
       emails++;
+      emailBodies.push(String(init?.body));
+      emailKeys.push(new Headers(init?.headers).get("idempotency-key") ?? "");
+      if (failEmail) return new Response(JSON.stringify({ name: "application_error", message: "Test failure" }), { status: 500, headers: { "content-type": "application/json" } });
       return new Response(JSON.stringify({ id: "test-message" }), { status: 200, headers: { "content-type": "application/json" } });
     }
     return realFetch(input, init);
   };
-  const { db, pool: p, usersTable, clientesTable, cotizacionesTable, cobrosTable, productosTable } = await import("@workspace/db");
+  // Exercise the real archive code with a deterministic private storage transport.
+  const { ObjectStorageService, objectStorageClient } = await import("../src/lib/objectStorage");
+  const objects = new Map<string, { pdf: Buffer; metadata: any }>();
+  ObjectStorageService.prototype.getPrivateObjectDir = () => "/test-bucket/private";
+  (objectStorageClient as any).bucket = () => ({
+    file: (path: string) => ({
+      save: async (pdf: Buffer, opts: any) => {
+        if (failStorage) throw Error("storage unavailable");
+        assert.equal(opts.preconditionOpts.ifGenerationMatch, 0);
+        assert.ok(!objects.has(path), "Never overwrite an existing archive");
+        objects.set(path, { pdf: Buffer.from(pdf), metadata: opts.metadata });
+      },
+    }),
+  });
+  ObjectStorageService.prototype.getObjectEntityFile = async (path: string) => {
+    const object = objects.get(path.replace("/objects/", "private/"));
+    if (!object) throw Error("missing file");
+    return { getMetadata: async () => [object.metadata], download: async () => [Buffer.from(object.pdf)] } as any;
+  };
+  const { db, pool: p, usersTable, clientesTable, cotizacionesTable, cobrosTable, productosTable, empresasTable } = await import("@workspace/db");
   pool = p;
   const { eq } = await import("drizzle-orm");
   const [owner, outsider] = await db.insert(usersTable).values(["owner", "outsider"].map((s, i) => ({
@@ -65,7 +91,7 @@ try {
   const prefs = { moneda: "USD", decimales: 2, porcentajeIva: 10, formatoFecha: "MM/DD/YYYY", prefijoCobro: "VENT-", prefijoCotizacion: "PRES-" };
   assert.equal((await api("PUT", "/configuracion/preferencias", prefs)).status, 200);
   assert.equal((await api("GET", "/configuracion/preferencias")).data.moneda, "USD");
-  const input = { clienteId: cliente.id, fechaEmision: "2026-01-01", fechaVencimiento: "2099-01-01", moneda: "USD", decimales: 2, porcentajeIva: 10, notas: "Prueba", items: [
+  const input = { clienteId: cliente.id, fechaEmision: "2026-01-01", fechaVencimiento: "2030-01-01", moneda: "USD", decimales: 2, porcentajeIva: 10, notas: "Prueba", items: [
     { productoId: product.id, descripcion: "Producto", cantidad: 2, precioUnitario: 10, descuentoPorcentaje: 10 },
     { descripcion: "Servicio libre", cantidad: 1, precioUnitario: 5.25, descuentoPorcentaje: 0 },
   ] };
@@ -97,9 +123,52 @@ try {
   const pdf = await fetch(`${base}/cotizaciones/${id}/pdf`);
   assert.equal(pdf.status, 200);
   assert.equal(Buffer.from(await pdf.arrayBuffer()).subarray(0, 4).toString(), "%PDF");
+  failStorage = true;
+  assert.equal((await api("POST", `/cotizaciones/${id}/enviar`)).status, 500);
+  assert.equal(emails, 0, "No email without a durable attachment");
+  failStorage = false;
+  failEmail = true;
+  assert.equal((await api("POST", `/cotizaciones/${id}/enviar`)).status, 500);
+  assert.equal((await api("GET", `/cotizaciones/${id}/pdf-enviado`)).status, 404);
+  const pending = (await api("GET", `/cotizaciones/${id}`)).data;
+  assert.equal(pending.pdfEnviadoDisponible, false);
+  assert.equal(pending.envioPendiente, true);
+  assert.equal(pending.envioPdf, undefined, "Private paths/payloads not exposed");
+  assert.equal((await api("PATCH", `/cotizaciones/${id}`, input)).status, 409);
+  await db.insert(empresasTable).values({ scope: `user:${owner.id}`, perfil: { razonSocial: "Identidad nueva", plantilla: "moderna", colorPrimario: "#F00000" } });
+  failEmail = false;
+  const retries = await Promise.all([1, 2].map(() => api("POST", `/cotizaciones/${id}/enviar`)));
+  assert.ok(retries.some(r => r.status === 200));
+  assert.ok(retries.every(r => r.status === 200 || r.status === 409));
   assert.equal((await api("POST", `/cotizaciones/${id}/enviar`)).status, 200);
-  assert.equal((await api("POST", `/cotizaciones/${id}/enviar`)).status, 200);
-  assert.equal(emails, 1);
+  assert.equal(emails, 2);
+  assert.equal(emailBodies[0], emailBodies[1], "Retry keeps the entire email including PDF byte-for-byte");
+  assert.equal(emailKeys[0], emailKeys[1]);
+  assert.ok(emailKeys[0]);
+  const archived = await fetch(`${base}/cotizaciones/${id}/pdf-enviado`);
+  assert.equal(archived.status, 200);
+  assert.equal(archived.headers.get("cache-control"), "private, no-store");
+  const archivedBytes = Buffer.from(await archived.arrayBuffer());
+  assert.deepEqual(archivedBytes, Buffer.from(JSON.parse(emailBodies[1]).attachments[0].content, "base64"));
+  const regenerated = Buffer.from(await (await fetch(`${base}/cotizaciones/${id}/pdf`)).arrayBuffer());
+  assert.notDeepEqual(archivedBytes, regenerated, "Current identity is used only by the regenerated preview");
+  const stored = [...objects.values()][0];
+  const originalBytes = stored.pdf;
+  stored.pdf = Buffer.from("tampered");
+  assert.equal((await api("GET", `/cotizaciones/${id}/pdf-enviado`)).status, 500, "Corruption fails explicitly, never regenerates");
+  stored.pdf = originalBytes;
+  actor = outsider;
+  assert.equal((await api("GET", `/cotizaciones/${id}/pdf-enviado`)).status, 404);
+  actor = owner;
+  // Historical success without an archive must stay unavailable, never fabricated.
+  await db.update(cotizacionesTable).set({ enviadoEn: new Date(), estado: "enviada" }).where(eq(cotizacionesTable.id, whole.data.id));
+  assert.equal((await api("GET", `/cotizaciones/${whole.data.id}/pdf-enviado`)).status, 404);
+  assert.equal((await api("POST", `/cotizaciones/${whole.data.id}/enviar`)).status, 200);
+  assert.equal(emails, 2);
+  const [sent] = await db.select().from(cotizacionesTable).where(eq(cotizacionesTable.id, id));
+  await db.update(cotizacionesTable).set({ envioPdf: { ...sent.envioPdf!, scope: "org:999999" } }).where(eq(cotizacionesTable.id, id));
+  assert.equal((await api("GET", `/cotizaciones/${id}/pdf-enviado`)).status, 500, "Reject mismatched tenant metadata");
+  await db.update(cotizacionesTable).set({ envioPdf: sent.envioPdf }).where(eq(cotizacionesTable.id, id));
   assert.equal((await api("PATCH", `/cotizaciones/${id}`, input)).status, 409);
   assert.equal((await api("PATCH", `/cotizaciones/${id}/estado`, { estado: "aceptada" })).status, 200);
   const conversions = await Promise.all([1, 2].map(() => api("POST", `/cotizaciones/${id}/convertir`)));
@@ -117,7 +186,15 @@ try {
   const expired = await api("POST", "/cotizaciones", { ...input, fechaVencimiento: "2026-01-02" });
   assert.equal(expired.data.estado, "vencida");
   assert.equal((await api("POST", `/cotizaciones/${expired.data.id}/enviar`)).status, 409);
-  assert.equal(emails, 1);
+  assert.equal(emails, 2);
+  failEmail = true;
+  assert.equal((await api("POST", `/cotizaciones/${tenths.data.id}/enviar`)).status, 500);
+  const [stuck] = await db.select().from(cotizacionesTable).where(eq(cotizacionesTable.id, tenths.data.id));
+  await db.update(cotizacionesTable).set({ envioPdf: { ...stuck.envioPdf!, preparedAt: "2020-01-01T00:00:00Z" } }).where(eq(cotizacionesTable.id, stuck.id));
+  failEmail = false;
+  const beforeRetry = emails;
+  assert.equal((await api("POST", `/cotizaciones/${stuck.id}/enviar`)).status, 409);
+  assert.equal(emails, beforeRetry, "Never retry outside provider idempotency retention");
   console.log("PASS preferences, totals/discount/IVA, immutable currency, scope isolation, PDF, mocked Resend/idempotency, state guards, concurrent conversion, linked stock, expiration");
 } finally {
   globalThis.fetch = realFetch;

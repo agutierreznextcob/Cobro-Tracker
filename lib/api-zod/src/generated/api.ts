@@ -814,6 +814,8 @@ export const ListCotizacionesResponseItem = zod.object({
 }).and(zod.object({
   "id": zod.number(),
   "numeroCotizacion": zod.string(),
+  "pdfEnviadoDisponible": zod.boolean().optional(),
+  "envioPendiente": zod.boolean().optional(),
   "clienteNombre": zod.string(),
   "clienteRut": zod.string().nullish(),
   "clienteEmail": zod.string().nullish(),
@@ -954,6 +956,8 @@ export const GetCotizacionResponse = zod.object({
 }).and(zod.object({
   "id": zod.number(),
   "numeroCotizacion": zod.string(),
+  "pdfEnviadoDisponible": zod.boolean().optional(),
+  "envioPendiente": zod.boolean().optional(),
   "clienteNombre": zod.string(),
   "clienteRut": zod.string().nullish(),
   "clienteEmail": zod.string().nullish(),
@@ -1092,6 +1096,8 @@ export const UpdateCotizacionResponse = zod.object({
 }).and(zod.object({
   "id": zod.number(),
   "numeroCotizacion": zod.string(),
+  "pdfEnviadoDisponible": zod.boolean().optional(),
+  "envioPendiente": zod.boolean().optional(),
   "clienteNombre": zod.string(),
   "clienteRut": zod.string().nullish(),
   "clienteEmail": zod.string().nullish(),
@@ -1180,6 +1186,8 @@ export const SendCotizacionResponse = zod.object({
 }).and(zod.object({
   "id": zod.number(),
   "numeroCotizacion": zod.string(),
+  "pdfEnviadoDisponible": zod.boolean().optional(),
+  "envioPendiente": zod.boolean().optional(),
   "clienteNombre": zod.string(),
   "clienteRut": zod.string().nullish(),
   "clienteEmail": zod.string().nullish(),
@@ -1272,6 +1280,8 @@ export const SetCotizacionEstadoResponse = zod.object({
 }).and(zod.object({
   "id": zod.number(),
   "numeroCotizacion": zod.string(),
+  "pdfEnviadoDisponible": zod.boolean().optional(),
+  "envioPendiente": zod.boolean().optional(),
   "clienteNombre": zod.string(),
   "clienteRut": zod.string().nullish(),
   "clienteEmail": zod.string().nullish(),
@@ -1360,6 +1370,8 @@ export const ConvertirCotizacionResponse = zod.object({
 }).and(zod.object({
   "id": zod.number(),
   "numeroCotizacion": zod.string(),
+  "pdfEnviadoDisponible": zod.boolean().optional(),
+  "envioPendiente": zod.boolean().optional(),
   "clienteNombre": zod.string(),
   "clienteRut": zod.string().nullish(),
   "clienteEmail": zod.string().nullish(),
@@ -1385,6 +1397,11 @@ export const ConvertirCotizacionResponse = zod.object({
 
 
 export const DownloadCotizacionPdfParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const DownloadCotizacionPdfEnviadoParams = zod.object({
   "id": zod.coerce.number()
 })
 

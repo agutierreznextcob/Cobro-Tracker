@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import {
   downloadCotizacionPdf,
+  downloadCotizacionPdfEnviado,
   getGetCotizacionQueryKey,
   getListCotizacionesQueryKey,
   getListCobrosQueryKey,
@@ -53,12 +54,12 @@ export function invalidateCobrosTrasConversion(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: getListCobrosQueryKey() });
 }
 
-export async function descargarPdfCotizacion(c: Pick<Cotizacion, "id" | "numeroCotizacion">) {
-  const blob = await downloadCotizacionPdf(c.id);
+export async function descargarPdfCotizacion(c: Pick<Cotizacion, "id" | "numeroCotizacion">, enviado = false) {
+  const blob = await (enviado ? downloadCotizacionPdfEnviado(c.id) : downloadCotizacionPdf(c.id));
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${c.numeroCotizacion || `cotizacion-${c.id}`}.pdf`;
+  a.download = `${c.numeroCotizacion || `cotizacion-${c.id}`}${enviado ? "-enviada" : ""}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();

@@ -27,9 +27,10 @@ function diasValidez(emision: string, vencimiento: string) {
 }
 export async function serializeCotizacion(q: Cotizacion) {
   const items = await db.select().from(cotizacionItemsTable).where(eq(cotizacionItemsTable.cotizacionId, q.id)).orderBy(cotizacionItemsTable.id);
-  const { envioEnCurso: _claim, ...publicRow } = q;
+  const { envioEnCurso: _claim, envioPdf: _archivo, ...publicRow } = q;
   return {
-    ...publicRow, estado: estadoCotizacion(q), validezDias: diasValidez(q.fechaEmision, q.fechaVencimiento),
+    ...publicRow, pdfEnviadoDisponible: !!(q.enviadoEn && q.envioPdf), envioPendiente: !!(q.envioPdf && !q.enviadoEn),
+    estado: estadoCotizacion(q), validezDias: diasValidez(q.fechaEmision, q.fechaVencimiento),
     subtotal: Number(q.subtotal), porcentajeIva: Number(q.porcentajeIva), montoIva: Number(q.montoIva), total: Number(q.total),
     items: items.map(i => ({ ...i, cantidad: Number(i.cantidad), precioUnitario: Number(i.precioUnitario), descuentoPorcentaje: Number(i.descuentoPorcentaje), subtotalLinea: Number(i.subtotalLinea) })),
   };

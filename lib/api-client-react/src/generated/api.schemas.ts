@@ -402,6 +402,8 @@ export const CotizacionEstado = {
 export type Cotizacion = CotizacionInput & ({
   id: number;
   numeroCotizacion: string;
+  pdfEnviadoDisponible?: boolean;
+  envioPendiente?: boolean;
   clienteNombre: string;
   /** @nullable */
   clienteRut?: string | null;

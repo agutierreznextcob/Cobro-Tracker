@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, date, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, date, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { clientesTable } from "./clientes";
 import { createInsertSchema } from "drizzle-zod";
 
@@ -29,6 +29,12 @@ export const cotizacionesTable = pgTable("cotizaciones", {
   cobroId: integer("cobro_id"),
   enviadoEn: timestamp("enviado_en", { withTimezone: true }),
   envioEnCurso: timestamp("envio_en_curso", { withTimezone: true }),
+  envioPdf: jsonb("envio_pdf").$type<{
+    path: string; sha256: string; bytes: number; scope: string; preparedAt: string;
+    email: { id: number; version: string; numero: string; email: string; cliente: string;
+      total: number; moneda: string; decimales: number; vencimiento: string;
+      remitente: { nombre?: string | null; email?: string | null } };
+  }>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
