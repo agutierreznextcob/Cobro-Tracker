@@ -1,9 +1,8 @@
 import { Router, type Request, type Response } from "express";
-import { db, empresasTable } from "@workspace/db";
 import { RequestEmpresaLogoUploadBody } from "@workspace/api-zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { preferenciasScope } from "../lib/preferencias";
-import { EmpresaError, getEmpresaForScope, getEmpresaLogoBytes, normalizeEmpresaLogo, requestLogoUpload, validateEmpresa } from "../lib/empresa";
+import { EmpresaError, getEmpresaForScope, getEmpresaLogoBytes, saveEmpresa, requestLogoUpload, validateEmpresa } from "../lib/empresa";
 
 const router = Router();
 router.use("/configuracion/empresa", (req, res, next) => {
@@ -27,10 +26,7 @@ router.get("/configuracion/empresa", action(async (req, res) => {
 router.put("/configuracion/empresa", action(async (req, res) => {
   const scope = await context(req, true);
   const perfil = validateEmpresa(req.body);
-  const current = await getEmpresaForScope(scope);
-  if (perfil.logoPath && perfil.logoPath !== current.logoPath) perfil.logoPath = await normalizeEmpresaLogo(scope, perfil.logoPath);
-  await db.insert(empresasTable).values({ scope, perfil: { ...perfil } }).onConflictDoUpdate({ target: empresasTable.scope, set: { perfil: { ...perfil }, actualizadoEn: new Date() } });
-  res.json(perfil);
+  res.json(await saveEmpresa(scope, perfil));
 }));
 const uploadWindows = new Map<string, { start: number; count: number }>();
 router.post("/configuracion/empresa/logo/upload", action(async (req, res) => {

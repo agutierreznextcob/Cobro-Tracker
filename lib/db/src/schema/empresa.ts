@@ -7,6 +7,9 @@ export const empresasTable = pgTable("empresas", {
   actualizadoEn: timestamp("actualizado_en", { withTimezone: true }).notNull().defaultNow(),
 });
 export const empresaUploadsTable = pgTable("empresa_uploads", {
+  // Logo-only lifecycle ledger: temporary uploads and normalized versions.
+  // creadoEn is refreshed on reuse/retirement to start the cleanup grace period.
+  // Historical normalized objects without a ledger entry are intentionally kept.
   objectPath: text("object_path").primaryKey(),
   scope: text("scope").notNull(),
   creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),

@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import sharp from "sharp";
-import { db, empresasTable, empresaUploadsTable } from "@workspace/db";
+import { db, pool, empresasTable, empresaUploadsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { SaveEmpresaBody, type Empresa } from "@workspace/api-zod";
 import { preferenciasScope } from "./preferencias";
 import { ObjectStorageService, objectStorageClient } from "./objectStorage";
+import { LOGO_LOCK } from "./empresaLogoLifecycle";
 
 export const empresaDefault: Empresa = {
   razonSocial: "", rut: "", giro: "", direccion: "", ciudad: "", telefono: "", email: "",
@@ -56,9 +58,24 @@ async function readLimited(path: string, limit: number) {
   }
   return Buffer.concat(chunks);
 }
-export async function normalizeEmpresaLogo(scope: string, path: string) {
+async function withLogoLock<T>(work: (connection: NodePgDatabase) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  let discard = false;
+  try {
+    // Pin ONE connection for the whole operation, including the committed
+    // ledger write. Never ask the pool for another while holding this lock.
+    await client.query("SELECT pg_advisory_lock($1)", [LOGO_LOCK]);
+    return await work(drizzle(client));
+  } finally {
+    try { await client.query("SELECT pg_advisory_unlock($1)", [LOGO_LOCK]); }
+    catch { discard = true; }
+    // A connection whose unlock failed must never reenter the pool.
+    client.release(discard);
+  }
+}
+async function normalizeEmpresaLogo(connection: NodePgDatabase, scope: string, path: string) {
   if (!/^\/objects\/uploads\/[a-f0-9-]{36}$/.test(path)) throw new EmpresaError("Carga un nuevo logo.");
-  const [upload] = await db.select().from(empresaUploadsTable).where(and(eq(empresaUploadsTable.objectPath, path), eq(empresaUploadsTable.scope, scope)));
+  const [upload] = await connection.select().from(empresaUploadsTable).where(and(eq(empresaUploadsTable.objectPath, path), eq(empresaUploadsTable.scope, scope)));
   if (!upload) throw new EmpresaError("El logo no pertenece a este negocio.", 403);
   const bytes = await readLimited(path, 2 * 1024 * 1024);
   let png: Buffer;
@@ -74,8 +91,32 @@ export async function normalizeEmpresaLogo(scope: string, path: string) {
   const finalPath = `/objects/empresas/${hash}.png`;
   const full = `${storage.getPrivateObjectDir().replace(/\/$/, "")}/empresas/${hash}.png`;
   const [bucket, ...parts] = full.replace(/^\//, "").split("/");
+  // Durable before writing bytes: a failed profile transaction still leaves a
+  // cleanup record. The caller holds LOGO_LOCK until the profile is committed.
+  await connection.insert(empresaUploadsTable).values({ scope, objectPath: finalPath })
+    .onConflictDoUpdate({ target: empresaUploadsTable.objectPath, set: { creadoEn: new Date() } });
   await objectStorageClient.bucket(bucket).file(parts.join("/")).save(png, { resumable: false, contentType: "image/png" });
   return finalPath;
+}
+export async function saveEmpresa(scope: string, perfil: Empresa) {
+  return withLogoLock(async (connection) => {
+    const [row] = await connection.select().from(empresasTable).where(eq(empresasTable.scope, scope));
+    const current = SaveEmpresaBody.parse({ ...empresaDefault, ...row?.perfil });
+    if (perfil.logoPath && perfil.logoPath !== current.logoPath) {
+      perfil.logoPath = await normalizeEmpresaLogo(connection, scope, perfil.logoPath);
+    }
+    await connection.transaction(async (tx) => {
+      if (current.logoPath && current.logoPath !== perfil.logoPath) {
+        // Start the grace period at retirement, not the original upload date.
+        // Untracked historical files remain untracked and are never swept.
+        await tx.update(empresaUploadsTable).set({ creadoEn: new Date() })
+          .where(eq(empresaUploadsTable.objectPath, current.logoPath));
+      }
+      await tx.insert(empresasTable).values({ scope, perfil: { ...perfil } })
+        .onConflictDoUpdate({ target: empresasTable.scope, set: { perfil: { ...perfil }, actualizadoEn: new Date() } });
+    });
+    return perfil;
+  });
 }
 export async function getEmpresaLogoBytes(empresa: Empresa) {
   if (!empresa.logoPath) return null;
@@ -83,8 +124,10 @@ export async function getEmpresaLogoBytes(empresa: Empresa) {
   return readLimited(empresa.logoPath, 8 * 1024 * 1024);
 }
 export async function requestLogoUpload(scope: string) {
-  const uploadURL = await storage.getObjectEntityUploadURL();
-  const objectPath = storage.normalizeObjectEntityPath(uploadURL);
-  await db.insert(empresaUploadsTable).values({ scope, objectPath });
-  return { uploadURL, objectPath };
+  return withLogoLock(async (connection) => {
+    const uploadURL = await storage.getObjectEntityUploadURL();
+    const objectPath = storage.normalizeObjectEntityPath(uploadURL);
+    await connection.insert(empresaUploadsTable).values({ scope, objectPath });
+    return { uploadURL, objectPath };
+  });
 }
