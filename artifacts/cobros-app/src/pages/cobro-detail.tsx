@@ -1,4 +1,7 @@
 import { EquivalenciaCLP } from "@/components/equivalencia-clp";
+import { PdfPreviewDialog } from "@/components/pdf-preview-dialog";
+import { downloadCobroPdf } from "@workspace/api-client-react";
+import { FileText as FileTextPdf } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -174,6 +177,7 @@ function describirRecordatorio(canal: string, momento: string, diasOffset: numbe
 export default function CobroDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id || "0", 10);
+  const [pdfPreview, setPdfPreview] = useState(false);
 
   const { data: cobro, isLoading } = useGetCobro(id, {
     query: { enabled: !!id, queryKey: getGetCobroQueryKey(id) },
@@ -1020,6 +1024,11 @@ export default function CobroDetail() {
             {updateCobro.isPending && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground ml-2" />}
           </div>
 
+          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => setPdfPreview(true)} data-testid="button-vista-previa-cobro">
+            <FileTextPdf className="h-3.5 w-3.5" />
+            Vista previa PDF
+          </Button>
+          <PdfPreviewDialog open={pdfPreview} onOpenChange={setPdfPreview} cargar={() => downloadCobroPdf(cobro.id)} filename={cobro.numeroDocumento || `cobro-${cobro.id}`} titulo={`Cobro ${cobro.numeroDocumento || `#${cobro.id}`}`} />
           {cobro.estado === "pendiente" && (
             <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={openEditDialog}>
               <Pencil className="h-3.5 w-3.5" />

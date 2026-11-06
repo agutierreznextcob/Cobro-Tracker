@@ -15,10 +15,10 @@ let emails = 0;
 try {
   await admin.connect();
   await admin.query(`create schema "${schema}"`);
-  const tables = ["cotizaciones", "cotizacion_items", "preferencias", "clientes", "productos", "cobros", "users", "organizaciones", "movimientos_stock", "locales", "bodegas", "stock_por_bodega"];
+  const tables = ["cotizaciones", "cotizacion_items", "preferencias", "empresas", "clientes", "productos", "cobros", "users", "organizaciones", "movimientos_stock", "locales", "bodegas", "stock_por_bodega"];
   for (const table of tables) {
     await admin.query(`create table "${schema}"."${table}" (like public."${table}" including all)`);
-    if (!["users", "preferencias"].includes(table)) {
+    if (!["users", "preferencias", "empresas"].includes(table)) {
       await admin.query(`create sequence "${schema}"."${table}_seq"`);
       await admin.query(`alter table "${schema}"."${table}" alter column id set default nextval('"${schema}"."${table}_seq"')`);
     }

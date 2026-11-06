@@ -8,6 +8,8 @@
 
 export interface Cliente {
   /** @nullable */
+  giro?: string | null;
+  /** @nullable */
   direccion?: string | null;
   id: number;
   nombre: string;

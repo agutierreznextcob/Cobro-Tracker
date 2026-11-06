@@ -28,6 +28,7 @@ const ClienteInputSchema = z.object({
   nombre: z.string().min(1).max(200),
   empresa: z.string().max(200).optional().or(z.literal("")),
   direccion: z.string().max(500).optional().or(z.literal("")),
+  giro: z.string().max(300).optional(),
   rut: z
     .string()
     .max(20)
@@ -99,12 +100,13 @@ clientesRouter.post("/clientes", async (req, res) => {
 
   try {
     const ctx = await getOrgContext(userId);
-    const { nombre, empresa, rut, email, telefono, direccion } = parsed.data;
+    const { nombre, empresa, rut, email, telefono, direccion, giro } = parsed.data;
     const [created] = await db
       .insert(clientesTable)
       .values({
         nombre,
         direccion: direccion || null,
+        giro: giro || null,
         empresa: empresa || null,
         rut: rut || null,
         email: email || null,
@@ -296,12 +298,13 @@ clientesRouter.patch("/clientes/:id", async (req, res) => {
       return;
     }
 
-    const { nombre, empresa, rut, email, telefono, direccion } = parsed.data;
+    const { nombre, empresa, rut, email, telefono, direccion, giro } = parsed.data;
     const [updated] = await db
       .update(clientesTable)
       .set({
         nombre,
         ...(direccion !== undefined ? { direccion: direccion || null } : {}),
+        ...(giro !== undefined ? { giro: giro || null } : {}),
         empresa: empresa || null,
         rut: rut || null,
         email: email || null,

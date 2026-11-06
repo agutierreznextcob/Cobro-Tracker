@@ -53,6 +53,7 @@ import CotizacionesPage from "@/pages/cotizaciones";
 import CotizacionFormPage from "@/pages/cotizacion-form";
 import CotizacionDetailPage from "@/pages/cotizacion-detail";
 import PreferenciasPage from "@/pages/preferencias";
+import EmpresaPage from "@/pages/empresa";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -372,6 +373,13 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <PreferenciasPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/configuracion/empresa">
+        <AuthGate>
+          <Layout>
+            <EmpresaPage />
           </Layout>
         </AuthGate>
       </Route>

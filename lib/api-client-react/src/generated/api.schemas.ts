@@ -267,6 +267,70 @@ export type CotizacionItem = CotizacionItemInput & {
   subtotalLinea: number;
 };
 
+export type EmpresaPlantilla = typeof EmpresaPlantilla[keyof typeof EmpresaPlantilla];
+
+
+export const EmpresaPlantilla = {
+  clasica: 'clasica',
+  moderna: 'moderna',
+  bicolor: 'bicolor',
+} as const;
+
+export interface Empresa {
+  /** @maxLength 200 */
+  razonSocial: string;
+  /** @maxLength 20 */
+  rut: string;
+  /** @maxLength 300 */
+  giro: string;
+  /** @maxLength 300 */
+  direccion: string;
+  /** @maxLength 100 */
+  ciudad: string;
+  /** @maxLength 50 */
+  telefono: string;
+  /** @maxLength 254 */
+  email: string;
+  /** @maxLength 300 */
+  sitioWeb: string;
+  /** @maxLength 2000 */
+  piePagina: string;
+  /** @maxLength 2000 */
+  condicionesPago: string;
+  /**
+     * @minimum 1
+     * @maximum 3650
+     */
+  validezDias: number;
+  /** @pattern ^#[0-9A-Fa-f]{6}$ */
+  colorPrimario: string;
+  plantilla: EmpresaPlantilla;
+  /** @nullable */
+  logoPath: string | null;
+}
+
+export type EmpresaLogoInputContentType = typeof EmpresaLogoInputContentType[keyof typeof EmpresaLogoInputContentType];
+
+
+export const EmpresaLogoInputContentType = {
+  'image/png': 'image/png',
+  'image/jpeg': 'image/jpeg',
+} as const;
+
+export interface EmpresaLogoInput {
+  contentType: EmpresaLogoInputContentType;
+  /**
+     * @minimum 1
+     * @maximum 2097152
+     */
+  size: number;
+}
+
+export interface EmpresaLogoUpload {
+  uploadURL: string;
+  objectPath: string;
+}
+
 export type CotizacionInputMoneda = typeof CotizacionInputMoneda[keyof typeof CotizacionInputMoneda];
 
 
@@ -279,6 +343,17 @@ export const CotizacionInputMoneda = {
 
 export interface CotizacionInput {
   clienteId: number;
+  /** @maxLength 300 */
+  clienteGiro?: string;
+  /** @maxLength 2000 */
+  formaPago?: string;
+  /** @maxLength 1000 */
+  tiempoEntrega?: string;
+  /**
+     * @minimum 1
+     * @maximum 3650
+     */
+  validezDias?: number;
   fechaEmision: string;
   fechaVencimiento: string;
   moneda: CotizacionInputMoneda;
@@ -1108,6 +1183,8 @@ export interface HealthStatus {
 
 export interface Cliente {
   /** @nullable */
+  giro?: string | null;
+  /** @nullable */
   direccion?: string | null;
   id: number;
   nombre: string;
@@ -1215,6 +1292,8 @@ export interface ScoreDetalle {
 }
 
 export interface ClienteInput {
+  /** @maxLength 300 */
+  giro?: string;
   direccion?: string;
   /** @minLength 1 */
   nombre: string;
@@ -1398,6 +1477,8 @@ export interface Cobro {
 }
 
 export interface ClienteConHistorial {
+  /** @nullable */
+  giro?: string | null;
   id: number;
   nombre: string;
   /** @nullable */

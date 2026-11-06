@@ -67,6 +67,7 @@ const clienteSchema = z.object({
       "Formato inválido — usa +56 9 1234 5678"
     ),
   direccion: z.string().max(300).optional(),
+  giro: z.string().max(300).optional(),
 });
 type ClienteForm = z.infer<typeof clienteSchema>;
 
@@ -77,12 +78,12 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
 
   const form = useForm<ClienteForm>({
     resolver: zodResolver(clienteSchema),
-    defaultValues: { nombre: "", empresa: "", rut: "", email: "", telefono: "", direccion: "" },
+    defaultValues: { nombre: "", empresa: "", rut: "", email: "", telefono: "", direccion: "", giro: "" },
   });
 
   const onSubmit = (values: ClienteForm) => {
     createCliente.mutate(
-      { data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut, email: values.email, telefono: values.telefono, direccion: values.direccion?.trim() || undefined } },
+      { data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut, email: values.email, telefono: values.telefono, direccion: values.direccion?.trim() || undefined, giro: values.giro?.trim() || undefined } },
       {
         onSuccess: () => {
           toast({ title: "Cliente creado", description: "El cliente fue creado exitosamente." });
@@ -185,6 +186,19 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
                     <FormLabel>Dirección (opcional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Av. Providencia 1234, Of. 502, Providencia" data-testid="input-direccion" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="giro"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Giro comercial (opcional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ej: Construcción de obras civiles" maxLength={300} data-testid="input-giro" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

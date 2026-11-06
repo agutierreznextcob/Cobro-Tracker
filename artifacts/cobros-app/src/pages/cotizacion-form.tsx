@@ -15,6 +15,8 @@ import {
   type Cotizacion,
   type CotizacionInput,
   type Producto,
+  useGetEmpresa,
+  getGetEmpresaQueryKey,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
@@ -37,6 +39,13 @@ import {
 import { ArrowLeft, Boxes, Download, Loader2, Lock, Mail, MapPin, PenLine, Plus, RotateCw, Save, Search, Trash2 } from "lucide-react";
 
 let keySeq = 0;
+/** YYYY-MM-DD + n calendar days (UTC math, no timezone drift). */
+const sumarDias = (iso: string, n: number) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+};
+const diasEntre = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
 const nuevaKey = () => `l${Date.now().toString(36)}${(keySeq++).toString(36)}`;
 
 const lineaLibre = (): LineaCot => ({ key: nuevaKey(), productoId: null, descripcion: "", cantidad: "1", precioUnitario: "", descuentoPorcentaje: "0" });
@@ -72,6 +81,13 @@ export default function CotizacionFormPage() {
   const decimales = isEdit || savedId ? (decimalesGuardados ?? decimalesPref(prefs)) : decimalesPref(prefs);
   const [iva, setIva] = useState("19");
   const [notas, setNotas] = useState("");
+  const [clienteGiro, setClienteGiro] = useState("");
+  const [formaPago, setFormaPago] = useState("");
+  const [tiempoEntrega, setTiempoEntrega] = useState("");
+  const [validez, setValidez] = useState("30");
+  // Due date follows emission + validity until the user picks a date (edits keep stored dates).
+  const [vencManual, setVencManual] = useState(isEdit);
+  const empresaQ = useGetEmpresa({ query: { queryKey: getGetEmpresaQueryKey() } });
   const [lineas, setLineas] = useState<LineaCot[]>([lineaLibre()]);
   const [accion, setAccion] = useState<Accion | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -86,6 +102,23 @@ export default function CotizacionFormPage() {
     setIva(String(prefs.porcentajeIva));
   }, [isEdit, prefsListas, prefs]);
 
+  // New quote: commercial defaults from the company profile (once).
+  const empresaAplicada = useRef(false);
+  const empresa = empresaQ.data;
+  useEffect(() => {
+    if (isEdit || !empresa || empresaAplicada.current) return;
+    empresaAplicada.current = true;
+    setFormaPago((v) => v || empresa.condicionesPago || "");
+    setValidez(String(empresa.validezDias || 30));
+  }, [isEdit, empresa]);
+
+  const validezN = Number(validez);
+  const validezOk = Number.isInteger(validezN) && validezN >= 1 && validezN <= 3650;
+  useEffect(() => {
+    if (vencManual || !validezOk || !fechaEmision) return;
+    setFechaVencimiento(sumarDias(fechaEmision, validezN));
+  }, [vencManual, validezOk, validezN, fechaEmision]);
+
   // Edit: hydrate once per id.
   const initFor = useRef<number | null>(null);
   const cot = cotQ.data;
@@ -99,6 +132,11 @@ export default function CotizacionFormPage() {
     setDecimalesGuardados(cot.decimales ?? 0);
     setIva(String(cot.porcentajeIva));
     setNotas(cot.notas ?? "");
+    setClienteGiro(cot.clienteGiro ?? "");
+    setFormaPago(cot.formaPago ?? "");
+    setTiempoEntrega(cot.tiempoEntrega ?? "");
+    setValidez(String(cot.validezDias ?? Math.max(1, diasEntre(cot.fechaEmision.slice(0, 10), cot.fechaVencimiento.slice(0, 10)))));
+    setVencManual(true);
     setLineas(
       (cot.items ?? []).map((it) => ({
         key: nuevaKey(),
@@ -165,6 +203,7 @@ export default function CotizacionFormPage() {
       const d = Number(l.descuentoPorcentaje) || 0;
       if (d < 0 || d > 100) { toast({ title: "Descuento inválido", description: "Usa un porcentaje entre 0 y 100.", variant: "destructive" }); return null; }
     }
+    if (!validezOk) { toast({ title: "Validez inválida", description: "Usa entre 1 y 3650 días.", variant: "destructive" }); return null; }
     if (utiles.length > 100) { toast({ title: "Máximo 100 ítems", variant: "destructive" }); return null; }
     return {
       clienteId: Number(clienteId),
@@ -174,6 +213,10 @@ export default function CotizacionFormPage() {
       decimales,
       porcentajeIva: ivaPct,
       notas: notas.trim(),
+      clienteGiro: clienteGiro.trim(),
+      formaPago: formaPago.trim(),
+      tiempoEntrega: tiempoEntrega.trim(),
+      validezDias: validezN,
       items: utiles.map((l) => ({
         productoId: l.productoId,
         descripcion: l.descripcion.trim(),
@@ -294,7 +337,11 @@ export default function CotizacionFormPage() {
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <Label>Cliente</Label>
-                <Select value={clienteId} onValueChange={setClienteId}>
+                <Select value={clienteId} onValueChange={(v) => {
+                  setClienteId(v);
+                  const sel = clientes.find((c) => String(c.id) === v) as { giro?: string | null } | undefined;
+                  setClienteGiro(sel?.giro ?? "");
+                }}>
                   <SelectTrigger data-testid="select-cliente-cotizacion"><SelectValue placeholder={clientesQ.isLoading ? "Cargando clientes..." : "Selecciona un cliente"} /></SelectTrigger>
                   <SelectContent>
                     {clientes.map((c) => (
@@ -317,7 +364,23 @@ export default function CotizacionFormPage() {
               )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5"><Label>Fecha de emisión</Label><Input type="date" value={fechaEmision} onChange={(e) => setFechaEmision(e.target.value)} data-testid="input-fecha-emision" /></div>
-                <div className="space-y-1.5"><Label>Válida hasta</Label><Input type="date" min={fechaEmision} value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} data-testid="input-fecha-vencimiento" /></div>
+                <div className="space-y-1.5">
+                  <Label className="flex items-center justify-between">Válida hasta
+                    {vencManual && validezOk && <button type="button" className="text-[11px] font-normal text-primary hover:underline" onClick={() => setVencManual(false)} data-testid="button-recalcular-vencimiento">Recalcular con validez</button>}
+                  </Label>
+                  <Input type="date" min={fechaEmision} value={fechaVencimiento} onChange={(e) => {
+                    const v = e.target.value;
+                    setFechaVencimiento(v);
+                    setVencManual(true);
+                    const d = v && fechaEmision ? diasEntre(fechaEmision, v) : 0;
+                    if (d >= 1 && d <= 3650) setValidez(String(d));
+                  }} data-testid="input-fecha-vencimiento" />
+                  {!vencManual && <p className="text-[11px] text-muted-foreground">Emisión + {validezOk ? validezN : "?"} días de validez.</p>}
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Giro del cliente <span className="text-muted-foreground font-normal">(aparece en el PDF)</span></Label>
+                  <Input value={clienteGiro} maxLength={300} onChange={(e) => setClienteGiro(e.target.value)} placeholder="Ej: Construcción de obras civiles" data-testid="input-cliente-giro" />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -386,9 +449,30 @@ export default function CotizacionFormPage() {
           </Card>
 
           <Card className="shadow-sm">
-            <CardHeader className="pb-3"><CardTitle className="text-base">Notas y condiciones</CardTitle></CardHeader>
-            <CardContent>
-              <Textarea value={notas} maxLength={5000} onChange={(e) => setNotas(e.target.value)} placeholder="Forma de pago, plazos de entrega, validez, garantías..." className="resize-none h-28" data-testid="input-notas" />
+            <CardHeader className="pb-3"><CardTitle className="text-base">Condiciones comerciales</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Forma de pago</Label>
+                <Textarea value={formaPago} maxLength={2000} onChange={(e) => setFormaPago(e.target.value)} placeholder="50% anticipo, 50% contra entrega" className="resize-none h-16" data-testid="input-forma-pago" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-[1fr_150px]">
+                <div className="space-y-1.5">
+                  <Label>Tiempo de entrega</Label>
+                  <Input value={tiempoEntrega} maxLength={1000} onChange={(e) => setTiempoEntrega(e.target.value)} placeholder="10 días hábiles desde la aceptación" data-testid="input-tiempo-entrega" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Validez</Label>
+                  <div className="relative">
+                    <Input type="number" min={1} max={3650} value={validez} onChange={(e) => setValidez(e.target.value)} className="font-mono pr-12" data-testid="input-validez-dias" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">días</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notas</Label>
+                <Textarea value={notas} maxLength={5000} onChange={(e) => setNotas(e.target.value)} placeholder="Garantías, alcances, exclusiones..." className="resize-none h-24" data-testid="input-notas" />
+              </div>
+              <p className="text-[11px] text-muted-foreground">Estas condiciones aparecen al pie del PDF.</p>
             </CardContent>
           </Card>
         </div>

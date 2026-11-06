@@ -3,6 +3,8 @@ import indicadoresRouter from "./indicadores";
 import cotizacionesRouter from "./cotizaciones";
 import comprasRouter from "./compras";
 import preferenciasRouter from "./preferencias";
+import empresaRouter from "./empresa";
+import cobroPdfRouter from "./cobro-pdf";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import cobrosRouter from "./cobros";
@@ -76,6 +78,8 @@ router.use(indicadoresRouter);
 router.use(cotizacionesRouter);
 router.use(comprasRouter);
 router.use(preferenciasRouter);
+router.use(empresaRouter);
+router.use(cobroPdfRouter);
 router.use(localesRouter);
 router.use(cobrosRouter);
 // workflowsRouter and tareasRouter self-guard with their own auth middleware.

@@ -4,6 +4,7 @@ import { CreateCotizacionBody } from "@workspace/api-zod";
 import { clienteScopeCondition, getOrgContext, type OrgContext } from "./org";
 import { inventarioScope } from "./inventario";
 import { hoySantiago, roundMoney, getPreferenciasNegocio } from "./preferencias";
+import { getEmpresaForUser } from "./empresa";
 
 export class CotizacionError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -19,11 +20,16 @@ export function cotizacionScope(ctx: OrgContext, userId: string): SQL {
 export function estadoCotizacion(q: Cotizacion) {
   return ["borrador", "enviada"].includes(q.estado) && q.fechaVencimiento < hoySantiago() ? "vencida" : q.estado;
 }
+function diasValidez(emision: string, vencimiento: string) {
+  // Existing quotes predate the conditions fields. Their recorded expiry is
+  // authoritative; the new default must not label every historical quote 30d.
+  return Math.max(1, Math.round((Date.parse(vencimiento) - Date.parse(emision)) / 86_400_000));
+}
 export async function serializeCotizacion(q: Cotizacion) {
   const items = await db.select().from(cotizacionItemsTable).where(eq(cotizacionItemsTable.cotizacionId, q.id)).orderBy(cotizacionItemsTable.id);
   const { envioEnCurso: _claim, ...publicRow } = q;
   return {
-    ...publicRow, estado: estadoCotizacion(q),
+    ...publicRow, estado: estadoCotizacion(q), validezDias: diasValidez(q.fechaEmision, q.fechaVencimiento),
     subtotal: Number(q.subtotal), porcentajeIva: Number(q.porcentajeIva), montoIva: Number(q.montoIva), total: Number(q.total),
     items: items.map(i => ({ ...i, cantidad: Number(i.cantidad), precioUnitario: Number(i.precioUnitario), descuentoPorcentaje: Number(i.descuentoPorcentaje), subtotalLinea: Number(i.subtotalLinea) })),
   };
@@ -40,6 +46,7 @@ export async function cotizacionValues(userId: string, input: unknown, precision
   const parsed = CreateCotizacionBody.safeParse(input);
   if (!parsed.success) throw new CotizacionError("Revisa los datos de la cotización.");
   const data = parsed.data;
+  const empresa = await getEmpresaForUser(userId);
   data.decimales = precisionExistente ?? (await getPreferenciasNegocio(userId)).decimales;
   for (const day of [data.fechaEmision, data.fechaVencimiento]) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(Date.parse(day)) || new Date(day).toISOString().slice(0, 10) !== day) {
@@ -74,6 +81,10 @@ export async function cotizacionValues(userId: string, input: unknown, precision
   return { ctx, items, values: {
     clienteId: cliente.id, clienteNombre: cliente.nombre, clienteRut: cliente.rut,
     clienteEmail: cliente.email, clienteDireccion: cliente.direccion,
+    clienteGiro: data.clienteGiro ?? cliente.giro ?? "",
+    formaPago: data.formaPago ?? empresa.condicionesPago,
+    tiempoEntrega: data.tiempoEntrega ?? "",
+    validezDias: diasValidez(data.fechaEmision, data.fechaVencimiento),
     fechaEmision: data.fechaEmision, fechaVencimiento: data.fechaVencimiento,
     moneda: data.moneda, decimales: data.decimales, porcentajeIva: String(data.porcentajeIva),
     subtotal: String(subtotal), montoIva: String(montoIva), total: String(total), notas: data.notas,

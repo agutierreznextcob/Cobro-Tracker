@@ -541,6 +541,154 @@ export const SyncIndicadoresResponseItem = zod.object({
 export const SyncIndicadoresResponse = zod.array(SyncIndicadoresResponseItem)
 
 
+export const getEmpresaResponseRazonSocialMax = 200;
+
+export const getEmpresaResponseRutMax = 20;
+
+export const getEmpresaResponseGiroMax = 300;
+
+export const getEmpresaResponseDireccionMax = 300;
+
+export const getEmpresaResponseCiudadMax = 100;
+
+export const getEmpresaResponseTelefonoMax = 50;
+
+export const getEmpresaResponseEmailMax = 254;
+
+export const getEmpresaResponseSitioWebMax = 300;
+
+export const getEmpresaResponsePiePaginaMax = 2000;
+
+export const getEmpresaResponseCondicionesPagoMax = 2000;
+
+export const getEmpresaResponseValidezDiasMax = 3650;
+
+export const getEmpresaResponseColorPrimarioRegExp = new RegExp('^#[0-9A-Fa-f]{6}$');
+
+
+export const GetEmpresaResponse = zod.object({
+  "razonSocial": zod.string().max(getEmpresaResponseRazonSocialMax),
+  "rut": zod.string().max(getEmpresaResponseRutMax),
+  "giro": zod.string().max(getEmpresaResponseGiroMax),
+  "direccion": zod.string().max(getEmpresaResponseDireccionMax),
+  "ciudad": zod.string().max(getEmpresaResponseCiudadMax),
+  "telefono": zod.string().max(getEmpresaResponseTelefonoMax),
+  "email": zod.string().max(getEmpresaResponseEmailMax),
+  "sitioWeb": zod.string().max(getEmpresaResponseSitioWebMax),
+  "piePagina": zod.string().max(getEmpresaResponsePiePaginaMax),
+  "condicionesPago": zod.string().max(getEmpresaResponseCondicionesPagoMax),
+  "validezDias": zod.number().min(1).max(getEmpresaResponseValidezDiasMax),
+  "colorPrimario": zod.string().regex(getEmpresaResponseColorPrimarioRegExp),
+  "plantilla": zod.enum(['clasica', 'moderna', 'bicolor']),
+  "logoPath": zod.string().nullable()
+})
+
+
+export const saveEmpresaBodyRazonSocialMax = 200;
+
+export const saveEmpresaBodyRutMax = 20;
+
+export const saveEmpresaBodyGiroMax = 300;
+
+export const saveEmpresaBodyDireccionMax = 300;
+
+export const saveEmpresaBodyCiudadMax = 100;
+
+export const saveEmpresaBodyTelefonoMax = 50;
+
+export const saveEmpresaBodyEmailMax = 254;
+
+export const saveEmpresaBodySitioWebMax = 300;
+
+export const saveEmpresaBodyPiePaginaMax = 2000;
+
+export const saveEmpresaBodyCondicionesPagoMax = 2000;
+
+export const saveEmpresaBodyValidezDiasMax = 3650;
+
+export const saveEmpresaBodyColorPrimarioRegExp = new RegExp('^#[0-9A-Fa-f]{6}$');
+
+
+export const SaveEmpresaBody = zod.object({
+  "razonSocial": zod.string().max(saveEmpresaBodyRazonSocialMax),
+  "rut": zod.string().max(saveEmpresaBodyRutMax),
+  "giro": zod.string().max(saveEmpresaBodyGiroMax),
+  "direccion": zod.string().max(saveEmpresaBodyDireccionMax),
+  "ciudad": zod.string().max(saveEmpresaBodyCiudadMax),
+  "telefono": zod.string().max(saveEmpresaBodyTelefonoMax),
+  "email": zod.string().max(saveEmpresaBodyEmailMax),
+  "sitioWeb": zod.string().max(saveEmpresaBodySitioWebMax),
+  "piePagina": zod.string().max(saveEmpresaBodyPiePaginaMax),
+  "condicionesPago": zod.string().max(saveEmpresaBodyCondicionesPagoMax),
+  "validezDias": zod.number().min(1).max(saveEmpresaBodyValidezDiasMax),
+  "colorPrimario": zod.string().regex(saveEmpresaBodyColorPrimarioRegExp),
+  "plantilla": zod.enum(['clasica', 'moderna', 'bicolor']),
+  "logoPath": zod.string().nullable()
+})
+
+export const saveEmpresaResponseRazonSocialMax = 200;
+
+export const saveEmpresaResponseRutMax = 20;
+
+export const saveEmpresaResponseGiroMax = 300;
+
+export const saveEmpresaResponseDireccionMax = 300;
+
+export const saveEmpresaResponseCiudadMax = 100;
+
+export const saveEmpresaResponseTelefonoMax = 50;
+
+export const saveEmpresaResponseEmailMax = 254;
+
+export const saveEmpresaResponseSitioWebMax = 300;
+
+export const saveEmpresaResponsePiePaginaMax = 2000;
+
+export const saveEmpresaResponseCondicionesPagoMax = 2000;
+
+export const saveEmpresaResponseValidezDiasMax = 3650;
+
+export const saveEmpresaResponseColorPrimarioRegExp = new RegExp('^#[0-9A-Fa-f]{6}$');
+
+
+export const SaveEmpresaResponse = zod.object({
+  "razonSocial": zod.string().max(saveEmpresaResponseRazonSocialMax),
+  "rut": zod.string().max(saveEmpresaResponseRutMax),
+  "giro": zod.string().max(saveEmpresaResponseGiroMax),
+  "direccion": zod.string().max(saveEmpresaResponseDireccionMax),
+  "ciudad": zod.string().max(saveEmpresaResponseCiudadMax),
+  "telefono": zod.string().max(saveEmpresaResponseTelefonoMax),
+  "email": zod.string().max(saveEmpresaResponseEmailMax),
+  "sitioWeb": zod.string().max(saveEmpresaResponseSitioWebMax),
+  "piePagina": zod.string().max(saveEmpresaResponsePiePaginaMax),
+  "condicionesPago": zod.string().max(saveEmpresaResponseCondicionesPagoMax),
+  "validezDias": zod.number().min(1).max(saveEmpresaResponseValidezDiasMax),
+  "colorPrimario": zod.string().regex(saveEmpresaResponseColorPrimarioRegExp),
+  "plantilla": zod.enum(['clasica', 'moderna', 'bicolor']),
+  "logoPath": zod.string().nullable()
+})
+
+
+export const requestEmpresaLogoUploadBodySizeMax = 2097152;
+
+
+
+export const RequestEmpresaLogoUploadBody = zod.object({
+  "contentType": zod.enum(['image/png', 'image/jpeg']),
+  "size": zod.number().min(1).max(requestEmpresaLogoUploadBodySizeMax)
+})
+
+export const RequestEmpresaLogoUploadResponse = zod.object({
+  "uploadURL": zod.string(),
+  "objectPath": zod.string()
+})
+
+
+export const DownloadCobroPdfParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
 export const getPreferenciasResponseDecimalesMin = 0;
 export const getPreferenciasResponseDecimalesMax = 2;
 
@@ -606,6 +754,14 @@ export const SavePreferenciasResponse = zod.object({
 })
 
 
+export const listCotizacionesResponseOneClienteGiroMax = 300;
+
+export const listCotizacionesResponseOneFormaPagoMax = 2000;
+
+export const listCotizacionesResponseOneTiempoEntregaMax = 1000;
+
+export const listCotizacionesResponseOneValidezDiasMax = 3650;
+
 export const listCotizacionesResponseOneDecimalesMin = 0;
 export const listCotizacionesResponseOneDecimalesMax = 2;
 
@@ -638,6 +794,10 @@ export const listCotizacionesResponseTwoItemsItemOneDescuentoPorcentajeMax = 100
 
 export const ListCotizacionesResponseItem = zod.object({
   "clienteId": zod.number(),
+  "clienteGiro": zod.string().max(listCotizacionesResponseOneClienteGiroMax).optional(),
+  "formaPago": zod.string().max(listCotizacionesResponseOneFormaPagoMax).optional(),
+  "tiempoEntrega": zod.string().max(listCotizacionesResponseOneTiempoEntregaMax).optional(),
+  "validezDias": zod.number().min(1).max(listCotizacionesResponseOneValidezDiasMax).optional(),
   "fechaEmision": zod.string(),
   "fechaVencimiento": zod.string(),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
@@ -679,6 +839,14 @@ export const ListCotizacionesResponseItem = zod.object({
 export const ListCotizacionesResponse = zod.array(ListCotizacionesResponseItem)
 
 
+export const createCotizacionBodyClienteGiroMax = 300;
+
+export const createCotizacionBodyFormaPagoMax = 2000;
+
+export const createCotizacionBodyTiempoEntregaMax = 1000;
+
+export const createCotizacionBodyValidezDiasMax = 3650;
+
 export const createCotizacionBodyDecimalesMin = 0;
 export const createCotizacionBodyDecimalesMax = 2;
 
@@ -702,6 +870,10 @@ export const createCotizacionBodyItemsMax = 100;
 
 export const CreateCotizacionBody = zod.object({
   "clienteId": zod.number(),
+  "clienteGiro": zod.string().max(createCotizacionBodyClienteGiroMax).optional(),
+  "formaPago": zod.string().max(createCotizacionBodyFormaPagoMax).optional(),
+  "tiempoEntrega": zod.string().max(createCotizacionBodyTiempoEntregaMax).optional(),
+  "validezDias": zod.number().min(1).max(createCotizacionBodyValidezDiasMax).optional(),
   "fechaEmision": zod.string(),
   "fechaVencimiento": zod.string(),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
@@ -721,6 +893,14 @@ export const CreateCotizacionBody = zod.object({
 export const GetCotizacionParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const getCotizacionResponseOneClienteGiroMax = 300;
+
+export const getCotizacionResponseOneFormaPagoMax = 2000;
+
+export const getCotizacionResponseOneTiempoEntregaMax = 1000;
+
+export const getCotizacionResponseOneValidezDiasMax = 3650;
 
 export const getCotizacionResponseOneDecimalesMin = 0;
 export const getCotizacionResponseOneDecimalesMax = 2;
@@ -754,6 +934,10 @@ export const getCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax = 100;
 
 export const GetCotizacionResponse = zod.object({
   "clienteId": zod.number(),
+  "clienteGiro": zod.string().max(getCotizacionResponseOneClienteGiroMax).optional(),
+  "formaPago": zod.string().max(getCotizacionResponseOneFormaPagoMax).optional(),
+  "tiempoEntrega": zod.string().max(getCotizacionResponseOneTiempoEntregaMax).optional(),
+  "validezDias": zod.number().min(1).max(getCotizacionResponseOneValidezDiasMax).optional(),
   "fechaEmision": zod.string(),
   "fechaVencimiento": zod.string(),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
@@ -798,6 +982,14 @@ export const UpdateCotizacionParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateCotizacionBodyClienteGiroMax = 300;
+
+export const updateCotizacionBodyFormaPagoMax = 2000;
+
+export const updateCotizacionBodyTiempoEntregaMax = 1000;
+
+export const updateCotizacionBodyValidezDiasMax = 3650;
+
 export const updateCotizacionBodyDecimalesMin = 0;
 export const updateCotizacionBodyDecimalesMax = 2;
 
@@ -821,6 +1013,10 @@ export const updateCotizacionBodyItemsMax = 100;
 
 export const UpdateCotizacionBody = zod.object({
   "clienteId": zod.number(),
+  "clienteGiro": zod.string().max(updateCotizacionBodyClienteGiroMax).optional(),
+  "formaPago": zod.string().max(updateCotizacionBodyFormaPagoMax).optional(),
+  "tiempoEntrega": zod.string().max(updateCotizacionBodyTiempoEntregaMax).optional(),
+  "validezDias": zod.number().min(1).max(updateCotizacionBodyValidezDiasMax).optional(),
   "fechaEmision": zod.string(),
   "fechaVencimiento": zod.string(),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
@@ -835,6 +1031,14 @@ export const UpdateCotizacionBody = zod.object({
   "descuentoPorcentaje": zod.number().min(updateCotizacionBodyItemsItemDescuentoPorcentajeMin).max(updateCotizacionBodyItemsItemDescuentoPorcentajeMax)
 })).min(1).max(updateCotizacionBodyItemsMax)
 })
+
+export const updateCotizacionResponseOneClienteGiroMax = 300;
+
+export const updateCotizacionResponseOneFormaPagoMax = 2000;
+
+export const updateCotizacionResponseOneTiempoEntregaMax = 1000;
+
+export const updateCotizacionResponseOneValidezDiasMax = 3650;
 
 export const updateCotizacionResponseOneDecimalesMin = 0;
 export const updateCotizacionResponseOneDecimalesMax = 2;
@@ -868,6 +1072,10 @@ export const updateCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax = 100
 
 export const UpdateCotizacionResponse = zod.object({
   "clienteId": zod.number(),
+  "clienteGiro": zod.string().max(updateCotizacionResponseOneClienteGiroMax).optional(),
+  "formaPago": zod.string().max(updateCotizacionResponseOneFormaPagoMax).optional(),
+  "tiempoEntrega": zod.string().max(updateCotizacionResponseOneTiempoEntregaMax).optional(),
+  "validezDias": zod.number().min(1).max(updateCotizacionResponseOneValidezDiasMax).optional(),
   "fechaEmision": zod.string(),
   "fechaVencimiento": zod.string(),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
@@ -912,6 +1120,14 @@ export const SendCotizacionParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const sendCotizacionResponseOneClienteGiroMax = 300;
+
+export const sendCotizacionResponseOneFormaPagoMax = 2000;
+
+export const sendCotizacionResponseOneTiempoEntregaMax = 1000;
+
+export const sendCotizacionResponseOneValidezDiasMax = 3650;
+
 export const sendCotizacionResponseOneDecimalesMin = 0;
 export const sendCotizacionResponseOneDecimalesMax = 2;
 
@@ -944,6 +1160,10 @@ export const sendCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax = 100;
 
 export const SendCotizacionResponse = zod.object({
   "clienteId": zod.number(),
+  "clienteGiro": zod.string().max(sendCotizacionResponseOneClienteGiroMax).optional(),
+  "formaPago": zod.string().max(sendCotizacionResponseOneFormaPagoMax).optional(),
+  "tiempoEntrega": zod.string().max(sendCotizacionResponseOneTiempoEntregaMax).optional(),
+  "validezDias": zod.number().min(1).max(sendCotizacionResponseOneValidezDiasMax).optional(),
   "fechaEmision": zod.string(),
   "fechaVencimiento": zod.string(),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
@@ -992,6 +1212,14 @@ export const SetCotizacionEstadoBody = zod.object({
   "estado": zod.enum(['aceptada', 'rechazada'])
 })
 
+export const setCotizacionEstadoResponseOneClienteGiroMax = 300;
+
+export const setCotizacionEstadoResponseOneFormaPagoMax = 2000;
+
+export const setCotizacionEstadoResponseOneTiempoEntregaMax = 1000;
+
+export const setCotizacionEstadoResponseOneValidezDiasMax = 3650;
+
 export const setCotizacionEstadoResponseOneDecimalesMin = 0;
 export const setCotizacionEstadoResponseOneDecimalesMax = 2;
 
@@ -1024,6 +1252,10 @@ export const setCotizacionEstadoResponseTwoItemsItemOneDescuentoPorcentajeMax = 
 
 export const SetCotizacionEstadoResponse = zod.object({
   "clienteId": zod.number(),
+  "clienteGiro": zod.string().max(setCotizacionEstadoResponseOneClienteGiroMax).optional(),
+  "formaPago": zod.string().max(setCotizacionEstadoResponseOneFormaPagoMax).optional(),
+  "tiempoEntrega": zod.string().max(setCotizacionEstadoResponseOneTiempoEntregaMax).optional(),
+  "validezDias": zod.number().min(1).max(setCotizacionEstadoResponseOneValidezDiasMax).optional(),
   "fechaEmision": zod.string(),
   "fechaVencimiento": zod.string(),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
@@ -1068,6 +1300,14 @@ export const ConvertirCotizacionParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const convertirCotizacionResponseOneClienteGiroMax = 300;
+
+export const convertirCotizacionResponseOneFormaPagoMax = 2000;
+
+export const convertirCotizacionResponseOneTiempoEntregaMax = 1000;
+
+export const convertirCotizacionResponseOneValidezDiasMax = 3650;
+
 export const convertirCotizacionResponseOneDecimalesMin = 0;
 export const convertirCotizacionResponseOneDecimalesMax = 2;
 
@@ -1100,6 +1340,10 @@ export const convertirCotizacionResponseTwoItemsItemOneDescuentoPorcentajeMax = 
 
 export const ConvertirCotizacionResponse = zod.object({
   "clienteId": zod.number(),
+  "clienteGiro": zod.string().max(convertirCotizacionResponseOneClienteGiroMax).optional(),
+  "formaPago": zod.string().max(convertirCotizacionResponseOneFormaPagoMax).optional(),
+  "tiempoEntrega": zod.string().max(convertirCotizacionResponseOneTiempoEntregaMax).optional(),
+  "validezDias": zod.number().min(1).max(convertirCotizacionResponseOneValidezDiasMax).optional(),
   "fechaEmision": zod.string(),
   "fechaVencimiento": zod.string(),
   "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']),
@@ -2066,10 +2310,13 @@ export const ListClientesResponse = zod.array(ListClientesResponseItem)
 /**
  * @summary Create a new cliente
  */
+export const createClienteBodyGiroMax = 300;
+
 
 
 
 export const CreateClienteBody = zod.object({
+  "giro": zod.string().max(createClienteBodyGiroMax).optional(),
   "direccion": zod.string().optional(),
   "nombre": zod.string().min(1),
   "empresa": zod.string().optional(),
@@ -2122,6 +2369,7 @@ export const getClienteResponseCobrosItemFechaVencimientoRegExp = new RegExp('^\
 
 
 export const GetClienteResponse = zod.object({
+  "giro": zod.string().nullish(),
   "id": zod.number(),
   "nombre": zod.string(),
   "empresa": zod.string().nullish(),
@@ -2210,10 +2458,13 @@ export const UpdateClienteParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateClienteBodyGiroMax = 300;
+
 
 
 
 export const UpdateClienteBody = zod.object({
+  "giro": zod.string().max(updateClienteBodyGiroMax).optional(),
   "direccion": zod.string().optional(),
   "nombre": zod.string().min(1),
   "empresa": zod.string().optional(),
@@ -2223,6 +2474,7 @@ export const UpdateClienteBody = zod.object({
 })
 
 export const UpdateClienteResponse = zod.object({
+  "giro": zod.string().nullish(),
   "direccion": zod.string().nullish(),
   "id": zod.number(),
   "nombre": zod.string(),

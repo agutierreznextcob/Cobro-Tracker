@@ -10,6 +10,17 @@ import type { CotizacionItemInput } from './cotizacionItemInput';
 
 export interface CotizacionInput {
   clienteId: number;
+  /** @maxLength 300 */
+  clienteGiro?: string;
+  /** @maxLength 2000 */
+  formaPago?: string;
+  /** @maxLength 1000 */
+  tiempoEntrega?: string;
+  /**
+     * @minimum 1
+     * @maximum 3650
+     */
+  validezDias?: number;
   fechaEmision: string;
   fechaVencimiento: string;
   moneda: CotizacionInputMoneda;

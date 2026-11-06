@@ -9,6 +9,8 @@ import type { Cobro } from './cobro';
 import type { ScoreDetalle } from './scoreDetalle';
 
 export interface ClienteConHistorial {
+  /** @nullable */
+  giro?: string | null;
   id: number;
   nombre: string;
   /** @nullable */

@@ -204,6 +204,62 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/IndicadorEconomico" }
+  /configuracion/empresa:
+    get:
+      operationId: getEmpresa
+      responses:
+        "200":
+          description: Perfil compartido del negocio
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Empresa" }
+    put:
+      operationId: saveEmpresa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Empresa" }
+      responses:
+        "200":
+          description: Perfil guardado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Empresa" }
+  /configuracion/empresa/logo/upload:
+    post:
+      operationId: requestEmpresaLogoUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmpresaLogoInput" }
+      responses:
+        "200":
+          description: URL temporal para carga directa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmpresaLogoUpload" }
+  /configuracion/empresa/logo:
+    get:
+      operationId: getEmpresaLogo
+      responses:
+        "200":
+          description: Logo privado del negocio
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+  /cobros/{id}/pdf:
+    get:
+      operationId: downloadCobroPdf
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Documento de cobro A4
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
   /configuracion/preferencias:
     get:
       operationId: getPreferencias
@@ -4158,11 +4214,45 @@ components:
           properties:
             id: { type: integer }
             subtotalLinea: { type: number }
+    Empresa:
+      type: object
+      required: [razonSocial, rut, giro, direccion, ciudad, telefono, email, sitioWeb, piePagina, condicionesPago, validezDias, colorPrimario, plantilla, logoPath]
+      properties:
+        razonSocial: { type: string, maxLength: 200 }
+        rut: { type: string, maxLength: 20 }
+        giro: { type: string, maxLength: 300 }
+        direccion: { type: string, maxLength: 300 }
+        ciudad: { type: string, maxLength: 100 }
+        telefono: { type: string, maxLength: 50 }
+        email: { type: string, maxLength: 254 }
+        sitioWeb: { type: string, maxLength: 300 }
+        piePagina: { type: string, maxLength: 2000 }
+        condicionesPago: { type: string, maxLength: 2000 }
+        validezDias: { type: integer, minimum: 1, maximum: 3650 }
+        colorPrimario: { type: string, pattern: "^#[0-9A-Fa-f]{6}$" }
+        plantilla: { type: string, enum: [clasica, moderna, bicolor] }
+        logoPath: { type: [string, "null"] }
+    EmpresaLogoInput:
+      type: object
+      required: [contentType, size]
+      properties:
+        contentType: { type: string, enum: [image/png, image/jpeg] }
+        size: { type: integer, minimum: 1, maximum: 2097152 }
+    EmpresaLogoUpload:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL: { type: string }
+        objectPath: { type: string }
     CotizacionInput:
       type: object
       required: [clienteId, fechaEmision, fechaVencimiento, moneda, decimales, porcentajeIva, notas, items]
       properties:
         clienteId: { type: integer }
+        clienteGiro: { type: string, maxLength: 300 }
+        formaPago: { type: string, maxLength: 2000 }
+        tiempoEntrega: { type: string, maxLength: 1000 }
+        validezDias: { type: integer, minimum: 1, maximum: 3650 }
         fechaEmision: { type: string }
         fechaVencimiento: { type: string }
         moneda: { type: string, enum: [CLP, USD, EUR, UF] }
@@ -5043,6 +5133,7 @@ components:
       type: object
       required: [id, nombre, userId, creadoEn, actualizadoEn]
       properties:
+        giro: { type: [string, "null"] }
         direccion: { type: [string, "null"] }
         id:
           type: integer
@@ -5198,6 +5289,7 @@ components:
       type: object
       required: [nombre]
       properties:
+        giro: { type: string, maxLength: 300 }
         direccion: { type: string }
         nombre:
           type: string
@@ -5216,6 +5308,7 @@ components:
       type: object
       required: [id, nombre, userId, creadoEn, actualizadoEn, cobros, scoreDetalle]
       properties:
+        giro: { type: [string, "null"] }
         id:
           type: integer
         nombre:

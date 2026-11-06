@@ -29,7 +29,9 @@ import { EstadoCotizacionBadge } from "@/components/estado-cotizacion-badge";
 import { formatMoney, formatFechaPref, formatDate } from "@/lib/format";
 import { apiErrorMessage } from "@/lib/inventario";
 import { descargarPdfCotizacion, invalidateCobrosTrasConversion, invalidateCotizaciones } from "@/lib/cotizaciones";
-import { ArrowLeft, ArrowRightLeft, Check, Download, ExternalLink, Loader2, Mail, Pencil, RotateCw, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Check, Download, ExternalLink, Eye, Loader2, Mail, Pencil, RotateCw, X } from "lucide-react";
+import { downloadCotizacionPdf } from "@workspace/api-client-react";
+import { PdfPreviewDialog } from "@/components/pdf-preview-dialog";
 
 type Confirm = null | "enviar" | "aceptada" | "rechazada" | "convertir";
 
@@ -49,6 +51,7 @@ export default function CotizacionDetailPage() {
   const convertir = useConvertirCotizacion();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [descargando, setDescargando] = useState(false);
+  const [preview, setPreview] = useState(false);
 
   const aplicar = (res: Cotizacion) => {
     qc.setQueryData(getGetCotizacionQueryKey(res.id), res);
@@ -263,9 +266,15 @@ export default function CotizacionDetailPage() {
             )}
             {c.estado === "vencida" && <p className="text-xs text-muted-foreground">Cotización vencida: ya no se puede aceptar ni convertir. Crea una nueva si el cliente sigue interesado.</p>}
             {c.estado === "rechazada" && <p className="text-xs text-muted-foreground">El cliente rechazó esta propuesta.</p>}
-            <Button variant="ghost" className="w-full" onClick={pdf} disabled={descargando} data-testid="button-pdf">
-              {descargando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}Descargar PDF
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setPreview(true)} data-testid="button-vista-previa">
+                <Eye className="h-4 w-4 mr-2" />Vista previa
+              </Button>
+              <Button variant="ghost" onClick={pdf} disabled={descargando} data-testid="button-pdf">
+                {descargando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}PDF
+              </Button>
+            </div>
+            <PdfPreviewDialog open={preview} onOpenChange={setPreview} cargar={() => downloadCotizacionPdf(c.id)} filename={c.numeroCotizacion || `cotizacion-${c.id}`} titulo={`Cotización ${c.numeroCotizacion}`} />
           </Card>
 
           <Card className="p-4 shadow-sm">

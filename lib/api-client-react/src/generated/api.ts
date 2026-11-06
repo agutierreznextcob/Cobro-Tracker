@@ -81,6 +81,9 @@ import type {
   EliminarCobroInput,
   EliminarCuentaInput,
   EmailInput,
+  Empresa,
+  EmpresaLogoInput,
+  EmpresaLogoUpload,
   EncuestaPublica,
   EncuestaRespuestaInput,
   EncuestasResumen,
@@ -1298,6 +1301,349 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getSyncIndicadoresMutationOptions(options));
     }
+
+export const getGetEmpresaUrl = () => {
+
+
+
+
+  return `/api/configuracion/empresa`
+}
+
+export const getEmpresa = async ( options?: RequestInit): Promise<Empresa> => {
+
+  return customFetch<Empresa>(getGetEmpresaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmpresaQueryKey = () => {
+    return [
+    `/api/configuracion/empresa`
+    ] as const;
+    }
+
+
+export const getGetEmpresaQueryOptions = <TData = Awaited<ReturnType<typeof getEmpresa>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpresa>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmpresaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmpresa>>> = ({ signal }) => getEmpresa({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmpresa>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmpresaQueryResult = NonNullable<Awaited<ReturnType<typeof getEmpresa>>>
+export type GetEmpresaQueryError = ErrorType<unknown>
+
+
+
+export function useGetEmpresa<TData = Awaited<ReturnType<typeof getEmpresa>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpresa>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmpresaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveEmpresaUrl = () => {
+
+
+
+
+  return `/api/configuracion/empresa`
+}
+
+export const saveEmpresa = async (empresa: Empresa, options?: RequestInit): Promise<Empresa> => {
+
+  return customFetch<Empresa>(getSaveEmpresaUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      empresa,)
+  }
+);}
+
+
+
+
+export const getSaveEmpresaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveEmpresa>>, TError,{data: BodyType<Empresa>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveEmpresa>>, TError,{data: BodyType<Empresa>}, TContext> => {
+
+const mutationKey = ['saveEmpresa'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveEmpresa>>, {data: BodyType<Empresa>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveEmpresa(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveEmpresaMutationResult = NonNullable<Awaited<ReturnType<typeof saveEmpresa>>>
+    export type SaveEmpresaMutationBody = BodyType<Empresa>
+    export type SaveEmpresaMutationError = ErrorType<unknown>
+
+    export const useSaveEmpresa = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveEmpresa>>, TError,{data: BodyType<Empresa>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveEmpresa>>,
+        TError,
+        {data: BodyType<Empresa>},
+        TContext
+      > => {
+      return useMutation(getSaveEmpresaMutationOptions(options));
+    }
+
+export const getRequestEmpresaLogoUploadUrl = () => {
+
+
+
+
+  return `/api/configuracion/empresa/logo/upload`
+}
+
+export const requestEmpresaLogoUpload = async (empresaLogoInput: EmpresaLogoInput, options?: RequestInit): Promise<EmpresaLogoUpload> => {
+
+  return customFetch<EmpresaLogoUpload>(getRequestEmpresaLogoUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      empresaLogoInput,)
+  }
+);}
+
+
+
+
+export const getRequestEmpresaLogoUploadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestEmpresaLogoUpload>>, TError,{data: BodyType<EmpresaLogoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestEmpresaLogoUpload>>, TError,{data: BodyType<EmpresaLogoInput>}, TContext> => {
+
+const mutationKey = ['requestEmpresaLogoUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestEmpresaLogoUpload>>, {data: BodyType<EmpresaLogoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestEmpresaLogoUpload(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestEmpresaLogoUploadMutationResult = NonNullable<Awaited<ReturnType<typeof requestEmpresaLogoUpload>>>
+    export type RequestEmpresaLogoUploadMutationBody = BodyType<EmpresaLogoInput>
+    export type RequestEmpresaLogoUploadMutationError = ErrorType<unknown>
+
+    export const useRequestEmpresaLogoUpload = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestEmpresaLogoUpload>>, TError,{data: BodyType<EmpresaLogoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestEmpresaLogoUpload>>,
+        TError,
+        {data: BodyType<EmpresaLogoInput>},
+        TContext
+      > => {
+      return useMutation(getRequestEmpresaLogoUploadMutationOptions(options));
+    }
+
+export const getGetEmpresaLogoUrl = () => {
+
+
+
+
+  return `/api/configuracion/empresa/logo`
+}
+
+export const getEmpresaLogo = async ( options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetEmpresaLogoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmpresaLogoQueryKey = () => {
+    return [
+    `/api/configuracion/empresa/logo`
+    ] as const;
+    }
+
+
+export const getGetEmpresaLogoQueryOptions = <TData = Awaited<ReturnType<typeof getEmpresaLogo>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpresaLogo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmpresaLogoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmpresaLogo>>> = ({ signal }) => getEmpresaLogo({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmpresaLogo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmpresaLogoQueryResult = NonNullable<Awaited<ReturnType<typeof getEmpresaLogo>>>
+export type GetEmpresaLogoQueryError = ErrorType<unknown>
+
+
+
+export function useGetEmpresaLogo<TData = Awaited<ReturnType<typeof getEmpresaLogo>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpresaLogo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmpresaLogoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDownloadCobroPdfUrl = (id: number,) => {
+
+
+
+
+  return `/api/cobros/${id}/pdf`
+}
+
+export const downloadCobroPdf = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadCobroPdfUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadCobroPdfQueryKey = (id: number,) => {
+    return [
+    `/api/cobros/${id}/pdf`
+    ] as const;
+    }
+
+
+export const getDownloadCobroPdfQueryOptions = <TData = Awaited<ReturnType<typeof downloadCobroPdf>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadCobroPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadCobroPdfQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadCobroPdf>>> = ({ signal }) => downloadCobroPdf(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadCobroPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadCobroPdfQueryResult = NonNullable<Awaited<ReturnType<typeof downloadCobroPdf>>>
+export type DownloadCobroPdfQueryError = ErrorType<unknown>
+
+
+
+export function useDownloadCobroPdf<TData = Awaited<ReturnType<typeof downloadCobroPdf>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadCobroPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadCobroPdfQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetPreferenciasUrl = () => {
 

@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal, ShoppingCart, Truck } from "lucide-react";
+import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal, ShoppingCart, Truck, Building2 } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus, useGetGestionResumen, getGetGestionResumenQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -300,6 +300,7 @@ const VENTAS_ITEMS: NavLeaf[] = [
 const CONFIG_ITEMS: NavLeaf[] = [
   { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock, feature: "Recordatorios automáticos" },
   { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes", match: (l) => l === "/workflows" || l.startsWith("/workflows/") },
+  { href: "/configuracion/empresa", label: "Perfil de empresa", icon: Building2 },
   { href: "/configuracion/preferencias", label: "Preferencias", icon: SlidersHorizontal },
   { href: "/encuestas", label: "Satisfacción", icon: MessageSquare, feature: "Encuestas de satisfacción" },
 ];

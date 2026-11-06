@@ -40,10 +40,11 @@ const editSchema = z.object({
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   telefono: z.string().max(30).optional(),
   direccion: z.string().max(300).optional(),
+  giro: z.string().max(300).optional(),
 });
 type EditForm = z.infer<typeof editSchema>;
 
-function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nombre: string; empresa?: string | null; rut?: string | null; email?: string | null; telefono?: string | null; direccion?: string | null }; onUpdated: () => void }) {
+function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nombre: string; empresa?: string | null; rut?: string | null; email?: string | null; telefono?: string | null; direccion?: string | null; giro?: string | null }; onUpdated: () => void }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const updateCliente = useUpdateCliente();
@@ -57,12 +58,13 @@ function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nomb
       email: cliente.email ?? "",
       telefono: cliente.telefono ?? "",
       direccion: cliente.direccion ?? "",
+      giro: cliente.giro ?? "",
     },
   });
 
   const onSubmit = (values: EditForm) => {
     updateCliente.mutate(
-      { id: cliente.id, data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut || undefined, email: values.email || undefined, telefono: values.telefono || undefined, direccion: values.direccion?.trim() ?? "" } },
+      { id: cliente.id, data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut || undefined, email: values.email || undefined, telefono: values.telefono || undefined, direccion: values.direccion?.trim() ?? "", giro: values.giro?.trim() ?? "" } },
       {
         onSuccess: () => {
           toast({ title: "Cliente actualizado" });
@@ -129,6 +131,13 @@ function EditClienteDialog({ cliente, onUpdated }: { cliente: { id: number; nomb
                 <FormItem className="sm:col-span-2">
                   <FormLabel>Dirección</FormLabel>
                   <FormControl><Input placeholder="Calle, número, comuna" data-testid="input-edit-direccion" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="giro" render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Giro comercial</FormLabel>
+                  <FormControl><Input placeholder="Actividad económica del cliente" maxLength={300} data-testid="input-edit-giro" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -436,7 +445,7 @@ export default function ClienteDetailPage() {
         </Link>
         <div className="flex items-center gap-2">
           <EnviarPortalDialog cliente={data} onChanged={handleUpdated} />
-          <EditClienteDialog cliente={data as typeof data & { direccion?: string | null }} onUpdated={handleUpdated} />
+          <EditClienteDialog cliente={data as typeof data & { direccion?: string | null; giro?: string | null }} onUpdated={handleUpdated} />
         </div>
       </div>
 

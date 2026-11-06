@@ -49,3 +49,4 @@
 - [Inventario y pagos](inventario-stock.md) — pagos confirmados pueden dejar stock negativo; salidas manuales no. No revertir ventas automáticamente; catálogo compartido por organización.
 - [Compras y recepción](compras-recepcion.md) — admin/supervisor reciben; costos netos automáticos sin preguntar; recepción atómica sin duplicar stock; SII futuro.
 - [IVA y PVP de inventario](inventario-precios.md) — márgenes sobre neto, precio final IVA incluido, historial de costos y compras sin cambiar venta vigente.
+- [Perfil de empresa y documentos](empresa-documentos.md) — identidad por negocio, logos privados validados y PDFs con importes y fechas históricos preservados.

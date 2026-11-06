@@ -7,6 +7,8 @@
  */
 
 export interface ClienteInput {
+  /** @maxLength 300 */
+  giro?: string;
   direccion?: string;
   /** @minLength 1 */
   nombre: string;
