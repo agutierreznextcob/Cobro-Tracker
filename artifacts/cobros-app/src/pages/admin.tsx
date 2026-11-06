@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CotizacionesSoporte } from "@/components/cotizaciones-soporte";
 import { Link } from "wouter";
 import {
   useListAdminUsuarios,
@@ -588,6 +589,7 @@ export default function AdminPage() {
         </div>
       </div>
 
+      <CotizacionesSoporte />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={<Users className="h-5 w-5" />}

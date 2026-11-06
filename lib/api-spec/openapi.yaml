@@ -33,6 +33,39 @@ tags:
   - name: encuestas
     description: Client satisfaction surveys
 paths:
+  /admin/cotizaciones-envios:
+    get:
+      operationId: listCotizacionesEnvios
+      responses:
+        "200":
+          description: Envíos pendientes, solo superadmin.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CotizacionEnvioSoporte"
+  /admin/cotizaciones-envios/{id}/conciliar:
+    post:
+      operationId: conciliarCotizacion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CotizacionConciliacionInput"
+      responses:
+        "200":
+          description: Consulta o acción auditada completada.
+        "400":
+          description: Entrada inválida.
+        "409":
+          description: Evidencia insuficiente o envío cambiado.
   /informes:
     get:
       operationId: getInformeArea
@@ -4084,6 +4117,46 @@ paths:
 
 components:
   schemas:
+    CotizacionEnvioSoporte:
+      type: object
+      required: [id, numero, email, key, preparedAt, windowStart, sha256, audit, confirmed]
+      properties:
+        id: { type: integer }
+        numero: { type: string }
+        email: { type: string }
+        key: { type: string }
+        preparedAt: { type: string }
+        windowStart: { type: string }
+        sha256: { type: string }
+        confirmed: { type: boolean }
+        audit:
+          type: array
+          items:
+            $ref: "#/components/schemas/CotizacionEnvioAudit"
+    CotizacionEnvioAudit:
+      type: object
+      required: [at, actor, action, key, reason, evidence]
+      properties:
+        at: { type: string }
+        actor: { type: string }
+        action: { type: string }
+        key: { type: string }
+        reason: { type: string }
+        evidence: { type: string }
+        providerId: { type: string }
+    CotizacionConciliacionInput:
+      type: object
+      required: [action, key, reason]
+      properties:
+        action:
+          type: string
+          enum: [consultar, confirmar, autorizar]
+        key: { type: string, minLength: 1, maxLength: 256 }
+        reason: { type: string, minLength: 10, maxLength: 1000 }
+        providerId: { type: string, format: uuid }
+        providerCase: { type: string, minLength: 5, maxLength: 500 }
+        providerStatement: { type: string, minLength: 50, maxLength: 5000 }
+        noAcceptanceConfirmed: { type: boolean }
     InformeArea:
       type: object
       required: [desde, hasta, moneda, notas, total, facturas, ticketPromedio, mesActual, mesAnterior, variacion, totalStock, ventas, menorMovimiento, proveedores, pendientes, evolucion, valorizado, quiebres]

@@ -26,3 +26,7 @@ Un escritor que mantiene un bloqueo global de logos no debe pedir otra conexión
 Los reintentos de correo deben conservar tanto el adjunto como los demás datos del mensaje; una respuesta fallida puede ser ambigua y no autoriza a crear otro envío.
 **Why:** regenerar con otra identidad bajo la misma clave de idempotencia puede no coincidir con el documento efectivamente aceptado por el proveedor. Su ventana de deduplicación es limitada.
 **How to apply:** distinguir preparación de confirmación; no ofrecer como enviada una copia pendiente ni reconstruir históricos. Fuera de la ventana segura, exigir conciliación en lugar de reenviar a ciegas.
+
+La ausencia en una consulta al proveedor no demuestra que no aceptó el correo. La autorización de otro intento exige verificación humana de una respuesta explícita del soporte del proveedor sobre TODOS los intentos de la clave.
+**Why:** un 404 puede deberse a retención o visibilidad; un rebote ya supone aceptación y un error de transporte sigue siendo ambiguo.
+**How to apply:** conservar el bloqueo si no hay evidencia suficiente; seguir el procedimiento de conciliación y distinguir siempre aceptación de entrega.

@@ -31,6 +31,10 @@ export const cotizacionesTable = pgTable("cotizaciones", {
   envioEnCurso: timestamp("envio_en_curso", { withTimezone: true }),
   envioPdf: jsonb("envio_pdf").$type<{
     path: string; sha256: string; bytes: number; scope: string; preparedAt: string;
+    providerId?: string;
+    retry?: { key: string; authorizedAt: string };
+    audit?: { at: string; actor: string; action: string; key: string; reason: string; evidence: string; providerId?: string }[];
+    message?: { from: string; replyTo?: string; to: string[]; subject: string; html: string };
     email: { id: number; version: string; numero: string; email: string; cliente: string;
       total: number; moneda: string; decimales: number; vencimiento: string;
       remitente: { nombre?: string | null; email?: string | null } };

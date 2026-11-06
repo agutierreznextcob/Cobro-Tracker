@@ -14,11 +14,15 @@ const realFetch = globalThis.fetch;
 let emails = 0;
 let failEmail = false;
 let failStorage = false;
+let providerEmail: any = null;
+let providerPdf = Buffer.alloc(0);
+let providerUnavailable = false;
 const emailBodies: string[] = [];
 const emailKeys: string[] = [];
 try {
   await admin.connect();
   await admin.query(`create schema "${schema}"`);
+  await admin.query(`create table "${schema}".sessions (like public.sessions including all)`);
   const tables = ["cotizaciones", "cotizacion_items", "preferencias", "empresas", "clientes", "productos", "cobros", "users", "organizaciones", "movimientos_stock", "locales", "bodegas", "stock_por_bodega"];
   for (const table of tables) {
     await admin.query(`create table "${schema}"."${table}" (like public."${table}" including all)`);
@@ -33,7 +37,16 @@ try {
   // Fake transport only in this isolated process; no real external message.
   process.env.RESEND_API_KEY = "re_fake_test_only";
   globalThis.fetch = async (input, init) => {
+    if (String(input).startsWith("https://outbound-cdn.resend.com/")) return new Response(providerPdf);
+    if (String(input).startsWith("https://api.resend.com/emails/")) {
+      if (providerUnavailable) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify(String(input).endsWith("/attachments")
+        ? { has_more: false, data: [{ size: providerPdf.length, filename: `${providerEmail.numero}.pdf`, download_url: "https://outbound-cdn.resend.com/test" }] }
+        : providerEmail), { headers: { "content-type": "application/json" } });
+    }
     if (String(input).startsWith("https://api.resend.com/")) {
+      assert.equal(new Headers(init?.headers).get("authorization"), "Bearer re_fake_test_only");
+      assert.equal(new Headers(init?.headers).get("content-type"), "application/json");
       emails++;
       emailBodies.push(String(init?.body));
       emailKeys.push(new Headers(init?.headers).get("idempotency-key") ?? "");
@@ -75,11 +88,13 @@ try {
   const express = (await import("express")).default;
   const app = express();
   app.use(express.json());
+  app.use((await import("../src/middlewares/authMiddleware")).authMiddleware);
   app.use((req, _res, next) => {
-    (req as any).user = actor; (req as any).isAuthenticated = () => true;
+    if (!req.user) { (req as any).user = actor; (req as any).isAuthenticated = () => true; }
     (req as any).log = { error() {}, warn() {}, info() {} }; next();
   });
   app.use("/api", (await import("../src/routes/cotizaciones")).default);
+  app.use("/api", (await import("../src/routes/cotizaciones-soporte")).default);
   app.use("/api", (await import("../src/routes/preferencias")).default);
   server = http.createServer(app);
   await new Promise<void>(resolve => server!.listen(0, "127.0.0.1", resolve));
@@ -195,6 +210,70 @@ try {
   const beforeRetry = emails;
   assert.equal((await api("POST", `/cotizaciones/${stuck.id}/enviar`)).status, 409);
   assert.equal(emails, beforeRetry, "Never retry outside provider idempotency retention");
+  const supportPath = `/admin/cotizaciones-envios/${stuck.id}/conciliar`;
+  const key = `cotizacion-${stuck.id}-${stuck.envioPdf!.email.version}`;
+  const reason = "Revisión de evidencia con el proveedor";
+  assert.equal((await api("GET", "/admin/cotizaciones-envios")).status, 403);
+  assert.equal((await api("POST", supportPath, { action: "autorizar", key, reason })).status, 403);
+  await db.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, owner.id));
+  const { createSession, deleteSession } = await import("../src/lib/auth");
+  // Real persisted support session + real auth middleware: the visited user
+  // is an admin, but the operator must never acquire its privileges.
+  const supportSession = await createSession({
+    user: { id: owner.id, email: owner.email, firstName: null, lastName: null, profileImageUrl: null },
+    consultor: { sesionId: 1, consultorId: 1, nombre: "Test support", tipo: "soporte", inicioEn: new Date().toISOString() },
+  });
+  for (const [method, path] of [["GET", "/admin/cotizaciones-envios"], ["POST", supportPath]]) {
+    const denied = await fetch(base + path, { method, headers: { authorization: `Bearer ${supportSession}`, "content-type": "application/json" },
+      ...(method === "POST" ? { body: JSON.stringify({ action: "autorizar", key, reason }) } : {}) });
+    assert.equal(denied.status, 403, "An impersonated admin never grants support access to reconciliation");
+  }
+  await deleteSession(supportSession);
+  assert.equal((await api("GET", "/admin/cotizaciones-envios")).status, 200);
+  const providerId = "11111111-1111-4111-8111-111111111111";
+  providerUnavailable = true;
+  assert.equal((await api("POST", supportPath, { action: "confirmar", key, reason, providerId })).status, 409);
+  assert.equal((await api("POST", supportPath, { action: "autorizar", key, reason })).status, 409, "No evidence is not authorization");
+  const evidence = { action: "autorizar", key, reason, providerCase: "RESEND-CASE-TEST", providerStatement: `Resend confirma explícitamente que ningún intento de la clave ${key} fue aceptado.`, noAcceptanceConfirmed: true };
+  const authorizations = await Promise.all([api("POST", supportPath, evidence), api("POST", supportPath, evidence)]);
+  assert.deepEqual(authorizations.map(r => r.status).sort(), [200, 409], "Only one authorization can rotate the key");
+  const [authorized] = await db.select().from(cotizacionesTable).where(eq(cotizacionesTable.id, stuck.id));
+  assert.equal(authorized.envioPdf!.sha256, stuck.envioPdf!.sha256);
+  assert.equal(authorized.envioPdf!.path, stuck.envioPdf!.path);
+  assert.equal(authorized.envioPdf!.audit!.length, 1);
+  const freshKey = authorized.envioPdf!.retry!.key;
+  assert.notEqual(freshKey, key);
+  failEmail = true;
+  assert.equal((await api("POST", `/cotizaciones/${stuck.id}/enviar`)).status, 500);
+  assert.equal(emailKeys.at(-1), freshKey);
+  assert.equal(emailBodies.at(-1), emailBodies.at(-2), "Authorized retry uses the exact original payload/PDF");
+  const old = new Date(Date.now() - 25 * 60 * 60_000).toISOString();
+  await db.update(cotizacionesTable).set({ envioPdf: { ...authorized.envioPdf!, retry: { key: freshKey, authorizedAt: old } } }).where(eq(cotizacionesTable.id, stuck.id));
+  const payload = JSON.parse(emailBodies.at(-1)!);
+  providerPdf = Buffer.from(payload.attachments[0].content, "base64");
+  providerEmail = { ...payload, id: providerId, numero: stuck.numeroCotizacion.replace(/[^A-Za-z0-9_-]/g, "_"), created_at: new Date().toISOString(), last_event: "bounced", reply_to: payload.reply_to ? [payload.reply_to] : [] };
+  providerUnavailable = false;
+  const originalHtml = providerEmail.html;
+  providerEmail.html = "wrong message";
+  assert.equal((await api("POST", supportPath, { action: "confirmar", key: freshKey, reason, providerId })).status, 409);
+  providerEmail.html = originalHtml;
+  const originalPdf = providerPdf;
+  providerPdf = Buffer.from("wrong pdf");
+  assert.equal((await api("POST", supportPath, { action: "confirmar", key: freshKey, reason, providerId })).status, 409);
+  providerPdf = originalPdf;
+  const consultation = await api("POST", supportPath, { action: "consultar", key: freshKey, reason, providerId });
+  assert.equal(consultation.status, 200, JSON.stringify(consultation));
+  assert.equal((await api("POST", supportPath, { ...evidence, key: freshKey, providerStatement: evidence.providerStatement.replace(key, freshKey) })).status, 409, "A bounce is still accepted; never authorize a duplicate");
+  const beforeConfirm = emails;
+  const confirmations = await Promise.all([1, 2].map(() => api("POST", supportPath, { action: "confirmar", key: freshKey, reason, providerId })));
+  assert.deepEqual(confirmations.map(r => r.status).sort(), [200, 409]);
+  assert.equal(emails, beforeConfirm, "Reconciliation never sends an email");
+  const [resolved] = await db.select().from(cotizacionesTable).where(eq(cotizacionesTable.id, stuck.id));
+  assert.equal(resolved.estado, "enviada");
+  assert.equal(resolved.envioPdf!.path, stuck.envioPdf!.path);
+  assert.equal(resolved.envioPdf!.audit!.length, 3);
+  assert.equal((await api("GET", "/admin/cotizaciones-envios")).data.find((r: any) => r.id === stuck.id).confirmed, true);
+  console.log("PASS reconciliation: admin-only, ambiguous/404 blocked, evidence, concurrent authorization, original payload, provider message/hash verification, bounce, concurrent confirmation and durable audit");
   console.log("PASS preferences, totals/discount/IVA, immutable currency, scope isolation, PDF, mocked Resend/idempotency, state guards, concurrent conversion, linked stock, expiration");
 } finally {
   globalThis.fetch = realFetch;

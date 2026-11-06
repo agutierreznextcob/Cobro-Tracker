@@ -5,6 +5,63 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+export interface CotizacionEnvioAudit {
+  at: string;
+  actor: string;
+  action: string;
+  key: string;
+  reason: string;
+  evidence: string;
+  providerId?: string;
+}
+
+export interface CotizacionEnvioSoporte {
+  id: number;
+  numero: string;
+  email: string;
+  key: string;
+  preparedAt: string;
+  windowStart: string;
+  sha256: string;
+  confirmed: boolean;
+  audit: CotizacionEnvioAudit[];
+}
+
+export type CotizacionConciliacionInputAction = typeof CotizacionConciliacionInputAction[keyof typeof CotizacionConciliacionInputAction];
+
+
+export const CotizacionConciliacionInputAction = {
+  consultar: 'consultar',
+  confirmar: 'confirmar',
+  autorizar: 'autorizar',
+} as const;
+
+export interface CotizacionConciliacionInput {
+  action: CotizacionConciliacionInputAction;
+  /**
+     * @minLength 1
+     * @maxLength 256
+     */
+  key: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  reason: string;
+  providerId?: string;
+  /**
+     * @minLength 5
+     * @maxLength 500
+     */
+  providerCase?: string;
+  /**
+     * @minLength 50
+     * @maxLength 5000
+     */
+  providerStatement?: string;
+  noAcceptanceConfirmed?: boolean;
+}
+
 export interface InformeProducto {
   id: number;
   nombre: string;

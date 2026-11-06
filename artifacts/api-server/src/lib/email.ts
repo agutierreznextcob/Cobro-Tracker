@@ -15,22 +15,42 @@ function escapeHtml(value: string): string {
 
 let resend: Resend | null = null;
 
-export async function sendCotizacionEmail(data: {
+export type CotizacionEmailData = {
   id: number; version: string; numero: string; email: string; cliente: string;
   total: number; moneda: string; decimales: number; vencimiento: string;
-  remitente: { nombre?: string | null; email?: string | null }; pdf: Buffer;
-}): Promise<void> {
-  const client = getResend();
-  if (!client) throw new Error("El servicio de correo no está configurado.");
+  remitente: { nombre?: string | null; email?: string | null };
+};
+
+export function cotizacionEmailMessage(data: CotizacionEmailData) {
   const amount = formatDocumentMoney(data.total, data.moneda, data.decimales);
-  const { error } = await client.emails.send({
+  return {
     ...buildRemitente(data.remitente),
     to: [data.email],
     subject: `Cotización ${data.numero} — ${amount}`,
     html: `<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#161616"><h1>Cotización ${escapeHtml(data.numero)}</h1><p>Hola ${escapeHtml(data.cliente)},</p><p>Adjuntamos tu cotización por <strong>${escapeHtml(amount)}</strong>.</p><p>Válida hasta ${escapeHtml(data.vencimiento)}.</p><p>Responde este correo para aceptar la cotización o realizar consultas.</p><p>${escapeHtml(data.remitente.nombre || "NextCob")}</p></div>`,
-    attachments: [{ filename: `${data.numero.replace(/[^A-Za-z0-9_-]/g, "_")}.pdf`, content: data.pdf }],
-  }, { idempotencyKey: `cotizacion-${data.id}-${data.version}` });
+  };
+}
+
+export async function sendCotizacionEmail(data: CotizacionEmailData & {
+  pdf: Buffer; idempotencyKey?: string; message?: ReturnType<typeof cotizacionEmailMessage>;
+}): Promise<string> {
+  const client = getResend();
+  if (!client) throw new Error("El servicio de correo no está configurado.");
+  const { replyTo, ...message } = data.message ?? cotizacionEmailMessage(data);
+  // Bound the transport while the send's row lock prevents reconciliation.
+  // A timeout remains ambiguous and must not create a new idempotency key.
+  const { data: result, error } = await client.fetchRequest<{ id: string }>("/emails", {
+    method: "POST", signal: AbortSignal.timeout(30_000),
+    headers: {
+      Authorization: `Bearer ${client.key}`, "Content-Type": "application/json",
+      "Idempotency-Key": data.idempotencyKey ?? `cotizacion-${data.id}-${data.version}`,
+    },
+    body: JSON.stringify({ ...message, ...(replyTo ? { reply_to: replyTo } : {}),
+      attachments: [{ filename: `${data.numero.replace(/[^A-Za-z0-9_-]/g, "_")}.pdf`, content: data.pdf.toString("base64") }] }),
+  });
   if (error) throw new Error("No se pudo enviar la cotización. Intenta nuevamente.");
+  if (!result?.id) throw new Error("El proveedor no confirmó el identificador del correo.");
+  return result.id;
 }
 
 function getResend(): Resend | null {

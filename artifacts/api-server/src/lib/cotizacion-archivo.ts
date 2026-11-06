@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { Cotizacion } from "@workspace/db";
 import { ObjectStorageService, objectStorageClient } from "./objectStorage";
 import { documentScope } from "./empresa";
+import { cotizacionEmailMessage } from "./email";
 
 const storage = new ObjectStorageService();
 export type ArchivoCotizacion = NonNullable<Cotizacion["envioPdf"]>;
@@ -17,7 +18,7 @@ export async function guardarPdfCotizacion(q: Cotizacion, pdf: Buffer, email: Ar
     resumable: false, contentType: "application/pdf", preconditionOpts: { ifGenerationMatch: 0 },
     metadata: { metadata: { scope, cotizacionId: String(q.id), sha256 } },
   });
-  return { path: `/objects/${name}`, sha256, bytes: pdf.length, scope, preparedAt: new Date().toISOString(), email };
+  return { path: `/objects/${name}`, sha256, bytes: pdf.length, scope, preparedAt: new Date().toISOString(), email, message: cotizacionEmailMessage(email) };
 }
 
 export async function leerPdfCotizacion(q: Cotizacion): Promise<Buffer> {

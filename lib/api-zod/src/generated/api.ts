@@ -8,6 +8,56 @@
 import * as zod from 'zod';
 
 
+export const ListCotizacionesEnviosResponseItem = zod.object({
+  "id": zod.number(),
+  "numero": zod.string(),
+  "email": zod.string(),
+  "key": zod.string(),
+  "preparedAt": zod.string(),
+  "windowStart": zod.string(),
+  "sha256": zod.string(),
+  "confirmed": zod.boolean(),
+  "audit": zod.array(zod.object({
+  "at": zod.string(),
+  "actor": zod.string(),
+  "action": zod.string(),
+  "key": zod.string(),
+  "reason": zod.string(),
+  "evidence": zod.string(),
+  "providerId": zod.string().optional()
+}))
+})
+export const ListCotizacionesEnviosResponse = zod.array(ListCotizacionesEnviosResponseItem)
+
+
+export const ConciliarCotizacionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const conciliarCotizacionBodyKeyMax = 256;
+
+export const conciliarCotizacionBodyReasonMin = 10;
+export const conciliarCotizacionBodyReasonMax = 1000;
+
+export const conciliarCotizacionBodyProviderCaseMin = 5;
+export const conciliarCotizacionBodyProviderCaseMax = 500;
+
+export const conciliarCotizacionBodyProviderStatementMin = 50;
+export const conciliarCotizacionBodyProviderStatementMax = 5000;
+
+
+
+export const ConciliarCotizacionBody = zod.object({
+  "action": zod.enum(['consultar', 'confirmar', 'autorizar']),
+  "key": zod.string().min(1).max(conciliarCotizacionBodyKeyMax),
+  "reason": zod.string().min(conciliarCotizacionBodyReasonMin).max(conciliarCotizacionBodyReasonMax),
+  "providerId": zod.string().uuid().optional(),
+  "providerCase": zod.string().min(conciliarCotizacionBodyProviderCaseMin).max(conciliarCotizacionBodyProviderCaseMax).optional(),
+  "providerStatement": zod.string().min(conciliarCotizacionBodyProviderStatementMin).max(conciliarCotizacionBodyProviderStatementMax).optional(),
+  "noAcceptanceConfirmed": zod.boolean().optional()
+})
+
+
 export const getInformeAreaQueryPeriodoDefault = `mes`;
 export const getInformeAreaQueryMonedaDefault = `CLP`;
 export const getInformeAreaQueryUmbralDefault = 5;

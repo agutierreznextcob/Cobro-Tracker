@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import indicadoresRouter from "./indicadores";
 import cotizacionesRouter from "./cotizaciones";
+import cotizacionesSoporteRouter from "./cotizaciones-soporte";
 import comprasRouter from "./compras";
 import preferenciasRouter from "./preferencias";
 import informesRouter from "./informes";
@@ -77,6 +78,7 @@ router.use(organizationRouter);
 router.use(inventarioRouter);
 router.use(indicadoresRouter);
 router.use(cotizacionesRouter);
+router.use(cotizacionesSoporteRouter);
 router.use(comprasRouter);
 router.use(preferenciasRouter);
 router.use(informesRouter);

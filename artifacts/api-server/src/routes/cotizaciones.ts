@@ -8,6 +8,7 @@ import { getPreferenciasNegocio, hoySantiago } from "../lib/preferencias";
 import { cotizacionPdf } from "../lib/cotizacion-pdf";
 import { sendCotizacionEmail } from "../lib/email";
 import { guardarPdfCotizacion, leerPdfCotizacion } from "../lib/cotizacion-archivo";
+import { envioKey, envioWindowStart } from "../lib/cotizacion-conciliacion";
 
 const router = Router();
 router.use("/cotizaciones", (req, res, next) => {
@@ -104,7 +105,7 @@ router.post("/cotizaciones/:id/enviar", action(async (req, res) => {
       });
     }
     // Resend retains idempotency keys for 24h. Never risk a duplicate beyond it.
-    if (Date.now() - Date.parse(archivo.preparedAt) > 23 * 60 * 60_000)
+    if (!Number.isFinite(Date.parse(envioWindowStart(archivo))) || Date.now() - Date.parse(envioWindowStart(archivo)) > 23 * 60 * 60_000)
       throw new CotizacionError("El envío necesita revisión de soporte antes de volver a intentarlo; no se enviará otro correo para evitar duplicados.", 409);
     const [claimed] = await tx.update(cotizacionesTable).set({ envioEnCurso: claim, envioPdf: archivo }).where(condition).returning();
     return claimed;
@@ -112,10 +113,17 @@ router.post("/cotizaciones/:id/enviar", action(async (req, res) => {
   if (q.enviadoEn) { res.json(await serializeCotizacion(q)); return; }
   try {
     const pdf = await leerPdfCotizacion(q);
-    await sendCotizacionEmail({ ...q.envioPdf!.email, pdf });
-    const [updated] = await db.update(cotizacionesTable).set({ estado: "enviada", enviadoEn: new Date(), envioEnCurso: null, updatedAt: new Date() })
-      .where(and(condition, eq(cotizacionesTable.envioEnCurso, claim))).returning();
-    if (!updated) throw new CotizacionError("El envío se está conciliando. Actualiza la página.", 409);
+    const updated = await db.transaction(async tx => {
+      const [live] = await tx.select().from(cotizacionesTable).where(condition).for("update");
+      if (!live?.envioPdf || live.enviadoEn || live.envioEnCurso?.getTime() !== claim.getTime() ||
+          envioKey(live.envioPdf) !== envioKey(q.envioPdf!) ||
+          Date.now() - Date.parse(envioWindowStart(live.envioPdf)) > 23 * 60 * 60_000)
+        throw new CotizacionError("El envío cambió o requiere conciliación. Actualiza la página.", 409);
+      const providerId = await sendCotizacionEmail({ ...live.envioPdf.email, pdf, message: live.envioPdf.message, idempotencyKey: envioKey(live.envioPdf) });
+      const [saved] = await tx.update(cotizacionesTable).set({ estado: "enviada", enviadoEn: new Date(), envioEnCurso: null, updatedAt: new Date(), envioPdf: { ...live.envioPdf, providerId } })
+        .where(condition).returning();
+      return saved;
+    });
     res.json(await serializeCotizacion(updated));
   } catch (err) {
     await db.update(cotizacionesTable).set({ envioEnCurso: null }).where(and(condition, eq(cotizacionesTable.envioEnCurso, claim)));

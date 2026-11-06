@@ -72,6 +72,8 @@ import type {
   CompraRecepcionPreview,
   ComprobanteTransferencia,
   Cotizacion,
+  CotizacionConciliacionInput,
+  CotizacionEnvioSoporte,
   CotizacionEstadoInput,
   CotizacionInput,
   DashboardMetricas,
@@ -215,6 +217,143 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getListCotizacionesEnviosUrl = () => {
+
+
+
+
+  return `/api/admin/cotizaciones-envios`
+}
+
+export const listCotizacionesEnvios = async ( options?: RequestInit): Promise<CotizacionEnvioSoporte[]> => {
+
+  return customFetch<CotizacionEnvioSoporte[]>(getListCotizacionesEnviosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCotizacionesEnviosQueryKey = () => {
+    return [
+    `/api/admin/cotizaciones-envios`
+    ] as const;
+    }
+
+
+export const getListCotizacionesEnviosQueryOptions = <TData = Awaited<ReturnType<typeof listCotizacionesEnvios>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCotizacionesEnvios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCotizacionesEnviosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCotizacionesEnvios>>> = ({ signal }) => listCotizacionesEnvios({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCotizacionesEnvios>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCotizacionesEnviosQueryResult = NonNullable<Awaited<ReturnType<typeof listCotizacionesEnvios>>>
+export type ListCotizacionesEnviosQueryError = ErrorType<unknown>
+
+
+
+export function useListCotizacionesEnvios<TData = Awaited<ReturnType<typeof listCotizacionesEnvios>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCotizacionesEnvios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCotizacionesEnviosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getConciliarCotizacionUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/cotizaciones-envios/${id}/conciliar`
+}
+
+export const conciliarCotizacion = async (id: number,
+    cotizacionConciliacionInput: CotizacionConciliacionInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getConciliarCotizacionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cotizacionConciliacionInput,)
+  }
+);}
+
+
+
+
+export const getConciliarCotizacionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof conciliarCotizacion>>, TError,{id: number;data: BodyType<CotizacionConciliacionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof conciliarCotizacion>>, TError,{id: number;data: BodyType<CotizacionConciliacionInput>}, TContext> => {
+
+const mutationKey = ['conciliarCotizacion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof conciliarCotizacion>>, {id: number;data: BodyType<CotizacionConciliacionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  conciliarCotizacion(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConciliarCotizacionMutationResult = NonNullable<Awaited<ReturnType<typeof conciliarCotizacion>>>
+    export type ConciliarCotizacionMutationBody = BodyType<CotizacionConciliacionInput>
+    export type ConciliarCotizacionMutationError = ErrorType<void>
+
+    export const useConciliarCotizacion = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof conciliarCotizacion>>, TError,{id: number;data: BodyType<CotizacionConciliacionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof conciliarCotizacion>>,
+        TError,
+        {id: number;data: BodyType<CotizacionConciliacionInput>},
+        TContext
+      > => {
+      return useMutation(getConciliarCotizacionMutationOptions(options));
+    }
 
 export const getGetInformeAreaUrl = (params: GetInformeAreaParams,) => {
   const normalizedParams = new URLSearchParams();
