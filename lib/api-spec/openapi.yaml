@@ -33,6 +33,23 @@ tags:
   - name: encuestas
     description: Client satisfaction surveys
 paths:
+  /informes:
+    get:
+      operationId: getInformeArea
+      parameters:
+        - { name: area, in: query, required: true, schema: { type: string, enum: [ventas, compras, inventario] } }
+        - { name: periodo, in: query, schema: { type: string, enum: [7dias, mes, trimestre, ano, todo], default: mes } }
+        - { name: moneda, in: query, schema: { type: string, enum: [CLP, USD, EUR, UF], default: CLP } }
+        - { name: umbral, in: query, schema: { type: number, minimum: 0, maximum: 1000000, default: 5 } }
+        - { name: proveedorId, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: bodegaId, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: localId, in: query, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Informe por área y moneda
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InformeArea" }
   /proveedores:
     get:
       operationId: listProveedores
@@ -4031,6 +4048,95 @@ paths:
 
 components:
   schemas:
+    InformeArea:
+      type: object
+      required: [desde, hasta, moneda, notas, total, facturas, ticketPromedio, mesActual, mesAnterior, variacion, totalStock, ventas, menorMovimiento, proveedores, pendientes, evolucion, valorizado, quiebres]
+      properties:
+        desde: { type: string }
+        hasta: { type: string }
+        moneda: { type: string }
+        notas: { type: string }
+        total: { type: number }
+        facturas: { type: integer }
+        ticketPromedio: { type: number }
+        mesActual: { type: number }
+        mesAnterior: { type: number }
+        variacion: { type: [number, "null"] }
+        totalStock: { type: number }
+        ventas: { type: array, items: { $ref: "#/components/schemas/InformeProducto" } }
+        menorMovimiento: { type: array, items: { $ref: "#/components/schemas/InformeProducto" } }
+        proveedores: { type: array, items: { $ref: "#/components/schemas/InformeProveedor" } }
+        pendientes: { type: array, items: { $ref: "#/components/schemas/InformeFactura" } }
+        evolucion: { type: array, items: { $ref: "#/components/schemas/InformeSerie" } }
+        valorizado: { type: array, items: { $ref: "#/components/schemas/InformeStock" } }
+        quiebres: { type: array, items: { $ref: "#/components/schemas/InformeQuiebre" } }
+    InformeProducto:
+      type: object
+      required: [id, nombre, tipo, unidades, ingresos, porcentaje, ultimaVenta, diasSinMovimiento, stockActual, stockPromedio, rotacion]
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        tipo: { type: string }
+        unidades: { type: number }
+        ingresos: { type: number }
+        porcentaje: { type: number }
+        ultimaVenta: { type: [string, "null"] }
+        diasSinMovimiento: { type: integer }
+        stockActual: { type: number }
+        stockPromedio: { type: number }
+        rotacion: { type: [number, "null"] }
+    InformeProveedor:
+      type: object
+      required: [id, nombre, facturas, total, ultimaCompra, productos]
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        facturas: { type: integer }
+        total: { type: number }
+        ultimaCompra: { type: string }
+        productos: { type: string }
+    InformeFactura:
+      type: object
+      required: [id, numero, proveedor, fecha, monto, dias, estado]
+      properties:
+        id: { type: integer }
+        numero: { type: string }
+        proveedor: { type: string }
+        fecha: { type: string }
+        monto: { type: number }
+        dias: { type: integer }
+        estado: { type: string }
+    InformeSerie:
+      type: object
+      required: [fecha, total]
+      properties:
+        fecha: { type: string }
+        total: { type: number }
+    InformeStock:
+      type: object
+      required: [productoId, nombre, bodegaId, bodega, localId, local, stock, costo, valor]
+      properties:
+        productoId: { type: integer }
+        nombre: { type: string }
+        bodegaId: { type: [integer, "null"] }
+        bodega: { type: string }
+        localId: { type: [integer, "null"] }
+        local: { type: string }
+        stock: { type: number }
+        costo: { type: number }
+        valor: { type: number }
+    InformeQuiebre:
+      type: object
+      required: [productoId, nombre, fecha, diasSinStock, frecuencia, critico, stockMinimo, abierto]
+      properties:
+        productoId: { type: integer }
+        nombre: { type: string }
+        fecha: { type: string }
+        diasSinStock: { type: number }
+        frecuencia: { type: integer }
+        critico: { type: boolean }
+        stockMinimo: { type: number }
+        abierto: { type: boolean }
     ProveedorInput:
       type: object
       required: [razonSocial, rut]

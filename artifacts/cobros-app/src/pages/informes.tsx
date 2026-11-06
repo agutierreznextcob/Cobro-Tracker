@@ -62,6 +62,7 @@ import {
 import { SaludCarteraPanel } from "@/components/salud-cartera-panel";
 import { Download, TrendingUp, Receipt, Percent, ListChecks, TicketPercent, RefreshCcw, Wallet, AlertTriangle, CalendarClock, Star, Loader2, MessageSquare, Gauge } from "lucide-react";
 import { formatDate } from "@/lib/format";
+import { ProductosMasVendidos, MenorMovimiento } from "@/components/informes/ventas-productos";
 
 type Estado = "pendiente" | "pagado" | "parcial" | "fallido" | "cancelado";
 type Gran = "dia" | "semana" | "mes";
@@ -503,20 +504,23 @@ export default function Informes() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Informes</h1>
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Informes</p>
+        <h1 className="text-2xl font-bold tracking-tight">Ventas</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Analiza tu recaudación y tus cuentas por cobrar.
+          Analiza tu recaudación, tus cuentas por cobrar y qué productos se venden.
         </p>
       </div>
 
       <Tabs defaultValue="resumen" className="space-y-6">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="cuentas">Cuentas por Cobrar</TabsTrigger>
           <TabsTrigger value="ranking">Ranking de clientes</TabsTrigger>
           <TabsTrigger value="gestiones">Gestiones</TabsTrigger>
           <TabsTrigger value="satisfaccion">Satisfacción</TabsTrigger>
           <TabsTrigger value="recurrentes">Recurrentes</TabsTrigger>
+          <TabsTrigger value="mas-vendidos" data-testid="tab-mas-vendidos">Productos y servicios más vendidos</TabsTrigger>
+          <TabsTrigger value="menor-movimiento" data-testid="tab-menor-movimiento">Menor movimiento</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-6 mt-0">
@@ -1000,6 +1004,12 @@ export default function Informes() {
             </>
           )}
         </TabsContent>
+        <TabsContent value="mas-vendidos" className="mt-0">
+          <ProductosMasVendidos />
+        </TabsContent>
+        <TabsContent value="menor-movimiento" className="mt-0">
+          <MenorMovimiento />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -1035,8 +1045,23 @@ function SatisfaccionReport() {
 
   if (!data) return null;
 
+  const exportarSatisfaccion = async () => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Indicador", "Valor"], ["Encuestas enviadas", data.total], ["Respondidas", data.respondidas], ["Promedio (1-5)", Number(data.promedio.toFixed(2))]]), "Resumen");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.distribucion.map((d) => ({ Calificación: d.calificacion, Cantidad: d.cantidad }))), "Distribución");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.recientes.map((r) => ({ Cliente: r.clienteNombre ?? "", Calificación: r.calificacion, Comentario: r.comentario ?? "", Fecha: r.respondidoEn ?? "" }))), "Recientes");
+    XLSX.writeFile(wb, `satisfaccion-${format(new Date(), "yyyyMMdd")}.xlsx`);
+  };
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button size="sm" variant="outline" className="gap-1.5" onClick={exportarSatisfaccion} disabled={data.total === 0} data-testid="button-excel-satisfaccion">
+          <Download className="h-4 w-4" />
+          Exportar Excel
+        </Button>
+      </div>
       <div className="flex items-center gap-2">
         <MessageSquare className="h-5 w-5 text-primary" />
         <p className="text-sm text-muted-foreground">
@@ -1315,6 +1340,12 @@ function AgingReport({
   if (rows.length === 0) {
     return (
       <Card className="p-10 shadow-sm text-center">
+        <div className="mb-4 flex justify-end">
+          <Button disabled className="gap-2" title="Sin cuentas por cobrar para exportar" data-testid="button-excel-cuentas-vacias">
+            <Download className="h-4 w-4" />
+            Descargar Excel
+          </Button>
+        </div>
         <div className="mx-auto h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
           <Wallet className="h-6 w-6 text-emerald-600" />
         </div>

@@ -5,6 +5,93 @@
  * API specification for Cobros (charges) management
  * OpenAPI spec version: 0.1.0
  */
+export interface InformeProducto {
+  id: number;
+  nombre: string;
+  tipo: string;
+  unidades: number;
+  ingresos: number;
+  porcentaje: number;
+  /** @nullable */
+  ultimaVenta: string | null;
+  diasSinMovimiento: number;
+  stockActual: number;
+  stockPromedio: number;
+  /** @nullable */
+  rotacion: number | null;
+}
+
+export interface InformeProveedor {
+  id: number;
+  nombre: string;
+  facturas: number;
+  total: number;
+  ultimaCompra: string;
+  productos: string;
+}
+
+export interface InformeFactura {
+  id: number;
+  numero: string;
+  proveedor: string;
+  fecha: string;
+  monto: number;
+  dias: number;
+  estado: string;
+}
+
+export interface InformeSerie {
+  fecha: string;
+  total: number;
+}
+
+export interface InformeStock {
+  productoId: number;
+  nombre: string;
+  /** @nullable */
+  bodegaId: number | null;
+  bodega: string;
+  /** @nullable */
+  localId: number | null;
+  local: string;
+  stock: number;
+  costo: number;
+  valor: number;
+}
+
+export interface InformeQuiebre {
+  productoId: number;
+  nombre: string;
+  fecha: string;
+  diasSinStock: number;
+  frecuencia: number;
+  critico: boolean;
+  stockMinimo: number;
+  abierto: boolean;
+}
+
+export interface InformeArea {
+  desde: string;
+  hasta: string;
+  moneda: string;
+  notas: string;
+  total: number;
+  facturas: number;
+  ticketPromedio: number;
+  mesActual: number;
+  mesAnterior: number;
+  /** @nullable */
+  variacion: number | null;
+  totalStock: number;
+  ventas: InformeProducto[];
+  menorMovimiento: InformeProducto[];
+  proveedores: InformeProveedor[];
+  pendientes: InformeFactura[];
+  evolucion: InformeSerie[];
+  valorizado: InformeStock[];
+  quiebres: InformeQuiebre[];
+}
+
 export interface ProveedorInput {
   razonSocial: string;
   rut: string;
@@ -3478,6 +3565,59 @@ export interface RendimientoEjecutivo {
  * Opaque session token — Bearer <sid>.
  */
 export type AuthorizationSessionHeaderParameter = string;
+
+export type GetInformeAreaParams = {
+area: GetInformeAreaArea;
+periodo?: GetInformeAreaPeriodo;
+moneda?: GetInformeAreaMoneda;
+/**
+ * @minimum 0
+ * @maximum 1000000
+ */
+umbral?: number;
+/**
+ * @minimum 1
+ */
+proveedorId?: number;
+/**
+ * @minimum 1
+ */
+bodegaId?: number;
+/**
+ * @minimum 1
+ */
+localId?: number;
+};
+
+export type GetInformeAreaArea = typeof GetInformeAreaArea[keyof typeof GetInformeAreaArea];
+
+
+export const GetInformeAreaArea = {
+  ventas: 'ventas',
+  compras: 'compras',
+  inventario: 'inventario',
+} as const;
+
+export type GetInformeAreaPeriodo = typeof GetInformeAreaPeriodo[keyof typeof GetInformeAreaPeriodo];
+
+
+export const GetInformeAreaPeriodo = {
+  '7dias': '7dias',
+  mes: 'mes',
+  trimestre: 'trimestre',
+  ano: 'ano',
+  todo: 'todo',
+} as const;
+
+export type GetInformeAreaMoneda = typeof GetInformeAreaMoneda[keyof typeof GetInformeAreaMoneda];
+
+
+export const GetInformeAreaMoneda = {
+  CLP: 'CLP',
+  USD: 'USD',
+  EUR: 'EUR',
+  UF: 'UF',
+} as const;
 
 export type ListComprasParams = {
 proveedorId?: number;

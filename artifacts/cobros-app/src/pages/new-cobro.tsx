@@ -263,7 +263,7 @@ export default function NewCobro() {
         // actionable instead of disappearing behind a redirect.
         if (!(data.deliveryResults?.length)) {
           const targetId = data.cobro?.id ?? data.cobros?.[0]?.id;
-          setLocation(targetId ? `/cobros/${targetId}` : "/cobros/informes");
+          setLocation(targetId ? `/cobros/${targetId}` : "/informes/ventas");
         }
       } catch (error) {
         toast({ title: "Error", description: error instanceof Error ? error.message : "No se pudo crear el cobro.", variant: "destructive" });

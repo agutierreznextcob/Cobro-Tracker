@@ -18,6 +18,8 @@ import CobroDetail from "@/pages/cobro-detail";
 import WebhookLog from "@/pages/webhook-log";
 import SearchPage from "@/pages/search";
 import Informes from "@/pages/informes";
+import InformesCompras from "@/pages/informes-compras";
+import InformesInventario from "@/pages/informes-inventario";
 import ProfilePage from "@/pages/profile";
 import ClientesPage from "@/pages/clientes";
 import ClienteDetailPage from "@/pages/cliente-detail";
@@ -198,9 +200,29 @@ function AppRouter() {
         </AuthGate>
       </Route>
       <Route path="/cobros/informes">
+        <Redirect to="/informes/ventas" replace />
+      </Route>
+      <Route path="/informes">
+        <Redirect to="/informes/ventas" replace />
+      </Route>
+      <Route path="/informes/ventas">
         <AuthGate>
           <Layout>
             <Informes />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/informes/compras">
+        <AuthGate>
+          <Layout>
+            <InformesCompras />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/informes/inventario">
+        <AuthGate>
+          <Layout>
+            <InformesInventario />
           </Layout>
         </AuthGate>
       </Route>

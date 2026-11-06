@@ -104,6 +104,7 @@ import type {
   GestionMetricaEjecutivo,
   GestionResumen,
   GetDashboardMetricsParams,
+  GetInformeAreaParams,
   GetInventarioResumen200,
   GetPaymentMethodUrl200,
   GetRendimientoEquipoParams,
@@ -114,6 +115,7 @@ import type {
   ImportarClientesInput,
   ImportarClientesResult,
   IndicadorEconomico,
+  InformeArea,
   Invitacion,
   InvitacionPublica,
   InvitarUsuarioInput,
@@ -209,6 +211,84 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getGetInformeAreaUrl = (params: GetInformeAreaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/informes?${stringifiedParams}` : `/api/informes`
+}
+
+export const getInformeArea = async (params: GetInformeAreaParams, options?: RequestInit): Promise<InformeArea> => {
+
+  return customFetch<InformeArea>(getGetInformeAreaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInformeAreaQueryKey = (params?: GetInformeAreaParams,) => {
+    return [
+    `/api/informes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetInformeAreaQueryOptions = <TData = Awaited<ReturnType<typeof getInformeArea>>, TError = ErrorType<unknown>>(params: GetInformeAreaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInformeArea>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInformeAreaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInformeArea>>> = ({ signal }) => getInformeArea(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInformeArea>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInformeAreaQueryResult = NonNullable<Awaited<ReturnType<typeof getInformeArea>>>
+export type GetInformeAreaQueryError = ErrorType<unknown>
+
+
+
+export function useGetInformeArea<TData = Awaited<ReturnType<typeof getInformeArea>>, TError = ErrorType<unknown>>(
+ params: GetInformeAreaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInformeArea>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInformeAreaQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 

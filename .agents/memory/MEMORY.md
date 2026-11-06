@@ -2,7 +2,7 @@
 - [Cotizaciones y moneda](cotizaciones-moneda.md) — moneda por documento confirmada por el usuario; no relabelar históricos; proveedores actuales CLP entero y aceptación registrada por el negocio.
 - [Admin role & access bypass](admin-role.md) — role lives in DB, enriched into /auth/user (not session); admin bypass centralized in computeSubscriptionState; requireAdmin is the real security boundary.
 - [Frontend auth gating](auth-gating.md) — useAuth is mount-time fetch (not shared/TanStack); use ONE useAuth per guard chain or protected content leaks; reload (not query invalidation) to refresh after mutating user state.
-- [Informes reporting page](informes-reporting.md) — Cobros>Informes reuses useListCobros + aggregates client-side (no report endpoint); method pie precedence Flow>MP>Manual; route must precede /cobros/:id.
+- [Informes por área](informes-reporting.md) — Ventas/Compras/Inventario; rankings pagados, monedas separadas, compras no contabilizadas y reconstrucción de stock sin inventar historial.
 - [Webhook estado precedence](webhook-estado-precedencia.md) — payment webhooks: money state (pagado/parcial) always wins over manual/stale; protect against downgrade atomically in SQL (except MP refund).
 - [Notification durability](notification-durability.md) — reconcile incrementally from scan-start watermarks; serialize per-inbox writes and persist a read cursor for cross-process mark-all races.
 - [Cobro & cliente authz model](cobro-ownership-gap.md) — org-aware per-record access: admin_org=whole org, ejecutivo=own; guard every :id route (404 not 403) + aggregate/POST paths via lib/org.ts helpers.
@@ -46,6 +46,7 @@
 - [Flujo de invitaciones](invitaciones-flujo.md) — página pública /invitacion/:token; aceptación transaccional con cupo revalidado; registro atado al token; returnTo con validación anti open-redirect; gating de cupos en UI.
 - [Superadmin = libro de ingresos](superadmin-ledger.md) — módulo Cobros del superadmin muestra pagos de suscripción; seed borra sus cobros; pagos_suscripcion con UNIQUE user+período (idempotencia obligatoria).
 - [OpenAPI date coercion](openapi-date-coercion.md) — Orval Zod coerces both date and date-time inputs to Date objects; route handlers must not assume validated values remain strings.
+- [Colisiones Orval](openapi-codegen-collisions.md) — combinar parámetros de ruta y query puede duplicar el export OperationParams; corregir contrato/generador, no archivos generados.
 - [Inventario y pagos](inventario-stock.md) — pagos confirmados pueden dejar stock negativo; salidas manuales no. No revertir ventas automáticamente; catálogo compartido por organización.
 - [Compras y recepción](compras-recepcion.md) — admin/supervisor reciben; costos netos automáticos sin preguntar; recepción atómica sin duplicar stock; SII futuro.
 - [IVA y PVP de inventario](inventario-precios.md) — márgenes sobre neto, precio final IVA incluido, historial de costos y compras sin cambiar venta vigente.

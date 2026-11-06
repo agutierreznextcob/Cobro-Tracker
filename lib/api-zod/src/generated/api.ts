@@ -8,6 +8,110 @@
 import * as zod from 'zod';
 
 
+export const getInformeAreaQueryPeriodoDefault = `mes`;
+export const getInformeAreaQueryMonedaDefault = `CLP`;
+export const getInformeAreaQueryUmbralDefault = 5;
+export const getInformeAreaQueryUmbralMin = 0;
+export const getInformeAreaQueryUmbralMax = 1000000;
+
+
+
+
+
+
+export const GetInformeAreaQueryParams = zod.object({
+  "area": zod.enum(['ventas', 'compras', 'inventario']),
+  "periodo": zod.enum(['7dias', 'mes', 'trimestre', 'ano', 'todo']).default(getInformeAreaQueryPeriodoDefault),
+  "moneda": zod.enum(['CLP', 'USD', 'EUR', 'UF']).default(getInformeAreaQueryMonedaDefault),
+  "umbral": zod.coerce.number().min(getInformeAreaQueryUmbralMin).max(getInformeAreaQueryUmbralMax).default(getInformeAreaQueryUmbralDefault),
+  "proveedorId": zod.coerce.number().min(1).optional(),
+  "bodegaId": zod.coerce.number().min(1).optional(),
+  "localId": zod.coerce.number().min(1).optional()
+})
+
+export const GetInformeAreaResponse = zod.object({
+  "desde": zod.string(),
+  "hasta": zod.string(),
+  "moneda": zod.string(),
+  "notas": zod.string(),
+  "total": zod.number(),
+  "facturas": zod.number(),
+  "ticketPromedio": zod.number(),
+  "mesActual": zod.number(),
+  "mesAnterior": zod.number(),
+  "variacion": zod.number().nullable(),
+  "totalStock": zod.number(),
+  "ventas": zod.array(zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "tipo": zod.string(),
+  "unidades": zod.number(),
+  "ingresos": zod.number(),
+  "porcentaje": zod.number(),
+  "ultimaVenta": zod.string().nullable(),
+  "diasSinMovimiento": zod.number(),
+  "stockActual": zod.number(),
+  "stockPromedio": zod.number(),
+  "rotacion": zod.number().nullable()
+})),
+  "menorMovimiento": zod.array(zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "tipo": zod.string(),
+  "unidades": zod.number(),
+  "ingresos": zod.number(),
+  "porcentaje": zod.number(),
+  "ultimaVenta": zod.string().nullable(),
+  "diasSinMovimiento": zod.number(),
+  "stockActual": zod.number(),
+  "stockPromedio": zod.number(),
+  "rotacion": zod.number().nullable()
+})),
+  "proveedores": zod.array(zod.object({
+  "id": zod.number(),
+  "nombre": zod.string(),
+  "facturas": zod.number(),
+  "total": zod.number(),
+  "ultimaCompra": zod.string(),
+  "productos": zod.string()
+})),
+  "pendientes": zod.array(zod.object({
+  "id": zod.number(),
+  "numero": zod.string(),
+  "proveedor": zod.string(),
+  "fecha": zod.string(),
+  "monto": zod.number(),
+  "dias": zod.number(),
+  "estado": zod.string()
+})),
+  "evolucion": zod.array(zod.object({
+  "fecha": zod.string(),
+  "total": zod.number()
+})),
+  "valorizado": zod.array(zod.object({
+  "productoId": zod.number(),
+  "nombre": zod.string(),
+  "bodegaId": zod.number().nullable(),
+  "bodega": zod.string(),
+  "localId": zod.number().nullable(),
+  "local": zod.string(),
+  "stock": zod.number(),
+  "costo": zod.number(),
+  "valor": zod.number()
+})),
+  "quiebres": zod.array(zod.object({
+  "productoId": zod.number(),
+  "nombre": zod.string(),
+  "fecha": zod.string(),
+  "diasSinStock": zod.number(),
+  "frecuencia": zod.number(),
+  "critico": zod.boolean(),
+  "stockMinimo": zod.number(),
+  "abierto": zod.boolean()
+}))
+})
+
+
 export const ListProveedoresResponseItem = zod.object({
   "razonSocial": zod.string(),
   "rut": zod.string(),

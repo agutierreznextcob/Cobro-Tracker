@@ -400,6 +400,65 @@ function GestionNavGroup({ closeMobile, esStarter, setUpgradeFeature }: { closeM
   );
 }
 
+const INFORMES_ITEMS = [
+  { href: "/informes/ventas", label: "Ventas", icon: ShoppingBag },
+  { href: "/informes/compras", label: "Compras", icon: ShoppingCart },
+  { href: "/informes/inventario", label: "Inventario", icon: Boxes },
+];
+
+function InformesNavGroup({ closeMobile }: { closeMobile: () => void }) {
+  const [location] = useLocation();
+  const isActive = location.startsWith("/informes");
+  const [isOpen, setIsOpen] = useState(isActive);
+  useEffect(() => {
+    if (isActive) setIsOpen(true);
+  }, [isActive]);
+  return (
+    <div className="space-y-0.5">
+      <div className={`flex items-center rounded-lg text-sm font-medium transition-colors ${isActive && !isOpen ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"}`}>
+        <Link
+          href="/informes/ventas"
+          onClick={() => { setIsOpen(true); closeMobile(); }}
+          className="flex flex-1 items-center gap-3 px-3 py-2.5"
+          data-testid="nav-informes"
+        >
+          <BarChart3 className="h-4 w-4 shrink-0" />
+          <span>Informes</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setIsOpen((o) => !o)}
+          aria-expanded={isOpen}
+          aria-label={isOpen ? "Contraer Informes" : "Expandir Informes"}
+          className="px-3 py-2.5 rounded-r-lg hover:bg-secondary/60"
+          data-testid="nav-group-informes-toggle"
+        >
+          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      {isOpen && (
+        <div className="pl-9 pr-2 py-1 space-y-1">
+          {INFORMES_ITEMS.map((it) => {
+            const sub = location === it.href;
+            return (
+              <Link
+                key={it.href}
+                href={it.href}
+                onClick={closeMobile}
+                data-testid={`nav-informes-${it.label.toLowerCase()}`}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sub ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}`}
+              >
+                <it.icon className={`h-3.5 w-3.5 shrink-0 ${sub ? "text-primary" : "text-muted-foreground"}`} />
+                <span>{it.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
   const { user, logout } = useAuth();
@@ -423,11 +482,11 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/inventario", label: "Inventario", icon: Boxes },
     { href: "/locales", label: "Locales y bodegas", icon: Warehouse },
     { id: "gestion_group" },
-    { href: "/cobros/informes", label: "Informes", icon: BarChart3 },
+    { id: "informes_group" },
     { id: "config_group" },
   ] as Array<
     | { href: string; label: string; icon: typeof Home; feature?: string }
-    | { id: "gestion_group" | "notificaciones" | "ventas_group" | "config_group" }
+    | { id: "gestion_group" | "notificaciones" | "ventas_group" | "config_group" | "informes_group" }
   >;
 
   const displayName = user
@@ -505,6 +564,9 @@ export function Layout({ children }: { children: ReactNode }) {
             }
             if ("id" in item && item.id === "ventas_group") {
               return <NavGroup key="ventas_group" id="ventas" label="Ventas" icon={ShoppingBag} items={VENTAS_ITEMS} closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
+            }
+            if ("id" in item && item.id === "informes_group") {
+              return <InformesNavGroup key="informes_group" closeMobile={closeMobile} />;
             }
             if ("id" in item && item.id === "config_group") {
               return <NavGroup key="config_group" id="configuracion" label="Configuración" icon={Settings} items={CONFIG_ITEMS} closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
