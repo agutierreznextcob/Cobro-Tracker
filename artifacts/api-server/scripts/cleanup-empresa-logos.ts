@@ -4,6 +4,7 @@ import { cleanupEmpresaLogos } from "../src/lib/empresaLogoCleanup";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { readLogoCursor, writeLogoCursor } from "../src/lib/empresaLogoCursor";
+import { createEmpresaLogoStorage } from "../src/lib/empresaLogoStorage";
 
 const pools: InstanceType<typeof Pool>[] = [];
 const clients: Awaited<ReturnType<InstanceType<typeof Pool>["connect"]>>[] = [];
@@ -37,23 +38,7 @@ try {
   const key = createHash("sha256").update(JSON.stringify([root, [...names].sort(), apply])).digest("hex");
   const cursorFile = fileURLToPath(new URL(`../../../generated-artifacts/logo-cleanup/${key}.json`, import.meta.url));
   const afterPath = await readLogoCursor(cursorFile);
-  const file = (path: string) => objectStorageClient.bucket(bucket).file(`${prefix.join("/")}/${path.slice("/objects/".length)}`);
-  const report = await cleanupEmpresaLogos(clients, {
-    async inspect(path) {
-      try {
-        const [meta] = await file(path).getMetadata();
-        if (!meta.generation || !meta.updated) throw new Error("Missing storage metadata.");
-        return { generation: String(meta.generation), updatedAt: new Date(meta.updated) };
-      } catch (error) {
-        if ((error as { code?: number }).code === 404) return null;
-        throw error;
-      }
-    },
-    async remove(path, generation) {
-      try { await file(path).delete({ ifGenerationMatch: generation }); }
-      catch (error) { if ((error as { code?: number }).code !== 404) throw error; }
-    },
-  }, { apply, afterPath });
+  const report = await cleanupEmpresaLogos(clients, createEmpresaLogoStorage(objectStorageClient, root), { apply, afterPath });
   // Persist only a completely successful batch; failures retry the same page.
   const nextCursor = await writeLogoCursor(cursorFile, report);
   console.log(JSON.stringify({ mode: apply ? "apply" : "dry-run", report, nextCursor }, null, 2));

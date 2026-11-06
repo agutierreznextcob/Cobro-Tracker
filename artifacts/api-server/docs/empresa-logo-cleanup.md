@@ -64,3 +64,39 @@ No se ha ejecutado el modo destructivo como parte de la implementación.
 - Mientras corre un lote, las ediciones de perfil/logo pueden esperar.
   Ejecutar fuera de horas punta; no programar borrados sin revisar antes
   el inventario de entornos.
+
+## Prueba opt-in contra almacenamiento real
+
+Desde la raíz:
+
+```sh
+# Omite la prueba sin conectar a SQL ni storage:
+pnpm --filter @workspace/api-server run test:logo-cleanup-storage
+# Ejecuta contra GCS y PostgreSQL configurados:
+pnpm --filter @workspace/api-server run test:logo-cleanup-storage --live
+```
+
+Requiere `DATABASE_URL` con permiso de crear/eliminar un esquema de prueba,
+`PRIVATE_OBJECT_DIR` y las credenciales habituales de App Storage. No acepta
+emuladores. No configurar nuevas credenciales en la línea de comandos.
+
+Cada ejecución usa un esquema SQL aleatorio con tablas mínimas y un directorio
+privado `integration-tests/logo-cleanup/<UUID>`. No consulta tablas de negocio,
+no enumera el bucket, no inicia la aplicación, no manda correos y no toca PDFs.
+El CLI se ejecuta como proceso separado con ese directorio y un `search_path`
+exclusivo del esquema sintético, **sin fallback a public**.
+
+Comprueba metadatos/generación reales, simulación sin cambios en bytes,
+generación o registros, rechazo 412 tras sobrescritura y conservación del
+registro al fallar. Comprueba acceso denegado mediante un cliente GCS anónimo
+(401 o 403, nunca 404), tanto al inspeccionar como al borrar, sin alterar IAM.
+Verifica borrado, desaparición entre inspección y borrado, 404 idempotente y
+reintento. El motor recibe un reloj futuro únicamente en la prueba para evaluar
+objetos recién creados sin esperar siete días; el CLI conserva su reloj real y
+debe proteger esos objetos, aunque sí elimina registros sintéticos ausentes.
+
+El bloque de salida elimina únicamente rutas conocidas de esa ejecución, tras
+verificar su etiqueta de propietario y generación; elimina también su esquema
+y cursores. Un fallo de limpieza hace fallar la prueba. Si el proceso se mata
+abruptamente, usar el UUID impreso para localizar los residuos sintéticos;
+no ejecutar el mantenimiento sobre el directorio real para limpiarlos.

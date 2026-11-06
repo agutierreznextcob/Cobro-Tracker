@@ -34,3 +34,7 @@ La ausencia en una consulta al proveedor no demuestra que no aceptó el correo. 
 Las pruebas opt-in contra almacenamiento real deben aislar objetos por ejecución, no asumir que el bucket pertenece exclusivamente al entorno de pruebas.
 **Why:** desarrollo y producción pueden compartir archivos; el usuario exige no tocar documentos de usuarios ni enviar correos durante estas comprobaciones.
 **How to apply:** usar un prefijo aleatorio privado, borrar solo objetos sintéticos verificados con precondición de generación y cargar la aplicación sin el arranque de tareas automáticas para probar rutas.
+
+Las comprobaciones anónimas de permisos de GCS pueden devolver 401, no solo 403; un error de resolución de credenciales local no demuestra denegación del proveedor.
+**Why:** el SDK puede intentar credenciales por defecto incluso al deshabilitar autenticación para endpoints personalizados si considera que la URL es la predeterminada.
+**How to apply:** exigir un estado HTTP real de denegación y comprobar por separado que los registros y objetos permanecen intactos; no confundir errores locales o 404 con permisos denegados.
