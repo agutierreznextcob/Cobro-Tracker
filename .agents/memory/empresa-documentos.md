@@ -30,3 +30,7 @@ Los reintentos de correo deben conservar tanto el adjunto como los demás datos 
 La ausencia en una consulta al proveedor no demuestra que no aceptó el correo. La autorización de otro intento exige verificación humana de una respuesta explícita del soporte del proveedor sobre TODOS los intentos de la clave.
 **Why:** un 404 puede deberse a retención o visibilidad; un rebote ya supone aceptación y un error de transporte sigue siendo ambiguo.
 **How to apply:** conservar el bloqueo si no hay evidencia suficiente; seguir el procedimiento de conciliación y distinguir siempre aceptación de entrega.
+
+Las pruebas opt-in contra almacenamiento real deben aislar objetos por ejecución, no asumir que el bucket pertenece exclusivamente al entorno de pruebas.
+**Why:** desarrollo y producción pueden compartir archivos; el usuario exige no tocar documentos de usuarios ni enviar correos durante estas comprobaciones.
+**How to apply:** usar un prefijo aleatorio privado, borrar solo objetos sintéticos verificados con precondición de generación y cargar la aplicación sin el arranque de tareas automáticas para probar rutas.
