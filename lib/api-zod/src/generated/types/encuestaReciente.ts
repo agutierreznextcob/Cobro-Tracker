@@ -7,6 +7,7 @@
  */
 
 export interface EncuestaReciente {
+  googleRedirigido?: boolean;
   /** @nullable */
   clienteNombre?: string | null;
   calificacion: number;

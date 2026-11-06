@@ -12,6 +12,9 @@ export interface EncuestaRespuestaInput {
      * @maximum 5
      */
   calificacion: number;
-  /** @nullable */
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
   comentario?: string | null;
 }

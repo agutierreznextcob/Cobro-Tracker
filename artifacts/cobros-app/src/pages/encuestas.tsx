@@ -3,8 +3,9 @@ import {
   getGetEncuestasResumenQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Star, Loader2, MessageSquare } from "lucide-react";
+import { Star, Loader2, MessageSquare, ExternalLink } from "lucide-react";
 import { formatDate } from "@/lib/format";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 function Stars({ value }: { value: number }) {
   return (
@@ -21,7 +22,7 @@ function Stars({ value }: { value: number }) {
 
 export default function EncuestasPage() {
   const { data, isLoading } = useGetEncuestasResumen({
-    query: { queryKey: getGetEncuestasResumenQueryKey() },
+    query: { queryKey: getGetEncuestasResumenQueryKey(), refetchOnWindowFocus: true, refetchInterval: 60_000 },
   });
 
   const maxDist = Math.max(1, ...(data?.distribucion.map((d) => d.cantidad) ?? [1]));
@@ -71,6 +72,14 @@ export default function EncuestasPage() {
             </Card>
           </div>
 
+          <div className="flex items-start gap-3 rounded-lg border bg-secondary/40 px-4 py-3" data-testid="card-google-redirigidos">
+            <ExternalLink className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div>
+              <p className="text-sm"><span className="font-semibold tabular-nums">{data.googleRedirigidosMes ?? 0}</span> clientes redirigidos a Google este mes</p>
+              <p className="text-xs text-muted-foreground">Cuenta clics en el botón de reseña, no reseñas publicadas.</p>
+            </div>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Distribución</CardTitle>
@@ -97,24 +106,29 @@ export default function EncuestasPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Comentarios recientes</CardTitle>
+              <CardTitle className="text-base">Respuestas recientes</CardTitle>
+              <p className="text-xs text-muted-foreground">Los comentarios son privados: solo tu equipo los ve.</p>
             </CardHeader>
             <CardContent className="space-y-3">
               {data.recientes.length === 0 ? (
                 <p className="py-4 text-center text-sm text-muted-foreground">Aún no hay respuestas.</p>
               ) : (
-                data.recientes.map((r, i) => (
-                  <div key={i} className="rounded-lg border p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium">{r.clienteNombre ?? "Cliente"}</span>
-                      <Stars value={r.calificacion} />
-                    </div>
-                    {r.comentario && <p className="mt-1 text-sm text-muted-foreground">{r.comentario}</p>}
-                    {r.respondidoEn && (
-                      <p className="mt-1 text-xs text-muted-foreground">{formatDate(r.respondidoEn)}</p>
-                    )}
-                  </div>
-                ))
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Cliente</TableHead><TableHead>Calificación</TableHead>
+                    <TableHead>Comentario privado</TableHead><TableHead>Fecha</TableHead>
+                    <TableHead>Redirigido a Google</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>{data.recientes.map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{r.clienteNombre ?? "Cliente"}</TableCell>
+                      <TableCell><Stars value={r.calificacion} /></TableCell>
+                      <TableCell className="min-w-40 max-w-xs whitespace-normal break-words">{r.comentario || "—"}</TableCell>
+                      <TableCell>{r.respondidoEn ? formatDate(r.respondidoEn) : "—"}</TableCell>
+                      <TableCell data-testid={`text-redirigido-${i}`} className={r.googleRedirigido ? "text-emerald-700" : ""}>{r.googleRedirigido ? "Sí" : "No"}</TableCell>
+                    </TableRow>
+                  ))}</TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>

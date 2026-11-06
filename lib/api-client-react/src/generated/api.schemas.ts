@@ -328,6 +328,9 @@ export interface Preferencias {
      * @maxLength 16
      */
   prefijoCotizacion: string;
+  /** @maxLength 500 */
+  googleReviewUrl?: string;
+  googleReviewEnabled?: boolean;
 }
 
 export interface CotizacionItemInput {
@@ -843,6 +846,18 @@ export interface TareaEstadoUpdate {
   estado: TareaEstadoUpdateEstado;
 }
 
+export interface GoogleReviewDestino {
+  url: string;
+}
+
+export interface EncuestaComentarioInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  comentario: string;
+}
+
 export interface EncuestaPublica {
   empresa: string;
   descripcion: string;
@@ -854,6 +869,9 @@ export interface EncuestaPublica {
   /** @nullable */
   respondidoEn?: string | null;
   yaRespondida: boolean;
+  /** @nullable */
+  googleReviewUrl?: string | null;
+  googleRedirigido?: boolean;
 }
 
 export interface EncuestaRespuestaInput {
@@ -862,7 +880,10 @@ export interface EncuestaRespuestaInput {
      * @maximum 5
      */
   calificacion: number;
-  /** @nullable */
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
   comentario?: string | null;
 }
 
@@ -872,6 +893,7 @@ export interface EncuestaResumenItem {
 }
 
 export interface EncuestaReciente {
+  googleRedirigido?: boolean;
   /** @nullable */
   clienteNombre?: string | null;
   calificacion: number;
@@ -882,6 +904,7 @@ export interface EncuestaReciente {
 }
 
 export interface EncuestasResumen {
+  googleRedirigidosMes?: number;
   total: number;
   respondidas: number;
   promedio: number;

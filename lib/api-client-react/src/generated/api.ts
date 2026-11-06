@@ -84,6 +84,7 @@ import type {
   Empresa,
   EmpresaLogoInput,
   EmpresaLogoUpload,
+  EncuestaComentarioInput,
   EncuestaPublica,
   EncuestaRespuestaInput,
   EncuestasResumen,
@@ -110,6 +111,7 @@ import type {
   GetRendimientoEquipoParams,
   GetSaludCarteraHistorialParams,
   GetSugerenciaWorkflowParams,
+  GoogleReviewDestino,
   HealthStatus,
   HistorialCosto,
   ImportarClientesInput,
@@ -13744,6 +13746,136 @@ export function useGetEncuestasResumen<TData = Awaited<ReturnType<typeof getEncu
 
 
 
+
+export const getRegistrarClickGoogleUrl = (token: string,) => {
+
+
+
+
+  return `/api/encuestas/${token}/google`
+}
+
+export const registrarClickGoogle = async (token: string, options?: RequestInit): Promise<GoogleReviewDestino> => {
+
+  return customFetch<GoogleReviewDestino>(getRegistrarClickGoogleUrl(token),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRegistrarClickGoogleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registrarClickGoogle>>, TError,{token: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registrarClickGoogle>>, TError,{token: string}, TContext> => {
+
+const mutationKey = ['registrarClickGoogle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registrarClickGoogle>>, {token: string}> = (props) => {
+          const {token} = props ?? {};
+
+          return  registrarClickGoogle(token,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegistrarClickGoogleMutationResult = NonNullable<Awaited<ReturnType<typeof registrarClickGoogle>>>
+
+    export type RegistrarClickGoogleMutationError = ErrorType<unknown>
+
+    export const useRegistrarClickGoogle = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registrarClickGoogle>>, TError,{token: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registrarClickGoogle>>,
+        TError,
+        {token: string},
+        TContext
+      > => {
+      return useMutation(getRegistrarClickGoogleMutationOptions(options));
+    }
+
+export const getAgregarComentarioEncuestaUrl = (token: string,) => {
+
+
+
+
+  return `/api/encuestas/${token}/comentario`
+}
+
+export const agregarComentarioEncuesta = async (token: string,
+    encuestaComentarioInput: EncuestaComentarioInput, options?: RequestInit): Promise<EncuestaPublica> => {
+
+  return customFetch<EncuestaPublica>(getAgregarComentarioEncuestaUrl(token),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      encuestaComentarioInput,)
+  }
+);}
+
+
+
+
+export const getAgregarComentarioEncuestaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof agregarComentarioEncuesta>>, TError,{token: string;data: BodyType<EncuestaComentarioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof agregarComentarioEncuesta>>, TError,{token: string;data: BodyType<EncuestaComentarioInput>}, TContext> => {
+
+const mutationKey = ['agregarComentarioEncuesta'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof agregarComentarioEncuesta>>, {token: string;data: BodyType<EncuestaComentarioInput>}> = (props) => {
+          const {token,data} = props ?? {};
+
+          return  agregarComentarioEncuesta(token,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AgregarComentarioEncuestaMutationResult = NonNullable<Awaited<ReturnType<typeof agregarComentarioEncuesta>>>
+    export type AgregarComentarioEncuestaMutationBody = BodyType<EncuestaComentarioInput>
+    export type AgregarComentarioEncuestaMutationError = ErrorType<unknown>
+
+    export const useAgregarComentarioEncuesta = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof agregarComentarioEncuesta>>, TError,{token: string;data: BodyType<EncuestaComentarioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof agregarComentarioEncuesta>>,
+        TError,
+        {token: string;data: BodyType<EncuestaComentarioInput>},
+        TContext
+      > => {
+      return useMutation(getAgregarComentarioEncuestaMutationOptions(options));
+    }
 
 export const getGetEncuestaUrl = (token: string,) => {
 

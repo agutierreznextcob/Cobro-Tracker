@@ -31,4 +31,7 @@ export interface Preferencias {
      * @maxLength 16
      */
   prefijoCotizacion: string;
+  /** @maxLength 500 */
+  googleReviewUrl?: string;
+  googleReviewEnabled?: boolean;
 }

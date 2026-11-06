@@ -5,6 +5,7 @@ import { getOrgContext } from "./org";
 export const preferenciasDefault = {
   moneda: "CLP" as const, decimales: 0, porcentajeIva: 19,
   formatoFecha: "DD/MM/YYYY" as const, prefijoCobro: "COB-", prefijoCotizacion: "COT-",
+  googleReviewUrl: "", googleReviewEnabled: false,
 };
 export async function preferenciasScope(userId: string) {
   const ctx = await getOrgContext(userId);

@@ -14,6 +14,11 @@ import { formatMoney, formatFechaPref, hoySantiago, MONEDAS, MONEDA_INFO, type M
 import { apiErrorMessage } from "@/lib/inventario";
 import { Info, Loader2, Lock, RotateCw, Save } from "lucide-react";
 
+const norm = (p: Preferencias): Preferencias => ({ ...p, googleReviewUrl: p.googleReviewUrl ?? "", googleReviewEnabled: p.googleReviewEnabled ?? false });
+export function googleUrlValida(u: string): boolean {
+  return /^https:\/\/g\.page\/r\/[A-Za-z0-9_-]+\/review\/?$/.test(u.trim());
+}
+
 function Seccion({ titulo, desc, children }: { titulo: string; desc: string; children: React.ReactNode }) {
   return (
     <div className="grid gap-4 py-6 md:grid-cols-[240px_1fr] border-b last:border-b-0">
@@ -65,7 +70,7 @@ export default function PreferenciasPage() {
   useEffect(() => {
     if (!data || init.current) return;
     init.current = true;
-    setF(data);
+    setF(norm(data));
     setIva(String(data.porcentajeIva));
   }, [data]);
 
@@ -73,17 +78,20 @@ export default function PreferenciasPage() {
   const ivaN = Number(iva);
   const ivaValido = iva.trim() !== "" && ivaN >= 0 && ivaN <= 100;
   const prefijoOk = (s: string) => s.trim().length >= 1 && s.trim().length <= 16;
-  const valido = ivaValido && prefijoOk(f.prefijoCobro) && prefijoOk(f.prefijoCotizacion);
-  const sucio = !!data && (JSON.stringify({ ...f, porcentajeIva: ivaN }) !== JSON.stringify(data));
+  const gUrl = (f.googleReviewUrl ?? "").trim();
+  const gUrlOk = gUrl === "" || googleUrlValida(gUrl);
+  const gOk = gUrlOk && (!f.googleReviewEnabled || googleUrlValida(gUrl));
+  const valido = gOk && ivaValido && prefijoOk(f.prefijoCobro) && prefijoOk(f.prefijoCotizacion);
+  const sucio = !!data && (JSON.stringify({ ...f, porcentajeIva: ivaN }) !== JSON.stringify(norm(data)));
 
   const guardar = () => {
     if (!valido || !puedeGuardar) return;
-    const payload: Preferencias = { ...f, porcentajeIva: ivaN, prefijoCobro: f.prefijoCobro.trim(), prefijoCotizacion: f.prefijoCotizacion.trim() };
+    const payload: Preferencias = { ...f, porcentajeIva: ivaN, prefijoCobro: f.prefijoCobro.trim(), prefijoCotizacion: f.prefijoCotizacion.trim(), googleReviewUrl: gUrl, googleReviewEnabled: !!f.googleReviewEnabled && googleUrlValida(gUrl) };
     save.mutate({ data: payload }, {
       onSuccess: (res) => {
         init.current = false;
         qc.invalidateQueries({ queryKey: getGetPreferenciasQueryKey() });
-        setF(res ?? payload);
+        setF(norm(res ?? payload));
         toast({ title: "Preferencias guardadas", description: "Se aplicarán a los nuevos documentos." });
       },
       onError: (err) => toast({ title: "No se pudo guardar", description: apiErrorMessage(err, "Intenta nuevamente."), variant: "destructive" }),
@@ -202,13 +210,31 @@ export default function PreferenciasPage() {
             </div>
           </div>
         </Seccion>
+
+        <Seccion titulo="Reseñas de Google" desc="Tras responder la encuesta, todos tus clientes (cualquier calificación) verán una invitación opcional a dejar una reseña en Google. Solo se cuentan clics, no reseñas publicadas.">
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="input-google-review-url" className="text-xs">Enlace de reseña de Google</Label>
+              <Input id="input-google-review-url" type="url" inputMode="url" placeholder="https://g.page/r/XXXXXXXX/review" value={f.googleReviewUrl ?? ""} disabled={bloqueado}
+                onChange={(e) => { const v = e.target.value; setF((p) => ({ ...p, googleReviewUrl: v, googleReviewEnabled: v.trim() === "" ? false : p.googleReviewEnabled })); }}
+                className={`font-mono text-sm ${gUrlOk ? "" : "border-red-500"}`} data-testid="input-google-review-url" />
+              <p className="text-[11px] text-muted-foreground leading-relaxed">Para obtener tu enlace directo de reseña: busca tu negocio en Google Maps → Solicitar reseñas → Copiar enlace</p>
+              {!gUrlOk && <p className="text-xs text-red-600">Ingresa un enlace válido que comience con https://</p>}
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch id="switch-google-review" checked={!!f.googleReviewEnabled} disabled={bloqueado || (!f.googleReviewEnabled && !googleUrlValida(gUrl))} onCheckedChange={(on) => set("googleReviewEnabled", on)} data-testid="switch-google-review-enabled" />
+              <Label htmlFor="switch-google-review" className="text-sm">Invitar a dejar una reseña en Google</Label>
+            </div>
+            {!f.googleReviewEnabled && !googleUrlValida(gUrl) && !bloqueado && <p className="text-xs text-muted-foreground">Agrega un enlace válido para poder activar la invitación.</p>}
+          </div>
+        </Seccion>
       </Card>
 
       {puedeGuardar && sucio && (
         <div className="sticky bottom-4 flex justify-end">
           <div className="flex items-center gap-3 rounded-full border bg-card/95 backdrop-blur px-4 py-2 shadow-lg">
             <span className="text-sm text-muted-foreground">Cambios sin guardar</span>
-            <Button size="sm" variant="ghost" onClick={() => { if (data) { setF(data); setIva(String(data.porcentajeIva)); } }}>Descartar</Button>
+            <Button size="sm" variant="ghost" onClick={() => { if (data) { setF(norm(data)); setIva(String(data.porcentajeIva)); } }}>Descartar</Button>
             <Button size="sm" onClick={guardar} disabled={!valido || save.isPending}>Guardar</Button>
           </div>
         </div>

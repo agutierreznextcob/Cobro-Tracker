@@ -3986,6 +3986,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/EncuestasResumen"
 
+  /encuestas/{token}/google:
+    post:
+      operationId: registrarClickGoogle
+      tags: [encuestas]
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Primer clic registrado; URL validada del negocio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoogleReviewDestino"
+  /encuestas/{token}/comentario:
+    post:
+      operationId: agregarComentarioEncuesta
+      tags: [encuestas]
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EncuestaComentarioInput" }
+      responses:
+        "200":
+          description: Comentario privado registrado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EncuestaPublica" }
   /encuestas/{token}:
     get:
       operationId: getEncuesta
@@ -4316,6 +4352,8 @@ components:
         formatoFecha: { type: string, enum: ["DD/MM/YYYY", "MM/DD/YYYY"] }
         prefijoCobro: { type: string, minLength: 1, maxLength: 16 }
         prefijoCotizacion: { type: string, minLength: 1, maxLength: 16 }
+        googleReviewUrl: { type: string, maxLength: 500 }
+        googleReviewEnabled: { type: boolean }
     CotizacionItemInput:
       type: object
       required: [descripcion, cantidad, precioUnitario, descuentoPorcentaje]
@@ -4747,6 +4785,16 @@ components:
         estado:
           type: string
           enum: [pendiente, completada, cancelada]
+    GoogleReviewDestino:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+    EncuestaComentarioInput:
+      type: object
+      required: [comentario]
+      properties:
+        comentario: { type: string, minLength: 1, maxLength: 2000 }
     EncuestaPublica:
       type: object
       required: [empresa, descripcion, monto, yaRespondida]
@@ -4766,6 +4814,10 @@ components:
           format: date-time
         yaRespondida:
           type: boolean
+        googleReviewUrl:
+          type: ["string", "null"]
+        googleRedirigido:
+          type: boolean
     EncuestaRespuestaInput:
       type: object
       required: [calificacion]
@@ -4776,6 +4828,7 @@ components:
           maximum: 5
         comentario:
           type: ["string", "null"]
+          maxLength: 2000
     EncuestaResumenItem:
       type: object
       required: [calificacion, cantidad]
@@ -4788,6 +4841,8 @@ components:
       type: object
       required: [calificacion]
       properties:
+        googleRedirigido:
+          type: boolean
         clienteNombre:
           type: ["string", "null"]
         calificacion:
@@ -4801,6 +4856,8 @@ components:
       type: object
       required: [total, respondidas, promedio, distribucion, recientes]
       properties:
+        googleRedirigidosMes:
+          type: integer
         total:
           type: integer
         respondidas:

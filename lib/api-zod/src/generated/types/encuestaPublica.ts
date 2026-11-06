@@ -17,4 +17,7 @@ export interface EncuestaPublica {
   /** @nullable */
   respondidoEn?: Date | null;
   yaRespondida: boolean;
+  /** @nullable */
+  googleReviewUrl?: string | null;
+  googleRedirigido?: boolean;
 }

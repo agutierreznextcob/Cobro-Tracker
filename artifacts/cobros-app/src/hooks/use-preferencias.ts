@@ -8,6 +8,8 @@ export const PREFERENCIAS_DEFAULT: Preferencias = {
   formatoFecha: "DD/MM/YYYY",
   prefijoCobro: "COB-",
   prefijoCotizacion: "COT-",
+  googleReviewUrl: "",
+  googleReviewEnabled: false,
 };
 
 /**

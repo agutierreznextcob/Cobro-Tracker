@@ -803,6 +803,8 @@ export const getPreferenciasResponsePrefijoCobroMax = 16;
 
 export const getPreferenciasResponsePrefijoCotizacionMax = 16;
 
+export const getPreferenciasResponseGoogleReviewUrlMax = 500;
+
 
 
 export const GetPreferenciasResponse = zod.object({
@@ -811,7 +813,9 @@ export const GetPreferenciasResponse = zod.object({
   "porcentajeIva": zod.number().min(getPreferenciasResponsePorcentajeIvaMin).max(getPreferenciasResponsePorcentajeIvaMax),
   "formatoFecha": zod.enum(['DD/MM/YYYY', 'MM/DD/YYYY']),
   "prefijoCobro": zod.string().min(1).max(getPreferenciasResponsePrefijoCobroMax),
-  "prefijoCotizacion": zod.string().min(1).max(getPreferenciasResponsePrefijoCotizacionMax)
+  "prefijoCotizacion": zod.string().min(1).max(getPreferenciasResponsePrefijoCotizacionMax),
+  "googleReviewUrl": zod.string().max(getPreferenciasResponseGoogleReviewUrlMax).optional(),
+  "googleReviewEnabled": zod.boolean().optional()
 })
 
 
@@ -825,6 +829,8 @@ export const savePreferenciasBodyPrefijoCobroMax = 16;
 
 export const savePreferenciasBodyPrefijoCotizacionMax = 16;
 
+export const savePreferenciasBodyGoogleReviewUrlMax = 500;
+
 
 
 export const SavePreferenciasBody = zod.object({
@@ -833,7 +839,9 @@ export const SavePreferenciasBody = zod.object({
   "porcentajeIva": zod.number().min(savePreferenciasBodyPorcentajeIvaMin).max(savePreferenciasBodyPorcentajeIvaMax),
   "formatoFecha": zod.enum(['DD/MM/YYYY', 'MM/DD/YYYY']),
   "prefijoCobro": zod.string().min(1).max(savePreferenciasBodyPrefijoCobroMax),
-  "prefijoCotizacion": zod.string().min(1).max(savePreferenciasBodyPrefijoCotizacionMax)
+  "prefijoCotizacion": zod.string().min(1).max(savePreferenciasBodyPrefijoCotizacionMax),
+  "googleReviewUrl": zod.string().max(savePreferenciasBodyGoogleReviewUrlMax).optional(),
+  "googleReviewEnabled": zod.boolean().optional()
 })
 
 export const savePreferenciasResponseDecimalesMin = 0;
@@ -846,6 +854,8 @@ export const savePreferenciasResponsePrefijoCobroMax = 16;
 
 export const savePreferenciasResponsePrefijoCotizacionMax = 16;
 
+export const savePreferenciasResponseGoogleReviewUrlMax = 500;
+
 
 
 export const SavePreferenciasResponse = zod.object({
@@ -854,7 +864,9 @@ export const SavePreferenciasResponse = zod.object({
   "porcentajeIva": zod.number().min(savePreferenciasResponsePorcentajeIvaMin).max(savePreferenciasResponsePorcentajeIvaMax),
   "formatoFecha": zod.enum(['DD/MM/YYYY', 'MM/DD/YYYY']),
   "prefijoCobro": zod.string().min(1).max(savePreferenciasResponsePrefijoCobroMax),
-  "prefijoCotizacion": zod.string().min(1).max(savePreferenciasResponsePrefijoCotizacionMax)
+  "prefijoCotizacion": zod.string().min(1).max(savePreferenciasResponsePrefijoCotizacionMax),
+  "googleReviewUrl": zod.string().max(savePreferenciasResponseGoogleReviewUrlMax).optional(),
+  "googleReviewEnabled": zod.boolean().optional()
 })
 
 
@@ -5470,6 +5482,7 @@ export const UpdateTareaEstadoResponse = zod.object({
  * @summary Satisfaction survey results summary
  */
 export const GetEncuestasResumenResponse = zod.object({
+  "googleRedirigidosMes": zod.number().optional(),
   "total": zod.number(),
   "respondidas": zod.number(),
   "promedio": zod.number(),
@@ -5478,11 +5491,46 @@ export const GetEncuestasResumenResponse = zod.object({
   "cantidad": zod.number()
 })),
   "recientes": zod.array(zod.object({
+  "googleRedirigido": zod.boolean().optional(),
   "clienteNombre": zod.string().nullish(),
   "calificacion": zod.number(),
   "comentario": zod.string().nullish(),
   "respondidoEn": zod.coerce.date().nullish()
 }))
+})
+
+
+export const RegistrarClickGoogleParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const RegistrarClickGoogleResponse = zod.object({
+  "url": zod.string()
+})
+
+
+export const AgregarComentarioEncuestaParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const agregarComentarioEncuestaBodyComentarioMax = 2000;
+
+
+
+export const AgregarComentarioEncuestaBody = zod.object({
+  "comentario": zod.string().min(1).max(agregarComentarioEncuestaBodyComentarioMax)
+})
+
+export const AgregarComentarioEncuestaResponse = zod.object({
+  "empresa": zod.string(),
+  "descripcion": zod.string(),
+  "monto": zod.number(),
+  "calificacion": zod.number().nullish(),
+  "comentario": zod.string().nullish(),
+  "respondidoEn": zod.coerce.date().nullish(),
+  "yaRespondida": zod.boolean(),
+  "googleReviewUrl": zod.string().nullish(),
+  "googleRedirigido": zod.boolean().optional()
 })
 
 
@@ -5500,7 +5548,9 @@ export const GetEncuestaResponse = zod.object({
   "calificacion": zod.number().nullish(),
   "comentario": zod.string().nullish(),
   "respondidoEn": zod.coerce.date().nullish(),
-  "yaRespondida": zod.boolean()
+  "yaRespondida": zod.boolean(),
+  "googleReviewUrl": zod.string().nullish(),
+  "googleRedirigido": zod.boolean().optional()
 })
 
 
@@ -5513,11 +5563,13 @@ export const ResponderEncuestaParams = zod.object({
 
 export const responderEncuestaBodyCalificacionMax = 5;
 
+export const responderEncuestaBodyComentarioMax = 2000;
+
 
 
 export const ResponderEncuestaBody = zod.object({
   "calificacion": zod.number().min(1).max(responderEncuestaBodyCalificacionMax),
-  "comentario": zod.string().nullish()
+  "comentario": zod.string().max(responderEncuestaBodyComentarioMax).nullish()
 })
 
 export const ResponderEncuestaResponse = zod.object({
@@ -5527,7 +5579,9 @@ export const ResponderEncuestaResponse = zod.object({
   "calificacion": zod.number().nullish(),
   "comentario": zod.string().nullish(),
   "respondidoEn": zod.coerce.date().nullish(),
-  "yaRespondida": zod.boolean()
+  "yaRespondida": zod.boolean(),
+  "googleReviewUrl": zod.string().nullish(),
+  "googleRedirigido": zod.boolean().optional()
 })
 
 

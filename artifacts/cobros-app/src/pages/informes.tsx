@@ -1048,9 +1048,9 @@ function SatisfaccionReport() {
   const exportarSatisfaccion = async () => {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Indicador", "Valor"], ["Encuestas enviadas", data.total], ["Respondidas", data.respondidas], ["Promedio (1-5)", Number(data.promedio.toFixed(2))]]), "Resumen");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Indicador", "Valor"], ["Encuestas enviadas", data.total], ["Respondidas", data.respondidas], ["Promedio (1-5)", Number(data.promedio.toFixed(2))], ["Clientes redirigidos a Google este mes (clics, no reseñas publicadas)", data.googleRedirigidosMes ?? 0]]), "Resumen");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.distribucion.map((d) => ({ Calificación: d.calificacion, Cantidad: d.cantidad }))), "Distribución");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.recientes.map((r) => ({ Cliente: r.clienteNombre ?? "", Calificación: r.calificacion, Comentario: r.comentario ?? "", Fecha: r.respondidoEn ?? "" }))), "Recientes");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.recientes.map((r) => ({ Cliente: r.clienteNombre ?? "", Calificación: r.calificacion, Comentario: r.comentario ?? "", "Redirigido a Google": r.googleRedirigido ? "Sí" : "No", Fecha: r.respondidoEn ?? "" }))), "Recientes");
     XLSX.writeFile(wb, `satisfaccion-${format(new Date(), "yyyyMMdd")}.xlsx`);
   };
 
@@ -1095,6 +1095,10 @@ function SatisfaccionReport() {
           </CardContent>
         </Card>
       </div>
+      <p className="text-sm text-muted-foreground" data-testid="text-google-redirigidos-informe">
+        <span className="font-semibold text-foreground tabular-nums">{data.googleRedirigidosMes ?? 0}</span> clientes redirigidos a Google este mes
+        <span className="ml-1 text-xs">(clics en el botón, no reseñas publicadas)</span>
+      </p>
 
       <Card>
         <CardHeader>
@@ -1139,6 +1143,7 @@ function SatisfaccionReport() {
                   <span className="text-sm font-medium">{r.clienteNombre ?? "Cliente"}</span>
                   <SatisfaccionStars value={r.calificacion} />
                 </div>
+                <p className="mt-1 text-xs text-muted-foreground">Redirigido a Google: <span className={r.googleRedirigido ? "font-medium text-emerald-700" : ""}>{r.googleRedirigido ? "Sí" : "No"}</span></p>
                 {r.comentario && <p className="mt-1 text-sm text-muted-foreground">{r.comentario}</p>}
                 {r.respondidoEn && (
                   <p className="mt-1 text-xs text-muted-foreground">{formatDate(r.respondidoEn)}</p>

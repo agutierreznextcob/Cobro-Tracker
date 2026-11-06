@@ -19,6 +19,7 @@ export const encuestasTable = pgTable(
     calificacion: integer("calificacion"),
     comentario: text("comentario"),
     respondidoEn: timestamp("respondido_en", { withTimezone: true }),
+    googleClickedAt: timestamp("google_clicked_at", { withTimezone: true }),
     // Deferred delivery: the survey email is sent ~1h after payment (so the
     // client isn't hit with receipt + survey at once). Sweep sends when due.
     enviarEn: timestamp("enviar_en", { withTimezone: true }).notNull().defaultNow(),

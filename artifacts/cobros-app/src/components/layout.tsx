@@ -302,7 +302,6 @@ const CONFIG_ITEMS: NavLeaf[] = [
   { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes", match: (l) => l === "/workflows" || l.startsWith("/workflows/") },
   { href: "/configuracion/empresa", label: "Perfil de empresa", icon: Building2 },
   { href: "/configuracion/preferencias", label: "Preferencias", icon: SlidersHorizontal },
-  { href: "/encuestas", label: "Satisfacción", icon: MessageSquare, feature: "Encuestas de satisfacción" },
 ];
 
 function MobileBell() {
@@ -483,6 +482,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/locales", label: "Locales y bodegas", icon: Warehouse },
     { id: "gestion_group" },
     { id: "informes_group" },
+    { href: "/encuestas", label: "Satisfacción", icon: MessageSquare, feature: "Encuestas de satisfacción" },
     { id: "config_group" },
   ] as Array<
     | { href: string; label: string; icon: typeof Home; feature?: string }

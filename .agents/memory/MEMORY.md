@@ -16,6 +16,7 @@
 - [Groq reasoning visibility](groq-reasoning-visibility.md) — verify live model availability before switching; disable reasoning at the API and still strip think blocks incrementally in the UI.
 - [Flow plan pricing & IVA](flow-plan-pricing.md) — platform prices are IVA-inclusive (neto+IVA=total); changing the charged amount REQUIRES bumping PLAN_ID or Flow keeps the old price.
 - [Encuestas post-pago](encuestas-satisfaccion.md) — envío diferido +1h vía barrido claim-TTL con tope de reintentos; un-clic NUNCA muta en GET (prefetch de email), la página pública auto-POSTea.
+- [Reseñas de Google](google-reviews.md) — invitación para todas las calificaciones aprobada; contar clics explícitos y clientes únicos por mes de Chile, no reseñas publicadas.
 - [Comprobante auto-delivery](comprobante-delivery.md) — receipt email idempotent+retryable via emailEnviado(success-only)+emailIntentoEn(TTL claim); residual dup-send is an accepted tradeoff, stop re-hardening.
 - [pagadoEn & revenue accounting](pagado-en-revenue.md) — every estado-writing path must maintain pagadoEn; revenue reports use pagadoEn + abonos + net-of-descuento, never raw monto/creadoEn.
 - [MP webhook owner-token verification](mp-webhook-owner-token.md) — re-verify MP payments with the cobro owner's token before applying estado changes (prevents cross-tenant tampering).

@@ -1,9 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db, encuestasTable, cobrosTable, type Encuesta } from "@workspace/db";
-import { and, eq, isNull, isNotNull, desc, type SQL } from "drizzle-orm";
-import { ResponderEncuestaBody } from "@workspace/api-zod";
+import { and, eq, isNull, isNotNull, desc, sql, type SQL } from "drizzle-orm";
+import { ResponderEncuestaBody, AgregarComentarioEncuestaBody } from "@workspace/api-zod";
 import { getOrgContext, type OrgContext } from "../lib/org";
 import { userTieneFeature } from "../middlewares/requirePlanFeature";
+import { googleReviewForSurvey } from "../lib/google-reviews";
+import { hoySantiago } from "../lib/preferencias";
 
 const encuestasRouter: IRouter = Router();
 
@@ -34,11 +36,21 @@ encuestasRouter.get("/encuestas/stats/resumen", async (req, res) => {
     }
     const ctx = await getOrgContext(userId);
     const scope = encuestaScope(ctx, userId);
-    const rows = await db
-      .select()
+    const records = await db
+      .select({ encuesta: encuestasTable, email: cobrosTable.emailPagador })
       .from(encuestasTable)
+      .leftJoin(cobrosTable, eq(cobrosTable.id, encuestasTable.cobroId))
       .where(scope)
       .orderBy(desc(encuestasTable.respondidoEn));
+    const rows = records.map(r => r.encuesta);
+    const month = hoySantiago().slice(0, 7);
+    const monthOf = (date: Date) => new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "America/Santiago", year: "numeric", month: "2-digit",
+    }).format(date).slice(0, 7);
+    const googleRedirigidosMes = new Set(records.filter(r =>
+      r.encuesta.googleClickedAt && monthOf(r.encuesta.googleClickedAt) === month,
+    ).map(({ encuesta: e, email }) => e.clienteId != null ? `cliente:${e.clienteId}`
+      : email?.trim() ? `email:${email.trim().toLowerCase()}` : `encuesta:${e.id}`)).size;
 
     const respondidasRows = rows.filter((r) => r.calificacion != null);
     // "Enviadas" = emails que realmente salieron (o ya respondidas); las
@@ -58,6 +70,7 @@ encuestasRouter.get("/encuestas/stats/resumen", async (req, res) => {
       calificacion: r.calificacion!,
       comentario: r.comentario ?? null,
       respondidoEn: r.respondidoEn ? r.respondidoEn.toISOString() : null,
+      googleRedirigido: r.googleClickedAt != null,
     }));
 
     res.json({
@@ -66,6 +79,7 @@ encuestasRouter.get("/encuestas/stats/resumen", async (req, res) => {
       promedio: Math.round(promedio * 100) / 100,
       distribucion,
       recientes,
+      googleRedirigidosMes,
     });
   } catch (err) {
     req.log.error({ err }, "Error building encuestas summary");
@@ -74,7 +88,7 @@ encuestasRouter.get("/encuestas/stats/resumen", async (req, res) => {
 });
 
 // ---- Public: survey by token (unauthenticated) --------------------------
-function serializePublica(e: Encuesta, empresa: string, descripcion: string, monto: number) {
+async function serializePublica(e: Encuesta, empresa: string, descripcion: string, monto: number) {
   return {
     empresa,
     descripcion,
@@ -83,6 +97,8 @@ function serializePublica(e: Encuesta, empresa: string, descripcion: string, mon
     comentario: e.comentario ?? null,
     respondidoEn: e.respondidoEn ? e.respondidoEn.toISOString() : null,
     yaRespondida: e.calificacion != null,
+    googleReviewUrl: await googleReviewForSurvey(e),
+    googleRedirigido: e.googleClickedAt != null,
   };
 }
 
@@ -109,7 +125,7 @@ encuestasRouter.get("/encuestas/:token", async (req, res) => {
     }
     const { encuesta, cobro } = loaded;
     res.json(
-      serializePublica(
+      await serializePublica(
         encuesta,
         cobro?.clienteNombre ?? "",
         cobro?.descripcion ?? "",
@@ -152,7 +168,7 @@ encuestasRouter.post("/encuestas/:token", async (req, res) => {
     if (encuesta.calificacion != null) {
       // Already answered — single-response survey; return current state.
       res.json(
-        serializePublica(
+        await serializePublica(
           encuesta,
           cobro?.clienteNombre ?? "",
           cobro?.descripcion ?? "",
@@ -165,7 +181,7 @@ encuestasRouter.post("/encuestas/:token", async (req, res) => {
       .update(encuestasTable)
       .set({
         calificacion: parsed.data.calificacion,
-        comentario: parsed.data.comentario ?? null,
+        comentario: parsed.data.comentario?.trim() || null,
         respondidoEn: new Date(),
       })
       // Atomic single-response guard: a concurrent first answer wins and this
@@ -173,7 +189,7 @@ encuestasRouter.post("/encuestas/:token", async (req, res) => {
       .where(and(eq(encuestasTable.id, encuesta.id), isNull(encuestasTable.calificacion)))
       .returning();
     res.json(
-      serializePublica(
+      await serializePublica(
         // A concurrent first answer may have won the race; return its state.
         updated ?? (await loadEncuestaConCobro(req.params.token))!.encuesta,
         cobro?.clienteNombre ?? "",
@@ -184,6 +200,52 @@ encuestasRouter.post("/encuestas/:token", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error saving encuesta response");
     res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Supplement an email one-click rating with one private comment. Never replace
+// a saved rating/comment, including under concurrent submissions.
+encuestasRouter.post("/encuestas/:token/comentario", async (req, res) => {
+  const parsed = AgregarComentarioEncuestaBody.safeParse(req.body);
+  if (!parsed.success || !parsed.data.comentario.trim()) {
+    res.status(400).json({ error: "Escribe un comentario de hasta 2000 caracteres." }); return;
+  }
+  try {
+    const loaded = await loadEncuestaConCobro(req.params.token);
+    if (!loaded) { res.status(404).json({ error: "Encuesta no encontrada" }); return; }
+    if (loaded.encuesta.calificacion == null) {
+      res.status(409).json({ error: "Responde la encuesta antes de agregar un comentario." }); return;
+    }
+    const [updated] = await db.update(encuestasTable)
+      .set({ comentario: parsed.data.comentario.trim() })
+      .where(and(eq(encuestasTable.id, loaded.encuesta.id), isNotNull(encuestasTable.calificacion),
+        sql`nullif(trim(${encuestasTable.comentario}), '') is null`)).returning();
+    const e = updated ?? (await loadEncuestaConCobro(req.params.token))?.encuesta;
+    if (!e) { res.status(404).json({ error: "Encuesta no encontrada" }); return; }
+    res.json(await serializePublica(e, loaded.cobro?.clienteNombre ?? "", loaded.cobro?.descripcion ?? "",
+      Number(loaded.cobro?.monto ?? 0)));
+  } catch (err) {
+    req.log.error({ err }, "Error saving private survey comment");
+    res.status(500).json({ error: "No se pudo guardar tu comentario. Intenta nuevamente." });
+  }
+});
+
+// Explicit POST only: rendering/prefetching the invitation does not count.
+encuestasRouter.post("/encuestas/:token/google", async (req, res) => {
+  try {
+    const loaded = await loadEncuestaConCobro(req.params.token);
+    if (!loaded) { res.status(404).json({ error: "Encuesta no encontrada" }); return; }
+    const url = await googleReviewForSurvey(loaded.encuesta);
+    if (!url) {
+      res.status(409).json({ error: "La invitación a Google no está disponible en este momento." }); return;
+    }
+    await db.update(encuestasTable).set({ googleClickedAt: new Date() })
+      .where(and(eq(encuestasTable.id, loaded.encuesta.id), isNull(encuestasTable.googleClickedAt),
+        isNotNull(encuestasTable.calificacion)));
+    res.json({ url });
+  } catch (err) {
+    req.log.error({ err }, "Error recording Google invitation click");
+    res.status(500).json({ error: "No se pudo abrir la invitación. Intenta nuevamente." });
   }
 });
 

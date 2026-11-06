@@ -9,6 +9,7 @@ import type { EncuestaReciente } from './encuestaReciente';
 import type { EncuestaResumenItem } from './encuestaResumenItem';
 
 export interface EncuestasResumen {
+  googleRedirigidosMes?: number;
   total: number;
   respondidas: number;
   promedio: number;
