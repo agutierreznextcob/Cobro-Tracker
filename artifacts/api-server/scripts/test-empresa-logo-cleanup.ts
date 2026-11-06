@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test, before, after } from "node:test";
 import { cleanupEmpresaLogos, type LogoDatabase, type LogoStorage } from "../src/lib/empresaLogoCleanup";
 import { eligibleLogo, LOGO_GRACE_MS, LOGO_URL_TTL_MS, LOGO_LOCK } from "../src/lib/empresaLogoLifecycle";
 import { createRequire } from "node:module";
@@ -7,6 +7,16 @@ import { randomUUID } from "node:crypto";
 import { readLogoCursor, writeLogoCursor } from "../src/lib/empresaLogoCursor";
 import { fileURLToPath } from "node:url";
 import { rm } from "node:fs/promises";
+import { temporaryLogoPostgres } from "./helpers/logo-test-postgres";
+
+let postgres: Awaited<ReturnType<typeof temporaryLogoPostgres>>;
+const originalDatabaseUrl = process.env.DATABASE_URL;
+before(async () => { postgres = await temporaryLogoPostgres(); });
+after(async () => {
+  if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = originalDatabaseUrl;
+  await postgres?.close();
+});
 
 const now = new Date("2026-11-06T12:00:00Z");
 const old = new Date(now.getTime() - 2 * LOGO_GRACE_MS);
@@ -120,9 +130,161 @@ test("persistent pagination passes 50 cross-database references and wraps for ne
     assert.ok(nextCycle.every(row => row.status === "already-missing"));
   } finally { await rm(file, { force: true }); }
 });
+// Storage remains in memory: these tests must never touch a shared bucket.
+async function realPair(run: (f: ReturnType<typeof fixture>, clients: any[]) => Promise<void>) {
+  const clients = await Promise.all(postgres.databases.map(pool => pool.connect()));
+  try {
+    for (const client of clients) {
+      await client.query("TRUNCATE empresas, empresa_uploads");
+      for (const path of [logo, temp]) {
+        await client.query("INSERT INTO empresa_uploads VALUES ($1, 'test', $2)", [path, old]);
+      }
+    }
+    const names = await Promise.all(clients.map(client => client.query("SELECT current_database() AS name")));
+    assert.notEqual(names[0].rows[0].name, names[1].rows[0].name, "not two schemas in one database");
+    await run(fixture(), clients);
+  } finally {
+    for (const client of clients) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      client.release(true);
+    }
+  }
+}
+async function ledgerCounts() {
+  return Promise.all(postgres.databases.map(async pool =>
+    Number((await pool.query("SELECT count(*) FROM empresa_uploads")).rows[0].count)));
+}
+function barrier(count: number) {
+  let arrived = 0;
+  let release!: () => void;
+  const ready = new Promise<void>(resolve => { release = resolve; });
+  return async () => { if (++arrived === count) release(); await ready; };
+}
+test("independent Postgres databases: simultaneous writers protect references in both", { timeout: 15000 }, async () => {
+  await realPair(async (f, maintenance) => {
+    const writers = await Promise.all(postgres.databases.map(pool => pool.connect()));
+    try {
+      // Both transactions hold the same advisory key at once: these locks are
+      // database-local, so maintenance must acquire/check BOTH databases.
+      await Promise.all(writers.map(async (writer, i) => {
+        await writer.query("BEGIN");
+        await writer.query("SELECT pg_advisory_xact_lock($1)", [LOGO_LOCK]);
+        await writer.query("INSERT INTO empresas(scope, perfil) VALUES ('test', $1)",
+          [JSON.stringify({ logoPath: i === 0 ? logo : temp })]);
+      }));
+      await assert.rejects(cleanupEmpresaLogos(maintenance, f.storage, { now, apply: true }), /active/);
+      await writers[0].query("COMMIT");
+      // Specifically reaches the second DB, rolls back the first lock.
+      await assert.rejects(cleanupEmpresaLogos(maintenance, f.storage, { now, apply: true }), /active/);
+      assert.deepEqual(await ledgerCounts(), [2, 2]);
+      assert.equal(f.removed.length, 0);
+      await writers[1].query("COMMIT");
+      const report = await cleanupEmpresaLogos(maintenance, f.storage, { now, apply: true });
+      assert.equal(report.length, 2);
+      assert.ok(report.every(row => row.status === "protected"));
+      assert.equal(f.objects.size, 2);
+      assert.equal(f.removed.length, 0);
+      assert.deepEqual(await ledgerCounts(), [2, 2]);
+    } finally {
+      for (const writer of writers) { await writer.query("ROLLBACK"); writer.release(); }
+    }
+  });
+});
+test("second Postgres disconnect before deletion fails closed, reconnect protects its reference", { timeout: 15000 }, async () => {
+  await realPair(async (f, clients) => {
+    await clients[1].query("INSERT INTO empresas(scope, perfil) VALUES ('test', $1)", [JSON.stringify({ logoPath: logo })]);
+    const pid = (await clients[1].query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    clients[1].on("error", () => {}); // Expected backend termination, not an unhandled pool error.
+    let disconnected = false;
+    const second: LogoDatabase = { async query(sql, values) {
+      if (!disconnected && sql.includes("SELECT scope")) {
+        disconnected = true;
+        await postgres.databases[1].query("SELECT pg_terminate_backend($1)", [pid]);
+      }
+      return clients[1].query(sql, values);
+    } };
+    await assert.rejects(cleanupEmpresaLogos([clients[0], second], f.storage, { now, apply: true }));
+    assert.ok(disconnected, "failure occurs after candidate selection, before delete");
+    assert.equal(f.removed.length, 0);
+    assert.equal(f.objects.size, 2);
+    assert.deepEqual(await ledgerCounts(), [2, 2]);
+    const replacement = await postgres.databases[1].connect();
+    try {
+      const report = await cleanupEmpresaLogos([clients[0], replacement], f.storage, { now, apply: true });
+      assert.deepEqual(report, [{ path: logo, status: "protected" }, { path: temp, status: "deleted" }]);
+      assert.deepEqual(await cleanupEmpresaLogos([clients[0], replacement], f.storage, { now, apply: true }),
+        [{ path: logo, status: "protected" }]);
+      assert.deepEqual(f.removed, [temp]);
+      assert.ok(f.objects.has(logo));
+      assert.deepEqual(await ledgerCounts(), [1, 1]);
+    } finally { replacement.release(); }
+  });
+});
+test("opposite-order Postgres maintenance attempts abort without deadlock and retry once", { timeout: 15000 }, async () => {
+  await realPair(async (f, clients) => {
+    const others = await Promise.all(postgres.databases.map(pool => pool.connect()));
+    const firstLocks = barrier(2), secondLocks = barrier(2);
+    const wrap = (client: any, first: boolean): LogoDatabase => ({ async query(sql, values) {
+      const result = await client.query(sql, values);
+      if (sql.includes("pg_try")) await (first ? firstLocks() : secondLocks());
+      return result;
+    } });
+    try {
+      const results = await Promise.allSettled([
+        cleanupEmpresaLogos([wrap(clients[0], true), wrap(clients[1], false)], f.storage, { now, apply: true }),
+        cleanupEmpresaLogos([wrap(others[1], true), wrap(others[0], false)], f.storage, { now, apply: true }),
+      ]);
+      assert.ok(results.every(result => result.status === "rejected" && /active/.test(String(result.reason))));
+      assert.equal(f.removed.length, 0);
+      assert.deepEqual(await ledgerCounts(), [2, 2]);
+      assert.equal((await cleanupEmpresaLogos(clients, f.storage, { now, apply: true })).length, 2);
+      assert.deepEqual(await cleanupEmpresaLogos([...others].reverse(), f.storage, { now, apply: true }), []);
+      assert.equal(new Set(f.removed).size, 2);
+      assert.equal(f.removed.length, 2);
+      assert.deepEqual(await ledgerCounts(), [0, 0]);
+    } finally { for (const client of others) { await client.query("ROLLBACK"); client.release(); } }
+  });
+});
+test("partial Postgres commit preserves active logo and retry reconciles missing object idempotently", { timeout: 15000 }, async () => {
+  await realPair(async (f, clients) => {
+    await clients[1].query("INSERT INTO empresas(scope, perfil) VALUES ('test', $1)", [JSON.stringify({ logoPath: logo })]);
+    const pid = (await clients[1].query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    clients[1].on("error", () => {});
+    let firstCommitted = false, failed = false;
+    const first: LogoDatabase = { async query(sql, values) {
+      const result = await clients[0].query(sql, values);
+      if (sql === "COMMIT") firstCommitted = true;
+      return result;
+    } };
+    const second: LogoDatabase = { async query(sql, values) {
+      if (sql === "COMMIT") {
+        assert.ok(firstCommitted);
+        failed = true;
+        await postgres.databases[1].query("SELECT pg_terminate_backend($1)", [pid]);
+      }
+      return clients[1].query(sql, values);
+    } };
+    await assert.rejects(cleanupEmpresaLogos([first, second], f.storage, { now, apply: true }));
+    assert.ok(failed);
+    assert.deepEqual(await ledgerCounts(), [1, 2], "first commit durable; second transaction rolled back");
+    assert.deepEqual(f.removed, [temp]);
+    assert.ok(f.objects.has(logo));
+    const replacement = await postgres.databases[1].connect();
+    try {
+      assert.deepEqual(await cleanupEmpresaLogos([clients[0], replacement], f.storage, { now, apply: true }),
+        [{ path: logo, status: "protected" }, { path: temp, status: "already-missing" }]);
+      assert.deepEqual(await cleanupEmpresaLogos([replacement, clients[0]], f.storage, { now, apply: true }),
+        [{ path: logo, status: "protected" }]);
+      assert.deepEqual(await ledgerCounts(), [1, 1]);
+      assert.deepEqual(f.removed, [temp], "retry must not issue another storage deletion");
+      assert.ok(f.objects.has(logo));
+      assert.equal((await replacement.query("SELECT perfil->>'logoPath' AS path FROM empresas")).rows[0].path, logo);
+    } finally { replacement.release(); }
+  });
+});
 test("real Postgres lock serializes profile save, retirement and cleanup", async () => {
   const { Pool } = createRequire(new URL("../../../lib/db/package.json", import.meta.url))("pg");
-  const admin = new Pool({ connectionString: process.env.DATABASE_URL });
+  const admin = new Pool({ connectionString: postgres.url });
   const schema = `logo_test_${randomUUID().replaceAll("-", "")}`;
   let appPool: { end(): Promise<void> } | undefined;
   let maintenance: any;
@@ -131,7 +293,7 @@ test("real Postgres lock serializes profile save, retirement and cleanup", async
     for (const table of ["empresas", "empresa_uploads"]) {
       await admin.query(`CREATE TABLE "${schema}"."${table}" (LIKE public."${table}" INCLUDING ALL)`);
     }
-    const url = new URL(process.env.DATABASE_URL!);
+    const url = new URL(postgres.url);
     url.searchParams.set("options", `-c search_path=${schema},public`);
     process.env.DATABASE_URL = url.toString();
     const d = await import("@workspace/db"); appPool = d.pool;
