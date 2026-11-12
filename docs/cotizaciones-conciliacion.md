@@ -68,6 +68,9 @@ escribe archivos reales. Cubre permisos, evidencia insuficiente, claves
 obsoletas, autorizaciones concurrentes, preservación del mensaje/PDF,
 coincidencia del proveedor, rebotes, confirmación concurrente y auditoría.
 
+La [prueba opt-in del contrato real de Resend](cotizaciones-resend-live.md)
+complementa esas simulaciones usando sólo un correo interno ya existente.
+
 Referencias del proveedor:
 - https://resend.com/docs/api-reference/emails/retrieve-email
 - https://resend.com/docs/api-reference/emails/list-email-attachments

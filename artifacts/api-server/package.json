@@ -9,6 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:cotizacion-storage": "tsx scripts/test-cotizacion-storage-live.ts",
+    "test:cotizacion-resend": "tsx scripts/test-cotizacion-resend-live.ts",
+    "test:cotizacion-resend:offline": "tsx --test scripts/test-cotizacion-resend-contract.ts",
     "test:logo-cleanup-storage": "tsx scripts/test-empresa-logo-storage-live.ts",
     "check:auth-guards": "tsx --test scripts/test-auth-guards.ts && tsx scripts/check-auth-guards.ts",
     "e2e:notificaciones": "tsx scripts/e2e-notificaciones.ts",
