@@ -3,7 +3,7 @@ import { MarketingShell, usePageMeta, PageHeader, RegisterButton, DemoButton } f
 const PLANS = [
   { name: "Starter", for: "Para negocios que empiezan a ordenar ventas y cobros.", status: "Precio por confirmar", featured: false, available: true },
   { name: "NextCob", for: "Para negocios que quieren usar el sistema completo.", status: "Precio por confirmar", featured: true, available: true },
-  { name: "Pro", for: "Para equipos más grandes y operaciones con varias ubicaciones.", status: "Consultar disponibilidad", featured: false, available: false },
+  { name: "Pro", for: "Consulta las opciones para las necesidades de tu equipo.", status: "Precio por confirmar", featured: false, available: true },
 ];
 
 const FAQ = [

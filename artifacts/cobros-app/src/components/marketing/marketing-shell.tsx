@@ -92,8 +92,8 @@ function AccountArea() {
         <button type="button" onClick={login} data-testid="button-login" className="text-sm font-medium px-3 py-2 hover:text-[#E86B2A] transition-colors">
           Iniciar sesión
         </button>
-        <DemoButton className="hidden lg:inline-flex text-sm px-4 py-2" />
-        <RegisterButton className="hidden sm:inline-flex text-sm px-4 py-2" />
+        <div className="hidden lg:block"><DemoButton className="text-sm px-4 py-2" /></div>
+        <div className="hidden sm:block"><RegisterButton className="text-sm px-4 py-2" /></div>
       </div>
     );
   }
