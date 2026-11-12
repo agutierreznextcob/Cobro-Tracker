@@ -233,7 +233,7 @@ export function LandingChat() {
                   >
                     <DianaAvatar className="h-12 w-12" />
                   </div>
-                  <p className="font-medium text-foreground">Hola, soy Diana 👋 ¿En qué puedo ayudarte sobre NextCob?</p>
+                  <p className="font-medium text-foreground">Hola, soy Diana. ¿En qué puedo ayudarte sobre NextCob?</p>
                   <p className="text-xs mt-1 opacity-80">
                     Pregúntame sobre NextCob: precios, funciones, seguridad o cómo empezar tu prueba gratis.
                   </p>

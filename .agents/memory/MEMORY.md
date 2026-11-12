@@ -11,6 +11,7 @@
 - [WhatsApp reminder auto-send](whatsapp-reminders.md) — whatsapp canal auto-sends via Meta Cloud API when configured, else in-app fallback; estado enviado=sent, pendiente=manual-click fallback.
 - [Email From/Reply-To](email-remitente.md) — every email via buildRemitente(): From="<sender> via Cobro Simple" on platform addr, Reply-To=sender email; new emails must route through it.
 - [Landing page routing](landing-routing.md) — root "/" ALWAYS shows the landing; never auto-redirect authenticated users to /dashboard; auth guards live on protected routes.
+- [Alcance del sitio público](landing-public-scope.md) — precios públicos pendientes; sin fondo animado, cuadros rectos y menú con páginas independientes; plataforma interna intacta.
 - [Leads capture](leads-capture.md) — landing form → lead; PLATFORM-admin-only (not per-org, avoids tenant leak); public route mounted before cobros blanket-auth; escape untrusted input in emails.
 - [Landing public AI chat](landing-public-chat.md) — unauth sales chatbot is its OWN router mounted before auth-gated aiRouter; public LLM endpoints MUST stay rate-limited (in-memory, single-instance only).
 - [Groq reasoning visibility](groq-reasoning-visibility.md) — verify live model availability before switching; disable reasoning at the API and still strip think blocks incrementally in the UI.

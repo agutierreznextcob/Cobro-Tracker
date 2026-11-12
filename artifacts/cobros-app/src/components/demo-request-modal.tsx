@@ -18,7 +18,14 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function DemoRequestModal({ trigger }: { trigger: ReactNode }) {
+export function DemoRequestModal({
+  trigger,
+  contentClassName,
+}: {
+  trigger: ReactNode;
+  /** Optional extra class for the portaled dialog (marketing-only styling). */
+  contentClassName?: string;
+}) {
   const { toast } = useToast();
   const crearLead = useCrearLeadPublico();
 
@@ -83,7 +90,7 @@ export function DemoRequestModal({ trigger }: { trigger: ReactNode }) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={`sm:max-w-md${contentClassName ? ` ${contentClassName}` : ""}`}>
         {enviado ? (
           <div className="flex flex-col items-center text-center py-6 gap-4">
             <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary">

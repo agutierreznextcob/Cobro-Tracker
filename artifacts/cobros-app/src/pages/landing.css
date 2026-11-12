@@ -1,52 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
 /* Marketing-only tokens: never change :root or the internal app theme. */
 .nextcob-landing {
   --background: 0 0% 100%;
   --foreground: 0 0% 4%;
   --card: 0 0% 100%;
   --card-foreground: 0 0% 4%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 4%;
   --primary: 180 79% 24.12%;
   --primary-foreground: 0 0% 100%;
-  --ring: 180 79% 24.12%;
-}
-
-.nextcob-landing .landing-particle-background {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
+  --ring: 21 80% 54%;
+  --border: 30 10% 88%;
+  --muted: 36 30% 97%;
+  --muted-foreground: 0 0% 32%;
+  --nc-ink: #0A0A0A;
+  --nc-orange: #E86B2A;
+  --nc-cyan: #0D6E6E;
+  --nc-gold: #F4A800;
+  --nc-paper: #FBFAF7;
+  --nc-line: #E4E1DA;
   background: #FFFFFF;
+  color: var(--nc-ink);
+  font-family: 'Instrument Sans', system-ui, sans-serif;
 }
 
-/* Keep one viewport-sized animation visible throughout the scroll, rather
-   than stretching an enormous canvas across the entire document. */
-.nextcob-landing > section,
-.nextcob-landing > footer {
-  background-color: transparent;
+/* Rectilinear system: straight corners only inside the marketing site. */
+.nextcob-landing,
+.nextcob-landing *,
+.nc-dialog,
+.nc-dialog * {
+  border-radius: 0 !important;
 }
 
+.nc-dialog {
+  border: 1px solid #0A0A0A;
+  box-shadow: 8px 8px 0 0 #E86B2A;
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+}
+.nc-dialog button[type="submit"] { background: #E86B2A; color: #0A0A0A; }
+.nc-dialog button[type="submit"]:hover { background: #F47B3B; }
+
+.nextcob-landing .nc-display {
+  font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif;
+  letter-spacing: -0.035em;
+  font-weight: 800;
+}
+.nextcob-landing .nc-mono {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.02em;
+}
+.nextcob-landing .nc-kicker {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--nc-cyan);
+}
+
+.nextcob-landing .nc-paper { background: var(--nc-paper); }
+.nextcob-landing .nc-rule { border-color: var(--nc-line); }
+
+/* Buttons */
 .nextcob-landing .landing-cta {
-  background-color: #E86B2A;
-  color: #0A0A0A;
-  box-shadow: 0 8px 24px -8px rgb(232 107 42 / 35%);
+  background-color: var(--nc-orange);
+  color: var(--nc-ink);
+  border: 1px solid var(--nc-ink);
+  transition: background-color .15s ease, transform .15s ease;
 }
-
-.nextcob-landing .landing-cta:hover {
-  background-color: #F47B3B;
-}
-
+.nextcob-landing .landing-cta:hover { background-color: #F47B3B; }
+.nextcob-landing .landing-cta:active { transform: translateY(1px); }
 .nextcob-landing .landing-secondary {
-  border: 1px solid #0D6E6E;
+  border: 1px solid var(--nc-cyan);
+  color: var(--nc-cyan);
+  background: #FFFFFF;
+  transition: background-color .15s ease, color .15s ease;
+}
+.nextcob-landing .landing-secondary:hover { background-color: var(--nc-cyan); color: #FFFFFF; }
+
+.nextcob-landing :focus-visible {
+  outline: 2px solid var(--nc-orange);
+  outline-offset: 2px;
 }
 
-.nextcob-landing .landing-secondary:hover {
-  background-color: rgb(13 110 110 / 18%);
+/* Nav links */
+.nextcob-landing .nc-navlink {
+  position: relative;
+  padding: 0.5rem 0;
+  color: #3B3B3B;
+  transition: color .15s ease;
+}
+.nextcob-landing .nc-navlink:hover { color: var(--nc-ink); }
+.nextcob-landing .nc-navlink[aria-current="page"] { color: var(--nc-ink); font-weight: 600; }
+.nextcob-landing .nc-navlink[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1.15rem;
+  height: 3px;
+  background: var(--nc-orange);
 }
 
-@keyframes landingCtaPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgb(232 107 42 / 40%); }
-  50% { box-shadow: 0 0 0 12px rgb(232 107 42 / 0%); }
+/* Cards that link out */
+.nextcob-landing .nc-tile {
+  transition: background-color .15s ease, border-color .15s ease;
 }
+.nextcob-landing .nc-tile:hover { background-color: #FFF4EC; border-color: var(--nc-orange); }
+.nextcob-landing .nc-tile:hover .nc-arrow { color: var(--nc-orange); transform: translateX(3px); }
+.nextcob-landing .nc-arrow { transition: transform .15s ease, color .15s ease; }
 
-.nextcob-landing .btn-pulse {
-  animation-name: landingCtaPulse;
+/* One-time load-in, no loops */
+@keyframes ncRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.nextcob-landing .nc-rise { animation: ncRise .6s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 0ms); }
+@media (prefers-reduced-motion: reduce) {
+  .nextcob-landing .nc-rise { animation: none; }
 }

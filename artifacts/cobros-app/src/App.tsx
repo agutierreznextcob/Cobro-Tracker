@@ -4,6 +4,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
+import ComoFuncionaPage from "@/pages/marketing/como-funciona";
+import CaracteristicasPage from "@/pages/marketing/caracteristicas";
+import PreciosPage from "@/pages/marketing/precios";
+import NosotrosPage from "@/pages/marketing/nosotros";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import ForgotPasswordPage from "@/pages/forgot-password";
@@ -160,6 +164,10 @@ function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
+      <Route path="/como-funciona" component={ComoFuncionaPage} />
+      <Route path="/caracteristicas" component={CaracteristicasPage} />
+      <Route path="/precios" component={PreciosPage} />
+      <Route path="/nosotros" component={NosotrosPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/consultor" component={ConsultorLoginPage} />
       <Route path="/register" component={RegisterPage} />

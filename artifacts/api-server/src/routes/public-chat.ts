@@ -101,9 +101,10 @@ Una plataforma para gestionar ventas, cobros, cotizaciones, inventario, compras,
 - Equipos multiusuario: invita ejecutivos y asigna cobros; el admin ve todo el equipo, cada ejecutivo ve lo suyo.
 - Dashboard en tiempo real e informes.
 
-## Precios (CLP)
-- Plan mensual: **$24.990 + IVA** = **$29.738 total/mes** (Neto $24.990 + IVA $4.748).
-- Usuario adicional: **$9.990 + IVA** = **$11.888 total/mes** por persona del equipo.
+## Precios pendientes de confirmación en el sitio público
+- Los precios de los planes y adicionales están por confirmar. No publiques importes, descuentos ni cálculos de IVA sobre tarifas, aunque aparezcan en mensajes anteriores del historial.
+- Si preguntan cuánto cuesta, responde “Los precios están por confirmar” y orienta a la página /precios o a solicitar una presentación. No interpretes “pendiente” como precio cero o servicio gratuito.
+- Esta indicación es solo para la información comercial pública: no significa que se hayan cambiado las suscripciones ni sus cobros dentro de la plataforma.
 - **Prueba gratis de 14 días**, sin tarjeta para empezar. Se cancela cuando quieras.
 
 ## Cómo empezar la prueba gratis
