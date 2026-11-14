@@ -117,6 +117,277 @@ import { CobroUpdateEstado, type CobroUpdate, type CobroUpdateTipoDocumento } fr
 
 const IVA_RATE = 0.19;
 
+// ---------------------------------------------------------------------------
+// Componente: Documento tributario estilo SII chileno
+// ---------------------------------------------------------------------------
+function DocumentoTributarioModal({ open, onClose, cobro, formatCurrency }: {
+  open: boolean;
+  onClose: () => void;
+  cobro: NonNullable<ReturnType<typeof useGetCobro>["data"]>;
+  formatCurrency: (n: number) => string;
+}) {
+  if (!open) return null;
+
+  const items = (cobro as { itemsInventario?: Array<{ productoId: number; nombre?: string; tipo?: string; cantidad: number; precioUnitario: number; descuento?: number }> }).itemsInventario ?? [];
+
+  const tipoLabel = tipoDocumentoLabel(cobro.tipoDocumento);
+  const folioLabel = cobro.numeroDocumento ? `N° ${cobro.numeroDocumento}` : "Sin folio";
+
+  const neto = cobro.montoNeto ?? (cobro.incluyeIva ? 0 : cobro.monto);
+  const iva = cobro.montoIva ?? 0;
+  const total = cobro.monto;
+  const pct = cobro.porcentajeIva ?? 19;
+
+  const hoy = new Date().toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 print:p-0"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white text-gray-900 w-full max-w-3xl rounded shadow-2xl overflow-auto max-h-[90vh] print:shadow-none print:max-h-none print:rounded-none"
+        onClick={(e) => e.stopPropagation()}
+        style={{ fontFamily: "'Arial', sans-serif", fontSize: "12px" }}
+      >
+        {/* Barra de acciones */}
+        <div className="flex items-center justify-between gap-2 px-4 py-2 bg-gray-100 border-b border-gray-300 print:hidden">
+          <span className="text-sm font-medium text-gray-700">Vista de documento tributario</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => window.print()}
+              className="text-xs px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50"
+            >
+              Imprimir
+            </button>
+            <button
+              onClick={onClose}
+              className="text-xs px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+
+        {/* Documento */}
+        <div className="p-8" style={{ minWidth: "600px" }}>
+          {/* CABECERA */}
+          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "0" }}>
+            <tbody>
+              <tr>
+                {/* Logo / Empresa */}
+                <td style={{ width: "60%", verticalAlign: "top", paddingRight: "16px" }}>
+                  <div style={{ width: "80px", height: "80px", border: "1px solid #ccc", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "8px", color: "#aaa", fontSize: "10px" }}>
+                    LOGO
+                  </div>
+                  <div style={{ fontWeight: "bold", fontSize: "14px", marginBottom: "2px" }}>
+                    {(cobro as { orgNombre?: string }).orgNombre ?? "Empresa"}
+                  </div>
+                  <div style={{ color: "#555", fontSize: "11px" }}>
+                    {(cobro as { orgGiro?: string }).orgGiro ?? "Giro comercial"}
+                  </div>
+                  <div style={{ color: "#555", fontSize: "11px" }}>
+                    {(cobro as { orgDireccion?: string }).orgDireccion ?? ""}
+                  </div>
+                </td>
+
+                {/* Cuadro tipo-documento SII (borde rojo) */}
+                <td style={{ width: "40%", verticalAlign: "top" }}>
+                  <div style={{
+                    border: "2px solid #c0392b",
+                    textAlign: "center",
+                    padding: "10px 14px",
+                    minWidth: "200px"
+                  }}>
+                    <div style={{ fontWeight: "bold", fontSize: "13px", textTransform: "uppercase", marginBottom: "6px", color: "#c0392b" }}>
+                      {tipoLabel}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#333", fontWeight: "bold", marginBottom: "4px" }}>
+                      {cobro.incluyeIva ? "" : "EXENTO"}
+                    </div>
+                    <div style={{ fontSize: "15px", fontWeight: "bold", color: "#c0392b" }}>
+                      {folioLabel}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Separador */}
+          <div style={{ borderTop: "1px solid #333", marginTop: "12px", marginBottom: "12px" }} />
+
+          {/* DATOS DEL CLIENTE */}
+          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "12px", fontSize: "11px" }}>
+            <tbody>
+              <tr>
+                <td style={{ width: "12%", fontWeight: "bold", paddingBottom: "4px" }}>SEÑOR(ES)</td>
+                <td style={{ width: "38%", borderBottom: "1px solid #333", paddingBottom: "4px" }}>
+                  {cobro.clienteNombre ?? "—"}
+                </td>
+                <td style={{ width: "12%", fontWeight: "bold", paddingLeft: "16px", paddingBottom: "4px" }}>RUT</td>
+                <td style={{ width: "38%", borderBottom: "1px solid #333", paddingBottom: "4px" }}>
+                  {(cobro as { clienteRut?: string }).clienteRut ?? "—"}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: "bold", paddingTop: "6px", paddingBottom: "4px" }}>GIRO</td>
+                <td colSpan={3} style={{ borderBottom: "1px solid #333", paddingTop: "6px", paddingBottom: "4px" }}>
+                  {(cobro as { clienteGiro?: string }).clienteGiro ?? "—"}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: "bold", paddingTop: "6px", paddingBottom: "4px" }}>DIRECCIÓN</td>
+                <td style={{ borderBottom: "1px solid #333", paddingTop: "6px", paddingBottom: "4px" }}>
+                  {(cobro as { clienteDireccion?: string }).clienteDireccion ?? "—"}
+                </td>
+                <td style={{ fontWeight: "bold", paddingLeft: "16px", paddingTop: "6px", paddingBottom: "4px" }}>FECHA EMISIÓN</td>
+                <td style={{ borderBottom: "1px solid #333", paddingTop: "6px", paddingBottom: "4px" }}>
+                  {hoy}
+                </td>
+              </tr>
+              {cobro.fechaVencimiento && (
+                <tr>
+                  <td style={{ fontWeight: "bold", paddingTop: "6px", paddingBottom: "4px" }}>VENCIMIENTO</td>
+                  <td colSpan={3} style={{ borderBottom: "1px solid #333", paddingTop: "6px", paddingBottom: "4px" }}>
+                    {new Date(cobro.fechaVencimiento).toLocaleDateString("es-CL")}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {/* TABLA DE ÍTEMS */}
+          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "0", fontSize: "11px" }}>
+            <thead>
+              <tr style={{ backgroundColor: "#2c3e50", color: "#fff" }}>
+                <th style={{ padding: "6px 8px", textAlign: "left", fontWeight: "bold", width: "12%" }}>CÓDIGO</th>
+                <th style={{ padding: "6px 8px", textAlign: "left", fontWeight: "bold" }}>DESCRIPCIÓN</th>
+                <th style={{ padding: "6px 8px", textAlign: "right", fontWeight: "bold", width: "10%" }}>CANT.</th>
+                <th style={{ padding: "6px 8px", textAlign: "right", fontWeight: "bold", width: "14%" }}>PRECIO UNIT.</th>
+                <th style={{ padding: "6px 8px", textAlign: "right", fontWeight: "bold", width: "8%" }}>%DESC</th>
+                <th style={{ padding: "6px 8px", textAlign: "right", fontWeight: "bold", width: "14%" }}>VALOR</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.length > 0 ? items.map((it, idx) => {
+                const desc = it.descuento ?? 0;
+                const subtotal = it.cantidad * it.precioUnitario * (1 - desc / 100);
+                return (
+                  <tr key={it.productoId} style={{ backgroundColor: idx % 2 === 0 ? "#f9f9f9" : "#fff" }}>
+                    <td style={{ padding: "5px 8px", borderBottom: "1px solid #e5e5e5", fontFamily: "monospace" }}>
+                      {it.productoId}
+                    </td>
+                    <td style={{ padding: "5px 8px", borderBottom: "1px solid #e5e5e5" }}>
+                      {it.nombre ?? `Ítem #${it.productoId}`}
+                      {it.tipo === "servicio" ? " (Servicio)" : ""}
+                    </td>
+                    <td style={{ padding: "5px 8px", textAlign: "right", borderBottom: "1px solid #e5e5e5" }}>
+                      {it.cantidad.toLocaleString("es-CL")}
+                    </td>
+                    <td style={{ padding: "5px 8px", textAlign: "right", borderBottom: "1px solid #e5e5e5", fontFamily: "monospace" }}>
+                      {formatCurrency(it.precioUnitario)}
+                    </td>
+                    <td style={{ padding: "5px 8px", textAlign: "right", borderBottom: "1px solid #e5e5e5" }}>
+                      {desc > 0 ? `${desc}%` : "—"}
+                    </td>
+                    <td style={{ padding: "5px 8px", textAlign: "right", borderBottom: "1px solid #e5e5e5", fontFamily: "monospace" }}>
+                      {formatCurrency(subtotal)}
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr>
+                  <td colSpan={6} style={{ padding: "10px 8px", textAlign: "center", color: "#888", borderBottom: "1px solid #e5e5e5" }}>
+                    {cobro.descripcion}
+                  </td>
+                </tr>
+              )}
+              {/* Filas vacías para relleno visual */}
+              {Array.from({ length: Math.max(0, 5 - (items.length || 1)) }).map((_, i) => (
+                <tr key={`empty-${i}`}>
+                  <td colSpan={6} style={{ padding: "5px 8px", borderBottom: "1px solid #e5e5e5", height: "24px" }}>&nbsp;</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* TOTALES */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0" }}>
+            <table style={{ borderCollapse: "collapse", fontSize: "11px", minWidth: "280px" }}>
+              <tbody>
+                {cobro.incluyeIva ? (
+                  <>
+                    <tr>
+                      <td style={{ padding: "5px 12px", fontWeight: "bold", borderTop: "2px solid #333", borderLeft: "2px solid #333" }}>
+                        MONTO NETO
+                      </td>
+                      <td style={{ padding: "5px 12px", textAlign: "right", fontFamily: "monospace", borderTop: "2px solid #333", borderRight: "2px solid #333", borderLeft: "1px solid #ccc" }}>
+                        $ {formatCurrency(neto)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: "5px 12px", fontWeight: "bold", borderLeft: "2px solid #333", borderTop: "1px solid #ccc" }}>
+                        I.V.A. {pct}%
+                      </td>
+                      <td style={{ padding: "5px 12px", textAlign: "right", fontFamily: "monospace", borderRight: "2px solid #333", borderLeft: "1px solid #ccc", borderTop: "1px solid #ccc" }}>
+                        $ {formatCurrency(iva)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: "7px 12px", fontWeight: "bold", fontSize: "13px", backgroundColor: "#2c3e50", color: "#fff", borderLeft: "2px solid #333", borderBottom: "2px solid #333" }}>
+                        TOTAL
+                      </td>
+                      <td style={{ padding: "7px 12px", textAlign: "right", fontFamily: "monospace", fontWeight: "bold", fontSize: "13px", backgroundColor: "#2c3e50", color: "#fff", borderRight: "2px solid #333", borderBottom: "2px solid #333" }}>
+                        $ {formatCurrency(total)}
+                      </td>
+                    </tr>
+                  </>
+                ) : (
+                  <>
+                    <tr>
+                      <td style={{ padding: "5px 12px", fontWeight: "bold", borderTop: "2px solid #333", borderLeft: "2px solid #333" }}>
+                        MONTO EXENTO
+                      </td>
+                      <td style={{ padding: "5px 12px", textAlign: "right", fontFamily: "monospace", borderTop: "2px solid #333", borderRight: "2px solid #333", borderLeft: "1px solid #ccc" }}>
+                        $ {formatCurrency(total)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: "7px 12px", fontWeight: "bold", fontSize: "13px", backgroundColor: "#2c3e50", color: "#fff", borderLeft: "2px solid #333", borderBottom: "2px solid #333" }}>
+                        TOTAL
+                      </td>
+                      <td style={{ padding: "7px 12px", textAlign: "right", fontFamily: "monospace", fontWeight: "bold", fontSize: "13px", backgroundColor: "#2c3e50", color: "#fff", borderRight: "2px solid #333", borderBottom: "2px solid #333" }}>
+                        $ {formatCurrency(total)}
+                      </td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pie */}
+          {cobro.descripcion && items.length === 0 && (
+            <div style={{ marginTop: "12px", fontSize: "10px", color: "#555", borderTop: "1px solid #ccc", paddingTop: "8px" }}>
+              <strong>Observaciones:</strong> {cobro.descripcion}
+            </div>
+          )}
+          {cobro.descripcion && items.length > 0 && (
+            <div style={{ marginTop: "12px", fontSize: "10px", color: "#555", borderTop: "1px solid #ccc", paddingTop: "8px" }}>
+              <strong>Observaciones:</strong> {cobro.descripcion}
+            </div>
+          )}
+
+          <div style={{ marginTop: "24px", borderTop: "1px solid #ccc", paddingTop: "8px", textAlign: "center", fontSize: "10px", color: "#aaa" }}>
+            Documento generado por Cobro Tracker · {new Date().toLocaleDateString("es-CL")}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const editFormSchema = z.object({
   monto: z.coerce.number().positive("El monto debe ser mayor a 0"),
   tipoDocumento: z.enum(TIPO_DOCUMENTO_VALUES),
@@ -178,6 +449,7 @@ export default function CobroDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id || "0", 10);
   const [pdfPreview, setPdfPreview] = useState(false);
+  const [showDocumento, setShowDocumento] = useState(false);
 
   const { data: cobro, isLoading } = useGetCobro(id, {
     query: { enabled: !!id, queryKey: getGetCobroQueryKey(id) },
@@ -1024,11 +1296,16 @@ export default function CobroDetail() {
             {updateCobro.isPending && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground ml-2" />}
           </div>
 
+          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => setShowDocumento(true)}>
+            <FileText className="h-3.5 w-3.5" />
+            Ver documento
+          </Button>
           <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => setPdfPreview(true)} data-testid="button-vista-previa-cobro">
             <FileTextPdf className="h-3.5 w-3.5" />
             Vista previa PDF
           </Button>
           <PdfPreviewDialog open={pdfPreview} onOpenChange={setPdfPreview} cargar={() => downloadCobroPdf(cobro.id)} filename={cobro.numeroDocumento || `cobro-${cobro.id}`} titulo={`Cobro ${cobro.numeroDocumento || `#${cobro.id}`}`} />
+          <DocumentoTributarioModal open={showDocumento} onClose={() => setShowDocumento(false)} cobro={cobro} formatCurrency={formatCurrency} />
           {cobro.estado === "pendiente" && (
             <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={openEditDialog}>
               <Pencil className="h-3.5 w-3.5" />
