@@ -85,11 +85,11 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
   const agregarEscaneado = (p: Producto) => agregarProducto(p, true);
 
   const disponibles = useMemo(() => {
-    const usados = new Set(lineas.map((l) => l.productoId));
     const s = q.trim().toLowerCase();
+    if (!s) return []; // sin texto → lista vacía
+    const usados = new Set(lineas.map((l) => l.productoId));
     return (productos ?? []).filter((p) => {
       if (!p.activo || !mismaMoneda(p) || usados.has(p.id)) return false;
-      if (!s) return true;
       return (
         p.nombre.toLowerCase().includes(s) ||
         (p.sku ?? "").toLowerCase().includes(s) ||
@@ -123,6 +123,10 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
                 <div className="space-y-1.5 p-1">{[1, 2, 3].map((i) => <div key={i} className="h-9 rounded bg-muted animate-pulse" />)}</div>
               ) : isError ? (
                 <div className="p-3 text-center text-sm">No se pudo cargar el catálogo. <button type="button" className="text-primary underline" onClick={() => refetch()}>Reintentar</button></div>
+              ) : !q.trim() ? (
+                <div className="p-3 text-center text-sm text-muted-foreground">
+                  Escribe para buscar productos o servicios
+                </div>
               ) : disponibles.length === 0 ? (
                 <div className="p-3 text-center text-sm text-muted-foreground">
                   {(productos ?? []).some((p) => p.activo && mismaMoneda(p)) ? "Sin coincidencias." : (productos ?? []).some((p) => p.activo) ? `No hay ítems con precio en ${mon}.` : <>Tu catálogo está vacío. <Link href="/inventario/nuevo" className="text-primary underline">Crear ítem</Link></>}
