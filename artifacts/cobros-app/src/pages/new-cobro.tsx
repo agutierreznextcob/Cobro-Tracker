@@ -132,9 +132,9 @@ export default function NewCobro() {
   const permiteIva = tipoDocumentoPermiteIva(tipoDocumentoWatch);
   const incluyeIvaWatch = form.watch("incluyeIva");
 
-  // Totales
+  // Totales — IVA aplica para cualquier tipo de documento cuando el usuario lo activa
   const netoNum = totalItems;
-  const ivaNum = permiteIva && incluyeIvaWatch ? roundTo(netoNum * ivaPct / 100, decimalesEfectivos) : 0;
+  const ivaNum = incluyeIvaWatch ? roundTo(netoNum * ivaPct / 100, decimalesEfectivos) : 0;
   const totalNum = netoNum + ivaNum;
 
   useEffect(() => {
@@ -142,12 +142,6 @@ export default function NewCobro() {
       form.setValue("emailPagador", selectedCliente.email, { shouldValidate: true });
     }
   }, [selectedCliente?.id]);
-
-  useEffect(() => {
-    if (!permiteIva && form.getValues("incluyeIva")) {
-      form.setValue("incluyeIva", false);
-    }
-  }, [permiteIva]);
 
   const onSubmit = async (values: FormValues) => {
     if (advancedInFlight.current || !prefsListas) return;
@@ -170,7 +164,7 @@ export default function NewCobro() {
       porcentajeIva: ivaPct,
       monto: montoFinal,
       tipoDocumento: values.tipoDocumento,
-      incluyeIva: permiteIva ? values.incluyeIva : false,
+      incluyeIva: values.incluyeIva,
       descripcion: values.descripcion || undefined,
       emailPagador: values.emailPagador || selectedCliente?.email || undefined,
       clienteId: values.clienteId || undefined,
@@ -196,7 +190,7 @@ export default function NewCobro() {
       try {
         const advancedPayload = {
           itemsInventario, moneda: "CLP", decimales: decimalesEfectivos, monto: montoFinal,
-          tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
+          tipoDocumento: values.tipoDocumento, incluyeIva: values.incluyeIva,
           descripcion: values.descripcion || undefined,
           responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
           automatizacion: "ninguna",
@@ -511,14 +505,14 @@ export default function NewCobro() {
                     <span className="text-muted-foreground">Neto</span>
                     <span className="font-mono">{simbolo} {formatCurrency(netoNum)}</span>
                   </div>
-                  {permiteIva && incluyeIvaWatch && (
+                  {incluyeIvaWatch && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">IVA ({ivaPct}%)</span>
                       <span className="font-mono">{simbolo} {formatCurrency(ivaNum)}</span>
                     </div>
                   )}
                   <div className="flex justify-between pt-2 border-t border-border">
-                    <span className="font-semibold">{permiteIva && incluyeIvaWatch ? "Total con IVA" : "Total"}</span>
+                    <span className="font-semibold">{incluyeIvaWatch ? "Total con IVA" : "Total"}</span>
                     <span className="font-mono font-bold text-lg text-primary">{simbolo} {formatCurrency(totalNum)}</span>
                   </div>
                   {monedaEfectiva !== "CLP" && (
