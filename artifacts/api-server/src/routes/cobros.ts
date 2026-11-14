@@ -413,7 +413,7 @@ const CobroAvanzadoBaseBody = z.object({
   itemsInventario: itemsInventarioBody,
   monto: z.number().finite().positive().max(9999999999.99),
   descripcion: z.string().min(1).max(255),
-  tipoDocumento: z.enum(["factura_afecta", "factura_exenta", "boleta_afecta", "boleta_exenta", "sin_documento"]).default("sin_documento"),
+  tipoDocumento: z.enum(["factura_afecta", "factura_exenta", "boleta_afecta", "boleta_exenta", "sin_documento", "boleta_manual", "boleta_electronica", "boleta_electronica_stock", "factura_electronica", "factura_electronica_stock", "factura_no_afecta", "liquidacion_factura", "nota_credito", "nota_credito_exenta", "nota_credito_stock", "nota_debito", "nota_debito_exenta", "vale_comprobante"]).default("sin_documento"),
   incluyeIva: z.boolean().optional(),
   referencia: z.string().max(255).optional(),
   clienteId: z.number().int().positive(),

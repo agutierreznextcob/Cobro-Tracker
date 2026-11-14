@@ -7,6 +7,26 @@ import { sql } from "drizzle-orm";
  * A unique (charge, product) movement makes repeated callbacks harmless.
  */
 export async function initializeInventarioTriggers() {
+  // Extend the tipo_documento enum with all document types used by the frontend.
+  // ALTER TYPE … ADD VALUE is idempotent in PG 12+ (IF NOT EXISTS).
+  await db.execute(sql.raw(`
+    DO $$ BEGIN
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'boleta_manual';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'boleta_electronica';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'boleta_electronica_stock';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'factura_electronica';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'factura_electronica_stock';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'factura_no_afecta';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'liquidacion_factura';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'nota_credito';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'nota_credito_exenta';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'nota_credito_stock';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'nota_debito';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'nota_debito_exenta';
+      ALTER TYPE tipo_documento ADD VALUE IF NOT EXISTS 'vale_comprobante';
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `));
+
   await db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('nextcob:inventario:triggers'))`);
     await tx.execute(sql.raw(`

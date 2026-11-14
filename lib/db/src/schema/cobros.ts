@@ -16,10 +16,25 @@ export const estadoCobroEnum = pgEnum("estado_cobro", [
 // Chilean electronic tax document type (DTE). "afecta" documents allow IVA;
 // "exenta" documents never carry IVA; "sin_documento" is an informal charge.
 export const tipoDocumentoEnum = pgEnum("tipo_documento", [
+  // Legacy values kept for backward compatibility
   "factura_afecta",
   "factura_exenta",
   "boleta_afecta",
   "boleta_exenta",
+  // Current values matching the frontend TIPO_DOCUMENTO_VALUES
+  "boleta_manual",
+  "boleta_electronica",
+  "boleta_electronica_stock",
+  "factura_electronica",
+  "factura_electronica_stock",
+  "factura_no_afecta",
+  "liquidacion_factura",
+  "nota_credito",
+  "nota_credito_exenta",
+  "nota_credito_stock",
+  "nota_debito",
+  "nota_debito_exenta",
+  "vale_comprobante",
   "sin_documento",
 ]);
 
