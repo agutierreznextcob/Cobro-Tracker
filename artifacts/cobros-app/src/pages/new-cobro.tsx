@@ -452,20 +452,18 @@ export default function NewCobro() {
                   </div>
                 </div>
 
-                {permiteIva && (
-                  <div className="flex items-center gap-3 pt-1">
-                    <input
-                      type="checkbox"
-                      id="incluye-iva"
-                      checked={incluyeIvaWatch}
-                      onChange={(e) => form.setValue("incluyeIva", e.target.checked)}
-                      className="h-4 w-4 rounded border-border"
-                    />
-                    <label htmlFor="incluye-iva" className="text-sm cursor-pointer">
-                      Precios incluyen IVA ({ivaPct}%)
-                    </label>
-                  </div>
-                )}
+                <div className="flex items-center gap-3 pt-1">
+                  <input
+                    type="checkbox"
+                    id="incluye-iva"
+                    checked={incluyeIvaWatch}
+                    onChange={(e) => form.setValue("incluyeIva", e.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  <label htmlFor="incluye-iva" className="text-sm cursor-pointer">
+                    Precios incluyen IVA ({ivaPct}%)
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -475,11 +473,11 @@ export default function NewCobro() {
             <CatalogoLineas
               lineas={lineas}
               onChange={setLineas}
-              incluyeIva={permiteIva && !!incluyeIvaWatch}
+              incluyeIva={!!incluyeIvaWatch}
               moneda={monedaEfectiva}
               decimales={decimalesEfectivos}
               onIvaDetectado={() => {
-                if (permiteIva) form.setValue("incluyeIva", true);
+                form.setValue("incluyeIva", true);
               }}
             />
           </div>

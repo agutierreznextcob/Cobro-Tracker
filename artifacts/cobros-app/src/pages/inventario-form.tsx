@@ -12,7 +12,6 @@ import {
   type Producto,
 } from "@workspace/api-client-react";
 import { HistorialCostos } from "@/components/historial-costos";
-import { PvpProveedorCard, type PvpCalc } from "@/components/pvp-proveedor";
 import { errorStatus } from "@/lib/compras";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -41,22 +40,21 @@ import {
   utilidadDe,
   type MetodoCalculo,
 } from "@/lib/inventario";
-import { AlertTriangle, ArrowLeft, ArrowLeftRight, Check, Loader2, Lock, Package, Receipt, RotateCw, Warehouse, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowLeftRight, Check, ChevronDown, ChevronUp, Loader2, Lock, Package, Receipt, RotateCw, Tag, Warehouse, Wrench } from "lucide-react";
 
 type Tipo = "producto" | "servicio";
 type Fuente = "manual" | "calculado" | "pvp";
 
 const num = (s: string) => (s.trim() === "" ? NaN : Number(s));
 
-function Money({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" | "accent" }) {
-  const c = tone === "neg" ? "text-red-600" : tone === "pos" ? "text-emerald-700" : tone === "accent" ? "text-primary" : "";
-  return (
-    <div>
-      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
-      <p className={`font-mono text-lg font-bold tabular-nums ${c}`}>{value}</p>
-    </div>
-  );
-}
+// Tasas IVA chilenas estándar
+const TASAS_IVA = [
+  { value: "19", label: "19% — General" },
+  { value: "15", label: "15% — Combustibles (Ley 18.502)" },
+  { value: "10", label: "10% — Alcohol y licores" },
+  { value: "0", label: "0% — Exento" },
+  { value: "otro", label: "Otro..." },
+] as const;
 
 export default function InventarioFormPage() {
   const params = useParams<{ id?: string }>();
@@ -89,13 +87,16 @@ export default function InventarioFormPage() {
   const [metodo, setMetodo] = useState<MetodoCalculo>("margen");
   const [pct, setPct] = useState("30");
   const [precio, setPrecio] = useState("");
-  // Where the final price comes from. On edit, the persisted price is kept ("manual") until the user picks otherwise.
   const [fuente, setFuente] = useState<Fuente>(isEdit ? "manual" : "calculado");
   const setPrecioManual = (b: boolean) => setFuente(b ? "manual" : "calculado");
   const [incluyeIva, setIncluyeIva] = useState(false);
-  const [tasaIva, setTasaIva] = useState("19");
+  // tasaIvaSelect: one of the preset keys or "otro"
+  const [tasaIvaSelect, setTasaIvaSelect] = useState("19");
+  const [tasaIvaOtro, setTasaIvaOtro] = useState(""); // only used when tasaIvaSelect === "otro"
+  const tasaIva = tasaIvaSelect === "otro" ? tasaIvaOtro : tasaIvaSelect;
   const [pvp, setPvp] = useState("");
   const [pvpIncluyeIva, setPvpIncluyeIva] = useState(true);
+  const [pvpExpanded, setPvpExpanded] = useState(false);
   const tokenRef = useRef<string | undefined>(undefined);
   const tocado = useRef(false);
   const [conflicto, setConflicto] = useState(false);
@@ -105,11 +106,9 @@ export default function InventarioFormPage() {
   const [tarifa, setTarifa] = useState("");
   const [horas, setHoras] = useState("");
   const [factor, setFactor] = useState(1);
-  // Existing services keep the loaded base cost (may come from a purchase invoice) until tariff/time change.
   const [baseServicioTocada, setBaseServicioTocada] = useState(!isEdit);
   const [costoServicioCargado, setCostoServicioCargado] = useState(0);
 
-  // Currency is set at creation (default from preferences) and cannot change later.
   const { prefs, listo: prefsListas } = usePreferencias();
   const [moneda, setMoneda] = useState<Moneda>("CLP");
   const monedaTocada = useRef(false);
@@ -117,9 +116,14 @@ export default function InventarioFormPage() {
     if (!isEdit && prefsListas && !monedaTocada.current) setMoneda(monedaDe(prefs.moneda));
   }, [isEdit, prefsListas, prefs.moneda]);
   useEffect(() => {
-    if (!isEdit && prefsListas && !tocado.current) setTasaIva(String(prefs.porcentajeIva ?? 19));
+    if (!isEdit && prefsListas && !tocado.current) {
+      const pref = String(prefs.porcentajeIva ?? 19);
+      const preset = TASAS_IVA.find((t) => t.value === pref && t.value !== "otro");
+      if (preset) { setTasaIvaSelect(pref); }
+      else { setTasaIvaSelect("otro"); setTasaIvaOtro(pref); }
+    }
   }, [isEdit, prefsListas, prefs.porcentajeIva]);
-  // Monetary precision is global (preferences), never currency-derived.
+
   const dec = decimalesPref(prefs);
   const formatCurrency = (n: number) => formatMoney(n, moneda, dec);
 
@@ -147,9 +151,13 @@ export default function InventarioFormPage() {
     setPrecio(String(p.precioUnitario));
     setFuente("manual");
     setIncluyeIva(!!p.incluyeIvaPrecio);
-    setTasaIva(String(p.porcentajeIvaPrecio ?? prefs.porcentajeIva ?? 19));
+    const tasa = String(p.porcentajeIvaPrecio ?? prefs.porcentajeIva ?? 19);
+    const preset = TASAS_IVA.find((t) => t.value === tasa && t.value !== "otro");
+    if (preset) { setTasaIvaSelect(tasa); }
+    else { setTasaIvaSelect("otro"); setTasaIvaOtro(tasa); }
     setPvp(p.pvpProveedor != null ? String(p.pvpProveedor) : "");
     setPvpIncluyeIva(p.pvpIncluyeIva ?? true);
+    setPvpExpanded(p.pvpProveedor != null && p.pvpProveedor > 0);
     setStockCritico(String(p.stockCritico ?? 0));
     setTarifa(p.tarifaHora != null ? String(p.tarifaHora) : "");
     setHoras(p.tiempoEstimadoHoras != null ? String(p.tiempoEstimadoHoras) : "");
@@ -163,7 +171,6 @@ export default function InventarioFormPage() {
     if (!producto || !isFetchedAfterMount) return;
     if (initFor.current !== producto.id) { aplicarRef.current(producto); return; }
     if (producto.actualizadoEn && producto.actualizadoEn !== tokenRef.current) {
-      // Updated elsewhere (e.g. a purchase receipt). Pristine form refreshes; dirty form warns.
       if (!tocado.current) aplicarRef.current(producto);
       else setCambioExterno(producto);
     }
@@ -182,27 +189,21 @@ export default function InventarioFormPage() {
   const desg = netoSug != null ? desgloseIva(netoSug, tasa, incluyeIva, dec) : null;
   const sugerido = desg ? desg.final : null;
 
-  // Supplier PVP analysis (unrounded net for margin).
+  // PVP analysis
   const pvpN = num(pvp);
   const hayPvp = tipo === "producto" && Number.isFinite(pvpN) && pvpN > 0;
-  const pvpCalc: PvpCalc = hayPvp ? (() => {
-    const netoExacto = netoDesde(pvpN, tasa, pvpIncluyeIva);
-    const c = Number.isNaN(costoN) ? 0 : costoN;
-    const finalAceptado = pvpIncluyeIva
-      ? redondear(pvpN, dec)
-      : desgloseIva(pvpN, tasa, incluyeIva, dec).final;
-    return { netoExacto, margen: ((netoExacto - c) / netoExacto) * 100, utilidad: netoExacto - c, finalAceptado };
-  })() : null;
+  const pvpNetoExacto = hayPvp ? netoDesde(pvpN, tasa, pvpIncluyeIva) : 0;
+  const pvpFinalAceptado = hayPvp ? (pvpIncluyeIva ? redondear(pvpN, dec) : desgloseIva(pvpN, tasa, incluyeIva, dec).final) : 0;
+  const c0 = Number.isNaN(costoN) ? 0 : costoN;
+  const pvpMargen = hayPvp && pvpNetoExacto > 0 ? ((pvpNetoExacto - c0) / pvpNetoExacto) * 100 : 0;
+  const pvpUtilidad = hayPvp ? pvpNetoExacto - c0 : 0;
 
-  // Keep price synced with its source until the user types their own.
   useEffect(() => {
     if (fuente === "calculado" && sugerido != null) setPrecio(String(sugerido));
-    if (fuente === "pvp" && pvpCalc) setPrecio(String(pvpCalc.finalAceptado));
-  }, [sugerido, fuente, pvpCalc?.finalAceptado]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (fuente === "pvp" && hayPvp) setPrecio(String(pvpFinalAceptado));
+  }, [sugerido, fuente, pvpFinalAceptado, hayPvp]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (fuente === "pvp" && !hayPvp) setFuente("calculado"); }, [fuente, hayPvp]);
 
-  const aceptarPvp = () => { if (!pvpCalc) return; if (pvpIncluyeIva) setIncluyeIva(true); setFuente("pvp"); };
-  // IVA toggle/rate: explicit adoption of the calculated price on edit so an old net price is never relabeled as gross.
   const cambioIva = () => {
     if (fuente === "pvp" && !pvpIncluyeIva) return;
     if (isEdit || fuente !== "manual") setFuente("calculado");
@@ -211,7 +212,7 @@ export default function InventarioFormPage() {
   const precioN = num(precio);
   const precioFinalR = Number.isNaN(precioN) ? 0 : roundTo(precioN, dec);
   const precioNeto = netoDesde(precioFinalR, tasa, incluyeIva);
-  const real = utilidadDe(Number.isNaN(costoN) ? 0 : costoN, precioNeto);
+  const real = utilidadDe(c0, precioNeto);
   const pctInvalido = tipo === "producto" && metodo === "margen" && pctN >= 100;
   const difiere = sugerido != null && !Number.isNaN(precioN) && roundTo(precioN, dec) !== sugerido;
 
@@ -220,19 +221,16 @@ export default function InventarioFormPage() {
     const p = r.data;
     if (!p) { toast({ title: "No se pudo recargar", variant: "destructive" }); return; }
     if (descartar) { aplicar(p); return; }
-    // Keep the user's edits; adopt only the current cost and version token.
     tokenRef.current = p.actualizadoEn;
     setCosto(String(p.costoUnitario ?? 0));
     setConflicto(false);
     setCambioExterno(null);
   };
   const ultimo = cambioExterno ?? (conflicto ? producto ?? null : null);
-
   const pending = createProducto.isPending || updateProducto.isPending;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Precision comes from preferences; never save with the fallback (0) while they load or failed.
     if (!prefsListas) { toast({ title: "Cargando preferencias", description: "Espera un momento e intenta nuevamente.", variant: "destructive" }); return; }
     if (!nombre.trim()) { toast({ title: "Falta el nombre", variant: "destructive" }); return; }
     if (Number.isNaN(costoN) || costoN < 0) { toast({ title: "Costo inválido", description: "Ingresa un costo de 0 o más.", variant: "destructive" }); return; }
@@ -241,7 +239,6 @@ export default function InventarioFormPage() {
     if (tasaInvalida) { toast({ title: "IVA inválido", description: "Usa un porcentaje entre 0 y 100.", variant: "destructive" }); return; }
     if (pvp.trim() !== "" && (!Number.isFinite(pvpN) || pvpN < 0)) { toast({ title: "PVP inválido", description: "Ingresa un monto de 0 o más, o déjalo vacío.", variant: "destructive" }); return; }
     if (tipo === "servicio" && (factor < 1 || factor > 2)) { toast({ title: "Factor fuera de rango", variant: "destructive" }); return; }
-
     if (codigoInterno.trim() && !CODIGO_RE.test(codigoInterno.trim())) { toast({ title: "Código interno inválido", description: "Usa solo letras, números y guiones.", variant: "destructive" }); return; }
     if (isEdit && !codigoInterno.trim()) { toast({ title: "Falta el código interno", variant: "destructive" }); return; }
     if (!isEdit && tipo === "producto" && hayBodegas && !bodegaId) { toast({ title: "Elige una bodega", description: "Indica dónde queda el stock inicial.", variant: "destructive" }); return; }
@@ -347,8 +344,11 @@ export default function InventarioFormPage() {
         </div>
       )}
 
-      <form onSubmit={submit} onChangeCapture={() => { tocado.current = true; }} onClickCapture={(e) => { if ((e.target as HTMLElement).closest("button[type=button]")) tocado.current = true; }} className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <form onSubmit={submit} onChangeCapture={() => { tocado.current = true; }} onClickCapture={(e) => { if ((e.target as HTMLElement).closest("button[type=button]")) tocado.current = true; }} className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        {/* ── Columna izquierda ───────────────────────────────────────── */}
         <div className="min-w-0 space-y-5">
+
+          {/* Identificación */}
           <Card className="shadow-sm">
             <CardHeader className="pb-3"><CardTitle className="text-base">Identificación</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -403,6 +403,7 @@ export default function InventarioFormPage() {
             </CardContent>
           </Card>
 
+          {/* Calculadora de precio / servicio */}
           {tipo === "producto" ? (
             <Card className="shadow-sm">
               <CardHeader className="pb-3">
@@ -451,7 +452,7 @@ export default function InventarioFormPage() {
                   <div className="space-y-1.5"><Label>Base del servicio</Label>
                     <div className="relative"><span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
                       <Input type="number" className="pl-7 font-mono bg-muted/40" value={Number.isFinite(costoN) ? costoN : ""} readOnly placeholder="0" /></div>
-                    <p className="text-xs text-muted-foreground">{isEdit && !baseServicioTocada ? "Costo vigente (puede venir de una factura). Cambia tarifa u horas para recalcular." : "Tarifa × horas, antes del factor."}</p></div>
+                    <p className="text-xs text-muted-foreground">{isEdit && !baseServicioTocada ? "Costo vigente. Cambia tarifa u horas para recalcular." : "Tarifa × horas, antes del factor."}</p></div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm"><Label>Factor de factibilidad</Label><span className="font-mono font-semibold">×{factor.toFixed(2)}</span></div>
@@ -467,40 +468,7 @@ export default function InventarioFormPage() {
             </Card>
           )}
 
-          <Card className="shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2"><Receipt className="h-4 w-4 text-primary" />IVA en el precio de venta</CardTitle>
-              <CardDescription>La calculadora trabaja en neto. Activa el IVA si tu precio de venta al público lo incluye.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-[1fr_160px] sm:items-end">
-              <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                <div>
-                  <p className="text-sm font-medium">Incluir IVA en precio final</p>
-                  <p className="text-xs text-muted-foreground">{incluyeIva ? "El precio final guardado es bruto (neto + IVA)." : "El precio final guardado es neto."}</p>
-                </div>
-                <Switch checked={incluyeIva} onCheckedChange={(v) => { setIncluyeIva(v); cambioIva(); }} data-testid="switch-incluye-iva" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tasa IVA</Label>
-                <div className="relative">
-                  <Input type="number" min="0" max="100" step="any" className={`pr-8 font-mono ${tasaInvalida ? "border-red-500" : ""}`} value={tasaIva} disabled={!incluyeIva}
-                    onChange={(e) => { setTasaIva(e.target.value); cambioIva(); }} data-testid="input-tasa-iva" />
-                  <span className="absolute right-3 top-2.5 text-muted-foreground">%</span>
-                </div>
-              </div>
-              {isEdit && fuente === "calculado" && (
-                <p className="sm:col-span-2 text-xs text-primary">Al cambiar el IVA se adopta el precio calculado para no reetiquetar un precio neto como bruto.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {tipo === "producto" && (
-            <PvpProveedorCard pvp={pvp} setPvp={setPvp} incluyeIva={pvpIncluyeIva}
-              setIncluyeIva={(v) => { setPvpIncluyeIva(v); if (fuente === "pvp") { if (v) setIncluyeIva(true); } }}
-              tasa={tasa} calc={pvpCalc} fmt={formatCurrency} fuente={fuente}
-              onAceptar={aceptarPvp} onUsarCalculado={() => setFuente("calculado")} />
-          )}
-
+          {/* Stock */}
           {tipo === "producto" && (
             <Card className="shadow-sm">
               <CardHeader className="pb-3"><CardTitle className="text-base">Stock</CardTitle></CardHeader>
@@ -539,7 +507,7 @@ export default function InventarioFormPage() {
                         </Link>
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground">Con bodegas, el umbral se define en cada bodega. Abre una para editarlo.</p>
+                    <p className="text-xs text-muted-foreground">Con bodegas, el umbral se define en cada bodega.</p>
                   </div>
                 ) : (
                   <div className="space-y-1.5">
@@ -551,49 +519,178 @@ export default function InventarioFormPage() {
               </CardContent>
             </Card>
           )}
+
           {isEdit && <HistorialCostos productoId={id} />}
         </div>
 
-        <aside className="min-w-0 lg:sticky lg:top-6 h-fit space-y-4">
-          <Card className="shadow-sm border-primary/30 overflow-hidden">
-            <div className="bg-primary/5 border-b border-primary/20 px-5 py-4">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{tipo === "producto" ? "Precio sugerido" : "Precio calculado"}{incluyeIva ? " con IVA" : " neto"}</p>
-              <p className="font-mono text-3xl font-bold text-primary tabular-nums" data-testid="text-precio-sugerido">{sugerido != null ? formatCurrency(sugerido) : "—"}</p>
-              {desg && incluyeIva && (
-                <p className="font-mono text-xs text-muted-foreground mt-1" data-testid="text-desglose-iva">{formatCurrency(desg.neto)} neto + {formatCurrency(desg.iva)} IVA ({tasa}%)</p>
+        {/* ── Columna derecha: precio + IVA + PVP + métricas ─────────── */}
+        <aside className="min-w-0 lg:sticky lg:top-6 h-fit space-y-0">
+          <Card className="shadow-sm overflow-hidden">
+
+            {/* 1. Precio a guardar (siempre visible, protagonista) */}
+            <div className="bg-primary/5 border-b border-primary/20 px-5 py-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Precio a guardar {incluyeIva ? "(con IVA)" : "(neto)"}
+                </p>
+                <span className="text-[10px] uppercase tracking-wider rounded bg-muted px-1.5 py-0.5 text-muted-foreground" data-testid="text-fuente-precio">
+                  {fuente === "calculado" ? "Calculado" : fuente === "pvp" ? "PVP proveedor" : "Manual"}
+                </span>
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">$</span>
+                <Input
+                  type="number" min="0" step="any"
+                  className="pl-7 font-mono text-xl font-bold h-11"
+                  value={precio}
+                  onChange={(e) => { setPrecio(e.target.value); setPrecioManual(true); }}
+                  data-testid="input-precio-final"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {incluyeIva
+                  ? <>Monto que paga el cliente, IVA incluido. Neto: <span className="font-mono">{formatCurrency(redondear(precioNeto, dec))}</span></>
+                  : "Precio sin IVA. Los documentos con IVA lo agregarán al cobrar."}
+              </p>
+              {/* Sugerido (secundario, solo si difiere) */}
+              {difiere && sugerido != null && (
+                <Button type="button" variant="outline" size="sm" className="w-full h-8 text-xs" onClick={() => setFuente("calculado")} data-testid="button-usar-sugerido">
+                  <Check className="h-3 w-3 mr-1.5" />Usar precio {incluyeIva ? "sugerido" : "calculado"}: {formatCurrency(sugerido)}
+                </Button>
               )}
             </div>
-            <CardContent className="pt-4 space-y-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label>Precio final de venta {incluyeIva ? "(con IVA)" : "(neto)"}</Label>
-                  <span className="text-[10px] uppercase tracking-wider rounded bg-muted px-1.5 py-0.5 text-muted-foreground" data-testid="text-fuente-precio">
-                    {fuente === "calculado" ? "Calculado" : fuente === "pvp" ? "PVP proveedor" : "Manual"}
-                  </span>
+
+            {/* 2. Métricas de utilidad */}
+            <div className="px-5 py-3 border-b border-border/60 grid grid-cols-3 gap-2">
+              {[
+                { label: "Utilidad neta", value: formatCurrency(real.utilidad), neg: real.utilidad < 0 },
+                { label: "Margen", value: formatPct(real.margen), neg: real.utilidad < 0 },
+                { label: "Recargo real", value: c0 > 0 && tipo === "producto" ? formatPct(real.recargo) : "—", neg: false },
+              ].map(({ label, value, neg }) => (
+                <div key={label}>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+                  <p className={`font-mono text-sm font-bold tabular-nums ${neg ? "text-red-600" : "text-emerald-700"}`}>{value}</p>
                 </div>
-                <div className="relative"><span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                  <Input type="number" min="0" step="any" className="pl-7 font-mono text-base font-semibold" value={precio}
-                    onChange={(e) => { setPrecio(e.target.value); setPrecioManual(true); }} data-testid="input-precio-final" /></div>
-                <p className="text-[11px] text-muted-foreground">
-                  {incluyeIva ? <>Monto que paga el cliente, IVA incluido. Neto: <span className="font-mono">{formatCurrency(redondear(precioNeto, dec))}</span></> : "Monto sin IVA; los documentos agregan el IVA."}
-                </p>
-                {difiere && (
-                  <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setFuente("calculado")} data-testid="button-usar-sugerido">
-                    <Check className="h-3.5 w-3.5 mr-1.5" />Usar precio sugerido
-                  </Button>
+              ))}
+              {real.utilidad < 0 && <p className="col-span-3 text-xs text-red-600">Este precio está bajo el costo: pierdes dinero en cada venta.</p>}
+            </div>
+
+            {/* 3. IVA en el precio */}
+            <div className="px-5 py-4 border-b border-border/60 space-y-3">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-3.5 w-3.5 text-primary" />
+                <p className="text-sm font-medium">IVA en el precio</p>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium leading-tight">Incluye IVA en el precio</p>
+                  <p className="text-[11px] text-muted-foreground">{incluyeIva ? "Precio guardado es bruto (neto + IVA)" : "Precio guardado es neto"}</p>
+                </div>
+                <Switch checked={incluyeIva} onCheckedChange={(v) => { setIncluyeIva(v); cambioIva(); }} data-testid="switch-incluye-iva" />
+              </div>
+              {incluyeIva && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Tasa de IVA</Label>
+                  <Select value={tasaIvaSelect} onValueChange={(v) => { setTasaIvaSelect(v); cambioIva(); }} data-testid="select-tasa-iva">
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {TASAS_IVA.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {tasaIvaSelect === "otro" && (
+                    <div className="relative">
+                      <Input
+                        type="number" min="0" max="100" step="any" placeholder="Ej: 12"
+                        className={`pr-8 font-mono h-9 ${tasaInvalida ? "border-red-500" : ""}`}
+                        value={tasaIvaOtro}
+                        onChange={(e) => { setTasaIvaOtro(e.target.value); cambioIva(); }}
+                        data-testid="input-tasa-iva"
+                      />
+                      <span className="absolute right-3 top-2 text-muted-foreground">%</span>
+                    </div>
+                  )}
+                  {desg && (
+                    <div className="rounded-md bg-muted/40 px-3 py-2 font-mono text-xs space-y-1">
+                      <div className="flex justify-between text-muted-foreground"><span>Neto</span><span>{formatCurrency(desg.neto)}</span></div>
+                      <div className="flex justify-between text-muted-foreground"><span>IVA {tasa}%</span><span>{formatCurrency(desg.iva)}</span></div>
+                      <div className="flex justify-between font-semibold border-t pt-1"><span>Total</span><span>{formatCurrency(desg.final)}</span></div>
+                    </div>
+                  )}
+                  {isEdit && fuente === "calculado" && (
+                    <p className="text-[11px] text-primary">Al cambiar el IVA se adopta el precio calculado.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 4. PVP del proveedor (colapsable) */}
+            {tipo === "producto" && (
+              <div className="px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => setPvpExpanded((v) => !v)}
+                  className="w-full flex items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <span className="flex items-center gap-2"><Tag className="h-3.5 w-3.5" />PVP del proveedor (opcional)</span>
+                  {pvpExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+
+                {pvpExpanded && (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">PVP sugerido</Label>
+                        <div className="relative"><span className="absolute left-3 top-2.5 text-muted-foreground text-sm">$</span>
+                          <Input type="number" min="0" step="any" className="pl-7 font-mono h-9" value={pvp} onChange={(e) => setPvp(e.target.value)} placeholder="Sin PVP" data-testid="input-pvp-proveedor" /></div>
+                      </div>
+                      <div className="flex gap-1 p-1 bg-muted rounded-lg" role="radiogroup">
+                        {([[true, "Con IVA"], [false, "Sin IVA"]] as const).map(([v, l]) => (
+                          <button key={l} type="button" role="radio" aria-checked={pvpIncluyeIva === v}
+                            onClick={() => { setPvpIncluyeIva(v); if (fuente === "pvp") { if (v) setIncluyeIva(true); } }}
+                            className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${pvpIncluyeIva === v ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                            data-testid={`toggle-pvp-${v ? "con" : "sin"}-iva`}>{l}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {hayPvp && (
+                      <>
+                        <div className="rounded-lg bg-muted/50 p-2.5 font-mono text-xs space-y-1">
+                          {pvpIncluyeIva ? (
+                            <>
+                              <div className="flex justify-between"><span className="text-muted-foreground">PVP con IVA</span><span>{formatCurrency(pvpN)}</span></div>
+                              <div className="flex justify-between"><span className="text-muted-foreground">÷ (1 + {tasa}%) = neto</span><span className="font-semibold">{formatCurrency(pvpNetoExacto)}</span></div>
+                            </>
+                          ) : (
+                            <div className="flex justify-between"><span className="text-muted-foreground">PVP neto</span><span className="font-semibold">{formatCurrency(pvpNetoExacto)}</span></div>
+                          )}
+                        </div>
+                        <p className={`text-xs rounded-md px-3 py-2 border ${pvpUtilidad < 0 ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} data-testid="text-pvp-margen">
+                          Obtienes <strong className="font-mono">{formatPct(pvpMargen)}</strong> de margen · <strong className="font-mono">{formatCurrency(pvpUtilidad)}</strong> utilidad
+                        </p>
+                        <div className="flex gap-2">
+                          <Button type="button" size="sm" variant={fuente === "pvp" ? "default" : "outline"} className="flex-1 h-8 text-xs" onClick={() => { if (pvpIncluyeIva) setIncluyeIva(true); setFuente("pvp"); }} data-testid="button-aceptar-pvp">
+                            <Check className="h-3 w-3 mr-1" />{fuente === "pvp" ? "PVP aceptado" : "Aceptar PVP"} · {formatCurrency(pvpFinalAceptado)}
+                          </Button>
+                          {fuente === "pvp" && (
+                            <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => setFuente("calculado")} data-testid="button-usar-calculado">
+                              Usar calculado
+                            </Button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t">
-                <Money label="Utilidad neta" value={formatCurrency(real.utilidad)} tone={real.utilidad < 0 ? "neg" : "pos"} />
-                <Money label="Margen neto" value={formatPct(real.margen)} tone={real.utilidad < 0 ? "neg" : "pos"} />
-                {tipo === "producto" && <Money label="Recargo real" value={costoN > 0 ? formatPct(real.recargo) : "—"} />}
-              </div>
-              {real.utilidad < 0 && <p className="text-xs text-red-600">Este precio está bajo el costo: pierdes dinero en cada venta.</p>}
-            </CardContent>
+            )}
           </Card>
 
+          {/* Activo / archivado */}
           {isEdit && (
-            <div className="flex items-center justify-between rounded-xl border bg-card p-4">
+            <div className="mt-4 flex items-center justify-between rounded-xl border bg-card p-4">
               <div>
                 <p className="text-sm font-medium">{activo ? "Activo en el catálogo" : "Archivado"}</p>
                 <p className="text-xs text-muted-foreground">{activo ? "Disponible para nuevos cobros." : "No aparece al crear cobros."}</p>
@@ -602,7 +699,7 @@ export default function InventarioFormPage() {
             </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={pending || !prefsListas}>
+          <Button type="submit" className="w-full mt-4" disabled={pending || !prefsListas}>
             {pending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</> : isEdit ? "Guardar cambios" : `Crear ${tipo}`}
           </Button>
         </aside>
