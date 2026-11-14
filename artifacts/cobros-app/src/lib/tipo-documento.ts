@@ -1,4 +1,9 @@
 export const TIPO_DOCUMENTO_VALUES = [
+  // Valores históricos: conservar al consultar y editar documentos existentes.
+  "factura_afecta",
+  "factura_exenta",
+  "boleta_afecta",
+  "boleta_exenta",
   // --- Documentos SII formales ---
   "boleta_manual",           // 35 Boleta Manual
   "boleta_electronica",      // 39 Boleta Electrónica
@@ -20,6 +25,10 @@ export const TIPO_DOCUMENTO_VALUES = [
 export type TipoDocumento = (typeof TIPO_DOCUMENTO_VALUES)[number];
 
 export const TIPO_DOCUMENTO_LABELS: Record<TipoDocumento, string> = {
+  factura_afecta:             "Factura afecta",
+  factura_exenta:             "Factura exenta",
+  boleta_afecta:              "Boleta afecta",
+  boleta_exenta:              "Boleta exenta",
   boleta_manual:              "35 · Boleta Manual",
   boleta_electronica:         "39 · Boleta Electrónica",
   boleta_electronica_stock:   "39 · Boleta Electrónica Rebaja Stock",
@@ -38,6 +47,10 @@ export const TIPO_DOCUMENTO_LABELS: Record<TipoDocumento, string> = {
 
 // Short label for compact surfaces (tables, badges).
 export const TIPO_DOCUMENTO_LABELS_CORTOS: Record<TipoDocumento, string> = {
+  factura_afecta:            "Factura afecta",
+  factura_exenta:            "Factura exenta",
+  boleta_afecta:             "Boleta afecta",
+  boleta_exenta:             "Boleta exenta",
   boleta_manual:             "Boleta Manual",
   boleta_electronica:        "Boleta Electrónica",
   boleta_electronica_stock:  "Boleta Elect. Stock",

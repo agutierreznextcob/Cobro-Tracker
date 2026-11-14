@@ -51,6 +51,7 @@ import {
   getGetDatosBancariosQueryKey,
   type RecordatorioInputCanal,
   type RecordatorioInputMomento,
+  type Cobro,
 } from "@workspace/api-client-react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -123,7 +124,7 @@ const IVA_RATE = 0.19;
 function DocumentoTributarioModal({ open, onClose, cobro, formatCurrency }: {
   open: boolean;
   onClose: () => void;
-  cobro: NonNullable<ReturnType<typeof useGetCobro>["data"]>;
+  cobro: Cobro;
   formatCurrency: (n: number) => string;
 }) {
   if (!open) return null;

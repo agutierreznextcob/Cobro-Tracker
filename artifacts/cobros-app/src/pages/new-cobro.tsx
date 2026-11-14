@@ -156,6 +156,9 @@ export default function NewCobro() {
 
     const itemsInventario = lineasPayload(lineas, decimalesEfectivos);
     const montoFinal = roundTo(totalItems, decimalesEfectivos);
+    const descripcion = values.descripcion?.trim()
+      || lineas.map((item) => item.nombre).filter(Boolean).join(", ").slice(0, 255)
+      || "Venta de productos o servicios";
 
     const payload: CobroInput = {
       itemsInventario,
@@ -165,7 +168,7 @@ export default function NewCobro() {
       monto: montoFinal,
       tipoDocumento: values.tipoDocumento,
       incluyeIva: values.incluyeIva,
-      descripcion: values.descripcion || undefined,
+      descripcion,
       emailPagador: values.emailPagador || selectedCliente?.email || undefined,
       clienteId: values.clienteId || undefined,
       fechaVencimiento: values.fechaVencimiento || undefined,
@@ -191,7 +194,7 @@ export default function NewCobro() {
         const advancedPayload = {
           itemsInventario, moneda: "CLP", decimales: decimalesEfectivos, monto: montoFinal,
           tipoDocumento: values.tipoDocumento, incluyeIva: values.incluyeIva,
-          descripcion: values.descripcion || undefined,
+          descripcion,
           responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
           automatizacion: "ninguna",
           ...(modoAvanzado === "recurrente"
