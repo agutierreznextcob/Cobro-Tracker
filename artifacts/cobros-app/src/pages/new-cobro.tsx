@@ -3,39 +3,47 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateCobro, useCreateCobroRecurrente, useCreateCobrosMasivos, useListClientes, useListMiembros, getListMiembrosQueryKey, getListCobrosQueryKey, getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey, useListWorkflows, getListWorkflowsQueryKey, useListWorkflowPlantillas, useCreateWorkflowFromPlantilla, useAsignarWorkflow, useGetDatosBancarios, getGetDatosBancariosQueryKey, type CobroInput } from "@workspace/api-client-react";
+import {
+  useCreateCobro, useCreateCobroRecurrente, useCreateCobrosMasivos,
+  useListClientes, useListMiembros, useGetDatosBancarios,
+  getListMiembrosQueryKey, getListCobrosQueryKey,
+  getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey,
+  getGetDatosBancariosQueryKey,
+  type CobroInput,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatMoney, roundTo, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
 import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 import { TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
-import { Loader2, ArrowLeft, Users, Lock } from "lucide-react";
+import { Loader2, ArrowLeft, Users, Lock, ChevronDown, ChevronUp, Calendar, FileText } from "lucide-react";
 import { Link } from "wouter";
 import { CatalogoLineas, lineasPayload, lineasValidas, totalLineas, type LineaCatalogo } from "@/components/catalogo-lineas";
 
-
 const formSchema = z.object({
-  monto: z.coerce.number().positive("El monto debe ser mayor a 0"),
   tipoDocumento: z.enum(TIPO_DOCUMENTO_VALUES),
   incluyeIva: z.boolean().default(false),
-  descripcion: z.string().min(1, "La descripción es obligatoria").max(255),
+  descripcion: z.string().max(255).optional().or(z.literal("")),
   referencia: z.string().optional(),
   clienteId: z.coerce.number().optional(),
   emailPagador: z.string().email("Email inválido").optional().or(z.literal("")),
   fechaVencimiento: z.string().optional().or(z.literal("")),
+  fechaEmision: z.string().optional().or(z.literal("")),
   responsableId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+function hoy() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default function NewCobro() {
   const [, setLocation] = useLocation();
@@ -60,15 +68,11 @@ export default function NewCobro() {
     (m) => !isSupervisor || m.id === user?.id || m.supervisorId === user?.id,
   );
 
-  const { data: workflowsList } = useListWorkflows({
-    query: { queryKey: getListWorkflowsQueryKey() },
-  });
-  const { data: plantillasList } = useListWorkflowPlantillas();
-  const asignarWorkflow = useAsignarWorkflow();
-  const crearDesdePlantilla = useCreateWorkflowFromPlantilla();
-  const [automatizacion, setAutomatizacion] = useState<"ninguna" | "simple" | "workflow">("ninguna");
-  // "wf:<id>" for a saved workflow, "tpl:<key>" for a template to instantiate.
-  const [workflowSeleccionado, setWorkflowSeleccionado] = useState<string>("");
+  const planUser = user as (typeof user & { subscriptionStatus?: string; plan?: string }) | null;
+  const nextCob = user?.role === "admin" || user?.esDemo || planUser?.subscriptionStatus === "prueba" || planUser?.plan !== "starter";
+
+  // Modos avanzados (colapsados por defecto)
+  const [mostrarModoAvanzado, setMostrarModoAvanzado] = useState(false);
   const [modoAvanzado, setModoAvanzado] = useState<"individual" | "masivo" | "recurrente">("individual");
   const [frecuencia, setFrecuencia] = useState("mensual");
   const [fechaInicio, setFechaInicio] = useState("");
@@ -78,24 +82,12 @@ export default function NewCobro() {
   const [creandoAvanzado, setCreandoAvanzado] = useState(false);
   const advancedAttempt = useRef<{ signature: string; key: string } | null>(null);
   const advancedInFlight = useRef(false);
-  const templateAttempt = useRef<{ key: string; id: number } | null>(null);
-  const [canalesIniciales, setCanalesIniciales] = useState<Array<"email" | "whatsapp">>([]);
+
   const { prefs, listo: prefsListas } = usePreferencias();
-  // Precision always follows the current preference (refetched on mount); it
-  // is not editable here and never derived from the currency.
   const decimalesEfectivos = decimalesPref(prefs);
   const [lineas, setLineas] = useState<LineaCatalogo[]>([]);
-  const usaLineas = lineas.length > 0;
   const totalItems = totalLineas(lineas, decimalesEfectivos);
-  const [resultadosEntrega, setResultadosEntrega] = useState<Array<{ cobroId?: number; canal: string; estado: string; detalle?: string; waUrl?: string }>>([]);
-  // Trial/demo/admin users inherit NextCob features even if a historical plan
-  // field says Starter; server endpoints remain the source of enforcement.
-  const planUser = user as (typeof user & { subscriptionStatus?: string; plan?: string }) | null;
-  const nextCob = user?.role === "admin" || user?.esDemo || planUser?.subscriptionStatus === "prueba" || planUser?.plan !== "starter";
 
-  // Document currency: defaults come from org preferences for NEW cobros only.
-  // Bulk/recurring creation is still CLP-only on the server, so those modes
-  // force CLP explicitly.
   const [monedaDoc, setMonedaDoc] = useState<Moneda>("CLP");
   const [ivaDoc, setIvaDoc] = useState("19");
   const prefsAplicadas = useRef(false);
@@ -105,17 +97,18 @@ export default function NewCobro() {
     setMonedaDoc(prefs.moneda as Moneda);
     setIvaDoc(String(prefs.porcentajeIva));
   }, [prefsListas, prefs]);
+
   const monedaEfectiva: Moneda = modoAvanzado === "individual" ? monedaDoc : "CLP";
   const ivaPct = modoAvanzado === "individual" ? Math.min(100, Math.max(0, Number(ivaDoc) || 0)) : 19;
   const formatCurrency = (n: number) => formatMoney(n, monedaEfectiva, decimalesEfectivos);
+  const simbolo = MONEDA_INFO[monedaEfectiva].simbolo;
+
   const cambiarMoneda = (m: Moneda) => {
-    // Radix's hidden native select can emit "" while its value is synced
-    // inside a form. It is not a currency change.
     if (!(MONEDAS as readonly string[]).includes(m)) return;
     if (m === monedaDoc) return;
     if (lineas.length > 0) {
       setLineas([]);
-      toast({ title: "Ítems quitados", description: "Los ítems del catálogo deben tener la misma moneda del cobro." });
+      toast({ title: "Ítems quitados", description: "Los ítems deben tener la misma moneda del documento." });
     }
     setMonedaDoc(m);
   };
@@ -123,7 +116,6 @@ export default function NewCobro() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      monto: 0,
       tipoDocumento: "sin_documento",
       incluyeIva: false,
       descripcion: "",
@@ -131,35 +123,28 @@ export default function NewCobro() {
       clienteId: undefined,
       emailPagador: "",
       fechaVencimiento: "",
+      fechaEmision: hoy(),
       responsableId: undefined,
     },
   });
 
   const selectedClienteId = form.watch("clienteId");
   const selectedCliente = clientes?.find((c) => c.id === selectedClienteId);
-
-  const montoWatch = form.watch("monto");
   const tipoDocumentoWatch = form.watch("tipoDocumento");
   const permiteIva = tipoDocumentoPermiteIva(tipoDocumentoWatch);
   const incluyeIvaWatch = form.watch("incluyeIva");
-  const netoNum = Number(montoWatch) || 0;
-  const ivaNum = incluyeIvaWatch ? roundTo(netoNum * ivaPct / 100, decimalesEfectivos) : 0;
-  const totalNum = incluyeIvaWatch ? netoNum + ivaNum : netoNum;
 
-  // Catalog lines drive the (neto) amount; keep the form field synchronized.
-  useEffect(() => {
-    if (usaLineas) form.setValue("monto", totalItems, { shouldValidate: true });
-  }, [usaLineas, totalItems]);
+  // Totales
+  const netoNum = totalItems;
+  const ivaNum = permiteIva && incluyeIvaWatch ? roundTo(netoNum * ivaPct / 100, decimalesEfectivos) : 0;
+  const totalNum = netoNum + ivaNum;
 
-  // Auto-fill email when a client is selected
   useEffect(() => {
     if (selectedCliente?.email) {
       form.setValue("emailPagador", selectedCliente.email, { shouldValidate: true });
     }
   }, [selectedCliente?.id]);
 
-  // Exenta / sin_documento charges can never carry IVA — force the toggle off
-  // whenever the selected document type does not allow it.
   useEffect(() => {
     if (!permiteIva && form.getValues("incluyeIva")) {
       form.setValue("incluyeIva", false);
@@ -168,16 +153,18 @@ export default function NewCobro() {
 
   const onSubmit = async (values: FormValues) => {
     if (advancedInFlight.current || !prefsListas) return;
-    if (usaLineas && (!lineasValidas(lineas) || totalItems <= 0)) {
-      toast({ title: "Revisa los ítems", description: "Cada ítem necesita cantidad mayor a 0 y precio válido, y el total debe ser mayor a $0.", variant: "destructive" });
+    if (lineas.length === 0) {
+      toast({ title: "Sin productos", description: "Agrega al menos un ítem al documento.", variant: "destructive" });
       return;
     }
-    const itemsInventario = usaLineas ? lineasPayload(lineas, decimalesEfectivos) : undefined;
-    const montoFinal = usaLineas ? totalItems : roundTo(values.monto, decimalesEfectivos);
-    if (!(montoFinal > 0)) {
-      toast({ title: "Monto inválido", description: "El monto debe ser mayor a 0.", variant: "destructive" });
+    if (!lineasValidas(lineas) || totalItems <= 0) {
+      toast({ title: "Revisa los ítems", description: "Cada ítem necesita cantidad mayor a 0 y precio válido.", variant: "destructive" });
       return;
     }
+
+    const itemsInventario = lineasPayload(lineas, decimalesEfectivos);
+    const montoFinal = roundTo(totalItems, decimalesEfectivos);
+
     const payload: CobroInput = {
       itemsInventario,
       moneda: monedaEfectiva as CobroInput["moneda"],
@@ -186,7 +173,7 @@ export default function NewCobro() {
       monto: montoFinal,
       tipoDocumento: values.tipoDocumento,
       incluyeIva: permiteIva ? values.incluyeIva : false,
-      descripcion: values.descripcion,
+      descripcion: values.descripcion || undefined,
       referencia: values.referencia || undefined,
       emailPagador: values.emailPagador || selectedCliente?.email || undefined,
       clienteId: values.clienteId || undefined,
@@ -194,18 +181,9 @@ export default function NewCobro() {
       responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
     };
 
-    if (automatizacion === "workflow" && !workflowSeleccionado) {
-      toast({
-        title: "Selecciona un workflow",
-        description: "Elige una plantilla o un workflow guardado, o cambia la opción de automatización.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (modoAvanzado !== "individual") {
       if (!nextCob) {
-        toast({ title: "Disponible en plan NextCob", description: "Disponible en plan NextCob", variant: "destructive" });
+        toast({ title: "Disponible en plan NextCob", variant: "destructive" });
         return;
       }
       if (modoAvanzado === "recurrente" && (!values.clienteId || !fechaInicio)) {
@@ -219,25 +197,12 @@ export default function NewCobro() {
       setCreandoAvanzado(true);
       advancedInFlight.current = true;
       try {
-        let workflowId: number | undefined;
-        if (automatizacion === "workflow") {
-          if (workflowSeleccionado.startsWith("tpl:")) {
-            if (templateAttempt.current?.key !== workflowSeleccionado) {
-              const nuevo = await crearDesdePlantilla.mutateAsync({ data: { plantillaKey: workflowSeleccionado.slice(4) } });
-              templateAttempt.current = { key: workflowSeleccionado, id: nuevo.id };
-            }
-            workflowId = templateAttempt.current.id;
-            queryClient.invalidateQueries({ queryKey: getListWorkflowsQueryKey() });
-          } else {
-            workflowId = Number(workflowSeleccionado.replace(/^wf:/, ""));
-          }
-          if (!Number.isInteger(workflowId) || workflowId! <= 0) throw new Error("Workflow inválido.");
-        }
         const advancedPayload = {
-          itemsInventario, moneda: "CLP", decimales: decimalesEfectivos, monto: montoFinal, tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
-          descripcion: values.descripcion, referencia: values.referencia || undefined,
+          itemsInventario, moneda: "CLP", decimales: decimalesEfectivos, monto: montoFinal,
+          tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
+          descripcion: values.descripcion || undefined, referencia: values.referencia || undefined,
           responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
-           automatizacion, workflowId, canalesIniciales,
+          automatizacion: "ninguna",
           ...(modoAvanzado === "recurrente"
             ? { clienteId: values.clienteId, emailPagador: values.emailPagador || selectedCliente?.email || undefined, frecuencia, fechaInicio, fechaTermino: fechaTermino || undefined }
             : { clienteIds: clienteIdsMasivos, fechaVencimiento: values.fechaVencimiento || undefined }),
@@ -249,22 +214,16 @@ export default function NewCobro() {
         const requestPayload = { ...advancedPayload, idempotencyKey: advancedAttempt.current.key };
         const data = (modoAvanzado === "recurrente"
           ? await createCobroRecurrente.mutateAsync({ data: requestPayload as never })
-          : await createCobrosMasivos.mutateAsync({ data: requestPayload as never })) as { cobro?: { id: number } | null; cobros?: Array<{ id: number }>; deliveryResults?: Array<{ cobroId?: number; canal: string; estado: string; detalle?: string; waUrl?: string }> };
-        setResultadosEntrega(data.deliveryResults ?? []);
+          : await createCobrosMasivos.mutateAsync({ data: requestPayload as never })) as { cobro?: { id: number } | null; cobros?: Array<{ id: number }> };
         queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardMetricsQueryKey() });
         toast({
           title: modoAvanzado === "recurrente" ? "Cobro recurrente programado" : "Cobros masivos creados",
-          description: modoAvanzado === "recurrente" ? "Cada ciclo tendrá su propio cobro y link de pago." : `${data.cobros?.length ?? 0} cobros independientes generados.`,
+          description: modoAvanzado === "recurrente" ? "Cada ciclo tendrá su propio cobro y link de pago." : `${data.cobros?.length ?? 0} cobros generados.`,
         });
-        // Keep the user on this page when delivery was requested so every
-        // customer-specific outcome (including manual WhatsApp links) remains
-        // actionable instead of disappearing behind a redirect.
-        if (!(data.deliveryResults?.length)) {
-          const targetId = data.cobro?.id ?? data.cobros?.[0]?.id;
-          setLocation(targetId ? `/cobros/${targetId}` : "/informes/ventas");
-        }
+        const targetId = data.cobro?.id ?? data.cobros?.[0]?.id;
+        setLocation(targetId ? `/cobros/${targetId}` : "/cobros");
       } catch (error) {
         toast({ title: "Error", description: error instanceof Error ? error.message : "No se pudo crear el cobro.", variant: "destructive" });
       } finally {
@@ -275,179 +234,345 @@ export default function NewCobro() {
     }
 
     createCobro.mutate({ data: payload }, {
-      onSuccess: async (data) => {
+      onSuccess: (data) => {
         queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetCobrosSummaryQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardMetricsQueryKey() });
-
-        if (automatizacion === "workflow" && workflowSeleccionado) {
-          try {
-            let workflowId: number;
-            if (workflowSeleccionado.startsWith("tpl:")) {
-              const plantillaKey = workflowSeleccionado.slice(4);
-              const nuevo = await crearDesdePlantilla.mutateAsync({ data: { plantillaKey } });
-              queryClient.invalidateQueries({ queryKey: getListWorkflowsQueryKey() });
-              workflowId = nuevo.id;
-            } else {
-              workflowId = Number(workflowSeleccionado.replace(/^wf:/, ""));
-            }
-            if (!Number.isInteger(workflowId) || workflowId <= 0) {
-              throw new Error("workflow inválido");
-            }
-            await asignarWorkflow.mutateAsync({ id: data.id, data: { workflowId } });
-            toast({
-              title: "Cobro creado con automatización",
-              description: "El workflow fue asignado al cobro.",
-            });
-          } catch {
-            toast({
-              title: "Cobro creado",
-              description: "No se pudo asignar el workflow; puedes asignarlo desde el detalle.",
-              variant: "destructive",
-            });
-          }
-        } else {
-          toast({
-            title: "Cobro creado",
-            description: "El cobro fue creado exitosamente.",
-          });
-        }
+        toast({ title: "Documento creado", description: "El cobro fue creado exitosamente." });
         setLocation(`/cobros/${data.id}`);
       },
       onError: () => {
-        toast({
-          title: "Error",
-          description: "No se pudo crear el cobro.",
-          variant: "destructive",
-        });
-      }
+        toast({ title: "Error", description: "No se pudo crear el cobro.", variant: "destructive" });
+      },
     });
   };
 
-  return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-300">
-      <Link href="/" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-2 transition-colors">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Volver al Dashboard
-      </Link>
+  const isPending = createCobro.isPending || creandoAvanzado;
 
-      <Card className="shadow-sm border-border/50">
-        <CardHeader>
-          <CardTitle className="text-2xl">Nuevo cobro</CardTitle>
-          <CardDescription>Crea un nuevo cargo para seguimiento y cobro.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
+  return (
+    <div className="max-w-5xl mx-auto space-y-0 animate-in fade-in duration-300">
+      {/* Encabezado de página */}
+      <div className="flex items-center gap-3 mb-5">
+        <Link href="/cobros" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          Volver
+        </Link>
+        <span className="text-muted-foreground/40">|</span>
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-primary" />
+          <h1 className="text-lg font-semibold">Nuevo documento de venta</h1>
+        </div>
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-0">
+
+          {/* ── Cabecera del documento ───────────────────────────────────── */}
+          <div className="rounded-t-xl border border-border bg-card">
+            {/* Fila superior: cliente + datos del documento */}
+            <div className="grid md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-border">
+              {/* Columna izquierda: cliente */}
+              <div className="p-5 space-y-4">
                 <FormField
                   control={form.control}
-                  name="monto"
+                  name="clienteId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{incluyeIvaWatch ? "Monto neto (sin IVA)" : "Monto"}</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-muted-foreground text-xs">{MONEDA_INFO[monedaEfectiva].simbolo}</span>
-                          <Input
-                            type="number"
-                            step={decimalesEfectivos ? String(10 ** -decimalesEfectivos) : "1"}
-                            min="0"
-                            placeholder="0"
-                            className="pl-10 font-mono"
-                            {...field}
-                            readOnly={usaLineas}
-                            disabled={usaLineas}
-                          />
+                      <FormLabel className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <Users className="h-3.5 w-3.5" />
+                        {modoAvanzado === "recurrente" ? "Cliente *" : "Cliente"}
+                      </FormLabel>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === "ninguno" ? undefined : Number(v))}
+                        value={field.value ? String(field.value) : "ninguno"}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Seleccionar cliente..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="ninguno">Sin cliente</SelectItem>
+                          {clientes?.map((c) => (
+                            <SelectItem key={c.id} value={String(c.id)}>
+                              <span>{c.nombre}</span>
+                              {c.rut && <span className="ml-2 text-xs text-muted-foreground font-mono">{c.rut}</span>}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedCliente && (
+                        <div className="mt-1.5 text-xs text-muted-foreground space-y-0.5">
+                          {selectedCliente.empresa && <p>{selectedCliente.empresa}</p>}
+                          {selectedCliente.email && <p>{selectedCliente.email}</p>}
+                          {selectedCliente.telefono && <p>{selectedCliente.telefono}</p>}
                         </div>
-                      </FormControl>
-                      {usaLineas && <FormDescription>Calculado desde los ítems del catálogo.</FormDescription>}
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                {modoAvanzado !== "masivo" && (
+                  <FormField
+                    control={form.control}
+                    name="emailPagador"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Email del pagador
+                        </FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder={selectedCliente?.email ?? "pagador@ejemplo.com"} className="h-10 text-sm" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {puedeAsignar && miembrosActivos.length > 0 && (
+                  <FormField
+                    control={form.control}
+                    name="responsableId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Ejecutivo responsable
+                        </FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(v === "yo" ? undefined : v)}
+                          value={field.value ?? "yo"}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Asignar a..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="yo">Yo (asignármelo)</SelectItem>
+                            {miembrosActivos.filter((m) => m.id !== user?.id).map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.nombre || m.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
+              {/* Columna derecha: tipo documento + fechas + moneda */}
+              <div className="p-5 space-y-4">
                 <FormField
                   control={form.control}
                   name="tipoDocumento"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tipo de documento</FormLabel>
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Tipo de documento
+                      </FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona el tipo..." />
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Selecciona..." />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {TIPO_DOCUMENTO_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <FormDescription>
-                        Documento tributario electrónico (DTE) asociado al cobro.
-                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="fechaEmision"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />Fecha emisión
+                        </FormLabel>
+                        <FormControl>
+                          <Input type="date" className="h-10 text-sm" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {modoAvanzado !== "recurrente" && (
+                    <FormField
+                      control={form.control}
+                      name="fechaVencimiento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />Vencimiento
+                          </FormLabel>
+                          <FormControl>
+                            <Input type="date" className="h-10 text-sm" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+
+                {/* Moneda e IVA */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Moneda</label>
+                    <Select value={monedaEfectiva} onValueChange={(v) => cambiarMoneda(v as Moneda)} disabled={modoAvanzado !== "individual"}>
+                      <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {MONEDAS.map((m) => <SelectItem key={m} value={m}>{m} · {MONEDA_INFO[m].nombre}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">IVA %</label>
+                    <Input
+                      type="number" min="0" max="100" step="0.01"
+                      value={modoAvanzado === "individual" ? ivaDoc : "19"}
+                      disabled={modoAvanzado !== "individual"}
+                      onChange={(e) => setIvaDoc(e.target.value)}
+                      className="h-10 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {permiteIva && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <input
+                      type="checkbox"
+                      id="incluye-iva"
+                      checked={incluyeIvaWatch}
+                      onChange={(e) => form.setValue("incluyeIva", e.target.checked)}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    <label htmlFor="incluye-iva" className="text-sm cursor-pointer">
+                      Precios incluyen IVA ({ivaPct}%)
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Tabla de ítems ───────────────────────────────────────────── */}
+          <div className="border-x border-border">
+            <CatalogoLineas
+              lineas={lineas}
+              onChange={setLineas}
+              incluyeIva={permiteIva && !!incluyeIvaWatch}
+              moneda={monedaEfectiva}
+              decimales={decimalesEfectivos}
+            />
+          </div>
+
+          {/* ── Totales + comentario ─────────────────────────────────────── */}
+          <div className="border border-t-0 border-border rounded-b-xl bg-card">
+            <div className="grid md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-border">
+              {/* Izquierda: comentario y referencia */}
+              <div className="p-5 space-y-4">
+                <FormField
+                  control={form.control}
+                  name="descripcion"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Descripción / Comentario
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Detalle del cobro, observaciones..." className="resize-none h-20 text-sm" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="referencia"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Referencia (N° orden, factura...)
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="REF-001" className="h-10 font-mono text-sm" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
 
-              <div className="rounded-lg border border-border/60 p-4 space-y-3" data-testid="section-moneda-documento">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium">Moneda del documento</p>
-                    <p className="text-xs text-muted-foreground">
-                      {modoAvanzado === "individual"
-                        ? "Por defecto según tus preferencias. Queda fija en este cobro."
-                        : "Los cobros recurrentes y masivos se emiten por ahora solo en CLP."}
+              {/* Derecha: totales */}
+              <div className="p-5 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="font-mono">{simbolo} {formatCurrency(netoNum)}</span>
+                  </div>
+                  {permiteIva && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">IVA ({ivaPct}%)</span>
+                      <span className="font-mono">{simbolo} {formatCurrency(ivaNum)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-2 border-t border-border">
+                    <span className="font-semibold">Total</span>
+                    <span className="font-mono font-bold text-lg text-primary">{simbolo} {formatCurrency(totalNum)}</span>
+                  </div>
+                  {monedaEfectiva !== "CLP" && (
+                    <EquivalenciaCLP monto={totalNum} moneda={monedaEfectiva} decimales={decimalesEfectivos} testId="equivalencia-clp-cobro" />
+                  )}
+                  {(monedaEfectiva !== "CLP" || decimalesEfectivos > 0) && (
+                    <p className="text-xs text-amber-700 dark:text-amber-400">Flow y MercadoPago solo cobran CLP sin decimales: no se podrán generar links de pago.</p>
+                  )}
+                </div>
+
+                {datosBancarios && !datosBancarios.configurado && (
+                  <div className="mt-4 rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
+                    <p className="text-xs text-amber-800 dark:text-amber-300">
+                      Para incluir datos de transferencia, configura tu{" "}
+                      <Link href="/perfil" className="font-medium underline underline-offset-2">cuenta bancaria →</Link>
                     </p>
                   </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Moneda</label>
-                    <Select value={monedaEfectiva} onValueChange={(v) => cambiarMoneda(v as Moneda)} disabled={modoAvanzado !== "individual"}>
-                      <SelectTrigger data-testid="select-moneda-cobro"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {MONEDAS.map((m) => <SelectItem key={m} value={m}>{m} · {MONEDA_INFO[m].nombre}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">IVA %</label>
-                    <Input type="number" min="0" max="100" step="0.01" value={modoAvanzado === "individual" ? ivaDoc : "19"} disabled={modoAvanzado !== "individual"} onChange={(e) => setIvaDoc(e.target.value)} className="font-mono" data-testid="input-iva-cobro" />
-                  </div>
-                </div>
-                {(monedaEfectiva !== "CLP" || decimalesEfectivos > 0) && (
-                  <p className="text-xs text-amber-700 dark:text-amber-400">Flow y MercadoPago solo cobran CLP sin decimales: este cobro no podrá generar links de pago.</p>
                 )}
               </div>
+            </div>
+          </div>
 
-              {monedaEfectiva !== "CLP" && <EquivalenciaCLP monto={usaLineas ? totalItems : totalNum} moneda={monedaEfectiva} decimales={decimalesEfectivos} testId="equivalencia-clp-cobro" />}
-
-              <CatalogoLineas lineas={lineas} onChange={setLineas} incluyeIva={permiteIva && !!incluyeIvaWatch} moneda={monedaEfectiva} decimales={decimalesEfectivos} />
-
-              <FormField
-                control={form.control}
-                name="referencia"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Referencia (opcional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Factura #, N° de orden..." className="font-mono text-sm" {...field} />
-                    </FormControl>
-                    <FormDescription>Identificador externo para conciliación.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
+          {/* ── Cobros recurrentes / masivos (colapsado) ─────────────────── */}
+          <div className="mt-4 rounded-xl border border-border bg-card overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setMostrarModoAvanzado((v) => !v)}
+              className="w-full flex items-center justify-between px-5 py-3.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                {modoAvanzado !== "individual" && (
+                  <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">
+                    {modoAvanzado === "recurrente" ? "Recurrente" : "Masivo"}
+                  </span>
                 )}
-              />
+                Cobro recurrente o masivo
+              </span>
+              {mostrarModoAvanzado ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
 
-              <div className="rounded-lg border border-border/60 p-4 space-y-3">
-                <p className="text-sm font-medium">¿Es un cobro recurrente o un cobro único?</p>
+            {mostrarModoAvanzado && (
+              <div className="border-t border-border p-5 space-y-4">
                 <div className="grid gap-2 sm:grid-cols-3">
                   {([
                     ["individual", "Cobro único", "Comportamiento habitual"],
@@ -461,358 +586,78 @@ export default function NewCobro() {
                       }
                       setModoAvanzado(key);
                     }}
-                      className={`rounded-md border p-3 text-left text-sm ${modoAvanzado === key ? "border-primary bg-primary/5" : "border-border/50"} ${key !== "individual" && !nextCob ? "opacity-70" : ""}`}>
+                      className={`rounded-lg border p-3 text-left text-sm transition-colors ${modoAvanzado === key ? "border-primary bg-primary/5" : "border-border/50 hover:bg-muted/50"} ${key !== "individual" && !nextCob ? "opacity-60" : ""}`}>
                       <span className="flex items-center gap-1 font-medium">{key !== "individual" && !nextCob && <Lock className="h-3 w-3" />}{label}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">{key !== "individual" && !nextCob ? "Disponible en plan NextCob" : desc}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{key !== "individual" && !nextCob ? "Plan NextCob" : desc}</span>
                     </button>
                   ))}
                 </div>
+
                 {modoAvanzado === "recurrente" && (
-                  <div className="grid gap-3 border-t pt-3 sm:grid-cols-3">
-                    <div><label className="text-xs font-medium">Frecuencia</label><Select value={frecuencia} onValueChange={setFrecuencia}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent>{[["semanal","Semanal"],["quincenal","Quincenal"],["mensual","Mensual"],["bimestral","Bimestral"],["trimestral","Trimestral"],["anual","Anual"]].map(([v,l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent></Select></div>
-                    <div><label className="text-xs font-medium">Fecha de inicio</label><Input className="mt-1" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} /></div>
-                    <div><label className="text-xs font-medium">Fecha de término (opcional)</label><Input className="mt-1" type="date" min={fechaInicio || undefined} value={fechaTermino} onChange={(e) => setFechaTermino(e.target.value)} /><p className="mt-1 text-xs text-muted-foreground">{!fechaTermino && "Sin fecha de término"}</p></div>
-                    <p className="sm:col-span-3 text-xs text-muted-foreground">El siguiente cobro se genera al vencer el anterior. Cada ciclo es independiente y tiene su propio link y seguimiento.</p>
-                  </div>
-                )}
-              </div>
-              {modoAvanzado !== "individual" && (
-                <div className="rounded-lg border border-border/60 p-4">
-                  <p className="text-sm font-medium">Aviso inicial individual</p>
-                  <p className="mb-2 text-xs text-muted-foreground">Cada cliente recibe solo sus propios datos. Los WhatsApp sin proveedor quedan listos para envío manual.</p>
-                  {(["email", "whatsapp"] as const).map((canal) => (
-                    <label key={canal} className="mr-4 inline-flex items-center gap-1.5 text-sm">
-                      <input type="checkbox" checked={canalesIniciales.includes(canal)} onChange={(e) => setCanalesIniciales((current) => e.target.checked ? [...current, canal] : current.filter((item) => item !== canal))} />
-                      {canal === "email" ? "Email" : "WhatsApp"}
-                    </label>
-                  ))}
-                </div>
-              )}
-              {resultadosEntrega.length > 0 && (
-                <div className="rounded-lg border border-border/60 p-4 text-sm">
-                  <p className="font-medium">Resultado de avisos</p>
-                  <div className="mt-2 space-y-1">{resultadosEntrega.map((r, i) => <div key={`${r.cobroId ?? "schedule"}-${r.canal}-${i}`} className="flex items-center justify-between gap-2"><span>{r.cobroId ? `Cobro #${r.cobroId} · ` : ""}{r.canal}</span><span className="text-muted-foreground">{r.estado === "enviado" ? "Enviado" : r.estado === "pendiente_manual" ? "Listo para envío manual" : `Falló: ${r.detalle ?? "sin detalle"}`}</span>{r.waUrl && <a className="text-primary underline" href={r.waUrl} target="_blank" rel="noreferrer">Abrir WhatsApp</a>}</div>)}</div>
-                </div>
-              )}
-
-              {permiteIva && (
-                <FormField
-                  control={form.control}
-                  name="incluyeIva"
-                  render={({ field }) => (
-                    <FormItem className="rounded-lg border border-border/60 p-4 space-y-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-sm">Incluir IVA ({ivaPct}%)</FormLabel>
-                          <FormDescription>
-                            Si lo activas, el monto ingresado es el neto y se agrega el IVA al total a cobrar.
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                      </div>
-
-                    {incluyeIvaWatch && (
-                      <div className="rounded-md bg-muted/50 p-3 space-y-1.5 text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Neto</span>
-                          <span className="font-mono">{formatCurrency(netoNum)}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">IVA ({ivaPct}%)</span>
-                          <span className="font-mono">{formatCurrency(ivaNum)}</span>
-                        </div>
-                        <div className="flex items-center justify-between pt-1.5 border-t border-border/60">
-                          <span className="font-medium text-primary">Total a cobrar</span>
-                          <span className="font-mono font-bold text-primary">{formatCurrency(totalNum)}</span>
-                        </div>
-                      </div>
-                    )}
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              <FormField
-                control={form.control}
-                name="descripcion"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descripción</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="¿Por qué es este cobro?"
-                        className="resize-none h-24"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {modoAvanzado === "masivo" && (
-                <div className="rounded-lg border border-border/60 p-4 space-y-3">
-                  <div className="flex items-center justify-between"><p className="text-sm font-medium">Clientes del lote</p><span className="text-xs text-muted-foreground">{clienteIdsMasivos.length} seleccionados</span></div>
-                  <Input value={busquedaMasiva} onChange={(e) => setBusquedaMasiva(e.target.value)} placeholder="Buscar por nombre o RUT" />
-                  <div className="max-h-48 overflow-y-auto space-y-1">
-                    {(clientes ?? []).filter((c) => `${c.nombre} ${c.rut ?? ""}`.toLowerCase().includes(busquedaMasiva.toLowerCase())).map((c) => (
-                      <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-muted text-sm">
-                        <input type="checkbox" checked={clienteIdsMasivos.includes(c.id)} onChange={(e) => setClienteIdsMasivos((ids) => e.target.checked ? [...ids, c.id] : ids.filter((id) => id !== c.id))} />
-                        <span>{c.nombre}</span>{c.rut && <span className="font-mono text-xs text-muted-foreground">{c.rut}</span>}
-                      </label>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Monto, descripción, documento, vencimiento y automatización se aplican igual a cada cliente.</p>
-                </div>
-              )}
-
-              {modoAvanzado !== "masivo" && <FormField
-                control={form.control}
-                name="clienteId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5" />
-                      {modoAvanzado === "recurrente" ? "Cliente" : "Cliente (opcional)"}
-                    </FormLabel>
-                    <Select
-                      onValueChange={(v) => field.onChange(v === "ninguno" ? undefined : Number(v))}
-                      value={field.value ? String(field.value) : "ninguno"}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar cliente..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="ninguno">Sin cliente</SelectItem>
-                        {clientes?.map((c) => (
-                          <SelectItem key={c.id} value={String(c.id)}>
-                            <div className="flex flex-col items-start">
-                              <span>{c.nombre}</span>
-                              {c.rut && <span className="text-xs text-muted-foreground font-mono">{c.rut}</span>}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Asocia este cobro a un cliente existente.{" "}
-                      <Link href="/clientes" className="text-primary hover:underline">
-                        Gestionar clientes →
-                      </Link>
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />}
-
-              {puedeAsignar && miembrosActivos.length > 0 && (
-                <FormField
-                  control={form.control}
-                  name="responsableId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-1.5">
-                        <Users className="h-3.5 w-3.5" />
-                        Ejecutivo responsable
-                      </FormLabel>
-                      <Select
-                        onValueChange={(v) => field.onChange(v === "yo" ? undefined : v)}
-                        value={field.value ?? "yo"}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Asignar a..." />
-                          </SelectTrigger>
-                        </FormControl>
+                  <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-3">
+                    <div>
+                      <label className="text-xs font-medium">Frecuencia</label>
+                      <Select value={frecuencia} onValueChange={setFrecuencia}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="yo">Yo (asignármelo)</SelectItem>
-                          {miembrosActivos
-                            .filter((m) => m.id !== user?.id)
-                            .map((m) => (
-                              <SelectItem key={m.id} value={m.id}>
-                                <div className="flex flex-col items-start">
-                                  <span>{m.nombre || m.email}</span>
-                                  {m.nombre && m.email && (
-                                    <span className="text-xs text-muted-foreground">{m.email}</span>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
+                          {[["semanal","Semanal"],["quincenal","Quincenal"],["mensual","Mensual"],["bimestral","Bimestral"],["trimestral","Trimestral"],["anual","Anual"]].map(([v,l]) => (
+                            <SelectItem key={v} value={v}>{l}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                      <FormDescription>
-                        Asigna este cobro a un miembro de tu equipo para su seguimiento.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {modoAvanzado !== "masivo" && <FormField
-                control={form.control}
-                name="emailPagador"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email del pagador (opcional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder={selectedCliente?.email ?? "pagador@ejemplo.com"}
-                        className="text-sm"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {selectedCliente?.email
-                        ? `Se usará el email del cliente (${selectedCliente.email}) al generar el link de pago si no ingresas otro.`
-                        : "Se usará al generar el link de pago con Flow."}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />}
-
-              {modoAvanzado !== "recurrente" && <FormField
-                control={form.control}
-                name="fechaVencimiento"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Fecha de vencimiento (opcional)</FormLabel>
-                    <FormControl>
-                      <Input type="date" className="text-sm" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Si la indicas, se aplicará automáticamente tu secuencia de recordatorios para
-                      avisar al cliente antes y después del vencimiento.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />}
-
-              <div className="space-y-3 rounded-lg border border-border/50 bg-muted/20 p-4">
-                <div>
-                  <p className="text-sm font-medium">Automatización de cobranza</p>
-                  <p className="text-xs text-muted-foreground">
-                    Elige cómo dar seguimiento a este cobro. Puedes cambiarlo después.
-                  </p>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {(
-                    [
-                      { key: "ninguna", label: "Sin automatización", desc: "Seguimiento manual." },
-                      { key: "simple", label: "Recordatorio simple", desc: "Secuencia por fecha de vencimiento." },
-                      { key: "workflow", label: "Workflow inteligente", desc: "Plantilla o workflow guardado." },
-                    ] as const
-                  ).map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setAutomatizacion(opt.key)}
-                      className={`rounded-lg border p-3 text-left transition-colors ${
-                        automatizacion === opt.key
-                          ? "border-primary bg-primary/5"
-                          : "border-border/50 hover:bg-secondary/50"
-                      }`}
-                    >
-                      <div className="text-sm font-medium">{opt.label}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">{opt.desc}</div>
-                    </button>
-                  ))}
-                </div>
-                {automatizacion === "simple" && (
-                  <div className="space-y-1.5 rounded-md border border-border/50 bg-background p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Se aplicará tu secuencia de recordatorios simples usando la fecha de vencimiento
-                      indicada abajo. Puedes personalizar la secuencia (días y canales) en la
-                      configuración de recordatorios.
-                    </p>
-                    <Link
-                      href="/recordatorios/config"
-                      className="inline-block text-xs font-medium text-primary hover:underline"
-                    >
-                      Configurar secuencia de recordatorios →
-                    </Link>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium">Fecha de inicio</label>
+                      <Input className="mt-1 h-9" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium">Fecha de término (opcional)</label>
+                      <Input className="mt-1 h-9" type="date" min={fechaInicio || undefined} value={fechaTermino} onChange={(e) => setFechaTermino(e.target.value)} />
+                    </div>
+                    <p className="sm:col-span-3 text-xs text-muted-foreground">Cada ciclo genera un cobro independiente con su propio link y seguimiento.</p>
                   </div>
                 )}
-                {automatizacion === "workflow" && (
-                  <div className="space-y-1.5">
-                    <Select value={workflowSeleccionado} onValueChange={setWorkflowSeleccionado}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una plantilla o workflow" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(plantillasList ?? []).length > 0 && (
-                          <SelectGroup>
-                            <SelectLabel>Plantillas</SelectLabel>
-                            {plantillasList!.map((p) => (
-                              <SelectItem key={`tpl:${p.key}`} value={`tpl:${p.key}`}>
-                                {p.nombre}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        )}
-                        {(workflowsList ?? []).length > 0 && (
-                          <SelectGroup>
-                            <SelectLabel>Mis workflows</SelectLabel>
-                            {workflowsList!.map((w) => (
-                              <SelectItem key={`wf:${w.id}`} value={`wf:${w.id}`}>
-                                {w.nombre}
-                                {!w.activo ? " (pausado)" : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        )}
-                        {(plantillasList ?? []).length === 0 &&
-                          (workflowsList ?? []).length === 0 && (
-                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                              No hay workflows disponibles.
-                            </div>
-                          )}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Al elegir una plantilla se creará un workflow a partir de ella. Al asignar un
-                      workflow, los recordatorios simples quedan desactivados para este cobro.
-                    </p>
+
+                {modoAvanzado === "masivo" && (
+                  <div className="border-t border-border pt-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Clientes del lote</p>
+                      <span className="text-xs text-muted-foreground">{clienteIdsMasivos.length} seleccionados</span>
+                    </div>
+                    <Input value={busquedaMasiva} onChange={(e) => setBusquedaMasiva(e.target.value)} placeholder="Buscar por nombre o RUT" className="h-9" />
+                    <div className="max-h-44 overflow-y-auto space-y-1 rounded-lg border border-border p-2">
+                      {(clientes ?? []).filter((c) => `${c.nombre} ${c.rut ?? ""}`.toLowerCase().includes(busquedaMasiva.toLowerCase())).map((c) => (
+                        <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-muted text-sm">
+                          <input type="checkbox" checked={clienteIdsMasivos.includes(c.id)} onChange={(e) => setClienteIdsMasivos((ids) => e.target.checked ? [...ids, c.id] : ids.filter((id) => id !== c.id))} />
+                          <span>{c.nombre}</span>
+                          {c.rut && <span className="font-mono text-xs text-muted-foreground">{c.rut}</span>}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
+            )}
+          </div>
 
-              {datosBancarios && !datosBancarios.configurado && (
-                <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 px-3 py-2" data-testid="aviso-sin-datos-bancarios">
-                  <p className="text-xs text-amber-800 dark:text-amber-300">
-                    Para incluir datos de transferencia en tus cobros, configura tu cuenta bancaria en{" "}
-                    <Link href="/perfil" className="font-medium underline underline-offset-2">
-                      Perfil → Datos bancarios
-                    </Link>
-                    .
-                  </p>
-                </div>
+          {/* ── Acciones ─────────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between pt-4">
+            <Link href="/cobros" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Cancelar
+            </Link>
+            <Button type="submit" disabled={!prefsListas || isPending} size="lg" className="min-w-36">
+              {isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creando...</>
+              ) : (
+                modoAvanzado === "recurrente" ? "Programar cobro" :
+                modoAvanzado === "masivo" ? `Crear ${clienteIdsMasivos.length || ""} cobros` :
+                "Crear cobro"
               )}
+            </Button>
+          </div>
 
-              <div className="flex justify-end pt-4 border-t border-border/50">
-                <Button
-                  type="submit"
-                  disabled={!prefsListas || createCobro.isPending || asignarWorkflow.isPending || creandoAvanzado}
-                  className="min-w-32"
-                >
-                  {createCobro.isPending || asignarWorkflow.isPending || creandoAvanzado ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creando...</>
-                  ) : (
-                    "Crear cobro"
-                  )}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+        </form>
+      </Form>
     </div>
   );
 }
