@@ -19,10 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatMoney, roundTo, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
 import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
-import { TIPO_DOCUMENTO_OPTIONS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
+import { TIPO_DOCUMENTO_GRUPOS, TIPO_DOCUMENTO_LABELS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
 import { Loader2, ArrowLeft, Users, Lock, ChevronDown, ChevronUp, Calendar, FileText } from "lucide-react";
 import { Link } from "wouter";
 import { CatalogoLineas, lineasPayload, lineasValidas, totalLineas, type LineaCatalogo } from "@/components/catalogo-lineas";
@@ -31,7 +31,6 @@ const formSchema = z.object({
   tipoDocumento: z.enum(TIPO_DOCUMENTO_VALUES),
   incluyeIva: z.boolean().default(false),
   descripcion: z.string().max(255).optional().or(z.literal("")),
-  referencia: z.string().optional(),
   clienteId: z.coerce.number().optional(),
   emailPagador: z.string().email("Email inválido").optional().or(z.literal("")),
   fechaVencimiento: z.string().optional().or(z.literal("")),
@@ -119,7 +118,6 @@ export default function NewCobro() {
       tipoDocumento: "sin_documento",
       incluyeIva: false,
       descripcion: "",
-      referencia: "",
       clienteId: undefined,
       emailPagador: "",
       fechaVencimiento: "",
@@ -174,7 +172,6 @@ export default function NewCobro() {
       tipoDocumento: values.tipoDocumento,
       incluyeIva: permiteIva ? values.incluyeIva : false,
       descripcion: values.descripcion || undefined,
-      referencia: values.referencia || undefined,
       emailPagador: values.emailPagador || selectedCliente?.email || undefined,
       clienteId: values.clienteId || undefined,
       fechaVencimiento: values.fechaVencimiento || undefined,
@@ -200,7 +197,7 @@ export default function NewCobro() {
         const advancedPayload = {
           itemsInventario, moneda: "CLP", decimales: decimalesEfectivos, monto: montoFinal,
           tipoDocumento: values.tipoDocumento, incluyeIva: permiteIva ? values.incluyeIva : false,
-          descripcion: values.descripcion || undefined, referencia: values.referencia || undefined,
+          descripcion: values.descripcion || undefined,
           responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
           automatizacion: "ninguna",
           ...(modoAvanzado === "recurrente"
@@ -382,8 +379,13 @@ export default function NewCobro() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {TIPO_DOCUMENTO_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          {TIPO_DOCUMENTO_GRUPOS.map((grupo) => (
+                            <SelectGroup key={grupo.label}>
+                              <SelectLabel className="text-xs text-muted-foreground">{grupo.label}</SelectLabel>
+                              {grupo.values.map((v) => (
+                                <SelectItem key={v} value={v}>{TIPO_DOCUMENTO_LABELS[v]}</SelectItem>
+                              ))}
+                            </SelectGroup>
                           ))}
                         </SelectContent>
                       </Select>
@@ -494,21 +496,6 @@ export default function NewCobro() {
                       </FormLabel>
                       <FormControl>
                         <Textarea placeholder="Detalle del cobro, observaciones..." className="resize-none h-20 text-sm" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="referencia"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Referencia (N° orden, factura...)
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="REF-001" className="h-10 font-mono text-sm" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

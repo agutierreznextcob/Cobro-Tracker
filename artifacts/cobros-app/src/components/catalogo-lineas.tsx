@@ -83,7 +83,16 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
   const disponibles = useMemo(() => {
     const usados = new Set(lineas.map((l) => l.productoId));
     const s = q.trim().toLowerCase();
-    return (productos ?? []).filter((p) => p.activo && mismaMoneda(p) && !usados.has(p.id) && (!s || p.nombre.toLowerCase().includes(s))).slice(0, 50);
+    return (productos ?? []).filter((p) => {
+      if (!p.activo || !mismaMoneda(p) || usados.has(p.id)) return false;
+      if (!s) return true;
+      return (
+        p.nombre.toLowerCase().includes(s) ||
+        (p.sku ?? "").toLowerCase().includes(s) ||
+        (p.codigoInterno ?? "").toLowerCase().includes(s) ||
+        (p.codigoBarras ?? "").toLowerCase().includes(s)
+      );
+    }).slice(0, 50);
   }, [productos, lineas, q, mon]);
 
   const update = (i: number, patch: Partial<LineaCatalogo>) => onChange(lineas.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -93,8 +102,8 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
     <div className="rounded-lg border border-border/60 p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-medium flex items-center gap-1.5"><Boxes className="h-3.5 w-3.5" />Ítems del catálogo (opcional)</p>
-          <p className="text-xs text-muted-foreground">Al agregar ítems, el monto{incluyeIva ? " neto" : ""} se calcula solo. El stock se descuenta cuando el cobro se pague.</p>
+          <p className="text-sm font-medium flex items-center gap-1.5"><Boxes className="h-3.5 w-3.5" />Productos y servicios</p>
+          <p className="text-xs text-muted-foreground">El total{incluyeIva ? " neto" : ""} se calcula automáticamente. El stock se descuenta cuando el cobro se pague.</p>
         </div>
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
@@ -103,7 +112,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
           <PopoverContent align="end" className="w-80 p-2">
             <div className="relative mb-2">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar producto o servicio" className="pl-8 h-9" />
+              <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, SKU o código interno" className="pl-8 h-9" />
             </div>
             <div className="max-h-64 overflow-y-auto">
               {isLoading ? (
@@ -127,6 +136,9 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
                       <span className="block truncate font-medium">{p.nombre}</span>
                       <span className={`text-[11px] ${e === "critico" || e === "agotado" ? "text-red-600" : "text-muted-foreground"}`}>
                         {p.tipo === "servicio" ? "Servicio" : `Stock ${formatQty(p.stockActual ?? 0)}`}
+                        {(p.sku || p.codigoInterno) && (
+                          <span className="ml-1.5 font-mono opacity-70">· {p.sku || p.codigoInterno}</span>
+                        )}
                       </span>
                     </span>
                     <span className="shrink-0 text-right"><span className="block font-mono text-xs">{formatCurrency(precioNetoDe(p))}</span><span className="block text-[10px] uppercase tracking-wide text-muted-foreground">neto unit.</span></span>
