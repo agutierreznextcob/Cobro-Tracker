@@ -62,8 +62,9 @@ type TipoDocumento = Cobro["tipoDocumento"];
 
 // Only "afecta" Chilean electronic documents may carry IVA. Exenta documents
 // and informal charges (sin_documento) never do.
-function tipoDocumentoPermiteIva(tipo: TipoDocumento): boolean {
-  return tipo === "factura_afecta" || tipo === "boleta_afecta";
+function tipoDocumentoPermiteIva(_tipo: TipoDocumento): boolean {
+  // IVA is allowed for all document types, including sin_documento and informal charges.
+  return true;
 }
 
 // Net amount to charge after the current effective discount.
