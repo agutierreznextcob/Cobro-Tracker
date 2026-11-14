@@ -5739,7 +5739,7 @@ components:
           items: { $ref: "#/components/schemas/ItemInventario" }
         monto: { type: number, minimum: 1 }
         descripcion: { type: string, minLength: 1, maxLength: 255 }
-        tipoDocumento: { type: string, enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento] }
+        tipoDocumento: { type: string, enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento, vale_comprobante] }
         incluyeIva: { type: boolean }
         referencia: { type: string }
         responsableId: { type: string }
@@ -5846,7 +5846,7 @@ components:
           description: IVA amount (19% of montoNeto, only set when incluyeIva is true)
         tipoDocumento:
           type: string
-          enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento]
+          enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento, vale_comprobante]
           description: Chilean electronic tax document type (DTE). Only "afecta" types carry IVA.
         descripcion:
           type: string
@@ -5933,7 +5933,7 @@ components:
           description: Apply Chilean VAT (IVA 19%). When true, `monto` is treated as the neto and the server computes IVA and total. Ignored (forced false) unless tipoDocumento is an "afecta" type.
         tipoDocumento:
           type: string
-          enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento]
+          enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento, vale_comprobante]
           description: Chilean electronic tax document type (DTE). Only "afecta" types may carry IVA. Defaults to sin_documento.
         descripcion:
           type: string
@@ -6692,7 +6692,7 @@ components:
           description: Reassign the cobro to an ejecutivo/admin of the organization (admin only). Only allowed when the cobro is "pendiente".
         tipoDocumento:
           type: string
-          enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento]
+          enum: [factura_afecta, factura_exenta, boleta_afecta, boleta_exenta, sin_documento, vale_comprobante]
           description: Chilean electronic tax document type (DTE).
         fechaVencimiento:
           type: ["string", "null"]

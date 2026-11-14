@@ -18,4 +18,5 @@ export const CobroInputTipoDocumento = {
   boleta_afecta: 'boleta_afecta',
   boleta_exenta: 'boleta_exenta',
   sin_documento: 'sin_documento',
+  vale_comprobante: 'vale_comprobante',
 } as const;
