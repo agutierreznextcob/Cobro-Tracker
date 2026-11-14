@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { useListInventario, useGetInventarioResumen, getListInventarioQueryKey, getGetInventarioResumenQueryKey } from "@workspace/api-client-react";
+import * as XLSX from "xlsx";
+import { useListInventario, useGetInventarioResumen, useCreateProducto, getListInventarioQueryKey, getGetInventarioResumenQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatMoney } from "@/lib/format";
-
+import { useToast } from "@/hooks/use-toast";
 import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 
 // Product prices render in each product's own currency (legacy = CLP) with the
@@ -16,7 +19,7 @@ const pm = (n: number, moneda?: string | null) => formatMoney(n, moneda, decInve
 import { estadoVisual, etiquetaUbicacion, formatPct, formatQty, ubicacionCritica, type EstadoVisual } from "@/lib/inventario";
 import { ScanLookup } from "@/components/barcode-scanner";
 import { EstadoStockBadge, TipoBadge } from "@/components/inventario-badges";
-import { AlertTriangle, ArrowLeftRight, Ban, Boxes, Package, Pencil, Plus, Search, Wrench, RotateCw, Warehouse, X } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Ban, Boxes, CheckCircle2, Download, Loader2, Package, Pencil, Plus, Search, Upload, Wrench, RotateCw, Warehouse, X } from "lucide-react";
 
 type Filtro = "todos" | "producto" | "servicio" | "alerta" | "archivados";
 
@@ -27,6 +30,161 @@ const FILTROS: { value: Filtro; label: string }[] = [
   { value: "alerta", label: "Con alerta" },
   { value: "archivados", label: "Archivados" },
 ];
+
+// ── Importación masiva de productos ─────────────────────────────────────────
+const PLANTILLA_HEADERS_PRODUCTOS = [
+  "Nombre*", "Tipo (producto/servicio)", "Código interno", "SKU", "Código de barras",
+  "Descripción", "Costo unitario*", "Precio unitario*", "Moneda (CLP/USD/UF)",
+  "Unidad de medida", "Margen %", "Stock crítico",
+];
+
+function descargarPlantillaProductos() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    PLANTILLA_HEADERS_PRODUCTOS,
+    ["Polera manga corta", "producto", "POL-001", "SKU-001", "7891234567890", "Polera 100% algodón talla M", "5000", "9990", "CLP", "unidad", "30", "5"],
+    ["Consultoría hora", "servicio", "CONS-001", "", "", "Consultoría técnica por hora", "0", "50000", "CLP", "hora", "", ""],
+  ]);
+  ws["!cols"] = [
+    { wch: 24 }, { wch: 20 }, { wch: 16 }, { wch: 12 }, { wch: 16 },
+    { wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 16 },
+    { wch: 16 }, { wch: 10 }, { wch: 12 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Productos");
+  XLSX.writeFile(wb, "plantilla-productos.xlsx");
+}
+
+function ImportarProductosButton({ onImported }: { onImported: () => void }) {
+  const { toast } = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const crear = useCreateProducto();
+  const [importando, setImportando] = useState(false);
+  const [resultado, setResultado] = useState<{ importados: number; omitidos: string[] } | null>(null);
+
+  const handleFile = async (file: File) => {
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<(string | number | undefined)[]>(ws, { header: 1 });
+      const filas = rows.slice(1).filter((r) => r && r.some((c) => String(c ?? "").trim() !== ""));
+
+      if (filas.length === 0) {
+        toast({ title: "Archivo vacío", description: "El Excel no contiene filas de productos.", variant: "destructive" });
+        return;
+      }
+      if (filas.length > 200) {
+        toast({ title: "Demasiadas filas", description: "Máximo 200 productos por importación.", variant: "destructive" });
+        return;
+      }
+
+      setImportando(true);
+      let importados = 0;
+      const omitidos: string[] = [];
+
+      for (const r of filas) {
+        const nombre = String(r[0] ?? "").trim();
+        if (!nombre) { omitidos.push("(sin nombre)"); continue; }
+        const tipo = String(r[1] ?? "producto").trim().toLowerCase();
+        const costoUnitario = parseFloat(String(r[6] ?? "0").replace(",", ".")) || 0;
+        const precioUnitario = parseFloat(String(r[7] ?? "0").replace(",", ".")) || 0;
+        if (precioUnitario <= 0) { omitidos.push(nombre + " (precio inválido)"); continue; }
+        try {
+          await new Promise<void>((resolve, reject) => {
+            crear.mutate(
+              {
+                data: {
+                  nombre,
+                  tipo: tipo === "servicio" ? "servicio" : "producto",
+                  codigoInterno: String(r[2] ?? "").trim() || undefined,
+                  sku: String(r[3] ?? "").trim(),
+                  codigoBarras: String(r[4] ?? "").trim(),
+                  descripcion: String(r[5] ?? "").trim() || undefined,
+                  costoUnitario,
+                  precioUnitario,
+                  moneda: (["CLP", "USD", "UF"].includes(String(r[8] ?? "").trim().toUpperCase()) ? String(r[8]).trim().toUpperCase() : "CLP") as "CLP" | "USD" | "UF",
+                  unidadMedida: String(r[9] ?? "").trim() || undefined,
+                  margenPorcentaje: parseFloat(String(r[10] ?? "").replace(",", ".")) || undefined,
+                  stockCritico: parseInt(String(r[11] ?? "0")) || 0,
+                  activo: true,
+                },
+              },
+              { onSuccess: () => resolve(), onError: () => reject() }
+            );
+          });
+          importados++;
+        } catch {
+          omitidos.push(nombre + " (error al crear)");
+        }
+      }
+
+      setImportando(false);
+      setResultado({ importados, omitidos });
+      onImported();
+    } catch {
+      setImportando(false);
+      toast({ title: "Archivo inválido", description: "No se pudo leer el Excel. Usa la plantilla.", variant: "destructive" });
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleFile(file);
+          e.target.value = "";
+        }}
+      />
+      <Button variant="outline" size="sm" className="gap-1.5" onClick={descargarPlantillaProductos}>
+        <Download className="h-4 w-4" />
+        Descargar plantilla Excel
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        disabled={importando}
+        onClick={() => inputRef.current?.click()}
+      >
+        {importando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        Importar productos
+      </Button>
+
+      <Dialog open={resultado != null} onOpenChange={(o) => !o && setResultado(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Resultado de la importación</DialogTitle>
+          </DialogHeader>
+          {resultado && (
+            <div className="space-y-3 pt-1">
+              <p className="text-sm">
+                <CheckCircle2 className="inline h-4 w-4 text-emerald-500 mr-1.5 -mt-0.5" />
+                <strong>{resultado.importados}</strong> producto{resultado.importados !== 1 ? "s" : ""} importado{resultado.importados !== 1 ? "s" : ""} correctamente
+                {resultado.omitidos.length > 0 && (
+                  <>, <strong>{resultado.omitidos.length}</strong> omitido{resultado.omitidos.length !== 1 ? "s" : ""} por error</>
+                )}.
+              </p>
+              {resultado.omitidos.length > 0 && (
+                <div className="max-h-48 overflow-y-auto rounded-lg border">
+                  <ul className="divide-y text-xs">
+                    {resultado.omitidos.map((m, i) => (
+                      <li key={i} className="px-3 py-1.5 text-muted-foreground">{m}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 export default function InventarioPage() {
   const { prefs } = usePreferencias();
@@ -76,9 +234,12 @@ export default function InventarioPage() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Inventario</h1>
           <p className="text-muted-foreground mt-1">Tu catálogo de productos y servicios, con costos y márgenes a la vista para cotizar sin dudar.</p>
         </div>
-        <Button asChild>
-          <Link href="/inventario/nuevo"><Plus className="h-4 w-4 mr-1.5" />Nuevo ítem</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ImportarProductosButton onImported={() => void refetch()} />
+          <Button asChild>
+            <Link href="/inventario/nuevo"><Plus className="h-4 w-4 mr-1.5" />Nuevo ítem</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
