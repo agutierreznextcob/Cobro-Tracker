@@ -478,6 +478,9 @@ export default function NewCobro() {
               incluyeIva={permiteIva && !!incluyeIvaWatch}
               moneda={monedaEfectiva}
               decimales={decimalesEfectivos}
+              onIvaDetectado={() => {
+                if (permiteIva) form.setValue("incluyeIva", true);
+              }}
             />
           </div>
 
@@ -507,17 +510,17 @@ export default function NewCobro() {
               <div className="p-5 flex flex-col justify-between">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-muted-foreground">Neto</span>
                     <span className="font-mono">{simbolo} {formatCurrency(netoNum)}</span>
                   </div>
-                  {permiteIva && (
+                  {permiteIva && incluyeIvaWatch && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">IVA ({ivaPct}%)</span>
                       <span className="font-mono">{simbolo} {formatCurrency(ivaNum)}</span>
                     </div>
                   )}
                   <div className="flex justify-between pt-2 border-t border-border">
-                    <span className="font-semibold">Total</span>
+                    <span className="font-semibold">{permiteIva && incluyeIvaWatch ? "Total con IVA" : "Total"}</span>
                     <span className="font-mono font-bold text-lg text-primary">{simbolo} {formatCurrency(totalNum)}</span>
                   </div>
                   {monedaEfectiva !== "CLP" && (

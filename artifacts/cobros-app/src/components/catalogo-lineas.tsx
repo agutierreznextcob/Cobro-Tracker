@@ -57,7 +57,7 @@ export function lineasPayload(lineas: LineaCatalogo[], decimales = 0) {
   }));
 }
 
-export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", decimales }: { lineas: LineaCatalogo[]; onChange: (l: LineaCatalogo[]) => void; incluyeIva: boolean; moneda?: string; decimales?: number }) {
+export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", decimales, onIvaDetectado }: { lineas: LineaCatalogo[]; onChange: (l: LineaCatalogo[]) => void; incluyeIva: boolean; moneda?: string; decimales?: number; onIvaDetectado?: () => void }) {
   const mon = monedaDe(moneda);
   const formatCurrency = (n: number) => formatMoney(n, mon, decimales ?? 0);
   // No exchange conversion: only catalog items priced in the document currency can be added.
@@ -68,9 +68,11 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
   const [q, setQ] = useState("");
   const { toast } = useToast();
 
-  const agregarEscaneado = (p: Producto) => {
+  const agregarProducto = (p: Producto, origenScan = false) => {
     if (!p.activo) { toast({ title: "Ítem archivado", description: `${p.nombre} no está disponible para cobros.`, variant: "destructive" }); return; }
     if (!mismaMoneda(p)) { toast({ title: "Moneda distinta", description: `${p.nombre} tiene precio en ${monedaDe(p.moneda)} y este cobro es en ${mon}.`, variant: "destructive" }); return; }
+    // Si el producto tiene IVA incluido en su precio, notificar al padre para activar incluyeIva
+    if (p.incluyeIvaPrecio && !incluyeIva) onIvaDetectado?.();
     const i = lineas.findIndex((l) => l.productoId === p.id);
     if (i >= 0) {
       onChange(lineas.map((l, j) => (j === i ? { ...l, cantidad: String((Number(l.cantidad) || 0) + 1) } : l)));
@@ -78,7 +80,9 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
       if (lineas.length >= MAX_LINEAS) { toast({ title: "Límite de ítems alcanzado", variant: "destructive" }); return; }
       onChange([...lineas, lineaDesdeProducto(p, decimales ?? 0)]);
     }
+    if (origenScan) toast({ title: `${p.nombre} agregado`, description: "Escanea de nuevo para sumar una unidad más." });
   };
+  const agregarEscaneado = (p: Producto) => agregarProducto(p, true);
 
   const disponibles = useMemo(() => {
     const usados = new Set(lineas.map((l) => l.productoId));
@@ -128,7 +132,7 @@ export function CatalogoLineas({ lineas, onChange, incluyeIva, moneda = "CLP", d
                 return (
                   <button key={p.id} type="button"
                     onClick={() => {
-                      onChange([...lineas, lineaDesdeProducto(p, decimales ?? 0)]);
+                      agregarProducto(p);
                       setOpen(false); setQ("");
                     }}
                     className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted">
