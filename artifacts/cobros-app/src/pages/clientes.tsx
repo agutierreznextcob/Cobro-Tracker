@@ -45,8 +45,7 @@ function validarRut(rut: string): boolean {
 }
 
 const clienteSchema = z.object({
-  nombre: z.string().min(1, "El nombre es obligatorio").max(200),
-  empresa: z.string().max(200).optional(),
+  nombre: z.string().min(1, "La razón social / nombre es obligatorio").max(200),
   rut: z
     .string()
     .min(1, "El RUT es obligatorio")
@@ -114,12 +113,12 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
 
   const form = useForm<ClienteForm>({
     resolver: zodResolver(clienteSchema),
-    defaultValues: { nombre: "", empresa: "", rut: "", email: "", telefono: "", direccion: "", giro: "" },
+    defaultValues: { nombre: "", rut: "", email: "", telefono: "", direccion: "", giro: "" },
   });
 
   const onSubmit = (values: ClienteForm) => {
     createCliente.mutate(
-      { data: { nombre: values.nombre, empresa: values.empresa || undefined, rut: values.rut, email: values.email, telefono: values.telefono, direccion: values.direccion?.trim() || undefined, giro: values.giro?.trim() || undefined } },
+      { data: { nombre: values.nombre, rut: values.rut, email: values.email, telefono: values.telefono, direccion: values.direccion?.trim() || undefined, giro: values.giro?.trim() || undefined } },
       {
         onSuccess: () => {
           toast({ title: "Cliente creado", description: "El cliente fue creado exitosamente." });
@@ -153,22 +152,9 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
               name="nombre"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre *</FormLabel>
+                  <FormLabel>Razón social / Nombre *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Nombre completo o razón social" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="empresa"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Empresa</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Empresa (opcional)" {...field} />
+                    <Input placeholder="Ej: Empresa S.A. o Juan Pérez" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -82,6 +82,8 @@ export default function NewCobro() {
   const [frecuencia, setFrecuencia] = useState("mensual");
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaTermino, setFechaTermino] = useState("");
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false);
   const [busquedaMasiva, setBusquedaMasiva] = useState("");
   const [clienteIdsMasivos, setClienteIdsMasivos] = useState<number[]>([]);
   const [creandoAvanzado, setCreandoAvanzado] = useState(false);
@@ -179,6 +181,9 @@ export default function NewCobro() {
   useEffect(() => {
     if (selectedCliente?.email) {
       form.setValue("emailPagador", selectedCliente.email, { shouldValidate: true });
+    }
+    if (selectedCliente) {
+      setBusquedaCliente(selectedCliente.nombre ?? "");
     }
   }, [selectedCliente?.id]);
 
@@ -330,30 +335,69 @@ export default function NewCobro() {
                         <Users className="h-3.5 w-3.5" />
                         {modoAvanzado === "recurrente" ? "Cliente *" : "Cliente"}
                       </FormLabel>
-                      <Select
-                        onValueChange={(v) => field.onChange(v === "ninguno" ? undefined : Number(v))}
-                        value={field.value ? String(field.value) : "ninguno"}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="h-10">
-                            <SelectValue placeholder="Seleccionar cliente..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="ninguno">Sin cliente</SelectItem>
-                          {clientes?.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>
-                              <span>{c.nombre}</span>
-                              {c.rut && <span className="ml-2 text-xs text-muted-foreground font-mono">{c.rut}</span>}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            placeholder="Buscar cliente por nombre o RUT..."
+                            className="h-10 text-sm pr-8"
+                            value={busquedaCliente}
+                            onChange={(e) => {
+                              setBusquedaCliente(e.target.value);
+                              setClienteDropdownOpen(true);
+                              if (!e.target.value) {
+                                field.onChange(undefined);
+                              }
+                            }}
+                            onFocus={() => setClienteDropdownOpen(true)}
+                            onBlur={() => setTimeout(() => setClienteDropdownOpen(false), 150)}
+                            autoComplete="off"
+                          />
+                          {busquedaCliente && (
+                            <button
+                              type="button"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                              onMouseDown={(e) => { e.preventDefault(); setBusquedaCliente(""); field.onChange(undefined); }}
+                            >
+                              <span className="text-xs">✕</span>
+                            </button>
+                          )}
+                          {clienteDropdownOpen && (
+                            <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-md max-h-60 overflow-y-auto">
+                              {(() => {
+                                const q = busquedaCliente.trim().toLowerCase();
+                                const filtrados = (clientes ?? []).filter(c =>
+                                  !q || c.nombre.toLowerCase().includes(q) || (c.rut ?? "").toLowerCase().includes(q)
+                                );
+                                if (filtrados.length === 0) {
+                                  return <div className="px-3 py-2 text-sm text-muted-foreground">Sin resultados</div>;
+                                }
+                                return filtrados.map((c) => (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted/60 flex items-center justify-between gap-2"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      field.onChange(c.id);
+                                      setBusquedaCliente(c.nombre);
+                                      setClienteDropdownOpen(false);
+                                    }}
+                                  >
+                                    <span>{c.nombre}</span>
+                                    {c.rut && <span className="text-xs text-muted-foreground font-mono shrink-0">{c.rut}</span>}
+                                  </button>
+                                ));
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
                       {selectedCliente && (
                         <div className="mt-1.5 text-xs text-muted-foreground space-y-0.5">
-                          {selectedCliente.empresa && <p>{selectedCliente.empresa}</p>}
                           {selectedCliente.email && <p>{selectedCliente.email}</p>}
                           {selectedCliente.telefono && <p>{selectedCliente.telefono}</p>}
+                          {(selectedCliente as unknown as { direccion?: string }).direccion && <p>{(selectedCliente as unknown as { direccion?: string }).direccion}</p>}
+                          {(selectedCliente as unknown as { giro?: string }).giro && <p className="italic">{(selectedCliente as unknown as { giro?: string }).giro}</p>}
                         </div>
                       )}
                       <FormMessage />
