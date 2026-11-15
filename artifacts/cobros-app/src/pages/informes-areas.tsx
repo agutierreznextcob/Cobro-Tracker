@@ -42,7 +42,6 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: s
 
 export default function InformesAreasPage() {
   const { data: areas, isLoading } = useListAreas();
-  const { user } = useAuth();
 
   if (isLoading) {
     return (
