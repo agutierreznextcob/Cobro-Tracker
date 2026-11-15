@@ -117,6 +117,9 @@ export const usersTable = pgTable("users", {
   // Campos de perfil de miembro de equipo.
   cargo: varchar("cargo"),
   area: varchar("area"),
+  // Área organizacional a la que pertenece el usuario (areas_org.id).
+  // Reemplaza/complementa el campo area (texto libre). No FK estricta.
+  areaId: integer("area_id"),
   profileCompleted: boolean("profile_completed").notNull().default(false),
   flowCustomerId: varchar("flow_customer_id"),
   flowSubscriptionId: varchar("flow_subscription_id"),

@@ -54,3 +54,4 @@ export * from "./pedido-items";
 export * from "./guias-despacho";
 export * from "./guia-despacho-items";
 export * from "./permisos-usuario";
+export * from "./areas-org";

@@ -1,5 +1,6 @@
 const ROLE_META: Record<string, { label: string; bg: string; fg: string }> = {
   admin_org: { label: "Administrador de organización", bg: "#F4A800", fg: "#3A2A00" },
+  gerente:   { label: "Gerente", bg: "#1E3A5F", fg: "#FFFFFF" },
   supervisor: { label: "Supervisor", bg: "#1A1333", fg: "#FFFFFF" },
   ejecutivo: { label: "Ejecutivo de cobranza", bg: "#666666", fg: "#FFFFFF" },
 };
@@ -23,9 +24,13 @@ export function OrgRoleBadge({
   const label = short
     ? orgRole === "admin_org"
       ? "Administrador"
-      : orgRole === "ejecutivo"
-        ? "Ejecutivo"
-        : meta.label
+      : orgRole === "gerente"
+        ? "Gerente"
+        : orgRole === "supervisor"
+          ? "Supervisor"
+          : orgRole === "ejecutivo"
+            ? "Ejecutivo"
+            : meta.label
     : meta.label;
   return (
     <span

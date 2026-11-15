@@ -107,3 +107,65 @@ export function useActualizarOrgRole() {
       ),
   });
 }
+
+// ── Áreas / Departamentos / Centros de Costo ─────────────────────────────────
+import { useQuery } from "@tanstack/react-query";
+
+export interface AreaOrg {
+  id: number;
+  organizationId: number;
+  nombre: string;
+  tipo: "area" | "departamento" | "centro_costo";
+  parentAreaId: number | null;
+  responsableId: string | null;
+  descripcion: string | null;
+  activa: string;
+  miembros?: number;
+}
+
+export function getListAreasQueryKey() {
+  return ["areas"] as const;
+}
+
+export function useListAreas() {
+  return useQuery({
+    queryKey: getListAreasQueryKey(),
+    queryFn: () => customFetch<AreaOrg[]>("/api/areas", { responseType: "json" }),
+  });
+}
+
+export function useCrearArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { nombre: string; tipo?: "area" | "departamento" | "centro_costo"; descripcion?: string; parentAreaId?: number; responsableId?: string }) =>
+      customFetch<AreaOrg>("/api/areas", { method: "POST", body: JSON.stringify(data), responseType: "json" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: getListAreasQueryKey() }); },
+  });
+}
+
+export function useActualizarArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: number; nombre?: string; tipo?: "area" | "departamento" | "centro_costo"; descripcion?: string | null; parentAreaId?: number | null; responsableId?: string | null }) =>
+      customFetch<AreaOrg>(`/api/areas/${id}`, { method: "PATCH", body: JSON.stringify(data), responseType: "json" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: getListAreasQueryKey() }); },
+  });
+}
+
+export function useEliminarArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      customFetch<{ ok: boolean; mensaje: string }>(`/api/areas/${id}`, { method: "DELETE", responseType: "json" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: getListAreasQueryKey() }); },
+  });
+}
+
+export function useUpdateMiembroArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { areaId: number | null } }) =>
+      customFetch<unknown>(`/api/organization/usuarios/${id}`, { method: "PATCH", body: JSON.stringify({ areaId: data.areaId }), responseType: "json" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/organization/usuarios"] }); },
+  });
+}

@@ -7,6 +7,7 @@ import {
   invitacionesTable,
   cobrosTable,
   pagosParciales,
+  areasOrgTable,
 } from "@workspace/db";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import { InvitarUsuarioBody, UpdateMiembroBody } from "@workspace/api-zod";
@@ -25,7 +26,8 @@ const organizationRouter = Router();
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // Validates that `supervisorId` is an active member of `organizationId` with
-// the supervisor role. Returns an error string or null when valid.
+// a manager role (supervisor or gerente). Returns an error string or null when valid.
+// supervisors can report to gerentes; ejecutivos can report to supervisors or gerentes.
 async function validarSupervisor(
   organizationId: number,
   supervisorId: string,
@@ -39,8 +41,11 @@ async function validarSupervisor(
         eq(usersTable.organizationId, organizationId),
       ),
     );
-  if (!sup || sup.orgRole !== "supervisor" || !sup.activo) {
-    return "El supervisor seleccionado no es válido.";
+  if (!sup || !sup.activo) {
+    return "El supervisor/gerente seleccionado no es válido.";
+  }
+  if (sup.orgRole !== "supervisor" && sup.orgRole !== "gerente") {
+    return "El responsable seleccionado debe tener rol supervisor o gerente.";
   }
   return null;
 }
@@ -174,8 +179,7 @@ organizationRouter.get("/organization/usuarios", async (req, res) => {
       .from(organizacionesTable)
       .where(eq(organizacionesTable.id, ctx.organizationId));
 
-    // Supervisores solo ven su propio equipo (él mismo + sus ejecutivos);
-    // ejecutivos solo se ven a sí mismos. La frontera es el backend, no la UI.
+    // Gerentes/Supervisores solo ven su subtree; ejecutivos solo se ven a sí mismos.
     const scopeCondition =
       ctx.orgRole === "admin_org"
         ? eq(usersTable.organizationId, ctx.organizationId)
@@ -183,7 +187,9 @@ organizationRouter.get("/organization/usuarios", async (req, res) => {
             eq(usersTable.organizationId, ctx.organizationId),
             inArray(
               usersTable.id,
-              ctx.orgRole === "supervisor" ? ctx.teamMemberIds : [userId],
+              (ctx.orgRole === "supervisor" || ctx.orgRole === "gerente")
+                ? ctx.teamMemberIds
+                : [userId],
             ),
           );
 
@@ -195,6 +201,17 @@ organizationRouter.get("/organization/usuarios", async (req, res) => {
 
     const nombrePorId = new Map(rows.map((u) => [u.id, nombreDe(u) ?? u.email]));
 
+    // Load areas to enrich with names
+    const areaIds = [...new Set(rows.map((u) => u.areaId).filter((id): id is number => id != null))];
+    const areasMap = new Map<number, string>();
+    if (areaIds.length > 0) {
+      const areas = await db
+        .select({ id: areasOrgTable.id, nombre: areasOrgTable.nombre })
+        .from(areasOrgTable)
+        .where(inArray(areasOrgTable.id, areaIds));
+      for (const a of areas) areasMap.set(a.id, a.nombre);
+    }
+
     res.json(
       rows.map((u) => ({
         id: u.id,
@@ -205,6 +222,9 @@ organizationRouter.get("/organization/usuarios", async (req, res) => {
         supervisorNombre: u.supervisorId
           ? (nombrePorId.get(u.supervisorId) ?? null)
           : null,
+        areaId: u.areaId ?? null,
+        areaNombre: u.areaId ? (areasMap.get(u.areaId) ?? null) : null,
+        cargo: u.cargo ?? null,
         activo: u.activo,
         esOwner: org?.ownerId === u.id,
         createdAt: u.createdAt ? u.createdAt.toISOString() : null,
@@ -259,6 +279,8 @@ organizationRouter.patch(
       const nuevoActivo = parsed.data.activo;
       const nuevoSupervisorId =
         "supervisorId" in parsed.data ? (parsed.data.supervisorId ?? null) : undefined;
+      const nuevoAreaId =
+        "areaId" in parsed.data ? (parsed.data.areaId ?? null) : undefined;
 
       // Guard: the owner must remain an active admin_org.
       if (org?.ownerId === targetId) {
@@ -282,10 +304,15 @@ organizationRouter.patch(
 
       const rolFinal = nuevoRol ?? target.orgRole;
 
+      if (nuevoAreaId !== undefined) {
+        updates.areaId = nuevoAreaId;
+      }
+
       if (nuevoSupervisorId !== undefined) {
-        if (nuevoSupervisorId !== null && rolFinal !== "ejecutivo") {
+        // Both ejecutivos AND supervisores can have a manager (supervisor/gerente)
+        if (nuevoSupervisorId !== null && rolFinal === "admin_org") {
           res.status(400).json({
-            error: "Solo los ejecutivos pueden tener un supervisor asignado.",
+            error: "El administrador no puede tener un supervisor asignado.",
           });
           return;
         }
@@ -301,8 +328,8 @@ organizationRouter.patch(
           }
         }
         updates.supervisorId = nuevoSupervisorId;
-      } else if (nuevoRol !== undefined && nuevoRol !== "ejecutivo") {
-        // Promotions to supervisor/admin clear their own supervisor.
+      } else if (nuevoRol !== undefined && (nuevoRol === "admin_org" || nuevoRol === "gerente")) {
+        // Promotions to gerente/admin clear their own supervisor link.
         updates.supervisorId = null;
       }
 
@@ -362,6 +389,11 @@ organizationRouter.patch(
             .where(eq(usersTable.id, updated.supervisorId));
           supervisorNombre = sup ? (nombreDe(sup) ?? sup.email) : null;
         }
+        let areaNombreReact: string | null = null;
+        if (updated.areaId) {
+          const [area] = await db.select({ nombre: areasOrgTable.nombre }).from(areasOrgTable).where(eq(areasOrgTable.id, updated.areaId));
+          areaNombreReact = area?.nombre ?? null;
+        }
         res.json({
           id: updated.id,
           nombre: nombreDe(updated),
@@ -369,6 +401,8 @@ organizationRouter.patch(
           orgRole: updated.orgRole,
           supervisorId: updated.supervisorId ?? null,
           supervisorNombre,
+          areaId: updated.areaId ?? null,
+          areaNombre: areaNombreReact,
           activo: updated.activo,
           esOwner: org?.ownerId === updated.id,
           createdAt: updated.createdAt ? updated.createdAt.toISOString() : null,
@@ -384,9 +418,11 @@ organizationRouter.patch(
         .where(eq(usersTable.id, targetId))
         .returning();
 
-      // If a supervisor stops being supervisor, their ejecutivos go back to
-      // reporting directly to the admin.
-      if (target.orgRole === "supervisor" && updated.orgRole !== "supervisor") {
+      // If a gerente/supervisor changes role to non-manager, clear their reports.
+      if (
+        (target.orgRole === "supervisor" || target.orgRole === "gerente") &&
+        updated.orgRole !== "supervisor" && updated.orgRole !== "gerente"
+      ) {
         await db
           .update(usersTable)
           .set({ supervisorId: null, updatedAt: new Date() })
@@ -406,6 +442,11 @@ organizationRouter.patch(
           .where(eq(usersTable.id, updated.supervisorId));
         supervisorNombre = sup ? (nombreDe(sup) ?? sup.email) : null;
       }
+      let areaNombre: string | null = null;
+      if (updated.areaId) {
+        const [area] = await db.select({ nombre: areasOrgTable.nombre }).from(areasOrgTable).where(eq(areasOrgTable.id, updated.areaId));
+        areaNombre = area?.nombre ?? null;
+      }
 
       res.json({
         id: updated.id,
@@ -414,6 +455,8 @@ organizationRouter.patch(
         orgRole: updated.orgRole,
         supervisorId: updated.supervisorId ?? null,
         supervisorNombre,
+        areaId: updated.areaId ?? null,
+        areaNombre,
         activo: updated.activo,
         esOwner: org?.ownerId === updated.id,
         createdAt: updated.createdAt ? updated.createdAt.toISOString() : null,

@@ -1,4 +1,4 @@
-import { db, usersTable, organizacionesTable } from "@workspace/db";
+import { db, usersTable, organizacionesTable, areasOrgTable } from "@workspace/db";
 import { eq, and, isNull, inArray, type SQL } from "drizzle-orm";
 import { cobrosTable, clientesTable } from "@workspace/db";
 import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA, IVA_RATE } from "./flow-subscriptions";
@@ -19,18 +19,56 @@ export const COSTO_USUARIO_ADICIONAL =
 
 export interface OrgContext {
   organizationId: number | null;
-  orgRole: "admin_org" | "supervisor" | "ejecutivo" | null;
+  orgRole: "admin_org" | "gerente" | "supervisor" | "ejecutivo" | null;
   isOrgAdmin: boolean;
+  isGerente: boolean;
   isSupervisor: boolean;
-  // For supervisors: the user ids of their team (their ejecutivos + themselves).
-  // Empty for other roles.
+  // For supervisors/gerentes: the user ids of their subtree (all reports + themselves).
+  // admin_org: empty (uses org-wide scope instead).
   teamMemberIds: string[];
+}
+
+// Recursively collects all descendant user IDs for a given manager/supervisor.
+// Traverses the supervisorId hierarchy: a gerente's subtree includes their
+// supervisors, and each supervisor's ejecutivos; a supervisor's subtree is
+// just their ejecutivos. Returns the given userId plus all descendants.
+async function collectSubtreeIds(
+  userId: string,
+  organizationId: number,
+): Promise<string[]> {
+  const result: string[] = [userId];
+  const queue: string[] = [userId];
+
+  while (queue.length > 0) {
+    const parentId = queue.shift()!;
+    const children = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.organizationId, organizationId),
+          eq(usersTable.supervisorId, parentId),
+          eq(usersTable.activo, true),
+        ),
+      );
+    for (const child of children) {
+      if (!result.includes(child.id)) {
+        result.push(child.id);
+        queue.push(child.id);
+      }
+    }
+  }
+  return result;
 }
 
 // Loads the organization context for a user from the DB.
 // - admin_org: sees and manages everything in their organization.
+// - gerente: sees and manages their supervisors and all those supervisors' ejecutivos.
 // - supervisor: sees and manages only their team (their ejecutivos + own records).
 // - ejecutivo: only their own.
+// The hierarchy is modeled via supervisorId: ejecutivo.supervisorId → supervisor,
+// supervisor.supervisorId → gerente (or null/admin). Multi-level traversal is
+// handled by collectSubtreeIds.
 export async function getOrgContext(userId: string): Promise<OrgContext> {
   const [row] = await db
     .select({
@@ -44,23 +82,15 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
   const orgRole = row?.orgRole ?? null;
 
   let teamMemberIds: string[] = [];
-  if (orgRole === "supervisor" && organizationId != null) {
-    const ejecutivos = await db
-      .select({ id: usersTable.id })
-      .from(usersTable)
-      .where(
-        and(
-          eq(usersTable.organizationId, organizationId),
-          eq(usersTable.supervisorId, userId),
-        ),
-      );
-    teamMemberIds = [userId, ...ejecutivos.map((e) => e.id)];
+  if ((orgRole === "supervisor" || orgRole === "gerente") && organizationId != null) {
+    teamMemberIds = await collectSubtreeIds(userId, organizationId);
   }
 
   return {
     organizationId,
     orgRole,
     isOrgAdmin: orgRole === "admin_org",
+    isGerente: orgRole === "gerente",
     isSupervisor: orgRole === "supervisor",
     teamMemberIds,
   };
@@ -88,10 +118,10 @@ export async function getRemitenteContacto(
 
 // Builds the WHERE condition that scopes cobros to what the user may see:
 // - admin_org: every cobro in their organization
+// - gerente: cobros assigned to their subtree (their supervisors + those supervisors' ejecutivos)
 // - supervisor: cobros assigned to their team (their ejecutivos + themselves)
 // - ejecutivo (or no org yet): only cobros assigned to them (responsableId)
-// An optional responsableId narrows the view to a single member; for a
-// supervisor it must belong to their team (otherwise the scope is empty).
+// An optional responsableId narrows the view to a single member.
 export function cobroScopeCondition(
   ctx: OrgContext,
   userId: string,
@@ -104,10 +134,9 @@ export function cobroScopeCondition(
     }
     return orgCond;
   }
-  if (ctx.isSupervisor && ctx.organizationId != null) {
+  if ((ctx.isSupervisor || ctx.isGerente) && ctx.organizationId != null) {
     const team = ctx.teamMemberIds.length > 0 ? ctx.teamMemberIds : [userId];
     if (responsableId) {
-      // A supervisor may only narrow to members of their own team.
       if (!team.includes(responsableId)) {
         return sqlFalse();
       }
@@ -125,7 +154,7 @@ function sqlFalse(): SQL {
 
 // Authorizes access to a single cobro (detail/mutation routes):
 // - admin_org: any cobro in their organization
-// - supervisor: cobros assigned to their team (their ejecutivos + themselves)
+// - gerente/supervisor: cobros assigned to their subtree
 // - ejecutivo (or no org yet): only cobros assigned to them (responsableId)
 export function userCanAccessCobro(
   ctx: OrgContext,
@@ -135,7 +164,7 @@ export function userCanAccessCobro(
   if (ctx.isOrgAdmin && ctx.organizationId != null) {
     return cobro.organizationId === ctx.organizationId;
   }
-  if (ctx.isSupervisor && ctx.organizationId != null) {
+  if ((ctx.isSupervisor || ctx.isGerente) && ctx.organizationId != null) {
     return (
       cobro.organizationId === ctx.organizationId &&
       cobro.responsableId != null &&
@@ -148,13 +177,13 @@ export function userCanAccessCobro(
 
 // Builds the WHERE condition that scopes clientes to what the user may see:
 // - admin_org: every cliente in their organization
-// - supervisor: clientes owned by their team (their ejecutivos + themselves)
+// - gerente/supervisor: clientes owned by their subtree
 // - ejecutivo (or no org yet): only clientes they own (userId)
 export function clienteScopeCondition(ctx: OrgContext, userId: string): SQL {
   if (ctx.isOrgAdmin && ctx.organizationId != null) {
     return eq(clientesTable.organizationId, ctx.organizationId);
   }
-  if (ctx.isSupervisor && ctx.organizationId != null) {
+  if ((ctx.isSupervisor || ctx.isGerente) && ctx.organizationId != null) {
     const team = ctx.teamMemberIds.length > 0 ? ctx.teamMemberIds : [userId];
     return inArray(clientesTable.userId, team);
   }
@@ -163,7 +192,7 @@ export function clienteScopeCondition(ctx: OrgContext, userId: string): SQL {
 
 // Authorizes access to a single cliente (detail/update routes):
 // - admin_org: any cliente in their organization
-// - supervisor: clientes owned by their team (their ejecutivos + themselves)
+// - gerente/supervisor: clientes owned by their subtree
 // - ejecutivo (or no org yet): only clientes they own (userId)
 export function userCanAccessCliente(
   ctx: OrgContext,
@@ -173,7 +202,7 @@ export function userCanAccessCliente(
   if (ctx.isOrgAdmin && ctx.organizationId != null) {
     return cliente.organizationId === ctx.organizationId;
   }
-  if (ctx.isSupervisor && ctx.organizationId != null) {
+  if ((ctx.isSupervisor || ctx.isGerente) && ctx.organizationId != null) {
     return (
       cliente.organizationId === ctx.organizationId &&
       cliente.userId != null &&
@@ -183,12 +212,12 @@ export function userCanAccessCliente(
   return cliente.userId === userId;
 }
 
-// True when `ctx` (a supervisor or admin) may assign records to `targetId`.
+// True when `ctx` (a gerente/supervisor/admin) may assign records to `targetId`.
 // - admin_org: any member of the organization (validated by caller against org)
-// - supervisor: only members of their team (their ejecutivos + themselves)
+// - gerente/supervisor: only members of their subtree
 export function canAssignTo(ctx: OrgContext, userId: string, targetId: string): boolean {
   if (ctx.isOrgAdmin) return true;
-  if (ctx.isSupervisor) {
+  if (ctx.isGerente || ctx.isSupervisor) {
     return ctx.teamMemberIds.includes(targetId) || targetId === userId;
   }
   return targetId === userId;

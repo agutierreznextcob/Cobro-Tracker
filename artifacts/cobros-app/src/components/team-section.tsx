@@ -11,6 +11,8 @@ import {
   getListMiembrosQueryKey,
   getListInvitacionesQueryKey,
   getGetSubscriptionStatusQueryKey,
+  useListAreas,
+  useUpdateMiembroArea,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -66,11 +68,12 @@ function formatCLP(value: number): string {
 
 const ORG_ROLE_LABEL: Record<string, string> = {
   admin_org: "Administrador",
+  gerente: "Gerente",
   supervisor: "Supervisor",
   ejecutivo: "Ejecutivo",
 };
 
-type OrgRole = "admin_org" | "supervisor" | "ejecutivo";
+type OrgRole = "admin_org" | "gerente" | "supervisor" | "ejecutivo";
 
 export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
@@ -79,9 +82,11 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: org } = useGetOrganization();
   const { data: miembros, isLoading: miembrosLoading } = useListMiembros();
   const { data: invitaciones } = useListInvitaciones();
+  const { data: areas } = useListAreas();
 
   const invitar = useInvitarUsuario();
   const updateMiembro = useUpdateMiembro();
+  const updateMiembroArea = useUpdateMiembroArea();
   const deactivateMiembro = useDeactivateMiembro();
   const cancelarInvitacion = useCancelarInvitacion();
 
@@ -89,6 +94,7 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<OrgRole>("ejecutivo");
   const [inviteSupervisorId, setInviteSupervisorId] = useState<string>("ninguno");
+  const [inviteAreaId, setInviteAreaId] = useState<string>("ninguna");
   const [deactivateTarget, setDeactivateTarget] = useState<{ id: string; nombre: string } | null>(
     null,
   );
@@ -118,9 +124,11 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
           email,
           orgRole: inviteRole,
           supervisorId:
-            inviteRole === "ejecutivo" && inviteSupervisorId !== "ninguno"
+            (inviteRole === "ejecutivo" || inviteRole === "supervisor") && inviteSupervisorId !== "ninguno"
               ? inviteSupervisorId
               : null,
+          areaId:
+            inviteAreaId !== "ninguna" ? parseInt(inviteAreaId) : undefined,
         },
       },
       {
@@ -133,6 +141,7 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
           setInviteEmail("");
           setInviteRole("ejecutivo");
           setInviteSupervisorId("ninguno");
+          setInviteAreaId("ninguna");
           setInviteOpen(false);
         },
         onError: (err: unknown) => {
@@ -188,6 +197,22 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
     );
   };
 
+  const handleAreaChange = (id: string, areaId: number | null) => {
+    updateMiembroArea.mutate(
+      { id, data: { areaId } },
+      {
+        onSuccess: () => {
+          toast({ title: "Área actualizada" });
+          invalidateTeam();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "No se pudo actualizar el área.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  };
+
   const handleDeactivate = () => {
     if (!deactivateTarget) return;
     deactivateMiembro.mutate(
@@ -230,8 +255,9 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
     ? org.cupoUsuarios - org.miembrosActivos - (org.invitacionesPendientes ?? 0)
     : 0;
   const sinCupo = org != null && cuposLibres <= 0;
+  // "managers" = gerentes + supervisores — available as managers for other users
   const supervisores = (miembros ?? []).filter(
-    (m) => m.orgRole === "supervisor" && m.activo,
+    (m) => (m.orgRole === "supervisor" || m.orgRole === "gerente") && m.activo,
   );
 
   return (
@@ -337,7 +363,8 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
                   <TableRow>
                     <TableHead>Usuario</TableHead>
                     <TableHead>Rol</TableHead>
-                    <TableHead>Supervisor</TableHead>
+                    <TableHead>Superior directo</TableHead>
+                    <TableHead>Área</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -377,6 +404,9 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
                               <SelectItem value="supervisor" className="text-xs">
                                 Supervisor
                               </SelectItem>
+                              <SelectItem value="gerente" className="text-xs">
+                                Gerente
+                              </SelectItem>
                               <SelectItem value="admin_org" className="text-xs">
                                 Administrador
                               </SelectItem>
@@ -385,7 +415,7 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
                         )}
                       </TableCell>
                       <TableCell>
-                        {m.orgRole === "ejecutivo" && !m.esOwner ? (
+                        {(m.orgRole === "ejecutivo" || m.orgRole === "supervisor") && !m.esOwner ? (
                           <Select
                             value={m.supervisorId ?? "ninguno"}
                             onValueChange={(v) =>
@@ -394,15 +424,42 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
                             disabled={!m.activo || updateMiembro.isPending}
                           >
                             <SelectTrigger className="h-8 w-[170px] text-xs">
-                              <SelectValue />
+                              <SelectValue placeholder="Sin superior" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="ninguno" className="text-xs">
-                                Sin supervisor
+                                Sin superior directo
                               </SelectItem>
-                              {supervisores.map((s) => (
-                                <SelectItem key={s.id} value={s.id} className="text-xs">
-                                  {s.nombre ?? s.email ?? "—"}
+                              {supervisores
+                                .filter((s) => s.id !== m.id)
+                                .map((s) => (
+                                  <SelectItem key={s.id} value={s.id} className="text-xs">
+                                    {s.nombre ?? s.email ?? "—"} ({ORG_ROLE_LABEL[s.orgRole ?? "supervisor"]})
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {!m.esOwner ? (
+                          <Select
+                            value={m.areaId != null ? String(m.areaId) : "ninguna"}
+                            onValueChange={(v) =>
+                              handleAreaChange(m.id, v === "ninguna" ? null : parseInt(v))
+                            }
+                            disabled={!m.activo || updateMiembroArea.isPending}
+                          >
+                            <SelectTrigger className="h-8 w-[150px] text-xs">
+                              <SelectValue placeholder="Sin área" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ninguna" className="text-xs">Sin área</SelectItem>
+                              {(areas ?? []).map((a) => (
+                                <SelectItem key={a.id} value={String(a.id)} className="text-xs">
+                                  {a.nombre}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -505,22 +562,41 @@ export function TeamSection({ embedded = false }: { embedded?: boolean } = {}) {
                 <SelectContent>
                   <SelectItem value="ejecutivo">Ejecutivo</SelectItem>
                   <SelectItem value="supervisor">Supervisor</SelectItem>
+                  <SelectItem value="gerente">Gerente</SelectItem>
                   <SelectItem value="admin_org">Administrador</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {inviteRole === "ejecutivo" && supervisores.length > 0 && (
+            {(inviteRole === "ejecutivo" || inviteRole === "supervisor") && supervisores.length > 0 && (
               <div className="space-y-2">
-                <Label>Supervisor</Label>
+                <Label>Superior directo</Label>
                 <Select value={inviteSupervisorId} onValueChange={setInviteSupervisorId}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ninguno">Sin supervisor (reporta al administrador)</SelectItem>
+                    <SelectItem value="ninguno">Sin superior directo (reporta al administrador)</SelectItem>
                     {supervisores.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.nombre ?? s.email ?? "—"}
+                        {s.nombre ?? s.email ?? "—"} ({ORG_ROLE_LABEL[s.orgRole ?? "supervisor"]})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {(areas ?? []).length > 0 && (
+              <div className="space-y-2">
+                <Label>Área / Departamento</Label>
+                <Select value={inviteAreaId} onValueChange={setInviteAreaId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ninguna">Sin área asignada</SelectItem>
+                    {(areas ?? []).map((a) => (
+                      <SelectItem key={a.id} value={String(a.id)}>
+                        {a.nombre}
                       </SelectItem>
                     ))}
                   </SelectContent>
