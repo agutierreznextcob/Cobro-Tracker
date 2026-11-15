@@ -12,12 +12,10 @@ import {
   useReclamarCobrosHuerfanos,
   useActualizarPacksUsuarios,
   useActualizarOrgRole,
-  useListAdminCobrosEliminados,
   useListAdminTrialExtensiones,
   getListAdminTrialExtensionesQueryKey,
   getListAdminUsuariosQueryKey,
   getGetAdminMetricasQueryKey,
-  getListAdminCobrosEliminadosQueryKey,
   type AdminUsuario,
 } from "@workspace/api-client-react";
 import { StatusBadge } from "@/components/status-badge";
@@ -673,10 +671,6 @@ export default function AdminPage() {
     },
   );
   const { data: metricas } = useGetAdminMetricas();
-  const { data: cobrosEliminados, isLoading: isLoadingEliminados } = useListAdminCobrosEliminados({
-    query: { queryKey: getListAdminCobrosEliminadosQueryKey() },
-  });
-
   const usuariosFiltrados = usuarios ?? [];
 
   return (
@@ -890,77 +884,6 @@ export default function AdminPage() {
           )}
         </CardContent>
       </Card>
-
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Trash2 className="h-5 w-5 text-destructive" />
-          <h2 className="text-xl font-bold tracking-tight">Cobros eliminados</h2>
-        </div>
-        <Card className="shadow-sm">
-          <CardContent className="p-0">
-            {isLoadingEliminados ? (
-              <div className="flex items-center justify-center py-24 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                Cargando cobros eliminados...
-              </div>
-            ) : (cobrosEliminados ?? []).length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <Trash2 className="h-8 w-8 text-muted-foreground mb-3" />
-                <p className="text-muted-foreground text-sm">
-                  No hay cobros eliminados registrados.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID original</TableHead>
-                      <TableHead>Descripción</TableHead>
-                      <TableHead className="text-right">Monto</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Eliminado por</TableHead>
-                      <TableHead>Motivo</TableHead>
-                      <TableHead>Fecha</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(cobrosEliminados ?? []).map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-mono text-xs whitespace-nowrap font-semibold text-primary">
-                          #{c.cobroIdOriginal}
-                        </TableCell>
-                        <TableCell className="max-w-[220px]">
-                          <span className="text-sm">{c.descripcion || "—"}</span>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap font-mono">
-                          {formatCurrency(c.montoACobrar ?? c.monto)}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={c.estado} />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {c.clienteNombre || "—"}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {c.eliminadoPorNombre || "—"}
-                        </TableCell>
-                        <TableCell className="max-w-[220px] text-muted-foreground text-sm">
-                          {c.motivo || "—"}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                          {formatDate(c.eliminadoEn)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
       <TrialExtensionesSection />
 
