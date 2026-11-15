@@ -102,7 +102,7 @@ export default function CotizacionDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4 animate-pulse">
+      <div className="max-w-7xl mx-auto space-y-4 animate-pulse">
         <div className="h-6 w-40 bg-muted rounded" />
         <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
           <div className="h-[520px] bg-muted/60 rounded-xl" />
@@ -136,7 +136,7 @@ export default function CotizacionDetailPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-300">
       <Link href="/cotizaciones" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="mr-2 h-4 w-4" />Volver a cotizaciones
       </Link>

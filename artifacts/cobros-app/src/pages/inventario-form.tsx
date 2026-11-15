@@ -317,7 +317,7 @@ export default function InventarioFormPage() {
   }
 
   return (
-    <div className="w-full min-w-0 max-w-5xl mx-auto space-y-5 animate-in fade-in duration-300">
+    <div className="w-full min-w-0 max-w-6xl mx-auto space-y-5 animate-in fade-in duration-300">
       <Link href="/inventario" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="mr-2 h-4 w-4" />Volver al inventario
       </Link>

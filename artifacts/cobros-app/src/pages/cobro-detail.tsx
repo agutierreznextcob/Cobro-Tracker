@@ -1265,7 +1265,7 @@ export default function CobroDetail() {
   const hasEmail = !!cobro.emailPagador;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
       <Link
         href="/dashboard"
         className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-2 transition-colors"

@@ -286,7 +286,7 @@ export default function CotizacionFormPage() {
 
   if (isEdit && (cotQ.isLoading || (!cotQ.isFetchedAfterMount && !cotQ.isError))) {
     return (
-      <div className="max-w-6xl mx-auto space-y-4 animate-pulse">
+      <div className="max-w-7xl mx-auto space-y-4 animate-pulse">
         <div className="h-6 w-48 bg-muted rounded" />
         <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
           <div className="h-96 bg-muted/60 rounded-xl" />
@@ -320,7 +320,7 @@ export default function CotizacionFormPage() {
   const ocupado = accion !== null;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-300">
       <Link href={isEdit ? `/cotizaciones/${id}` : "/cotizaciones"} className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="mr-2 h-4 w-4" />{isEdit ? "Volver a la cotización" : "Volver a cotizaciones"}
       </Link>

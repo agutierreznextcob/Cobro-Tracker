@@ -91,7 +91,7 @@ export default function WebhookLog() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>

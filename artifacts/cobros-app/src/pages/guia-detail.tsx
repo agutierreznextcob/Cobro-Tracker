@@ -59,8 +59,8 @@ export default function GuiaDetailPage() {
     window.open(`/api/guias-despacho/${id}/pdf`, "_blank");
   };
 
-  if (isLoading) return <div className="max-w-6xl mx-auto py-12 text-center text-muted-foreground">Cargando guía…</div>;
-  if (isError || !g) return <div className="max-w-6xl mx-auto py-12 text-center text-destructive">No se pudo cargar la guía.</div>;
+  if (isLoading) return <div className="max-w-7xl mx-auto py-12 text-center text-muted-foreground">Cargando guía…</div>;
+  if (isError || !g) return <div className="max-w-7xl mx-auto py-12 text-center text-destructive">No se pudo cargar la guía.</div>;
 
   const cfg = ESTADO_GUIA[g.estado];
   const subtotal = Number(g.subtotal);
@@ -68,7 +68,7 @@ export default function GuiaDetailPage() {
   const total = Number(g.total);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">

@@ -223,7 +223,7 @@ export default function CompraFormPage() {
   };
 
   if (isEdit && (compraQ.isLoading || (!compraQ.isFetchedAfterMount && !compraQ.isError))) {
-    return <div className="max-w-6xl mx-auto space-y-4 animate-pulse"><div className="h-6 w-48 bg-muted rounded" /><div className="grid gap-5 lg:grid-cols-[1fr_340px]"><div className="h-96 bg-muted/60 rounded-xl" /><div className="h-64 bg-muted/60 rounded-xl" /></div></div>;
+    return <div className="max-w-7xl mx-auto space-y-4 animate-pulse"><div className="h-6 w-48 bg-muted rounded" /><div className="grid gap-5 lg:grid-cols-[1fr_340px]"><div className="h-96 bg-muted/60 rounded-xl" /><div className="h-64 bg-muted/60 rounded-xl" /></div></div>;
   }
   if (isEdit && (compraQ.isError || !c)) {
     return (
@@ -252,7 +252,7 @@ export default function CompraFormPage() {
   const sinBodegas = !bodQ.isLoading && bodegas.length === 0;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-300">
       <Link href={isEdit ? `/compras/${id}` : "/compras"} className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors" data-testid="link-volver-compras">
         <ArrowLeft className="mr-2 h-4 w-4" />{isEdit ? "Volver a la compra" : "Volver a compras"}
       </Link>

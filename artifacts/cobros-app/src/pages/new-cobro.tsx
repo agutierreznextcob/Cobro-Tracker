@@ -289,7 +289,7 @@ export default function NewCobro() {
   const isPending = createCobro.isPending || creandoAvanzado;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-0 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-0 animate-in fade-in duration-300">
       {/* Encabezado de página */}
       <div className="flex items-center gap-3 mb-5">
         <Link href={fromCotizacionId ? `/cotizaciones/${fromCotizacionId}` : "/cobros"} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors">

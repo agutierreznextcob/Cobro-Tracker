@@ -55,7 +55,7 @@ export default function BodegaDetailPage() {
   const [editNombre, setEditNombre] = useState("");
   const [editDescripcion, setEditDescripcion] = useState("");
 
-  if (isLoading) return <div className="max-w-5xl mx-auto space-y-4 animate-pulse"><div className="h-8 w-60 bg-muted rounded" /><div className="h-64 bg-muted/60 rounded-xl" /></div>;
+  if (isLoading) return <div className="max-w-7xl mx-auto space-y-4 animate-pulse"><div className="h-8 w-60 bg-muted rounded" /><div className="h-64 bg-muted/60 rounded-xl" /></div>;
   if (isError || !bodega) {
     return (
       <div className="max-w-md mx-auto text-center py-16 space-y-3">
@@ -72,7 +72,7 @@ export default function BodegaDetailPage() {
   const criticos = productos.filter((p) => { const s = stockEnBodega(p, id); return s.stock <= s.critico; }).length;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-300">
       <Link href={`/locales/${bodega.localId}`} className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="mr-2 h-4 w-4" />Volver a {bodega.localNombre}</Link>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

@@ -40,7 +40,7 @@ export default function CotizacionesPage() {
   const totales = useMemo(() => totalesPorMoneda(lista, (c) => c.total), [lista]);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Ventas</p>
@@ -100,22 +100,22 @@ export default function CotizacionesPage() {
         </Card>
       ) : (
         <Card className="shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
+          <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">
-                  <TableHead>Número</TableHead>
+                  <TableHead className="w-32">Número</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Emisión</TableHead>
-                  <TableHead>Vence</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="w-36">Estado</TableHead>
+                  <TableHead className="w-32">Emisión</TableHead>
+                  <TableHead className="w-32">Vencimiento</TableHead>
+                  <TableHead className="w-24 hidden lg:table-cell">Moneda</TableHead>
+                  <TableHead className="text-right w-36">Total</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {lista.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">Sin resultados para este filtro.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="h-24 text-center text-sm text-muted-foreground">Sin resultados para este filtro.</TableCell></TableRow>
                 ) : lista.map((c) => (
                   <TableRow key={c.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/cotizaciones/${c.id}`)} data-testid={`row-cotizacion-${c.id}`}>
                     <TableCell className="font-mono text-sm font-semibold">{c.numeroCotizacion}</TableCell>
@@ -131,13 +131,13 @@ export default function CotizacionesPage() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground tabular-nums">{formatFechaPref(c.fechaEmision, prefs.formatoFecha)}</TableCell>
                     <TableCell className="text-sm tabular-nums">{formatFechaPref(c.fechaVencimiento, prefs.formatoFecha)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground hidden lg:table-cell">{c.moneda}</TableCell>
                     <TableCell className="text-right font-mono font-semibold text-sm whitespace-nowrap">{formatMoney(c.total, c.moneda, c.decimales)}</TableCell>
                     <TableCell><ArrowRight className="h-4 w-4 text-muted-foreground/40" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
           {totales.length > 0 && lista.length > 0 && (
             <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t bg-muted/20 px-4 py-3 text-sm" data-testid="text-totales-cotizaciones">
               <span className="text-muted-foreground">{lista.length} cotización{lista.length === 1 ? "" : "es"}</span>

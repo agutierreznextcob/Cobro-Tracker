@@ -75,10 +75,10 @@ export default function PedidoDetailPage() {
   const isBusy = cambiarEstado.isPending || emitirGuia.isPending;
 
   if (isLoading) return (
-    <div className="max-w-6xl mx-auto py-12 text-center text-muted-foreground">Cargando pedido…</div>
+    <div className="max-w-7xl mx-auto py-12 text-center text-muted-foreground">Cargando pedido…</div>
   );
   if (isError || !p) return (
-    <div className="max-w-6xl mx-auto py-12 text-center text-destructive">No se pudo cargar el pedido.</div>
+    <div className="max-w-7xl mx-auto py-12 text-center text-destructive">No se pudo cargar el pedido.</div>
   );
 
   const cfg = ESTADO_PEDIDO[p.estado];
@@ -87,7 +87,7 @@ export default function PedidoDetailPage() {
   const total = Number(p.total);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">

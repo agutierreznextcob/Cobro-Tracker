@@ -33,7 +33,7 @@ export default function CompraDetailPage() {
   const [confirmCont, setConfirmCont] = useState(false);
   const [recepcion, setRecepcion] = useState(false);
 
-  if (q.isLoading) return <div className="max-w-5xl mx-auto space-y-4 animate-pulse"><div className="h-8 w-64 bg-muted rounded" /><div className="h-80 bg-muted/60 rounded-xl" /></div>;
+  if (q.isLoading) return <div className="max-w-7xl mx-auto space-y-4 animate-pulse"><div className="h-8 w-64 bg-muted rounded" /><div className="h-80 bg-muted/60 rounded-xl" /></div>;
   if (q.isError || !q.data) {
     return (
       <div className="max-w-md mx-auto text-center py-16 space-y-3">
@@ -69,7 +69,7 @@ export default function CompraDetailPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-300">
       <Link href="/compras" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="mr-2 h-4 w-4" />Volver a compras</Link>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">

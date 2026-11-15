@@ -174,7 +174,7 @@ export default function EmpresaPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-4 animate-pulse">
+      <div className="max-w-7xl mx-auto space-y-4 animate-pulse">
         <div className="h-8 w-64 bg-muted rounded" />
         <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
           <div className="space-y-4">{[0, 1, 2].map((i) => <div key={i} className="h-56 bg-muted/60 rounded-xl" />)}</div>
@@ -196,7 +196,7 @@ export default function EmpresaPage() {
   const ro = !puedeEditar || ocupado;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5 animate-in fade-in duration-300 pb-24">
+    <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-300 pb-24">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Configuración</p>

@@ -34,7 +34,7 @@ export default function LocalDetailPage() {
     return [...set];
   }, [productos, id]);
 
-  if (isLoading) return <div className="max-w-4xl mx-auto space-y-4 animate-pulse"><div className="h-8 w-60 bg-muted rounded" /><div className="h-64 bg-muted/60 rounded-xl" /></div>;
+  if (isLoading) return <div className="max-w-6xl mx-auto space-y-4 animate-pulse"><div className="h-8 w-60 bg-muted rounded" /><div className="h-64 bg-muted/60 rounded-xl" /></div>;
   if (isError || !local) {
     return (
       <div className="max-w-md mx-auto text-center py-16 space-y-3">
@@ -48,7 +48,7 @@ export default function LocalDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5 animate-in fade-in duration-300">
+    <div className="max-w-6xl mx-auto space-y-5 animate-in fade-in duration-300">
       <Link href="/locales" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="mr-2 h-4 w-4" />Volver a locales</Link>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

@@ -19,7 +19,7 @@ export default function ProveedoresPage() {
   }, [q.data, busqueda, archivados]);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-300">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Proveedores</h1>
