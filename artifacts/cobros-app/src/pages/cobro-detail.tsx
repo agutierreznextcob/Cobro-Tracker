@@ -1265,7 +1265,7 @@ export default function CobroDetail() {
   const hasEmail = !!cobro.emailPagador;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300">
       <Link
         href="/dashboard"
         className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-2 transition-colors"
@@ -1349,9 +1349,10 @@ export default function CobroDetail() {
         </TabsList>
 
         <TabsContent value="cobro" className="space-y-6 mt-0">
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Main details */}
-        <Card className="md:col-span-2 shadow-sm border-border/50">
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* Left column: detalles + cliente */}
+        <div className="lg:col-span-3 space-y-6">
+        <Card className="shadow-sm border-border/50">
           <CardHeader className="bg-muted/20 border-b border-border/50 pb-4">
             <CardTitle className="text-lg flex items-center gap-2">
               <FileText className="h-4 w-4 text-primary" />
@@ -1459,8 +1460,69 @@ export default function CobroDetail() {
           </CardContent>
         </Card>
 
+        {/* Cliente info (dentro columna izquierda) */}
+        {cobro.clienteId != null && (() => {
+          const clienteActual = clientes?.find(c => c.id === cobro.clienteId);
+          if (!clienteActual) return null;
+          return (
+            <Card className="shadow-sm border-border/50">
+              <CardHeader className="bg-muted/20 border-b border-border/50 pb-4">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  Información del cliente
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Razón social</p>
+                    <p className="text-sm font-medium">{clienteActual.nombre}</p>
+                  </div>
+                  {clienteActual.rut && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">RUT</p>
+                      <p className="text-sm font-mono font-medium">{clienteActual.rut}</p>
+                    </div>
+                  )}
+                  {clienteActual.giro && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Giro</p>
+                      <p className="text-sm">{clienteActual.giro}</p>
+                    </div>
+                  )}
+                  {clienteActual.telefono && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                        <Phone className="h-3 w-3" />Teléfono
+                      </p>
+                      <p className="text-sm">{clienteActual.telefono}</p>
+                    </div>
+                  )}
+                  {clienteActual.email && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                        <AtSign className="h-3 w-3" />Correo
+                      </p>
+                      <p className="text-sm">{clienteActual.email}</p>
+                    </div>
+                  )}
+                  {clienteActual.direccion && (
+                    <div className="space-y-1 sm:col-span-2 lg:col-span-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />Dirección
+                      </p>
+                      <p className="text-sm">{clienteActual.direccion}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
+        </div>{/* end left column */}
+
         {/* Right column */}
-        <div className="space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           {/* Amount card */}
           <Card className="shadow-sm border-primary/20 bg-primary/5">
             <CardHeader className="pb-4">
@@ -2139,66 +2201,6 @@ export default function CobroDetail() {
           )}
         </div>
       </div>
-
-      {/* Información del cliente */}
-      {cobro.clienteId != null && (() => {
-        const clienteActual = clientes?.find(c => c.id === cobro.clienteId);
-        if (!clienteActual) return null;
-        return (
-          <Card className="shadow-sm border-border/50">
-            <CardHeader className="bg-muted/20 border-b border-border/50 pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-primary" />
-                Información del cliente
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Razón social</p>
-                  <p className="text-sm font-medium">{clienteActual.nombre}</p>
-                </div>
-                {clienteActual.rut && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">RUT</p>
-                    <p className="text-sm font-mono font-medium">{clienteActual.rut}</p>
-                  </div>
-                )}
-                {clienteActual.giro && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Giro</p>
-                    <p className="text-sm">{clienteActual.giro}</p>
-                  </div>
-                )}
-                {clienteActual.telefono && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                      <Phone className="h-3 w-3" />Teléfono
-                    </p>
-                    <p className="text-sm">{clienteActual.telefono}</p>
-                  </div>
-                )}
-                {clienteActual.email && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                      <AtSign className="h-3 w-3" />Correo
-                    </p>
-                    <p className="text-sm">{clienteActual.email}</p>
-                  </div>
-                )}
-                {(clienteActual as typeof clienteActual & { direccion?: string }).direccion && (
-                  <div className="space-y-1 sm:col-span-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />Dirección
-                    </p>
-                    <p className="text-sm">{(clienteActual as typeof clienteActual & { direccion?: string }).direccion}</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
 
         </TabsContent>
 
