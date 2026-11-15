@@ -27,17 +27,19 @@ export interface MiembroConPermisos {
   firstName: string | null;
   lastName: string | null;
   email: string | null;
-  orgRole: "admin_org" | "supervisor" | "ejecutivo" | null;
+  orgRole: "admin_org" | "gerente" | "subgerente" | "supervisor" | "ejecutivo" | null;
   activo: boolean;
   rut?: string | null;
   phone?: string | null;
   cargo?: string | null;
   area?: string | null;
+  areaId?: number | null;
+  supervisorId?: string | null;
   permisos: Partial<Record<ModuloPermiso, NivelPermiso>>;
 }
 
 export interface MisPermisos {
-  orgRole: "admin_org" | "supervisor" | "ejecutivo" | null;
+  orgRole: "admin_org" | "gerente" | "subgerente" | "supervisor" | "ejecutivo" | null;
   permisos: Partial<Record<ModuloPermiso, NivelPermiso>>;
 }
 

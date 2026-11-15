@@ -11,7 +11,7 @@ import { z } from "zod/v4";
 // gerente: ve a sus supervisores y los ejecutivos de esos supervisores.
 // supervisor: ve a sus ejecutivos asignados (via supervisorId).
 // ejecutivo: solo ve sus propios registros.
-export const orgRoleEnum = pgEnum("org_role", ["admin_org", "gerente", "supervisor", "ejecutivo"]);
+export const orgRoleEnum = pgEnum("org_role", ["admin_org", "gerente", "subgerente", "supervisor", "ejecutivo"]);
 
 export const organizacionesTable = pgTable("organizaciones", {
   id: serial("id").primaryKey(),

@@ -19,7 +19,7 @@ export const COSTO_USUARIO_ADICIONAL =
 
 export interface OrgContext {
   organizationId: number | null;
-  orgRole: "admin_org" | "gerente" | "supervisor" | "ejecutivo" | null;
+  orgRole: "admin_org" | "gerente" | "subgerente" | "supervisor" | "ejecutivo" | null;
   isOrgAdmin: boolean;
   isGerente: boolean;
   isSupervisor: boolean;
@@ -82,7 +82,7 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
   const orgRole = row?.orgRole ?? null;
 
   let teamMemberIds: string[] = [];
-  if ((orgRole === "supervisor" || orgRole === "gerente") && organizationId != null) {
+  if ((orgRole === "supervisor" || orgRole === "gerente" || orgRole === "subgerente") && organizationId != null) {
     teamMemberIds = await collectSubtreeIds(userId, organizationId);
   }
 
@@ -90,7 +90,7 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
     organizationId,
     orgRole,
     isOrgAdmin: orgRole === "admin_org",
-    isGerente: orgRole === "gerente",
+    isGerente: orgRole === "gerente" || orgRole === "subgerente",
     isSupervisor: orgRole === "supervisor",
     teamMemberIds,
   };

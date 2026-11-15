@@ -4363,7 +4363,7 @@ export const ListMiembrosResponseItem = zod.object({
   "id": zod.string(),
   "nombre": zod.string().nullable(),
   "email": zod.string().email().nullable(),
-  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('gerente'),zod.literal('supervisor'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
+  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('gerente'),zod.literal('subgerente'),zod.literal('supervisor'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
   "supervisorId": zod.string().nullish().describe('For ejecutivos/supervisores, the user id of their manager'),
   "supervisorNombre": zod.string().nullish(),
   "areaId": zod.number().int().positive().nullish(),
@@ -4384,7 +4384,7 @@ export const UpdateMiembroParams = zod.object({
 })
 
 export const UpdateMiembroBody = zod.object({
-  "orgRole": zod.enum(['admin_org', 'gerente', 'supervisor', 'ejecutivo']).optional(),
+  "orgRole": zod.enum(['admin_org', 'gerente', 'subgerente', 'supervisor', 'ejecutivo']).optional(),
   "supervisorId": zod.string().nullish().describe('For ejecutivos/supervisores, the manager they report to (null = reports to admin)'),
   "areaId": zod.number().int().positive().nullish().describe('Area/departamento/centro_costo id'),
   "activo": zod.boolean().optional()
@@ -4394,7 +4394,7 @@ export const UpdateMiembroResponse = zod.object({
   "id": zod.string(),
   "nombre": zod.string().nullable(),
   "email": zod.string().email().nullable(),
-  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('gerente'),zod.literal('supervisor'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
+  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('gerente'),zod.literal('subgerente'),zod.literal('supervisor'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
   "supervisorId": zod.string().nullish().describe('For ejecutivos/supervisores, the user id of their manager'),
   "supervisorNombre": zod.string().nullish(),
   "areaId": zod.number().int().positive().nullish(),
@@ -4416,7 +4416,7 @@ export const DeactivateMiembroResponse = zod.object({
   "id": zod.string(),
   "nombre": zod.string().nullable(),
   "email": zod.string().email().nullable(),
-  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('gerente'),zod.literal('supervisor'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
+  "orgRole": zod.union([zod.literal('admin_org'),zod.literal('gerente'),zod.literal('subgerente'),zod.literal('supervisor'),zod.literal('ejecutivo'),zod.literal(null)]).nullable(),
   "supervisorId": zod.string().nullish().describe('For ejecutivos/supervisores, the user id of their manager'),
   "supervisorNombre": zod.string().nullish(),
   "areaId": zod.number().int().positive().nullish(),
@@ -4433,7 +4433,7 @@ export const DeactivateMiembroResponse = zod.object({
 export const ListInvitacionesResponseItem = zod.object({
   "id": zod.number(),
   "email": zod.string().email(),
-  "orgRole": zod.enum(['admin_org', 'supervisor', 'ejecutivo']),
+  "orgRole": zod.enum(['admin_org', 'gerente', 'subgerente', 'supervisor', 'ejecutivo']),
   "supervisorId": zod.string().nullish().describe('For ejecutivo invitations, the supervisor the new member will report to'),
   "estado": zod.enum(['pendiente', 'aceptada', 'cancelada', 'expirada']),
   "invitadoPorNombre": zod.string().nullish(),
@@ -4448,7 +4448,7 @@ export const ListInvitacionesResponse = zod.array(ListInvitacionesResponseItem)
  */
 export const InvitarUsuarioBody = zod.object({
   "email": zod.string().email(),
-  "orgRole": zod.enum(['admin_org', 'gerente', 'supervisor', 'ejecutivo']),
+  "orgRole": zod.enum(['admin_org', 'gerente', 'subgerente', 'supervisor', 'ejecutivo']),
   "supervisorId": zod.string().nullish().describe('For ejecutivo/supervisor invitations, the manager the new member will report to'),
   "areaId": zod.number().int().positive().nullish().describe('Area/departamento/centro_costo id')
 })
@@ -4464,7 +4464,7 @@ export const CancelarInvitacionParams = zod.object({
 export const CancelarInvitacionResponse = zod.object({
   "id": zod.number(),
   "email": zod.string().email(),
-  "orgRole": zod.enum(['admin_org', 'supervisor', 'ejecutivo']),
+  "orgRole": zod.enum(['admin_org', 'gerente', 'subgerente', 'supervisor', 'ejecutivo']),
   "supervisorId": zod.string().nullish().describe('For ejecutivo invitations, the supervisor the new member will report to'),
   "estado": zod.enum(['pendiente', 'aceptada', 'cancelada', 'expirada']),
   "invitadoPorNombre": zod.string().nullish(),

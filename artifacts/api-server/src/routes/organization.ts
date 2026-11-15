@@ -44,8 +44,8 @@ async function validarSupervisor(
   if (!sup || !sup.activo) {
     return "El supervisor/gerente seleccionado no es válido.";
   }
-  if (sup.orgRole !== "supervisor" && sup.orgRole !== "gerente") {
-    return "El responsable seleccionado debe tener rol supervisor o gerente.";
+  if (sup.orgRole !== "supervisor" && sup.orgRole !== "gerente" && sup.orgRole !== "subgerente") {
+    return "El responsable seleccionado debe tener rol supervisor, subgerente o gerente.";
   }
   return null;
 }
@@ -187,7 +187,7 @@ organizationRouter.get("/organization/usuarios", async (req, res) => {
             eq(usersTable.organizationId, ctx.organizationId),
             inArray(
               usersTable.id,
-              (ctx.orgRole === "supervisor" || ctx.orgRole === "gerente")
+              (ctx.orgRole === "supervisor" || ctx.orgRole === "gerente" || ctx.orgRole === "subgerente")
                 ? ctx.teamMemberIds
                 : [userId],
             ),
@@ -328,8 +328,8 @@ organizationRouter.patch(
           }
         }
         updates.supervisorId = nuevoSupervisorId;
-      } else if (nuevoRol !== undefined && (nuevoRol === "admin_org" || nuevoRol === "gerente")) {
-        // Promotions to gerente/admin clear their own supervisor link.
+      } else if (nuevoRol !== undefined && (nuevoRol === "admin_org" || nuevoRol === "gerente" || nuevoRol === "subgerente")) {
+        // Promotions to gerente/subgerente/admin clear their own supervisor link.
         updates.supervisorId = null;
       }
 
@@ -418,10 +418,10 @@ organizationRouter.patch(
         .where(eq(usersTable.id, targetId))
         .returning();
 
-      // If a gerente/supervisor changes role to non-manager, clear their reports.
+      // If a gerente/subgerente/supervisor changes role to non-manager, clear their reports.
       if (
-        (target.orgRole === "supervisor" || target.orgRole === "gerente") &&
-        updated.orgRole !== "supervisor" && updated.orgRole !== "gerente"
+        (target.orgRole === "supervisor" || target.orgRole === "gerente" || target.orgRole === "subgerente") &&
+        updated.orgRole !== "supervisor" && updated.orgRole !== "gerente" && updated.orgRole !== "subgerente"
       ) {
         await db
           .update(usersTable)
