@@ -10,6 +10,7 @@ import {
   useDesactivarCuenta,
   useMarcarDemo,
   useReclamarCobrosHuerfanos,
+  useActualizarPacksUsuarios,
   useListAdminCobrosEliminados,
   useListAdminTrialExtensiones,
   getListAdminTrialExtensionesQueryKey,
@@ -195,7 +196,10 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
   const desactivar = useDesactivarCuenta();
   const marcarDemo = useMarcarDemo();
   const reclamarCobros = useReclamarCobrosHuerfanos();
+  const actualizarPacks = useActualizarPacksUsuarios();
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [packsOpen, setPacksOpen] = useState(false);
+  const [packsInput, setPacksInput] = useState("");
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: getListAdminUsuariosQueryKey() });
@@ -376,12 +380,28 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
     );
   };
 
+  const handlePacks = () => {
+    const n = Number(packsInput);
+    if (!Number.isInteger(n) || n < 0 || n > 50) return;
+    actualizarPacks.mutate(
+      { userId: u.id, usuariosExtra: n },
+      {
+        onSuccess: (res) => {
+          toast({ title: res.ok ? "Packs actualizados" : "Error", description: res.mensaje });
+          if (res.ok) { setPacksOpen(false); refresh(); }
+        },
+        onError: () => toast({ title: "Error", description: "No se pudieron actualizar los packs.", variant: "destructive" }),
+      },
+    );
+  };
+
   const busy =
     extender.isPending ||
     activar.isPending ||
     desactivar.isPending ||
     marcarDemo.isPending ||
-    reclamarCobros.isPending;
+    reclamarCobros.isPending ||
+    actualizarPacks.isPending;
 
   if (u.isAdmin) {
     return <span className="text-xs text-muted-foreground">—</span>;
@@ -444,6 +464,10 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
               Marcar como demo
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem onClick={() => { setPacksInput(String(u.usuariosExtra ?? 0)); setPacksOpen(true); }}>
+            <Users className="h-4 w-4 mr-2" />
+            Usuarios extra ({u.usuariosExtra ?? 0})
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={handleReclamarCobros}>
             <Users className="h-4 w-4 mr-2" />
             Reasignar cobros sin dueño
@@ -532,6 +556,39 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
                 <CalendarPlus className="h-4 w-4 mr-2" />
               )}
               Confirmar extensión
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={packsOpen} onOpenChange={setPacksOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Usuarios extra</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-1 pt-1">
+                <p className="text-sm text-muted-foreground">{u.nombre} · {u.email}</p>
+                <p className="text-sm text-muted-foreground">Actualmente: <strong>{u.usuariosExtra ?? 0}</strong> usuario(s) extra.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <label className="text-sm font-medium">Total de usuarios extra a asignar</label>
+            <Input
+              type="number"
+              min={0}
+              max={50}
+              value={packsInput}
+              onChange={(e) => setPacksInput(e.target.value)}
+              placeholder="0"
+            />
+            <p className="text-xs text-muted-foreground">Ej: 10 → la cuenta tendrá el cupo base + 10 usuarios extra.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPacksOpen(false)}>Cancelar</Button>
+            <Button onClick={handlePacks} disabled={actualizarPacks.isPending || packsInput === ""}>
+              {actualizarPacks.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>

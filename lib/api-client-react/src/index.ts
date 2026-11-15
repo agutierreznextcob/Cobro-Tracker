@@ -67,3 +67,13 @@ export function useResetMemberPassword() {
       }),
   });
 }
+
+export function useActualizarPacksUsuarios() {
+  return useMutation({
+    mutationFn: ({ userId, usuariosExtra }: { userId: string; usuariosExtra: number }) =>
+      customFetch<{ ok: boolean; mensaje: string; usuariosExtra: number }>(
+        `/api/admin/usuarios/${userId}/packs-usuarios`,
+        { method: "POST", body: JSON.stringify({ usuariosExtra }), responseType: "json" },
+      ),
+  });
+}

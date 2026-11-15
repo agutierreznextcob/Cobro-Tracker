@@ -600,6 +600,28 @@ adminRouter.post("/admin/usuarios/:id/demo", async (req, res) => {
   }
 });
 
+// Actualiza packs de usuarios adicionales para una cuenta.
+// body: { usuariosExtra: number } — total de usuarios extra a asignar (0..50).
+adminRouter.post("/admin/usuarios/:id/packs-usuarios", async (req, res) => {
+  const { id } = req.params;
+  const usuariosExtra = Number(req.body?.usuariosExtra ?? 0);
+  if (!Number.isInteger(usuariosExtra) || usuariosExtra < 0 || usuariosExtra > 50) {
+    res.status(400).json({ ok: false, mensaje: "usuariosExtra debe ser un entero entre 0 y 50." });
+    return;
+  }
+  try {
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!u) { res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" }); return; }
+    // Representamos el total como un pack "individual" de N unidades.
+    const packs = usuariosExtra > 0 ? { individual: usuariosExtra } : {};
+    await db.update(usersTable).set({ packsUsuarios: packs }).where(eq(usersTable.id, id));
+    res.json({ ok: true, mensaje: `Packs actualizados: ${usuariosExtra} usuario(s) extra.`, usuariosExtra });
+  } catch (err) {
+    req.log.error({ err }, "Error updating packs");
+    res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+});
+
 // Reassigns "orphaned" cobros (rows with no responsable_id, e.g. left dangling
 // by the Replit-Auth → email+password migration) to the given user, adopting
 // that user's organization. Scoped to responsable_id IS NULL so it can never
