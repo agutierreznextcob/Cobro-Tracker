@@ -58,6 +58,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -113,6 +114,10 @@ import {
   Workflow,
   Zap,
   XCircle,
+  Building2,
+  Phone,
+  MapPin,
+  AtSign,
 } from "lucide-react";
 import { CobroUpdateEstado, type CobroUpdate, type CobroUpdateTipoDocumento } from "@workspace/api-client-react";
 
@@ -1331,6 +1336,19 @@ export default function CobroDetail() {
         </div>
       </div>
 
+      <Tabs defaultValue="cobro" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 h-10">
+          <TabsTrigger value="cobro" className="text-sm">
+            <FileText className="h-4 w-4 mr-2" />
+            Cobro
+          </TabsTrigger>
+          <TabsTrigger value="cobranza" className="text-sm">
+            <Workflow className="h-4 w-4 mr-2" />
+            Cobranza
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="cobro" className="space-y-6 mt-0">
       <div className="grid gap-6 md:grid-cols-3">
         {/* Main details */}
         <Card className="md:col-span-2 shadow-sm border-border/50">
@@ -1517,13 +1535,16 @@ export default function CobroDetail() {
                   {formatCurrency(cobro.monto)}
                 </div>
               )}
-              <div className="mt-6 pt-6 border-t border-primary/10 flex items-center justify-between gap-2">
-                <StatusBadge status={cobro.estado} />
+              <div className="mt-6 pt-6 border-t border-primary/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Estado</span>
+                  <StatusBadge status={cobro.estado} />
+                </div>
                 {(cobro.estado === "pendiente" || cobro.estado === "parcial") && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 text-xs border-amber-600/40 text-amber-700 hover:bg-amber-50 hover:border-amber-600"
+                    className="w-full h-8 text-xs border-amber-600/40 text-amber-700 hover:bg-amber-50 hover:border-amber-600"
                     onClick={() => setShowDescuentoModal(true)}
                   >
                     <TicketPercent className="h-3.5 w-3.5 mr-1.5" />
@@ -2118,6 +2139,70 @@ export default function CobroDetail() {
           )}
         </div>
       </div>
+
+      {/* Información del cliente */}
+      {cobro.clienteId != null && (() => {
+        const clienteActual = clientes?.find(c => c.id === cobro.clienteId);
+        if (!clienteActual) return null;
+        return (
+          <Card className="shadow-sm border-border/50">
+            <CardHeader className="bg-muted/20 border-b border-border/50 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />
+                Información del cliente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Razón social</p>
+                  <p className="text-sm font-medium">{clienteActual.nombre}</p>
+                </div>
+                {clienteActual.rut && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">RUT</p>
+                    <p className="text-sm font-mono font-medium">{clienteActual.rut}</p>
+                  </div>
+                )}
+                {clienteActual.giro && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Giro</p>
+                    <p className="text-sm">{clienteActual.giro}</p>
+                  </div>
+                )}
+                {clienteActual.telefono && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <Phone className="h-3 w-3" />Teléfono
+                    </p>
+                    <p className="text-sm">{clienteActual.telefono}</p>
+                  </div>
+                )}
+                {clienteActual.email && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <AtSign className="h-3 w-3" />Correo
+                    </p>
+                    <p className="text-sm">{clienteActual.email}</p>
+                  </div>
+                )}
+                {(clienteActual as typeof clienteActual & { direccion?: string }).direccion && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />Dirección
+                    </p>
+                    <p className="text-sm">{(clienteActual as typeof clienteActual & { direccion?: string }).direccion}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+        </TabsContent>
+
+        <TabsContent value="cobranza" className="space-y-6 mt-0">
 
       {/* Automatización (workflows) */}
       <Card className="shadow-sm border-border/50">
@@ -2818,6 +2903,9 @@ export default function CobroDetail() {
 
       {/* Historial de gestiones */}
       <GestionesSection cobroId={Number(id)} />
+
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog: Contactar cliente (llegada desde Acciones recomendadas con ?contactar=1) */}
       <Dialog open={showContactarDialog} onOpenChange={setShowContactarDialog}>

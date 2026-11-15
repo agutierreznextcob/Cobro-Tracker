@@ -99,6 +99,11 @@ function CobrosListNormal() {
     for (const c of clientes ?? []) map.set(c.id, c.categoria);
     return map;
   }, [clientes]);
+  const rutPorCliente = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const c of clientes ?? []) if (c.rut) map.set(c.id, c.rut);
+    return map;
+  }, [clientes]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedBusqueda(busquedaCliente), 250);
@@ -117,14 +122,19 @@ function CobrosListNormal() {
     if (!cobros) return cobros;
     const q = debouncedBusqueda.trim().toLowerCase();
     return cobros.filter((c) => {
-      if (q && !(c.clienteNombre ?? "").toLowerCase().includes(q)) return false;
+      if (q) {
+        const nombreMatch = (c.clienteNombre ?? "").toLowerCase().includes(q);
+        const rut = c.clienteId != null ? rutPorCliente.get(c.clienteId) : undefined;
+        const rutMatch = rut ? rut.replace(/\./g, "").toLowerCase().includes(q.replace(/\./g, "")) : false;
+        if (!nombreMatch && !rutMatch) return false;
+      }
       if (filterScore) {
         const cat = c.clienteId != null ? categoriaPorCliente.get(c.clienteId) : undefined;
         if ((cat ?? "sin_datos") !== filterScore) return false;
       }
       return true;
     });
-  }, [cobros, debouncedBusqueda, filterScore, categoriaPorCliente]);
+  }, [cobros, debouncedBusqueda, filterScore, categoriaPorCliente, rutPorCliente]);
 
   const hayFiltros = !!filterEstado || !!filterMetodo || !!filterScore || busquedaCliente.trim() !== "";
   const planUser = user as (typeof user & { subscriptionStatus?: string; plan?: string }) | null;
@@ -244,12 +254,12 @@ function CobrosListNormal() {
           </SelectContent>
         </Select>
 
-        <div className="relative w-[180px]">
+        <div className="relative w-[200px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <Input
             value={busquedaCliente}
             onChange={(e) => setBusquedaCliente(e.target.value)}
-            placeholder="Buscar cliente"
+            placeholder="Buscar cliente o RUT"
             className="h-8 w-full pl-8 text-xs"
           />
         </div>
@@ -276,6 +286,7 @@ function CobrosListNormal() {
               <TableHead className="text-xs">Fecha</TableHead>
               <TableHead className="text-xs">Descripción</TableHead>
               <TableHead className="text-xs">Cliente</TableHead>
+              <TableHead className="text-xs">RUT</TableHead>
               <TableHead className="text-xs">Estado</TableHead>
               <TableHead className="text-xs">Tipo doc.</TableHead>
               <TableHead className="text-xs">Método</TableHead>
@@ -299,7 +310,7 @@ function CobrosListNormal() {
               ))
             ) : !cobrosFiltrados || cobrosFiltrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground text-sm">
+                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground text-sm">
                   {hayFiltros ? "Ningún cobro coincide con los filtros." : "Sin cobros registrados."}
                 </TableCell>
               </TableRow>
@@ -337,6 +348,11 @@ function CobrosListNormal() {
                         />
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                    {cobro.clienteId != null && rutPorCliente.has(cobro.clienteId)
+                      ? rutPorCliente.get(cobro.clienteId)
+                      : <span className="opacity-30">—</span>}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={cobro.estado} />
