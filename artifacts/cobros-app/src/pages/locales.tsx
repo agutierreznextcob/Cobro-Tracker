@@ -36,41 +36,60 @@ export default function LocalesPage() {
           <Button asChild size="sm"><Link href="/locales/nuevo"><Plus className="h-4 w-4 mr-1.5" />Crear el primer local</Link></Button>
         </CardContent></Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {locales!.map((l) => (
-            <Card key={l.id} className="shadow-sm overflow-hidden" data-testid={`card-local-${l.id}`}>
-              <div className="flex items-start justify-between gap-3 border-b bg-muted/30 px-5 py-4">
+        <Card className="shadow-sm overflow-hidden">
+          {/* Header */}
+          <div className="hidden sm:grid grid-cols-[2fr_2fr_1fr_1fr] gap-4 px-4 py-2.5 bg-muted/40 border-b text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <span>Local / Sucursal</span>
+            <span>Bodegas</span>
+            <span className="text-right">Stock total</span>
+            <span />
+          </div>
+          {locales!.map((l, idx) => (
+            <div key={l.id} className={idx !== locales!.length - 1 ? "border-b border-border/50" : ""} data-testid={`card-local-${l.id}`}>
+              {/* Fila del local */}
+              <div className="grid grid-cols-[2fr_2fr_1fr_1fr] items-center gap-4 px-4 py-3 bg-muted/10">
                 <div className="min-w-0">
-                  <Link href={`/locales/${l.id}`} className="font-semibold hover:underline flex items-center gap-1.5"><Store className="h-4 w-4 text-primary" />{l.nombre}</Link>
-                  {l.direccion && <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1"><MapPin className="h-3 w-3" />{l.direccion}</p>}
+                  <Link href={`/locales/${l.id}`} className="font-semibold text-sm hover:text-primary flex items-center gap-1.5 transition-colors">
+                    <Store className="h-4 w-4 text-primary shrink-0" />{l.nombre}
+                  </Link>
+                  {l.direccion && (
+                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 ml-5">
+                      <MapPin className="h-3 w-3 shrink-0" />{l.direccion}
+                    </p>
+                  )}
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Stock total</p>
-                  <p className="font-mono font-bold">{formatQty(l.stockTotal)}</p>
+                <div className="hidden sm:block text-xs text-muted-foreground">
+                  {l.bodegas.length === 0
+                    ? <Link href={`/bodegas/nueva?localId=${l.id}`} className="text-primary hover:underline">+ Agregar bodega</Link>
+                    : <span>{l.bodegas.length} bodega{l.bodegas.length !== 1 ? "s" : ""}</span>
+                  }
+                </div>
+                <div className="hidden sm:block text-right font-mono text-sm font-semibold">{formatQty(l.stockTotal)}</div>
+                <div className="flex justify-end">
+                  <Link href={`/locales/${l.id}`}>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                  </Link>
                 </div>
               </div>
-              <CardContent className="p-0">
-                {l.bodegas.length === 0 ? (
-                  <div className="px-5 py-4 text-sm text-muted-foreground flex items-center justify-between">
-                    Sin bodegas
-                    <Link href={`/bodegas/nueva?localId=${l.id}`} className="text-primary text-xs hover:underline">Agregar bodega</Link>
+              {/* Filas de bodegas */}
+              {l.bodegas.map((b) => (
+                <Link key={b.id} href={`/bodegas/${b.id}`} data-testid={`link-bodega-${b.id}`}>
+                  <div className="grid grid-cols-[2fr_2fr_1fr_1fr] items-center gap-4 px-4 py-2.5 hover:bg-muted/30 transition-colors border-t border-border/30 group">
+                    <div className="flex items-center gap-2 ml-5 min-w-0">
+                      <Warehouse className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-sm truncate group-hover:text-primary transition-colors">{b.nombre}</span>
+                    </div>
+                    <div className="hidden sm:block" />
+                    <div className="hidden sm:block text-right font-mono text-xs text-muted-foreground">{formatQty(b.stockTotal)}</div>
+                    <div className="flex justify-end">
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
                   </div>
-                ) : (
-                  <ul className="divide-y">
-                    {l.bodegas.map((b) => (
-                      <li key={b.id}>
-                        <Link href={`/bodegas/${b.id}`} className="flex items-center justify-between gap-2 px-5 py-2.5 text-sm hover:bg-muted/40" data-testid={`link-bodega-${b.id}`}>
-                          <span className="flex items-center gap-2 min-w-0"><Warehouse className="h-3.5 w-3.5 text-muted-foreground shrink-0" /><span className="truncate">{b.nombre}</span></span>
-                          <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">{formatQty(b.stockTotal)}<ChevronRight className="h-3.5 w-3.5" /></span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
+                </Link>
+              ))}
+            </div>
           ))}
-        </div>
+        </Card>
       )}
     </div>
   );

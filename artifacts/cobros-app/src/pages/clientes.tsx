@@ -651,14 +651,15 @@ export default function ClientesPage() {
       </div>
 
       {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="h-8 bg-muted/50 rounded-t-lg" />
-              <CardContent className="h-12 bg-muted/20" />
-            </Card>
+        <Card><CardContent className="p-0">
+          {[1,2,3,4,5].map((i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3 border-b last:border-0 animate-pulse">
+              <div className="h-8 w-8 rounded-full bg-muted/60 shrink-0" />
+              <div className="flex-1 space-y-1.5"><div className="h-3.5 w-40 bg-muted/60 rounded" /><div className="h-3 w-24 bg-muted/40 rounded" /></div>
+              <div className="h-3 w-20 bg-muted/40 rounded" />
+            </div>
           ))}
-        </div>
+        </CardContent></Card>
       ) : !clientes || clientes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
@@ -674,67 +675,70 @@ export default function ClientesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {clientes.map((cliente) => (
+        <Card className="shadow-sm overflow-hidden">
+          {/* Header */}
+          <div className="hidden sm:grid grid-cols-[2fr_1.5fr_1.5fr_1fr_auto] gap-4 px-4 py-2.5 bg-muted/40 border-b text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <span>Cliente</span>
+            <span>Contacto</span>
+            <span>Pendiente</span>
+            <span>Score</span>
+            <span />
+          </div>
+          {clientes.map((cliente, idx) => (
             <Link key={cliente.id} href={`/clientes/${cliente.id}`}>
-              <Card className="shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
-                        {cliente.nombre.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{cliente.nombre}</p>
-                        {cliente.empresa && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                            <Building2 className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{cliente.empresa}</span>
-                          </div>
-                        )}
-                        {cliente.rut && (
-                          <p className="text-xs text-muted-foreground font-mono mt-0.5">{cliente.rut}</p>
-                        )}
-                        <div className="flex flex-col gap-0.5 mt-1.5">
-                          {cliente.email && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Mail className="h-3 w-3 shrink-0" />
-                              <span className="truncate">{cliente.email}</span>
-                            </div>
-                          )}
-                          {cliente.telefono && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Phone className="h-3 w-3 shrink-0" />
-                              <span>{cliente.telefono}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <div className="flex items-center gap-1">
-                        <EliminarClienteButton clienteId={cliente.id} clienteNombre={cliente.nombre} />
-                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </div>
-                      <ScoreBadge score={cliente.score} categoria={cliente.categoria} size="xs" />
+              <div className={`group flex sm:grid sm:grid-cols-[2fr_1.5fr_1.5fr_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer ${idx !== clientes.length - 1 ? "border-b border-border/50" : ""}`}>
+                {/* Nombre + RUT */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs shrink-0">
+                    {cliente.nombre.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{cliente.nombre}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {cliente.rut && <span className="text-xs text-muted-foreground font-mono">{cliente.rut}</span>}
+                      {cliente.empresa && <span className="text-xs text-muted-foreground truncate hidden sm:inline">{cliente.empresa}</span>}
                     </div>
                   </div>
-                  {cliente.totalPendiente > 0 && (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Pendiente:{" "}
-                      <span className="font-semibold text-foreground">{formatCurrency(cliente.totalPendiente)}</span>
-                      {cliente.cobrosVencidos > 0 && (
-                        <span className="ml-1.5 text-red-600">
-                          · {cliente.cobrosVencidos} vencido{cliente.cobrosVencidos !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </p>
+                </div>
+                {/* Contacto */}
+                <div className="hidden sm:flex flex-col gap-0.5 min-w-0">
+                  {cliente.email && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Mail className="h-3 w-3 shrink-0" /><span className="truncate">{cliente.email}</span>
+                    </div>
                   )}
-                </CardContent>
-              </Card>
+                  {cliente.telefono && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Phone className="h-3 w-3 shrink-0" /><span>{cliente.telefono}</span>
+                    </div>
+                  )}
+                </div>
+                {/* Pendiente */}
+                <div className="hidden sm:block">
+                  {cliente.totalPendiente > 0 ? (
+                    <div>
+                      <p className="text-sm font-semibold">{formatCurrency(cliente.totalPendiente)}</p>
+                      {cliente.cobrosVencidos > 0 && (
+                        <p className="text-xs text-red-600">{cliente.cobrosVencidos} vencido{cliente.cobrosVencidos !== 1 ? "s" : ""}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </div>
+                {/* Score */}
+                <div className="hidden sm:block">
+                  <ScoreBadge score={cliente.score} categoria={cliente.categoria} size="xs" />
+                </div>
+                {/* Acciones */}
+                <div className="flex items-center gap-1 ml-auto sm:ml-0">
+                  <EliminarClienteButton clienteId={cliente.id} clienteNombre={cliente.nombre} />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+              </div>
             </Link>
           ))}
-        </div>
+        </Card>
       )}
     </div>
   );
