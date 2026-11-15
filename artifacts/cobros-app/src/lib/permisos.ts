@@ -29,6 +29,10 @@ export interface MiembroConPermisos {
   email: string | null;
   orgRole: "admin_org" | "supervisor" | "ejecutivo" | null;
   activo: boolean;
+  rut?: string | null;
+  phone?: string | null;
+  cargo?: string | null;
+  area?: string | null;
   permisos: Partial<Record<ModuloPermiso, NivelPermiso>>;
 }
 

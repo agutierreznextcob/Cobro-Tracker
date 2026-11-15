@@ -24,11 +24,44 @@ export const MODULOS_DISPONIBLES: ModuloPermiso[] = [
 
 // GET /api/permisos/usuarios
 // Lista todos los miembros de la organización con sus permisos actuales.
-// Solo admin_org puede consultar.
-permisosRouter.get("/usuarios", requireSubscription, requireOrgAdmin, async (req, res) => {
+// Si el usuario no tiene organización, retorna solo el usuario actual como admin.
+permisosRouter.get("/usuarios", requireSubscription, async (req, res) => {
   try {
     const user = req.user!;
-    const orgId = user.organizationId!;
+
+    // Si no tiene organización, retornar solo el usuario actual como admin.
+    if (!user.organizationId) {
+      const [perfil] = await db
+        .select({
+          id: usersTable.id,
+          firstName: usersTable.firstName,
+          lastName: usersTable.lastName,
+          email: usersTable.email,
+          orgRole: usersTable.orgRole,
+          activo: usersTable.activo,
+          rut: usersTable.rut,
+          phone: usersTable.phone,
+          cargo: usersTable.cargo,
+          area: usersTable.area,
+        })
+        .from(usersTable)
+        .where(eq(usersTable.id, user.id));
+
+      if (!perfil) return res.json([]);
+
+      return res.json([{
+        ...perfil,
+        orgRole: "admin_org",
+        permisos: {},
+      }]);
+    }
+
+    const orgId = user.organizationId;
+
+    // Solo admin_org puede ver todos los miembros.
+    if (user.orgRole !== "admin_org") {
+      return res.status(403).json({ error: "Solo el administrador puede ver los usuarios." });
+    }
 
     // Obtener todos los miembros activos de la organización.
     const miembros = await db
@@ -39,6 +72,10 @@ permisosRouter.get("/usuarios", requireSubscription, requireOrgAdmin, async (req
         email: usersTable.email,
         orgRole: usersTable.orgRole,
         activo: usersTable.activo,
+        rut: usersTable.rut,
+        phone: usersTable.phone,
+        cargo: usersTable.cargo,
+        area: usersTable.area,
       })
       .from(usersTable)
       .where(and(eq(usersTable.organizationId, orgId), eq(usersTable.activo, true)));

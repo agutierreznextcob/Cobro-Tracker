@@ -114,6 +114,9 @@ export const usersTable = pgTable("users", {
   phone: varchar("phone"),
   address: varchar("address"),
   companyName: varchar("company_name"),
+  // Campos de perfil de miembro de equipo.
+  cargo: varchar("cargo"),
+  area: varchar("area"),
   profileCompleted: boolean("profile_completed").notNull().default(false),
   flowCustomerId: varchar("flow_customer_id"),
   flowSubscriptionId: varchar("flow_subscription_id"),

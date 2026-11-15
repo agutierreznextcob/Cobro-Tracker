@@ -11,7 +11,7 @@ import {
   type ModuloPermiso,
   type NivelPermiso,
 } from "@/lib/permisos";
-import { Check, ChevronDown, ChevronUp, Loader2, RotateCw, Shield, User } from "lucide-react";
+import { Briefcase, Building2, Check, ChevronDown, ChevronUp, Loader2, Mail, Phone, RotateCw, Shield, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const GRUPOS = ["Ventas", "Logística", "Compras", "Gestión", "Sistema"] as const;
@@ -99,6 +99,7 @@ function UsuarioCard({ miembro }: { miembro: MiembroConPermisos }) {
 
   const rolInfo = orgRoleLabel(miembro.orgRole);
   const accesosActivos = Object.values(local).filter((v) => v !== null).length;
+  const estadoActivo = miembro.activo !== false;
 
   return (
     <Card className="shadow-sm border-border/50 overflow-hidden">
@@ -115,8 +116,20 @@ function UsuarioCard({ miembro }: { miembro: MiembroConPermisos }) {
             )}
           </div>
           <div className="min-w-0">
-            <p className="font-medium text-sm truncate">{nombreCompleto(miembro)}</p>
-            <p className="text-xs text-muted-foreground truncate">{miembro.email}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-sm truncate">{nombreCompleto(miembro)}</p>
+              <span className={cn(
+                "text-xs px-1.5 py-0.5 rounded-full font-medium",
+                estadoActivo
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                  : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+              )}>
+                {estadoActivo ? "Activo" : "Inactivo"}
+              </span>
+            </div>
+            {miembro.cargo && (
+              <p className="text-xs text-muted-foreground truncate">{miembro.cargo}{miembro.area ? ` · ${miembro.area}` : ""}</p>
+            )}
           </div>
         </div>
 
@@ -133,6 +146,40 @@ function UsuarioCard({ miembro }: { miembro: MiembroConPermisos }) {
             expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />
           )}
         </div>
+      </div>
+
+      {/* Información de perfil */}
+      <div className="px-5 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-muted-foreground border-t border-border/30 pt-3">
+        {miembro.rut && (
+          <div className="flex items-center gap-1.5">
+            <User className="h-3 w-3 shrink-0" />
+            <span>RUT: {miembro.rut}</span>
+          </div>
+        )}
+        {miembro.email && (
+          <div className="flex items-center gap-1.5">
+            <Mail className="h-3 w-3 shrink-0" />
+            <span className="truncate">{miembro.email}</span>
+          </div>
+        )}
+        {miembro.phone && (
+          <div className="flex items-center gap-1.5">
+            <Phone className="h-3 w-3 shrink-0" />
+            <span>{miembro.phone}</span>
+          </div>
+        )}
+        {miembro.cargo && (
+          <div className="flex items-center gap-1.5">
+            <Briefcase className="h-3 w-3 shrink-0" />
+            <span>{miembro.cargo}</span>
+          </div>
+        )}
+        {miembro.area && (
+          <div className="flex items-center gap-1.5">
+            <Building2 className="h-3 w-3 shrink-0" />
+            <span>{miembro.area}</span>
+          </div>
+        )}
       </div>
 
       {esAdmin && (
@@ -225,12 +272,14 @@ export default function ConfiguracionUsuariosPage() {
       )}
 
       {isError && (
-        <div className="text-center py-12 text-destructive">No se pudieron cargar los usuarios.</div>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+          No se pudieron cargar los usuarios. Intenta actualizar la página.
+        </div>
       )}
 
-      {miembros && miembros.length === 0 && (
+      {!isError && miembros && miembros.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
-          No hay miembros en la organización.
+          No hay usuarios registrados todavía.
         </div>
       )}
 
