@@ -3509,6 +3509,8 @@ export interface OrganizacionInfo {
   miembrosActivos: number;
   /** Pending (non-expired) invitations; they reserve seats when inviting */
   invitacionesPendientes?: number;
+  /** Human-readable plan name (e.g. "NextCob") */
+  planNombre?: string;
   /** Base plan net price (currency units), before IVA, covering the first seat */
   planBaseNeto: number;
   /** Base plan IVA (19%) amount (currency units) */

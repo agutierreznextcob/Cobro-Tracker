@@ -367,12 +367,12 @@ export default function ConfiguracionUsuariosPage() {
   const esAdmin = orgInfo?.esAdmin ?? false;
 
   // Cupo info from org
-  const totalCupo = (orgInfo as unknown as { cupoTotal?: number })?.cupoTotal ?? 0;
+  const totalCupo = orgInfo?.cupoUsuarios ?? 0;
   const miembrosActivos = orgInfo?.miembrosActivos ?? 0;
-  const invitacionesPendientes = (orgInfo as unknown as { invitacionesPendientes?: number })?.invitacionesPendientes ?? 0;
+  const invitacionesPendientes = orgInfo?.invitacionesPendientes ?? 0;
   const ocupados = miembrosActivos + invitacionesPendientes;
   const cupoLibre = Math.max(0, totalCupo - ocupados);
-  const planNombre = (orgInfo as unknown as { planNombre?: string })?.planNombre ?? "Plan";
+  const planNombre = orgInfo?.planNombre ?? "Plan";
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300">
