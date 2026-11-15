@@ -1306,12 +1306,7 @@ export default function CobroDetail() {
             <FileText className="h-3.5 w-3.5" />
             Ver documento
           </Button>
-          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => setPdfPreview(true)} data-testid="button-vista-previa-cobro">
-            <FileTextPdf className="h-3.5 w-3.5" />
-            Vista previa PDF
-          </Button>
-          <PdfPreviewDialog open={pdfPreview} onOpenChange={setPdfPreview} cargar={() => downloadCobroPdf(cobro.id)} filename={cobro.numeroDocumento || `cobro-${cobro.id}`} titulo={`Cobro ${cobro.numeroDocumento || `#${cobro.id}`}`} />
-          <DocumentoTributarioModal open={showDocumento} onClose={() => setShowDocumento(false)} cobro={cobro} formatCurrency={formatCurrency} />
+<DocumentoTributarioModal open={showDocumento} onClose={() => setShowDocumento(false)} cobro={cobro} formatCurrency={formatCurrency} />
           {cobro.estado === "pendiente" && (
             <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={openEditDialog}>
               <Pencil className="h-3.5 w-3.5" />
