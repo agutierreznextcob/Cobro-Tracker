@@ -77,3 +77,13 @@ export function useActualizarPacksUsuarios() {
       ),
   });
 }
+
+export function useActualizarOrgRole() {
+  return useMutation({
+    mutationFn: ({ userId, orgRole }: { userId: string; orgRole: "admin_org" | "supervisor" | "ejecutivo" }) =>
+      customFetch<{ ok: boolean; mensaje: string; orgRole: string }>(
+        `/api/admin/usuarios/${userId}/org-role`,
+        { method: "POST", body: JSON.stringify({ orgRole }), responseType: "json" },
+      ),
+  });
+}

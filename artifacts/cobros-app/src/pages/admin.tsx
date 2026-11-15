@@ -11,6 +11,7 @@ import {
   useMarcarDemo,
   useReclamarCobrosHuerfanos,
   useActualizarPacksUsuarios,
+  useActualizarOrgRole,
   useListAdminCobrosEliminados,
   useListAdminTrialExtensiones,
   getListAdminTrialExtensionesQueryKey,
@@ -197,9 +198,12 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
   const marcarDemo = useMarcarDemo();
   const reclamarCobros = useReclamarCobrosHuerfanos();
   const actualizarPacks = useActualizarPacksUsuarios();
+  const actualizarOrgRole = useActualizarOrgRole();
   const [sendingEmail, setSendingEmail] = useState(false);
   const [packsOpen, setPacksOpen] = useState(false);
   const [packsInput, setPacksInput] = useState("");
+  const [orgRoleOpen, setOrgRoleOpen] = useState(false);
+  const [orgRoleInput, setOrgRoleInput] = useState<"admin_org" | "supervisor" | "ejecutivo">("admin_org");
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: getListAdminUsuariosQueryKey() });
@@ -395,13 +399,27 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
     );
   };
 
+  const handleOrgRole = () => {
+    actualizarOrgRole.mutate(
+      { userId: u.id, orgRole: orgRoleInput },
+      {
+        onSuccess: (res) => {
+          toast({ title: res.ok ? "Rol actualizado" : "Error", description: res.mensaje });
+          if (res.ok) { setOrgRoleOpen(false); refresh(); }
+        },
+        onError: () => toast({ title: "Error", description: "No se pudo actualizar el rol.", variant: "destructive" }),
+      },
+    );
+  };
+
   const busy =
     extender.isPending ||
     activar.isPending ||
     desactivar.isPending ||
     marcarDemo.isPending ||
     reclamarCobros.isPending ||
-    actualizarPacks.isPending;
+    actualizarPacks.isPending ||
+    actualizarOrgRole.isPending;
 
   if (u.isAdmin) {
     return <span className="text-xs text-muted-foreground">—</span>;
@@ -464,6 +482,9 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
               Marcar como demo
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem onClick={() => { setOrgRoleInput((u as any).orgRole ?? "admin_org"); setOrgRoleOpen(true); }}>
+            Rol en org
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => { setPacksInput(String(u.usuariosExtra ?? 0)); setPacksOpen(true); }}>
             <Users className="h-4 w-4 mr-2" />
             Usuarios extra ({u.usuariosExtra ?? 0})
@@ -556,6 +577,39 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
                 <CalendarPlus className="h-4 w-4 mr-2" />
               )}
               Confirmar extensión
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={orgRoleOpen} onOpenChange={setOrgRoleOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rol en organización</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-1 pt-1">
+                <p className="text-sm text-muted-foreground">{u.nombre} · {u.email}</p>
+                <p className="text-sm text-muted-foreground">Cambia el rol del usuario dentro de su organización.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <label className="text-sm font-medium">Rol</label>
+            <select
+              className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+              value={orgRoleInput}
+              onChange={(e) => setOrgRoleInput(e.target.value as "admin_org" | "supervisor" | "ejecutivo")}
+            >
+              <option value="admin_org">admin_org (Administrador)</option>
+              <option value="supervisor">supervisor</option>
+              <option value="ejecutivo">ejecutivo</option>
+            </select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrgRoleOpen(false)}>Cancelar</Button>
+            <Button onClick={handleOrgRole} disabled={actualizarOrgRole.isPending}>
+              {actualizarOrgRole.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>

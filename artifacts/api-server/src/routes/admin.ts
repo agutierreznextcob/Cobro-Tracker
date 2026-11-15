@@ -622,6 +622,26 @@ adminRouter.post("/admin/usuarios/:id/packs-usuarios", async (req, res) => {
   }
 });
 
+// Sets the orgRole of a user (admin tool for fixing orgs).
+// body: { orgRole: "admin_org" | "supervisor" | "ejecutivo" }
+adminRouter.post("/admin/usuarios/:id/org-role", async (req, res) => {
+  const { id } = req.params;
+  const orgRole = req.body?.orgRole;
+  if (!["admin_org", "supervisor", "ejecutivo"].includes(orgRole)) {
+    res.status(400).json({ ok: false, mensaje: "orgRole debe ser admin_org, supervisor o ejecutivo." });
+    return;
+  }
+  try {
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!u) { res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" }); return; }
+    await db.update(usersTable).set({ orgRole, updatedAt: new Date() }).where(eq(usersTable.id, id));
+    res.json({ ok: true, mensaje: `Rol actualizado a ${orgRole}.`, orgRole });
+  } catch (err) {
+    req.log.error({ err }, "Error updating orgRole");
+    res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+});
+
 // Reassigns "orphaned" cobros (rows with no responsable_id, e.g. left dangling
 // by the Replit-Auth → email+password migration) to the given user, adopting
 // that user's organization. Scoped to responsable_id IS NULL so it can never

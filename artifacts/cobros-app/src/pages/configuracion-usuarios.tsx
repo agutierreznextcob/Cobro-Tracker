@@ -363,8 +363,10 @@ export default function ConfiguracionUsuariosPage() {
   const { data: orgInfo } = useGetOrganization();
   const [invitarOpen, setInvitarOpen] = useState(false);
 
-  // Determine if current user is org admin
+  // Determine if current user is org admin or owner (owners always can manage the team)
   const esAdmin = orgInfo?.esAdmin ?? false;
+  const esOwner = orgInfo?.esOwner ?? false;
+  const puedeInvitar = esAdmin || esOwner;
 
   // Cupo info from org
   const totalCupo = orgInfo?.cupoUsuarios ?? 0;
@@ -389,7 +391,7 @@ export default function ConfiguracionUsuariosPage() {
             <RotateCw className={cn("h-3.5 w-3.5 mr-1.5", isFetching && "animate-spin")} />
             Actualizar
           </Button>
-          {esAdmin && (
+          {puedeInvitar && (
             <Button size="sm" onClick={() => setInvitarOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" />
               Invitar usuario
