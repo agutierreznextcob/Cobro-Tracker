@@ -307,6 +307,7 @@ const CONFIG_ITEMS: NavLeaf[] = [
   { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes", match: (l) => l === "/workflows" || l.startsWith("/workflows/") },
   { href: "/configuracion/empresa", label: "Perfil de empresa", icon: Building2 },
   { href: "/configuracion/preferencias", label: "Preferencias", icon: SlidersHorizontal },
+  { href: "/configuracion/usuarios", label: "Usuarios y permisos", icon: Users, match: (l) => l === "/configuracion/usuarios" },
 ];
 
 function MobileBell() {

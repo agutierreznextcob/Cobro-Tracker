@@ -32,6 +32,7 @@ import inventarioRouter from "./inventario";
 import localesRouter from "./locales";
 import pedidosRouter from "./pedidos";
 import guiasDespachoRouter from "./guias-despacho";
+import permisosRouter from "./permisos";
 
 // ORDEN DE MONTAJE: los routers con rutas públicas (portal, leads, chat,
 // webhooks, encuestas) deben ir ANTES de cualquier router con auth "en blanco"
@@ -99,5 +100,6 @@ router.use(subscriptionRouter);
 router.use(adminRouter);
 router.use(pedidosRouter);
 router.use(guiasDespachoRouter);
+router.use("/permisos", permisosRouter);
 
 export default router;
