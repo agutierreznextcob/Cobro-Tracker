@@ -1,6 +1,6 @@
 import { db, usersTable, organizacionesTable, areasOrgTable } from "@workspace/db";
 import { eq, and, isNull, inArray, type SQL } from "drizzle-orm";
-import { cobrosTable, clientesTable, cotizacionesTable, pedidosTable, localesTable, guiasDespachoTable } from "@workspace/db";
+import { cobrosTable, clientesTable, cotizacionesTable, pedidosTable, localesTable, guiasDespachoTable, productosTable } from "@workspace/db";
 import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA, IVA_RATE } from "./flow-subscriptions";
 import { PLANES, costoDePacks, cupoDePacks, type PacksUsuarios, type PlanId } from "./plans";
 
@@ -282,7 +282,7 @@ export async function createSoloOrganization(user: {
 export async function backfillUserOrgRecords(
   userId: string,
   organizationId: number,
-): Promise<{ cobros: number; clientes: number; cotizaciones: number; pedidos: number; locales: number; guias: number }> {
+): Promise<{ cobros: number; clientes: number; cotizaciones: number; pedidos: number; locales: number; guias: number; productos: number }> {
   const cobros = await db
     .update(cobrosTable)
     .set({ organizationId })
@@ -331,5 +331,13 @@ export async function backfillUserOrgRecords(
     )
     .returning({ id: guiasDespachoTable.id });
 
-  return { cobros: cobros.length, clientes: clientes.length, cotizaciones: cotizaciones.length, pedidos: pedidos.length, locales: locales.length, guias: guias.length };
+  const productos = await db
+    .update(productosTable)
+    .set({ organizationId })
+    .where(
+      and(eq(productosTable.usuarioId, userId), isNull(productosTable.organizationId)),
+    )
+    .returning({ id: productosTable.id });
+
+  return { cobros: cobros.length, clientes: clientes.length, cotizaciones: cotizaciones.length, pedidos: pedidos.length, locales: locales.length, guias: guias.length, productos: productos.length };
 }
