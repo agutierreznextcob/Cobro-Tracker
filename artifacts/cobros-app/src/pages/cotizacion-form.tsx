@@ -12,6 +12,7 @@ import {
   getListClientesQueryKey,
   useListInventario,
   getListInventarioQueryKey,
+  useListAreas,
   type Cotizacion,
   type CotizacionInput,
   type Producto,
@@ -85,9 +86,11 @@ export default function CotizacionFormPage() {
   const [formaPago, setFormaPago] = useState("");
   const [tiempoEntrega, setTiempoEntrega] = useState("");
   const [validez, setValidez] = useState("30");
+  const [areaId, setAreaId] = useState<number | undefined>(undefined);
   // Due date follows emission + validity until the user picks a date (edits keep stored dates).
   const [vencManual, setVencManual] = useState(isEdit);
   const empresaQ = useGetEmpresa({ query: { queryKey: getGetEmpresaQueryKey() } });
+  const { data: areas } = useListAreas();
   const [lineas, setLineas] = useState<LineaCot[]>([lineaLibre()]);
   const [accion, setAccion] = useState<Accion | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -218,6 +221,7 @@ export default function CotizacionFormPage() {
       formaPago: formaPago.trim(),
       tiempoEntrega: tiempoEntrega.trim(),
       validezDias: validezN,
+      areaId: areaId || undefined,
       items: utiles.map((l) => ({
         productoId: l.productoId,
         descripcion: l.descripcion.trim(),
@@ -479,6 +483,29 @@ export default function CotizacionFormPage() {
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-4">
+          {(areas ?? []).length > 0 && (
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3"><CardTitle className="text-base">Área / Departamento</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Área, departamento o centro de costo</Label>
+                  <Select
+                    value={areaId != null ? String(areaId) : "ninguna"}
+                    onValueChange={(v) => setAreaId(v === "ninguna" ? undefined : Number(v))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Sin área asignada" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ninguna">Sin área asignada</SelectItem>
+                      {(areas ?? []).map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="shadow-sm">
             <CardHeader className="pb-3"><CardTitle className="text-base">Moneda e impuestos</CardTitle></CardHeader>
             <CardContent className="space-y-3">

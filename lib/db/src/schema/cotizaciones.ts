@@ -6,6 +6,7 @@ export const cotizacionesTable = pgTable("cotizaciones", {
   id: serial("id").primaryKey(),
   numeroCotizacion: text("numero_cotizacion").notNull(),
   organizationId: integer("organization_id"),
+  areaId: integer("area_id"),
   responsableId: text("responsable_id").notNull(),
   clienteId: integer("cliente_id").notNull().references(() => clientesTable.id, { onDelete: "restrict" }),
   clienteNombre: text("cliente_nombre").notNull(),

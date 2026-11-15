@@ -100,6 +100,7 @@ router.post("/pedidos/from-cotizacion/:cotizacionId", action(async (req, res) =>
   const pedido = await db.transaction(async tx => {
     const [created] = await tx.insert(pedidosTable).values({
       organizationId: ctx.organizationId ?? null,
+      areaId: cot.areaId ?? null,
       responsableId: req.user!.id,
       numeroPedido: "",
       clienteId: cot.clienteId!,

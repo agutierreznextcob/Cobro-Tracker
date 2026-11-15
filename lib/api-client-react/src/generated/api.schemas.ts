@@ -516,6 +516,8 @@ export interface CotizacionInput {
   porcentajeIva: number;
   /** @maxLength 5000 */
   notas: string;
+  /** Area/departamento/centro de costo id (optional) */
+  areaId?: number;
   /**
      * @minItems 1
      * @maxItems 100
@@ -2036,6 +2038,8 @@ export interface CobroInput {
   clienteId?: number;
   /** Assign the cobro to an ejecutivo/admin of the organization (admin only). Defaults to the creator. */
   responsableId?: string;
+  /** Area/departamento/centro de costo id (optional) */
+  areaId?: number;
   emailPagador?: string;
   /**
      * Due date (YYYY-MM-DD) used to schedule reminders

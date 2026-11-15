@@ -24,6 +24,7 @@ import SearchPage from "@/pages/search";
 import Informes from "@/pages/informes";
 import InformesCompras from "@/pages/informes-compras";
 import InformesInventario from "@/pages/informes-inventario";
+import InformesAreas from "@/pages/informes-areas";
 import ProfilePage from "@/pages/profile";
 import ClientesPage from "@/pages/clientes";
 import ClienteDetailPage from "@/pages/cliente-detail";
@@ -65,6 +66,7 @@ import GuiaDetailPage from "@/pages/guia-detail";
 import PreferenciasPage from "@/pages/preferencias";
 import EmpresaPage from "@/pages/empresa";
 import ConfiguracionUsuariosPage from "@/pages/configuracion-usuarios";
+import ConfiguracionAreasPage from "@/pages/configuracion-areas";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -236,6 +238,13 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <InformesInventario />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/informes/areas">
+        <AuthGate>
+          <Layout>
+            <InformesAreas />
           </Layout>
         </AuthGate>
       </Route>
@@ -450,6 +459,13 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <ConfiguracionUsuariosPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/configuracion/areas">
+        <AuthGate>
+          <Layout>
+            <ConfiguracionAreasPage />
           </Layout>
         </AuthGate>
       </Route>

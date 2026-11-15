@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+// Note: Input/Label/Select still used inside EditarUsuarioSheet and InvitarDialog
 import { useToast } from "@/hooks/use-toast";
 import {
   useListMiembrosConPermisos,
@@ -21,27 +22,20 @@ import {
   useUpdateMiembro,
   getGetOrganizationQueryKey,
   useListAreas,
-  useCrearArea,
-  useActualizarArea,
-  useEliminarArea,
-  type AreaOrg,
 } from "@workspace/api-client-react";
 import { useResetMemberPassword } from "@workspace/api-client-react";
+import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Briefcase,
-  Building2,
   Check,
   ChevronRight,
-  FolderOpen,
+  FolderKanban,
   KeyRound,
   Loader2,
   Mail,
-  Pencil,
   Plus,
   RotateCw,
   Shield,
-  Trash2,
   User,
   Users,
   X,
@@ -423,165 +417,29 @@ function UsuarioCard({
   );
 }
 
-// ── Areas Management ─────────────────────────────────────────────────────────
-function GestionAreasSection() {
-  const { toast } = useToast();
-  const { data: areas, isLoading } = useListAreas();
-  const crearArea = useCrearArea();
-  const actualizarArea = useActualizarArea();
-  const eliminarArea = useEliminarArea();
-
-  const [expanded, setExpanded] = useState(false);
-  const [nuevaAreaNombre, setNuevaAreaNombre] = useState("");
-  const [nuevaAreaTipo, setNuevaAreaTipo] = useState<"area" | "departamento" | "centro_costo">("area");
-  const [editandoId, setEditandoId] = useState<number | null>(null);
-  const [editNombre, setEditNombre] = useState("");
-
-  const handleCrear = () => {
-    if (!nuevaAreaNombre.trim()) return;
-    crearArea.mutate({ nombre: nuevaAreaNombre.trim(), tipo: nuevaAreaTipo }, {
-      onSuccess: () => {
-        toast({ title: "Área creada" });
-        setNuevaAreaNombre("");
-      },
-      onError: (err) => {
-        toast({ title: "Error", description: err instanceof Error ? err.message : "No se pudo crear el área.", variant: "destructive" });
-      },
-    });
-  };
-
-  const handleEditar = (area: AreaOrg) => {
-    setEditandoId(area.id);
-    setEditNombre(area.nombre);
-  };
-
-  const handleGuardarEdicion = () => {
-    if (!editandoId || !editNombre.trim()) return;
-    actualizarArea.mutate({ id: editandoId, nombre: editNombre.trim() }, {
-      onSuccess: () => {
-        toast({ title: "Área actualizada" });
-        setEditandoId(null);
-      },
-      onError: (err) => {
-        toast({ title: "Error", description: err instanceof Error ? err.message : "No se pudo actualizar.", variant: "destructive" });
-      },
-    });
-  };
-
-  const handleEliminar = (id: number) => {
-    eliminarArea.mutate(id, {
-      onSuccess: () => toast({ title: "Área eliminada" }),
-      onError: (err) => {
-        toast({ title: "Error", description: err instanceof Error ? err.message : "No se pudo eliminar.", variant: "destructive" });
-      },
-    });
-  };
-
-  const tipoLabel = (tipo: string) => {
-    if (tipo === "departamento") return "Departamento";
-    if (tipo === "centro_costo") return "Centro de costo";
-    return "Área";
-  };
-
+// ── Areas Link Card ───────────────────────────────────────────────────────────
+function AreasLinkCard() {
+  const { data: areas } = useListAreas();
+  const count = (areas ?? []).length;
   return (
-    <Card className="border-border/50 shadow-sm overflow-hidden">
-      <div
-        className="flex items-center justify-between gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <FolderOpen className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <p className="font-medium text-sm">Áreas, Departamentos y Centros de Costo</p>
-            <p className="text-xs text-muted-foreground">
-              {isLoading ? "Cargando…" : `${(areas ?? []).length} registrado${(areas ?? []).length !== 1 ? "s" : ""}`}
-            </p>
-          </div>
-        </div>
-        <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", expanded && "rotate-90")} />
-      </div>
-
-      {expanded && (
-        <div className="border-t border-border/50 p-5 space-y-4">
-          {/* Crear nueva área */}
-          <div className="flex gap-2 items-end flex-wrap">
-            <div className="flex-1 min-w-[180px] space-y-1">
-              <Label className="text-xs">Nombre</Label>
-              <Input
-                placeholder="Ej: Gerencia Comercial, Logística…"
-                value={nuevaAreaNombre}
-                onChange={(e) => setNuevaAreaNombre(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCrear()}
-                className="h-8 text-sm"
-              />
+    <Link href="/configuracion/areas">
+      <Card className="border-border/50 shadow-sm overflow-hidden cursor-pointer hover:bg-muted/30 transition-colors">
+        <div className="flex items-center justify-between gap-4 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <FolderKanban className="h-4 w-4 text-primary" />
             </div>
-            <div className="w-[160px] space-y-1">
-              <Label className="text-xs">Tipo</Label>
-              <Select value={nuevaAreaTipo} onValueChange={(v) => setNuevaAreaTipo(v as typeof nuevaAreaTipo)}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="area">Área</SelectItem>
-                  <SelectItem value="departamento">Departamento</SelectItem>
-                  <SelectItem value="centro_costo">Centro de costo</SelectItem>
-                </SelectContent>
-              </Select>
+            <div>
+              <p className="font-medium text-sm">Áreas, Departamentos y Centros de Costo</p>
+              <p className="text-xs text-muted-foreground">
+                {count > 0 ? `${count} registrado${count !== 1 ? "s" : ""}` : "Sin áreas — haz clic para crear"}
+              </p>
             </div>
-            <Button size="sm" className="h-8 gap-1.5" onClick={handleCrear} disabled={crearArea.isPending || !nuevaAreaNombre.trim()}>
-              <Plus className="h-3.5 w-3.5" />
-              Agregar
-            </Button>
           </div>
-
-          {/* Lista de áreas */}
-          {(areas ?? []).length === 0 && !isLoading && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No hay áreas registradas. Crea la primera arriba.
-            </p>
-          )}
-          <div className="space-y-1.5">
-            {(areas ?? []).map((area) => (
-              <div key={area.id} className="flex items-center gap-2 group py-1.5 px-2 rounded-lg hover:bg-muted/40">
-                {editandoId === area.id ? (
-                  <>
-                    <Input
-                      className="h-7 text-sm flex-1"
-                      value={editNombre}
-                      onChange={(e) => setEditNombre(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleGuardarEdicion()}
-                      autoFocus
-                    />
-                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={handleGuardarEdicion} disabled={actualizarArea.isPending}>
-                      <Check className="h-3.5 w-3.5 text-green-600" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditandoId(null)}>
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="text-sm flex-1">{area.nombre}</span>
-                    <span className="text-xs text-muted-foreground">{tipoLabel(area.tipo)}</span>
-                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => handleEditar(area)}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-6 px-1.5 text-destructive hover:text-destructive" onClick={() => handleEliminar(area.id)} disabled={eliminarArea.isPending}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
-      )}
-    </Card>
+      </Card>
+    </Link>
   );
 }
 
@@ -741,7 +599,7 @@ export default function ConfiguracionUsuariosPage() {
       )}
 
       {/* Areas section — only for admins */}
-      {esAdmin && <GestionAreasSection />}
+      {esAdmin && <AreasLinkCard />}
 
       {isLoading && (
         <div className="text-center py-12 text-muted-foreground">Cargando usuarios…</div>

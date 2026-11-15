@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal, ShoppingCart, Truck, Building2, Package, FileText } from "lucide-react";
+import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal, ShoppingCart, Truck, Building2, Package, FileText, FolderKanban } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus, useGetGestionResumen, getGetGestionResumenQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -308,6 +308,7 @@ const CONFIG_ITEMS: NavLeaf[] = [
   { href: "/configuracion/empresa", label: "Perfil de empresa", icon: Building2 },
   { href: "/configuracion/preferencias", label: "Preferencias", icon: SlidersHorizontal },
   { href: "/configuracion/usuarios", label: "Usuarios y permisos", icon: Users, match: (l) => l === "/configuracion/usuarios" },
+  { href: "/configuracion/areas", label: "Áreas y centros de costo", icon: FolderKanban, match: (l) => l === "/configuracion/areas" },
 ];
 
 function MobileBell() {
@@ -409,6 +410,7 @@ const INFORMES_ITEMS = [
   { href: "/informes/ventas", label: "Ventas", icon: ShoppingBag },
   { href: "/informes/compras", label: "Compras", icon: ShoppingCart },
   { href: "/informes/inventario", label: "Inventario", icon: Boxes },
+  { href: "/informes/areas", label: "Por Área", icon: FolderKanban },
 ];
 
 function InformesNavGroup({ closeMobile }: { closeMobile: () => void }) {

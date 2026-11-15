@@ -89,5 +89,6 @@ export async function cotizacionValues(userId: string, input: unknown, precision
     fechaEmision: data.fechaEmision, fechaVencimiento: data.fechaVencimiento,
     moneda: data.moneda, decimales: data.decimales, porcentajeIva: String(data.porcentajeIva),
     subtotal: String(subtotal), montoIva: String(montoIva), total: String(total), notas: data.notas,
+    areaId: (data as unknown as { areaId?: number }).areaId ?? null,
   } };
 }

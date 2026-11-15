@@ -1048,6 +1048,7 @@ export const CreateCotizacionBody = zod.object({
   "decimales": zod.number().min(createCotizacionBodyDecimalesMin).max(createCotizacionBodyDecimalesMax),
   "porcentajeIva": zod.number().min(createCotizacionBodyPorcentajeIvaMin).max(createCotizacionBodyPorcentajeIvaMax),
   "notas": zod.string().max(createCotizacionBodyNotasMax),
+  "areaId": zod.number().int().positive().optional(),
   "items": zod.array(zod.object({
   "productoId": zod.number().nullish(),
   "descripcion": zod.string().min(1).max(createCotizacionBodyItemsItemDescripcionMax),
@@ -2906,6 +2907,7 @@ export const CreateCobroBody = zod.object({
   "referencia": zod.string().optional(),
   "clienteId": zod.number().optional().describe('Associate an existing cliente'),
   "responsableId": zod.string().optional().describe('Assign the cobro to an ejecutivo\/admin of the organization (admin only). Defaults to the creator.'),
+  "areaId": zod.number().int().positive().optional().describe('Area/departamento/centro de costo id (optional)'),
   "emailPagador": zod.string().email().optional(),
   "fechaVencimiento": zod.string().regex(createCobroBodyFechaVencimientoRegExp).optional().describe('Due date (YYYY-MM-DD) used to schedule reminders')
 })

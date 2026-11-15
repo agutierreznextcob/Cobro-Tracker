@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   useCreateCobro, useCreateCobroRecurrente, useCreateCobrosMasivos,
   useListClientes, useListMiembros, useGetDatosBancarios, useGetCotizacion,
+  useListAreas,
   getListMiembrosQueryKey, getListCobrosQueryKey,
   getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey,
   getGetDatosBancariosQueryKey,
@@ -36,6 +37,7 @@ const formSchema = z.object({
   fechaVencimiento: z.string().optional().or(z.literal("")),
   fechaEmision: z.string().optional().or(z.literal("")),
   responsableId: z.string().optional(),
+  areaId: z.coerce.number().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -66,6 +68,7 @@ export default function NewCobro() {
   });
 
   const { data: clientes } = useListClientes();
+  const { data: areas } = useListAreas();
   const { data: miembros } = useListMiembros({
     query: { enabled: puedeAsignar, queryKey: getListMiembrosQueryKey() },
   });
@@ -217,6 +220,7 @@ export default function NewCobro() {
       clienteId: values.clienteId || undefined,
       fechaVencimiento: values.fechaVencimiento || undefined,
       responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
+      areaId: values.areaId || undefined,
       ...(fromCotizacionId ? { cotizacionId: Number(fromCotizacionId) } : {}),
     };
 
@@ -241,6 +245,7 @@ export default function NewCobro() {
           tipoDocumento: values.tipoDocumento, incluyeIva: values.incluyeIva,
           descripcion,
           responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
+          areaId: values.areaId || undefined,
           automatizacion: "ninguna",
           ...(modoAvanzado === "recurrente"
             ? { clienteId: values.clienteId, emailPagador: values.emailPagador || selectedCliente?.email || undefined, frecuencia, fechaInicio, fechaTermino: fechaTermino || undefined }
@@ -446,6 +451,39 @@ export default function NewCobro() {
                             {miembrosActivos.filter((m) => m.id !== user?.id).map((m) => (
                               <SelectItem key={m.id} value={m.id}>
                                 {m.nombre || m.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {(areas ?? []).length > 0 && (
+                  <FormField
+                    control={form.control}
+                    name="areaId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Área / Departamento / Centro de costo
+                        </FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(v === "ninguna" ? undefined : Number(v))}
+                          value={field.value != null ? String(field.value) : "ninguna"}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Sin área asignada" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="ninguna">Sin área asignada</SelectItem>
+                            {(areas ?? []).map((a) => (
+                              <SelectItem key={a.id} value={String(a.id)}>
+                                {a.nombre}
                               </SelectItem>
                             ))}
                           </SelectContent>

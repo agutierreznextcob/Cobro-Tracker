@@ -298,6 +298,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
   const clienteId = (parsed.data as Record<string, unknown>).clienteId as number | undefined;
   const fechaVencimiento = (parsed.data as Record<string, unknown>).fechaVencimiento as string | undefined;
   const responsableIdInput = (parsed.data as Record<string, unknown>).responsableId as string | undefined;
+  const areaId = (parsed.data as Record<string, unknown>).areaId as number | undefined;
   const cotizacionId = (req.body as Record<string, unknown>).cotizacionId as number | undefined;
   const user = req.isAuthenticated() ? req.user : null;
 
@@ -386,6 +387,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
         responsableId,
         responsableNombre,
         organizationId: ctx?.organizationId ?? null,
+        areaId: areaId ?? null,
         clienteId: clienteId ?? null,
         clienteNombre,
         emailPagador: emailPagador ?? null,

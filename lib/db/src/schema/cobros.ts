@@ -62,6 +62,8 @@ export const cobrosTable = pgTable("cobros", {
   referencia: text("referencia"),
   // Organization the cobro belongs to (denormalized for fast org-wide queries).
   organizationId: integer("organization_id"),
+  // Area/departamento/centro de costo this cobro belongs to (optional).
+  areaId: integer("area_id"),
   // The user (ejecutivo or admin) the cobro is assigned to / responsible for.
   responsableId: text("responsable_id"),
   responsableNombre: text("responsable_nombre"),
