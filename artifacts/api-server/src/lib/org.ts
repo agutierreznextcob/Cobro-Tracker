@@ -1,6 +1,6 @@
 import { db, usersTable, organizacionesTable, areasOrgTable } from "@workspace/db";
 import { eq, and, isNull, inArray, type SQL } from "drizzle-orm";
-import { cobrosTable, clientesTable } from "@workspace/db";
+import { cobrosTable, clientesTable, cotizacionesTable, pedidosTable, localesTable, guiasDespachoTable } from "@workspace/db";
 import { PLAN_AMOUNT, PLAN_NETO, PLAN_IVA, IVA_RATE } from "./flow-subscriptions";
 import { PLANES, costoDePacks, cupoDePacks, type PacksUsuarios, type PlanId } from "./plans";
 
@@ -282,7 +282,7 @@ export async function createSoloOrganization(user: {
 export async function backfillUserOrgRecords(
   userId: string,
   organizationId: number,
-): Promise<{ cobros: number; clientes: number }> {
+): Promise<{ cobros: number; clientes: number; cotizaciones: number; pedidos: number; locales: number; guias: number }> {
   const cobros = await db
     .update(cobrosTable)
     .set({ organizationId })
@@ -299,5 +299,37 @@ export async function backfillUserOrgRecords(
     )
     .returning({ id: clientesTable.id });
 
-  return { cobros: cobros.length, clientes: clientes.length };
+  const cotizaciones = await db
+    .update(cotizacionesTable)
+    .set({ organizationId })
+    .where(
+      and(eq(cotizacionesTable.responsableId, userId), isNull(cotizacionesTable.organizationId)),
+    )
+    .returning({ id: cotizacionesTable.id });
+
+  const pedidos = await db
+    .update(pedidosTable)
+    .set({ organizationId })
+    .where(
+      and(eq(pedidosTable.responsableId, userId), isNull(pedidosTable.organizationId)),
+    )
+    .returning({ id: pedidosTable.id });
+
+  const locales = await db
+    .update(localesTable)
+    .set({ organizationId })
+    .where(
+      and(eq(localesTable.usuarioId, userId), isNull(localesTable.organizationId)),
+    )
+    .returning({ id: localesTable.id });
+
+  const guias = await db
+    .update(guiasDespachoTable)
+    .set({ organizationId })
+    .where(
+      and(eq(guiasDespachoTable.responsableId, userId), isNull(guiasDespachoTable.organizationId)),
+    )
+    .returning({ id: guiasDespachoTable.id });
+
+  return { cobros: cobros.length, clientes: clientes.length, cotizaciones: cotizaciones.length, pedidos: pedidos.length, locales: locales.length, guias: guias.length };
 }
