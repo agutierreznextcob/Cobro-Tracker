@@ -1,16 +1,30 @@
-import { useMemo } from "react";
-import { Link, useParams } from "wouter";
-import { useGetLocal, getGetLocalQueryKey, useListInventario, getListInventarioQueryKey } from "@workspace/api-client-react";
+import { useMemo, useState } from "react";
+import { Link, useLocation, useParams } from "wouter";
+import { useGetLocal, getGetLocalQueryKey, useListInventario, getListInventarioQueryKey, useUpdateLocal, useDeleteLocal, getListLocalesQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { formatQty } from "@/lib/inventario";
-import { AlertTriangle, ArrowLeft, ChevronRight, MapPin, Plus, RotateCw, Store, Warehouse } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, MapPin, Pencil, Plus, RotateCw, Store, Trash2, Warehouse } from "lucide-react";
 
 export default function LocalDetailPage() {
   const { id: idStr } = useParams<{ id: string }>();
   const id = Number(idStr);
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const { data: local, isLoading, isError, refetch } = useGetLocal(id, { query: { enabled: !!id, queryKey: getGetLocalQueryKey(id), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
   const { data: productos } = useListInventario({ query: { queryKey: getListInventarioQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
+  const updateLocal = useUpdateLocal();
+  const deleteLocal = useDeleteLocal();
+  const [editOpen, setEditOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editNombre, setEditNombre] = useState("");
+  const [editDireccion, setEditDireccion] = useState("");
 
   const unidades = useMemo(() => {
     const set = new Set<string>();
@@ -41,8 +55,67 @@ export default function LocalDetailPage() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2"><Store className="h-6 w-6 text-primary" />{local.nombre}</h1>
           {local.direccion && <p className="text-muted-foreground mt-1 flex items-center gap-1 text-sm"><MapPin className="h-3.5 w-3.5" />{local.direccion}</p>}
         </div>
-        <Button asChild><Link href={`/bodegas/nueva?localId=${local.id}`} data-testid="link-agregar-bodega"><Plus className="h-4 w-4 mr-1.5" />Agregar bodega</Link></Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => { setEditNombre(local.nombre); setEditDireccion(local.direccion ?? ""); setEditOpen(true); }}>
+            <Pencil className="h-4 w-4 mr-1.5" />Editar
+          </Button>
+          <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDelete(true)}>
+            <Trash2 className="h-4 w-4 mr-1.5" />Eliminar
+          </Button>
+          <Button asChild><Link href={`/bodegas/nueva?localId=${local.id}`} data-testid="link-agregar-bodega"><Plus className="h-4 w-4 mr-1.5" />Agregar bodega</Link></Button>
+        </div>
       </div>
+
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Editar local</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <Label>Nombre *</Label>
+              <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} placeholder="Nombre del local" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Dirección (opcional)</Label>
+              <Input value={editDireccion} onChange={e => setEditDireccion(e.target.value)} placeholder="Dirección" />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button size="sm" disabled={updateLocal.isPending || !editNombre.trim()} onClick={() => {
+                updateLocal.mutate({ id, nombre: editNombre.trim(), direccion: editDireccion.trim() || undefined }, {
+                  onSuccess: () => { toast({ title: "Local actualizado" }); qc.invalidateQueries({ queryKey: getListLocalesQueryKey() }); qc.invalidateQueries({ queryKey: getGetLocalQueryKey(id) }); setEditOpen(false); },
+                  onError: () => toast({ title: "Error", description: "No se pudo actualizar el local.", variant: "destructive" }),
+                });
+              }}>
+                {updateLocal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Guardar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm dialog */}
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Eliminar local</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">¿Estás seguro que deseas eliminar <strong>{local.nombre}</strong>? Debes eliminar primero todas sus bodegas. Esta acción no se puede deshacer.</p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
+            <Button variant="destructive" size="sm" disabled={deleteLocal.isPending} onClick={() => {
+              deleteLocal.mutate(id, {
+                onSuccess: () => { toast({ title: "Local eliminado" }); setLocation("/locales"); },
+                onError: (err: unknown) => {
+                  const msg = (err as { data?: { error?: string } })?.data?.error ?? "No se pudo eliminar el local.";
+                  toast({ title: "Error", description: msg, variant: "destructive" });
+                  setConfirmDelete(false);
+                },
+              });
+            }}>
+              {deleteLocal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}Eliminar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="rounded-xl border bg-card px-5 py-4">
         <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Stock total del local</p>

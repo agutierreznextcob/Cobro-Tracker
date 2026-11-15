@@ -5,6 +5,7 @@ import {
   useListClientes,
   useCreateCliente,
   useImportarClientes,
+  useDeleteCliente,
   getListClientesQueryKey,
   useListAdminUsuarios,
   type AdminUsuario,
@@ -22,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight, Shield, Download, Upload, Building2, CheckCircle2, AlertTriangle, SearchCheck } from "lucide-react";
+import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight, Shield, Download, Upload, Building2, CheckCircle2, AlertTriangle, SearchCheck, Trash2 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { ScoreBadge } from "@/components/score-badge";
 import { formatCurrency } from "@/lib/format";
@@ -503,6 +504,65 @@ function AdminSuscriptoresView() {
   );
 }
 
+function EliminarClienteButton({ clienteId, clienteNombre }: { clienteId: number; clienteNombre: string }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const { toast } = useToast();
+  const deleteCliente = useDeleteCliente();
+  const qc = useQueryClient();
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmOpen(true);
+  };
+
+  const confirmar = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    deleteCliente.mutate(clienteId, {
+      onSuccess: () => {
+        toast({ title: "Cliente eliminado", description: `${clienteNombre} fue eliminado correctamente.` });
+        qc.invalidateQueries({ queryKey: getListClientesQueryKey() });
+        setConfirmOpen(false);
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { data?: { error?: string } })?.data?.error ?? "No se pudo eliminar el cliente.";
+        toast({ title: "Error", description: msg, variant: "destructive" });
+        setConfirmOpen(false);
+      },
+    });
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleDelete}
+        className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+        title="Eliminar cliente"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-sm" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Eliminar cliente</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            ¿Estás seguro que deseas eliminar a <strong>{clienteNombre}</strong>? Esta acción no se puede deshacer.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setConfirmOpen(false); }}>Cancelar</Button>
+            <Button variant="destructive" size="sm" disabled={deleteCliente.isPending} onClick={confirmar}>
+              {deleteCliente.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Eliminar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function ClientesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -652,7 +712,10 @@ export default function ClientesPage() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <div className="flex items-center gap-1">
+                        <EliminarClienteButton clienteId={cliente.id} clienteNombre={cliente.nombre} />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </div>
                       <ScoreBadge score={cliente.score} categoria={cliente.categoria} size="xs" />
                     </div>
                   </div>

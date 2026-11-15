@@ -383,6 +383,39 @@ clientesRouter.patch("/clientes/:id", async (req, res) => {
   }
 });
 
+clientesRouter.delete("/clientes/:id", async (req, res) => {
+  const userId = req.user!.id;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  try {
+    const ctx = await getOrgContext(userId);
+    const [existing] = await db.select().from(clientesTable).where(eq(clientesTable.id, id));
+    if (!existing || !userCanAccessCliente(ctx, userId, existing)) {
+      res.status(404).json({ error: "Cliente no encontrado" });
+      return;
+    }
+    // Check for active cobros
+    const [cobroActivo] = await db
+      .select({ id: cobrosTable.id })
+      .from(cobrosTable)
+      .where(and(eq(cobrosTable.clienteId, id), cobroScopeCondition(ctx, userId)))
+      .limit(1);
+    if (cobroActivo) {
+      res.status(409).json({ error: "No se puede eliminar un cliente que tiene cobros asociados. Elimina primero sus cobros." });
+      return;
+    }
+    await db.delete(clientesTable).where(eq(clientesTable.id, id));
+    req.log.info({ clienteId: id }, "Cliente deleted");
+    res.status(204).send();
+  } catch (err) {
+    req.log.error({ err }, "Error deleting cliente");
+    res.status(500).json({ error: "Error interno" });
+  }
+});
+
 // Rotate the debtor portal token for a cliente, invalidating any previously
 // shared link. Org-guarded like every other :id route.
 clientesRouter.post("/clientes/:id/portal/regenerar", async (req, res) => {

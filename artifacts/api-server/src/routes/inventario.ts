@@ -110,6 +110,27 @@ router.patch("/inventario/:id", async (req, res) => {
     res.json((await enrichProductos([p]))[0]);
   } catch (err) { res.status((err as { status?: number }).status ?? 400).json({ error: err instanceof Error ? err.message : "No se pudo editar." }); }
 });
+router.delete("/inventario/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+  try {
+    const { condition } = await inventarioScope(req.user!.id);
+    const [p] = await db.select().from(productosTable).where(and(condition, eq(productosTable.id, id)));
+    if (!p) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+    // Delete all related stock and movement records before deleting the product
+    await db.transaction(async tx => {
+      await tx.delete(stockPorBodegaTable).where(eq(stockPorBodegaTable.productoId, id));
+      await tx.delete(movimientosStockTable).where(eq(movimientosStockTable.productoId, id));
+      await tx.delete(historialCostosTable).where(eq(historialCostosTable.productoId, id));
+      await tx.delete(productosTable).where(eq(productosTable.id, id));
+    });
+    req.log.info({ productoId: id }, "Producto deleted");
+    res.status(204).send();
+  } catch (err) {
+    req.log.error({ err }, "Error deleting producto");
+    res.status(500).json({ error: "Error interno" });
+  }
+});
 router.get("/inventario/:id/costos", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0) { res.status(404).json({ error: "Producto no encontrado" }); return; }

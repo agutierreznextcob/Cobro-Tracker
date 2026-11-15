@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useGetBodega, getGetBodegaQueryKey, useUpdateStockCriticoBodega, type Producto } from "@workspace/api-client-react";
+import { useGetBodega, getGetBodegaQueryKey, useUpdateStockCriticoBodega, useUpdateBodega, useDeleteBodega, getListBodegasQueryKey, getListLocalesQueryKey, type Producto } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiErrorMessage, formatQty, invalidateInventario } from "@/lib/inventario";
-import { ArrowLeft, ArrowLeftRight, Check, Loader2, RotateCw, Store, Warehouse } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, Loader2, Pencil, RotateCw, Store, Trash2, Warehouse } from "lucide-react";
 
 function stockEnBodega(p: Producto, bodegaId: number) {
   const u = (p.ubicaciones ?? []).find((x) => x.bodegaId === bodegaId);
@@ -42,7 +44,16 @@ function CriticoEditor({ bodegaId, producto, actual }: { bodegaId: number; produ
 export default function BodegaDetailPage() {
   const { id: idStr } = useParams<{ id: string }>();
   const id = Number(idStr);
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const { data: bodega, isLoading, isError, refetch } = useGetBodega(id, { query: { enabled: !!id, queryKey: getGetBodegaQueryKey(id), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
+  const updateBodega = useUpdateBodega();
+  const deleteBodega = useDeleteBodega();
+  const [editOpen, setEditOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editNombre, setEditNombre] = useState("");
+  const [editDescripcion, setEditDescripcion] = useState("");
 
   if (isLoading) return <div className="max-w-5xl mx-auto space-y-4 animate-pulse"><div className="h-8 w-60 bg-muted rounded" /><div className="h-64 bg-muted/60 rounded-xl" /></div>;
   if (isError || !bodega) {
@@ -69,11 +80,74 @@ export default function BodegaDetailPage() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2"><Warehouse className="h-6 w-6 text-primary" />{bodega.nombre}</h1>
           {bodega.descripcion && <p className="text-muted-foreground mt-1 text-sm">{bodega.descripcion}</p>}
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => { setEditNombre(bodega.nombre); setEditDescripcion(bodega.descripcion ?? ""); setEditOpen(true); }}>
+            <Pencil className="h-4 w-4 mr-1.5" />Editar
+          </Button>
+          <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDelete(true)}>
+            <Trash2 className="h-4 w-4 mr-1.5" />Eliminar
+          </Button>
           <div className="rounded-xl border bg-card px-4 py-2"><p className="text-[11px] uppercase tracking-wider text-muted-foreground">Productos</p><p className="font-mono text-xl font-bold">{productos.length}</p></div>
           <div className={`rounded-xl border px-4 py-2 ${criticos > 0 ? "border-red-300 bg-red-50 text-red-700" : "bg-card"}`}><p className="text-[11px] uppercase tracking-wider opacity-80">En crítico</p><p className="font-mono text-xl font-bold">{criticos}</p></div>
         </div>
       </div>
+
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Editar bodega</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <Label>Nombre *</Label>
+              <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} placeholder="Nombre de la bodega" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descripción (opcional)</Label>
+              <Input value={editDescripcion} onChange={e => setEditDescripcion(e.target.value)} placeholder="Descripción" />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button size="sm" disabled={updateBodega.isPending || !editNombre.trim()} onClick={() => {
+                updateBodega.mutate({ id, nombre: editNombre.trim(), descripcion: editDescripcion.trim() || undefined }, {
+                  onSuccess: () => {
+                    toast({ title: "Bodega actualizada" });
+                    qc.invalidateQueries({ queryKey: getGetBodegaQueryKey(id) });
+                    qc.invalidateQueries({ queryKey: getListBodegasQueryKey() });
+                    qc.invalidateQueries({ queryKey: getListLocalesQueryKey() });
+                    setEditOpen(false);
+                  },
+                  onError: () => toast({ title: "Error", description: "No se pudo actualizar la bodega.", variant: "destructive" }),
+                });
+              }}>
+                {updateBodega.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Guardar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm dialog */}
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Eliminar bodega</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">¿Estás seguro que deseas eliminar <strong>{bodega.nombre}</strong>? La bodega debe tener stock en cero para poder eliminarse. Esta acción no se puede deshacer.</p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
+            <Button variant="destructive" size="sm" disabled={deleteBodega.isPending} onClick={() => {
+              deleteBodega.mutate(id, {
+                onSuccess: () => { toast({ title: "Bodega eliminada" }); setLocation(`/locales/${bodega.localId}`); },
+                onError: (err: unknown) => {
+                  const msg = (err as { data?: { error?: string } })?.data?.error ?? "No se pudo eliminar la bodega.";
+                  toast({ title: "Error", description: msg, variant: "destructive" });
+                  setConfirmDelete(false);
+                },
+              });
+            }}>
+              {deleteBodega.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}Eliminar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Card className="shadow-sm overflow-hidden">
         {productos.length === 0 ? (

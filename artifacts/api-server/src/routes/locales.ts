@@ -47,6 +47,35 @@ router.post("/locales", async (req, res) => {
   }).returning();
   res.status(201).json({ ...local, creadoEn: local.creadoEn.toISOString(), bodegas: [], stockTotal: 0 });
 });
+router.patch("/locales/:id", async (req, res) => {
+  const id = validId(req.params.id);
+  if (!id.success) { res.status(400).json({ error: "ID inválido" }); return; }
+  const nombre = req.body?.nombre?.trim?.();
+  const direccion = typeof req.body?.direccion === "string" ? req.body.direccion.trim() : undefined;
+  if (!nombre) { res.status(400).json({ error: "Indica un nombre válido." }); return; }
+  const { condition } = await localScope(req.user!.id);
+  const [existing] = await db.select().from(localesTable).where(and(condition, eq(localesTable.id, id.data)));
+  if (!existing) { res.status(404).json({ error: "Local no encontrado." }); return; }
+  await db.update(localesTable).set({ nombre, ...(direccion !== undefined ? { direccion } : {}) }).where(eq(localesTable.id, id.data));
+  const updated = (await listLocations(req.user!.id)).find(l => l.id === id.data);
+  res.json(updated);
+});
+router.delete("/locales/:id", async (req, res) => {
+  const id = validId(req.params.id);
+  if (!id.success) { res.status(400).json({ error: "ID inválido" }); return; }
+  const { condition } = await localScope(req.user!.id);
+  const [existing] = await db.select().from(localesTable).where(and(condition, eq(localesTable.id, id.data)));
+  if (!existing) { res.status(404).json({ error: "Local no encontrado." }); return; }
+  const warehouses = await listWarehouses(req.user!.id);
+  const localBodegas = warehouses.filter(b => b.localId === id.data);
+  if (localBodegas.length > 0) {
+    res.status(409).json({ error: "No se puede eliminar un local que tiene bodegas. Elimina primero sus bodegas." });
+    return;
+  }
+  await db.delete(localesTable).where(eq(localesTable.id, id.data));
+  req.log.info({ localId: id.data }, "Local deleted");
+  res.status(204).send();
+});
 router.get("/bodegas", async (req, res) => { res.json(await listWarehouses(req.user!.id)); });
 router.post("/bodegas", async (req, res) => {
   const parsed = CreateBodegaBody.safeParse(req.body);
@@ -93,6 +122,36 @@ router.get("/bodegas/:id", async (req, res) => {
     .innerJoin(productosTable, eq(productosTable.id, stockPorBodegaTable.productoId))
     .where(and(condition, eq(stockPorBodegaTable.bodegaId, warehouse.id)));
   res.json({ ...warehouse, productos: await enrichProductos(rows.map(r => r.producto)) });
+});
+router.patch("/bodegas/:id", async (req, res) => {
+  const id = validId(req.params.id);
+  if (!id.success) { res.status(400).json({ error: "ID inválido" }); return; }
+  const nombre = req.body?.nombre?.trim?.();
+  const descripcion = typeof req.body?.descripcion === "string" ? req.body.descripcion.trim() : undefined;
+  if (!nombre) { res.status(400).json({ error: "Indica un nombre válido." }); return; }
+  const warehouses = await listWarehouses(req.user!.id);
+  const existing = warehouses.find(b => b.id === id.data);
+  if (!existing) { res.status(404).json({ error: "Bodega no encontrada." }); return; }
+  await db.update(bodegasTable).set({ nombre, ...(descripcion !== undefined ? { descripcion } : {}) }).where(eq(bodegasTable.id, id.data));
+  const updated = (await listWarehouses(req.user!.id)).find(b => b.id === id.data);
+  res.json(updated);
+});
+router.delete("/bodegas/:id", async (req, res) => {
+  const id = validId(req.params.id);
+  if (!id.success) { res.status(400).json({ error: "ID inválido" }); return; }
+  const warehouses = await listWarehouses(req.user!.id);
+  const existing = warehouses.find(b => b.id === id.data);
+  if (!existing) { res.status(404).json({ error: "Bodega no encontrada." }); return; }
+  if (existing.stockTotal > 0) {
+    res.status(409).json({ error: "No se puede eliminar una bodega que tiene stock. Transfiere el stock primero." });
+    return;
+  }
+  await db.transaction(async tx => {
+    await tx.delete(stockPorBodegaTable).where(eq(stockPorBodegaTable.bodegaId, id.data));
+    await tx.delete(bodegasTable).where(eq(bodegasTable.id, id.data));
+  });
+  req.log.info({ bodegaId: id.data }, "Bodega deleted");
+  res.status(204).send();
 });
 router.patch("/bodegas/:id/productos/:productoId", async (req, res) => {
   const id = validId(req.params.id), productId = validId(req.params.productoId);

@@ -5,6 +5,7 @@ import {
   useCreateProducto,
   useUpdateProducto,
   useGetProducto,
+  useDeleteProducto,
   getGetProductoQueryKey,
   useListBodegas,
   getListBodegasQueryKey,
@@ -22,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatMoney, monedaDe, roundTo, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
 import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 import {
@@ -40,7 +42,7 @@ import {
   utilidadDe,
   type MetodoCalculo,
 } from "@/lib/inventario";
-import { AlertTriangle, ArrowLeft, ArrowLeftRight, Check, ChevronDown, ChevronUp, Loader2, Lock, Package, Receipt, RotateCw, Tag, Warehouse, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowLeftRight, Check, ChevronDown, ChevronUp, Loader2, Lock, Package, Receipt, RotateCw, Tag, Trash2, Warehouse, Wrench } from "lucide-react";
 
 type Tipo = "producto" | "servicio";
 type Fuente = "manual" | "calculado" | "pvp";
@@ -65,6 +67,8 @@ export default function InventarioFormPage() {
   const qc = useQueryClient();
   const createProducto = useCreateProducto();
   const updateProducto = useUpdateProducto();
+  const deleteProducto = useDeleteProducto();
+  const [confirmEliminar, setConfirmEliminar] = useState(false);
   const { data: producto, isLoading, isError, isFetchedAfterMount, refetch } = useGetProducto(id, {
     query: { enabled: isEdit, queryKey: getGetProductoQueryKey(id), staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true },
   });
@@ -702,8 +706,59 @@ export default function InventarioFormPage() {
           <Button type="submit" className="w-full mt-4" disabled={pending || !prefsListas}>
             {pending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</> : isEdit ? "Guardar cambios" : `Crear ${tipo}`}
           </Button>
+
+          {isEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setConfirmEliminar(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar producto
+            </Button>
+          )}
         </aside>
       </form>
+
+      {/* Confirm delete dialog */}
+      {isEdit && (
+        <Dialog open={confirmEliminar} onOpenChange={setConfirmEliminar}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Eliminar producto</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              ¿Estás seguro que deseas eliminar este producto? Se eliminarán también sus movimientos de stock e historial de costos. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmEliminar(false)}>Cancelar</Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={deleteProducto.isPending}
+                onClick={() => {
+                  deleteProducto.mutate(id, {
+                    onSuccess: () => {
+                      toast({ title: "Producto eliminado", description: "El producto fue eliminado correctamente." });
+                      invalidateInventario(qc);
+                      setLocation("/inventario");
+                    },
+                    onError: (err: unknown) => {
+                      const msg = (err as { data?: { error?: string } })?.data?.error ?? "No se pudo eliminar el producto.";
+                      toast({ title: "Error", description: msg, variant: "destructive" });
+                      setConfirmEliminar(false);
+                    },
+                  });
+                }}
+              >
+                {deleteProducto.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Eliminar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
