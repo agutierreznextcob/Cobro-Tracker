@@ -58,6 +58,10 @@ import BodegaDetailPage from "@/pages/bodega-detail";
 import CotizacionesPage from "@/pages/cotizaciones";
 import CotizacionFormPage from "@/pages/cotizacion-form";
 import CotizacionDetailPage from "@/pages/cotizacion-detail";
+import PedidosPage from "@/pages/pedidos";
+import PedidoDetailPage from "@/pages/pedido-detail";
+import GuiasDespachoPage from "@/pages/guias-despacho";
+import GuiaDetailPage from "@/pages/guia-detail";
 import PreferenciasPage from "@/pages/preferencias";
 import EmpresaPage from "@/pages/empresa";
 import { Layout } from "@/components/layout";
@@ -396,6 +400,34 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <CotizacionDetailPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/pedidos">
+        <AuthGate>
+          <Layout>
+            <PedidosPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/pedidos/:id">
+        <AuthGate>
+          <Layout>
+            <PedidoDetailPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/guias-despacho">
+        <AuthGate>
+          <Layout>
+            <GuiasDespachoPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/guias-despacho/:id">
+        <AuthGate>
+          <Layout>
+            <GuiaDetailPage />
           </Layout>
         </AuthGate>
       </Route>

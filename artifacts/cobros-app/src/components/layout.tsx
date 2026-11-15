@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal, ShoppingCart, Truck, Building2 } from "lucide-react";
+import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal, ShoppingCart, Truck, Building2, Package, FileText } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus, useGetGestionResumen, getGetGestionResumenQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -297,6 +297,11 @@ const VENTAS_ITEMS: NavLeaf[] = [
   { href: "/cotizaciones", label: "Cotizaciones", icon: FileSignature, match: (l) => l === "/cotizaciones" || l.startsWith("/cotizaciones/") },
 ];
 
+const LOGISTICA_ITEMS: NavLeaf[] = [
+  { href: "/pedidos", label: "Pedidos", icon: Package, match: (l) => l === "/pedidos" || l.startsWith("/pedidos/") },
+  { href: "/guias-despacho", label: "Guías de despacho", icon: FileText, match: (l) => l === "/guias-despacho" || l.startsWith("/guias-despacho/") },
+];
+
 const CONFIG_ITEMS: NavLeaf[] = [
   { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock, feature: "Recordatorios automáticos" },
   { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes", match: (l) => l === "/workflows" || l.startsWith("/workflows/") },
@@ -474,6 +479,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/dashboard", label: "Dashboard", icon: Home },
     { id: "notificaciones" },
     { id: "ventas_group" },
+    { id: "logistica_group" },
     { href: "/compras", label: "Compras", icon: ShoppingCart },
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/cobros/buscar", label: "Buscar", icon: Search },
@@ -486,7 +492,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { id: "config_group" },
   ] as Array<
     | { href: string; label: string; icon: typeof Home; feature?: string }
-    | { id: "gestion_group" | "notificaciones" | "ventas_group" | "config_group" | "informes_group" }
+    | { id: "gestion_group" | "notificaciones" | "ventas_group" | "logistica_group" | "config_group" | "informes_group" }
   >;
 
   const displayName = user
@@ -564,6 +570,9 @@ export function Layout({ children }: { children: ReactNode }) {
             }
             if ("id" in item && item.id === "ventas_group") {
               return <NavGroup key="ventas_group" id="ventas" label="Ventas" icon={ShoppingBag} items={VENTAS_ITEMS} closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
+            }
+            if ("id" in item && item.id === "logistica_group") {
+              return <NavGroup key="logistica_group" id="logistica" label="Logística" icon={Truck} items={LOGISTICA_ITEMS} closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
             }
             if ("id" in item && item.id === "informes_group") {
               return <InformesNavGroup key="informes_group" closeMobile={closeMobile} />;

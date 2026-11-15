@@ -29,11 +29,12 @@ import { EstadoCotizacionBadge } from "@/components/estado-cotizacion-badge";
 import { formatMoney, formatFechaPref, formatDate } from "@/lib/format";
 import { apiErrorMessage } from "@/lib/inventario";
 import { descargarPdfCotizacion, invalidateCobrosTrasConversion, invalidateCotizaciones } from "@/lib/cotizaciones";
-import { ArrowLeft, ArrowRightLeft, Check, Download, ExternalLink, Eye, Loader2, Mail, Pencil, RotateCw, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Check, Download, ExternalLink, Eye, Loader2, Mail, Package, Pencil, RotateCw, X } from "lucide-react";
 import { downloadCotizacionPdf } from "@workspace/api-client-react";
 import { PdfPreviewDialog } from "@/components/pdf-preview-dialog";
+import { useConvertirCotizacionAPedido, PEDIDOS_KEY } from "@/lib/pedidos";
 
-type Confirm = null | "enviar" | "aceptada" | "rechazada" | "convertir";
+type Confirm = null | "enviar" | "aceptada" | "rechazada" | "convertir" | "convertir-pedido";
 
 export default function CotizacionDetailPage() {
   const params = useParams<{ id: string }>();
@@ -49,6 +50,7 @@ export default function CotizacionDetailPage() {
   const enviar = useSendCotizacion();
   const setEstado = useSetCotizacionEstado();
   const convertir = useConvertirCotizacion();
+  const convertirPedido = useConvertirCotizacionAPedido();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [descargando, setDescargando] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -80,6 +82,15 @@ export default function CotizacionDetailPage() {
           if (r.cobroId) navigate(`/cobros/${r.cobroId}`);
         },
         onError: onErr("No se pudo convertir"),
+      });
+    } else if (which === "convertir-pedido") {
+      convertirPedido.mutate(c.id, {
+        onSuccess: (pedido) => {
+          qc.invalidateQueries({ queryKey: PEDIDOS_KEY });
+          toast({ title: "Pedido creado", description: `${pedido.numeroPedido} generado desde la cotización.` });
+          navigate(`/pedidos/${pedido.id}`);
+        },
+        onError: onErr("No se pudo crear el pedido"),
       });
     } else {
       setEstado.mutate({ id: c.id, data: { estado: which } }, {
@@ -126,7 +137,7 @@ export default function CotizacionDetailPage() {
 
   const fmt = (n: number) => formatMoney(n, c.moneda, c.decimales);
   const fecha = (s: string) => formatFechaPref(s, prefs.formatoFecha);
-  const pending = enviar.isPending || setEstado.isPending || convertir.isPending;
+  const pending = enviar.isPending || setEstado.isPending || convertir.isPending || convertirPedido.isPending;
   const items = (c.items ?? []) as CotizacionItem[];
 
   const confirmCopy: Record<Exclude<Confirm, null>, { title: string; desc: string; cta: string }> = {
@@ -134,6 +145,7 @@ export default function CotizacionDetailPage() {
     aceptada: { title: "Registrar aceptación", desc: "Marca esta cotización como aceptada por el cliente. Luego podrás convertirla en cobro.", cta: "Marcar aceptada" },
     rechazada: { title: "Registrar rechazo", desc: "Marca esta cotización como rechazada por el cliente. Esta acción cierra la cotización.", cta: "Marcar rechazada" },
     convertir: { title: "Convertir en cobro", desc: `Se creará un cobro en ${c.moneda} por ${fmt(c.total)} con los mismos ítems y cliente, vinculado a esta cotización.`, cta: "Crear cobro" },
+    "convertir-pedido": { title: "Convertir en pedido", desc: `Se creará un pedido de logística en ${c.moneda} por ${fmt(c.total)} con los mismos ítems y cliente, para que logística confirme disponibilidad.`, cta: "Crear pedido" },
   };
 
   return (
@@ -264,6 +276,16 @@ export default function CotizacionDetailPage() {
                   {convertir.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRightLeft className="h-4 w-4 mr-2" />}Convertir a cobro
                 </Button>
               )
+            )}
+            {(c.estado === "aceptada" || c.estado === "enviada" || c.estado === "borrador") && !(c as unknown as { pedidoId?: number }).pedidoId && (
+              <Button variant="outline" className="w-full" onClick={() => setConfirm("convertir-pedido")} disabled={pending} data-testid="button-convertir-pedido">
+                {convertirPedido.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Package className="h-4 w-4 mr-2" />}Crear pedido de logística
+              </Button>
+            )}
+            {(c as unknown as { pedidoId?: number }).pedidoId && (
+              <Button asChild variant="outline" className="w-full" data-testid="link-pedido-generado">
+                <Link href={`/pedidos/${(c as unknown as { pedidoId: number }).pedidoId}`}><ExternalLink className="h-4 w-4 mr-2" />Ver pedido de logística</Link>
+              </Button>
             )}
             {c.estado === "vencida" && <p className="text-xs text-muted-foreground">Cotización vencida: ya no se puede aceptar ni convertir. Crea una nueva si el cliente sigue interesado.</p>}
             {c.estado === "rechazada" && <p className="text-xs text-muted-foreground">El cliente rechazó esta propuesta.</p>}

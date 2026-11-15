@@ -159,9 +159,10 @@ export default function CotizacionFormPage() {
 
   const productosMoneda = useMemo(() => {
     const s = busqueda.trim().toLowerCase();
+    if (!s) return [];
     return (productosQ.data ?? [])
       .filter((p) => p.activo && monedaDe(p.moneda) === moneda)
-      .filter((p) => !s || `${p.nombre} ${p.codigoInterno ?? ""} ${p.sku ?? ""}`.toLowerCase().includes(s))
+      .filter((p) => `${p.nombre} ${p.codigoInterno ?? ""} ${p.sku ?? ""}`.toLowerCase().includes(s))
       .slice(0, 50);
   }, [productosQ.data, moneda, busqueda]);
   const otrosMoneda = (productosQ.data ?? []).filter((p) => p.activo && monedaDe(p.moneda) !== moneda).length;
@@ -405,7 +406,7 @@ export default function CotizacionFormPage() {
                         <div className="p-3 text-center text-sm">No se pudo cargar el catálogo. <button type="button" className="text-primary underline" onClick={() => productosQ.refetch()}>Reintentar</button></div>
                       ) : productosMoneda.length === 0 ? (
                         <p className="p-3 text-center text-sm text-muted-foreground">
-                          {otrosMoneda > 0 ? `No hay ítems con precio en ${moneda}. Usa una línea libre.` : busqueda ? "Sin coincidencias." : "Tu catálogo está vacío."}
+                          {!busqueda.trim() ? "Escribe para buscar por nombre, SKU o código." : otrosMoneda > 0 ? `No hay ítems con precio en ${moneda}. Usa una línea libre.` : "Sin coincidencias."}
                         </p>
                       ) : productosMoneda.map((p) => (
                         <button key={p.id} type="button" onClick={() => agregarProducto(p)} className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted" data-testid={`option-producto-${p.id}`}>
