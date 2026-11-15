@@ -13,6 +13,7 @@ export const guiasDespachoTable = pgTable("guias_despacho", {
   clienteRut: text("cliente_rut"),
   clienteDireccion: text("cliente_direccion"),
   pedidoId: integer("pedido_id").references(() => pedidosTable.id, { onDelete: "set null" }),
+  cobroId: integer("cobro_id"),
   estado: text("estado")
     .$type<"emitida" | "en_despacho" | "entregada" | "anulada">()
     .notNull()

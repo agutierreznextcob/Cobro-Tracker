@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { db, guiasDespachoTable, guiaDespachoItemsTable, pedidosTable, pedidoItemsTable } from "@workspace/db";
 import { and, eq, desc } from "drizzle-orm";
 import { getOrgContext } from "../lib/org";
-import { descontarStockPorItems } from "../lib/inventario";
+import { confirmarStock, descontarStockDirecto } from "../lib/inventario";
 import { getPreferenciasNegocio } from "../lib/preferencias";
 import { getEmpresaForScope, getEmpresaLogoBytes, documentScope } from "../lib/empresa";
 import PDFDocument from "pdfkit";
@@ -214,18 +214,23 @@ router.patch("/guias-despacho/:id/estado", action(async (req, res) => {
     return updated;
   });
 
-  // Descontar stock al entregar la guía. Fire-and-forget, fuera de la tx
-  // para no bloquearla. Usa GREATEST(..., 0) → nunca stock negativo.
+  // Stock management on entrega. Fire-and-forget, outside the tx.
+  // - cobroId set → cobro already reserved stock; confirmarStock decrements
+  //   stockActual AND releases the reservation (stockReservado -=).
+  // - no cobroId   → guía without prior cobro; direct decrement only.
   if (estado === "entregada") {
     const items = await db
       .select({ productoId: guiaDespachoItemsTable.productoId, cantidad: guiaDespachoItemsTable.cantidad })
       .from(guiaDespachoItemsTable)
       .where(eq(guiaDespachoItemsTable.guiaId, guia.id));
-    void descontarStockPorItems(
-      items
-        .filter(i => i.productoId != null)
-        .map(i => ({ productoId: i.productoId!, cantidad: Number(i.cantidad) })),
-    );
+    const stockItems = items
+      .filter(i => i.productoId != null)
+      .map(i => ({ productoId: i.productoId!, cantidad: Number(i.cantidad) }));
+    if (guia.cobroId != null) {
+      void confirmarStock(stockItems);
+    } else {
+      void descontarStockDirecto(stockItems);
+    }
   }
 
   res.json(await serializeGuia(guia));

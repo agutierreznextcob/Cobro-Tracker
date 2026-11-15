@@ -22,6 +22,7 @@ export const productosTable = pgTable("productos", {
   margenPorcentaje: numeric("margen_porcentaje", { precision: 12, scale: 4 }).notNull().default("0"),
   metodoCalculo: text("metodo_calculo").$type<"margen" | "recargo">().notNull().default("margen"),
   stockActual: numeric("stock_actual", { precision: 18, scale: 3 }),
+  stockReservado: numeric("stock_reservado", { precision: 18, scale: 3 }).notNull().default("0"),
   stockCritico: numeric("stock_critico", { precision: 18, scale: 3 }).notNull().default("0"),
   unidadMedida: text("unidad_medida").notNull().default("unidad"),
   activo: boolean("activo").notNull().default(true),

@@ -97,6 +97,8 @@ export default function NewCobro() {
   const decimalesEfectivos = decimalesPref(prefs);
   const [lineas, setLineas] = useState<LineaCatalogo[]>([]);
   const totalItems = totalLineas(lineas, decimalesEfectivos);
+  const [requiereDespacho, setRequiereDespacho] = useState(false);
+  const tieneProductosFisicos = lineas.some(l => l.tipo === "producto");
 
   const [monedaDoc, setMonedaDoc] = useState<Moneda>("CLP");
   const [ivaDoc, setIvaDoc] = useState("19");
@@ -222,6 +224,7 @@ export default function NewCobro() {
       responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
       areaId: values.areaId || undefined,
       ...(fromCotizacionId ? { cotizacionId: Number(fromCotizacionId) } : {}),
+      requiereDespacho: tieneProductosFisicos && requiereDespacho,
     };
 
     if (modoAvanzado !== "individual") {
@@ -614,6 +617,27 @@ export default function NewCobro() {
               }}
             />
           </div>
+
+          {/* ── Requiere despacho ───────────────────────────────────────── */}
+          {tieneProductosFisicos && (
+            <div className="border-x border-border px-5 py-3 bg-muted/30 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">¿Requiere guía de despacho?</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Al activar, el stock se <strong>reserva</strong> al pagar (no descuenta). Se descuenta definitivamente cuando se entregue la guía.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={requiereDespacho}
+                onClick={() => setRequiereDespacho(v => !v)}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${requiereDespacho ? "bg-primary" : "bg-input"}`}
+              >
+                <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${requiereDespacho ? "translate-x-5" : "translate-x-0"}`} />
+              </button>
+            </div>
+          )}
 
           {/* ── Totales + comentario ─────────────────────────────────────── */}
           <div className="border border-t-0 border-border rounded-b-xl bg-card">

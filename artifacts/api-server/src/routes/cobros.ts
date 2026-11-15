@@ -300,6 +300,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
   const responsableIdInput = (parsed.data as Record<string, unknown>).responsableId as string | undefined;
   const areaId = (parsed.data as Record<string, unknown>).areaId as number | undefined;
   const cotizacionId = (req.body as Record<string, unknown>).cotizacionId as number | undefined;
+  const requiereDespacho = (req.body as Record<string, unknown>).requiereDespacho === true;
   const user = req.isAuthenticated() ? req.user : null;
 
   try {
@@ -393,6 +394,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
         emailPagador: emailPagador ?? null,
         fechaVencimiento: fechaVencimiento ?? null,
         cotizacionId: cotizacionId ?? null,
+        requiereDespacho,
       })
       .returning();
     cobro.numeroDocumento = `${prefs.prefijoCobro}${String(cobro.id).padStart(4, "0")}`;
@@ -434,6 +436,7 @@ const CobroAvanzadoBaseBody = z.object({
   automatizacion: z.enum(["ninguna", "simple", "workflow"]).default("ninguna"),
   workflowId: z.number().int().positive().optional(),
   canalesIniciales: z.array(z.enum(["email", "whatsapp"])).default([]),
+  requiereDespacho: z.boolean().default(false),
   idempotencyKey: z.string().uuid(),
 });
 

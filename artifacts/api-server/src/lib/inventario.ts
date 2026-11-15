@@ -126,10 +126,12 @@ export function serializeProducto(p: Producto) {
   const sugerido = Number(p.precioCalculado ?? 0);
   const calculadoNeto = p.precioCalculadoNeto != null ? Number(p.precioCalculadoNeto) : p.incluyeIvaPrecio ? sugerido / (1 + iva / 100) : sugerido;
   const stock = p.stockActual == null ? null : Number(p.stockActual);
+  const reservado = Number(p.stockReservado ?? 0);
+  const disponible = stock == null ? null : Math.max(stock - reservado, 0);
   return {
     ...p, codigoInterno: p.codigoInterno || `PROD-${String(p.id).padStart(4, "0")}`, costoUnitario: costo, precioUnitario: precio,
     margenPorcentaje: Number(p.margenPorcentaje),
-    stockActual: stock, stockCritico: Number(p.stockCritico),
+    stockActual: stock, stockReservado: reservado, stockDisponible: disponible, stockCritico: Number(p.stockCritico),
     tarifaHora: p.tarifaHora == null ? null : Number(p.tarifaHora),
     tiempoEstimadoHoras: p.tiempoEstimadoHoras == null ? null : Number(p.tiempoEstimadoHoras),
     factorFactibilidad: p.factorFactibilidad == null ? null : Number(p.factorFactibilidad),
@@ -139,34 +141,81 @@ export function serializeProducto(p: Producto) {
     pvpNeto, pvpUtilidad: pvpNeto == null ? null : pvpNeto - costo,
     pvpMargen: pvpNeto == null || pvpNeto <= 0 ? null : (pvpNeto - costo) / pvpNeto * 100,
     utilidad: neto - costo, margenReal: neto > 0 ? ((neto - costo) / neto) * 100 : 0,
-    estadoStock: stock == null ? "no_aplica" : stock <= 0 ? "agotado" : stock <= Number(p.stockCritico) ? "critico" : "normal",
+    estadoStock: disponible == null ? "no_aplica" : disponible <= 0 ? "agotado" : disponible <= Number(p.stockCritico) ? "critico" : "normal",
     creadoEn: p.creadoEn.toISOString(), actualizadoEn: p.actualizadoEn.toISOString(),
   };
 }
 
-// Descuenta stock de los productos de tipo "producto" al concretar una venta
-// (cobro pagado o guía de despacho entregada). Solo afecta productos que tienen
-// stockActual configurado (no null) — servicios se ignoran. Idempotente dentro
-// de una transacción: si el stock ya llegó a 0, se detiene en 0 (nunca negativo).
-export async function descontarStockPorItems(
-  items: { productoId: number; cantidad: number; tipo?: string }[],
-): Promise<void> {
-  const productosItems = items.filter(i => i.tipo !== "servicio" && i.cantidad > 0);
-  if (!productosItems.length) return;
-  for (const item of productosItems) {
+// ─── Stock helpers ──────────────────────────────────────────────────────────
+// Three operations model the full reservation lifecycle:
+//
+//  1. reservarStock   — cobro pagado CON despacho pendiente
+//                       stockReservado += cantidad  (stockActual unchanged)
+//
+//  2. confirmarStock  — guía entregada que tenía cobro asociado
+//                       stockActual -= cantidad  AND  stockReservado -= cantidad
+//
+//  3. descontarStockDirecto — cobro pagado SIN despacho, o guía sin cobro
+//                       stockActual -= cantidad  (no reservation involved)
+//
+// All three use GREATEST(..., 0) to prevent negatives and skip servicios.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type StockItem = { productoId: number; cantidad: number; tipo?: string };
+
+function filterProductos(items: StockItem[]) {
+  return items.filter(i => i.tipo !== "servicio" && i.cantidad > 0);
+}
+
+/** Cobro pagado + requiereDespacho=true → incrementa stockReservado */
+export async function reservarStock(items: StockItem[]): Promise<void> {
+  const rows = filterProductos(items);
+  if (!rows.length) return;
+  for (const item of rows) {
+    await db
+      .update(productosTable)
+      .set({
+        stockReservado: sql`COALESCE(${productosTable.stockReservado}, 0) + ${String(item.cantidad)}`,
+        actualizadoEn: new Date(),
+      })
+      .where(and(eq(productosTable.id, item.productoId), eq(productosTable.tipo, "producto")));
+  }
+}
+
+/** Guía entregada con cobroId → decrementa stockActual Y stockReservado */
+export async function confirmarStock(items: StockItem[]): Promise<void> {
+  const rows = filterProductos(items);
+  if (!rows.length) return;
+  for (const item of rows) {
+    await db
+      .update(productosTable)
+      .set({
+        stockActual: sql`GREATEST(COALESCE(${productosTable.stockActual}, 0) - ${String(item.cantidad)}, 0)`,
+        stockReservado: sql`GREATEST(COALESCE(${productosTable.stockReservado}, 0) - ${String(item.cantidad)}, 0)`,
+        actualizadoEn: new Date(),
+      })
+      .where(and(eq(productosTable.id, item.productoId), eq(productosTable.tipo, "producto")));
+  }
+}
+
+/** Cobro pagado sin despacho, o guía sin cobro → decrementa solo stockActual */
+export async function descontarStockDirecto(items: StockItem[]): Promise<void> {
+  const rows = filterProductos(items);
+  if (!rows.length) return;
+  for (const item of rows) {
     await db
       .update(productosTable)
       .set({
         stockActual: sql`GREATEST(COALESCE(${productosTable.stockActual}, 0) - ${String(item.cantidad)}, 0)`,
         actualizadoEn: new Date(),
       })
-      .where(
-        and(
-          eq(productosTable.id, item.productoId),
-          eq(productosTable.tipo, "producto"),
-        ),
-      );
+      .where(and(eq(productosTable.id, item.productoId), eq(productosTable.tipo, "producto")));
   }
+}
+
+/** @deprecated Usar reservarStock / confirmarStock / descontarStockDirecto */
+export async function descontarStockPorItems(items: StockItem[]): Promise<void> {
+  return descontarStockDirecto(items);
 }
 
 export async function resolveItemsInventario(userId: string, input: unknown, monto: unknown, moneda = "CLP", decimales = 0): Promise<ItemInventarioSnapshot[]> {

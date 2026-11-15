@@ -271,7 +271,11 @@ export default function InventarioPage() {
             </div>
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
               <span><span className="text-muted-foreground">Precio </span><span className="font-mono font-semibold">{pm(seleccionado.precioUnitario, seleccionado.moneda)}</span></span>
-              {seleccionado.tipo === "producto" && <span><span className="text-muted-foreground">Stock total </span><span className="font-mono font-semibold">{formatQty(seleccionado.stockActual ?? 0)} {seleccionado.unidadMedida || "unidad"}</span></span>}
+              {seleccionado.tipo === "producto" && <>
+                <span><span className="text-muted-foreground">Stock físico </span><span className="font-mono font-semibold">{formatQty(seleccionado.stockActual ?? 0)} {seleccionado.unidadMedida || "unidad"}</span></span>
+                {(seleccionado.stockReservado ?? 0) > 0 && <span><span className="text-muted-foreground">Reservado </span><span className="font-mono font-semibold text-amber-600">{formatQty(seleccionado.stockReservado ?? 0)}</span></span>}
+                {(seleccionado.stockReservado ?? 0) > 0 && <span><span className="text-muted-foreground">Disponible </span><span className="font-mono font-semibold text-emerald-600">{formatQty(seleccionado.stockDisponible ?? 0)}</span></span>}
+              </>}
               <EstadoStockBadge estado={estadoVisual(seleccionado)} />
             </div>
             {(seleccionado.ubicaciones ?? []).length > 0 && (
@@ -379,6 +383,11 @@ export default function InventarioPage() {
                             {p.tipo === "servicio" ? <span className="text-muted-foreground/50">—</span> : (
                               <span className={alerta ? "text-red-700 font-bold" : ""}>
                                 {formatQty(p.stockActual ?? 0)}
+                                {(p.stockReservado ?? 0) > 0 && (
+                                  <span className="block text-[10px] text-amber-600 font-sans">
+                                    res. {formatQty(p.stockReservado ?? 0)} · disp. {formatQty(p.stockDisponible ?? 0)}
+                                  </span>
+                                )}
                                 <span className="block text-[10px] text-muted-foreground font-sans">{p.unidadMedida || "un"} · {(p.ubicaciones?.length ?? 0) > 0 ? "mín. por bodega" : `mín ${formatQty(p.stockCritico)}`}</span>
                               </span>
                             )}

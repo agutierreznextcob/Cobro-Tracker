@@ -11,7 +11,7 @@ import { sendComprobanteEmail } from "./email";
 import { getRemitenteContacto } from "./org";
 import { crearYEnviarEncuesta } from "./encuestas-service";
 import { crearNotificacion } from "./notificaciones-service";
-import { descontarStockPorItems } from "./inventario";
+import { reservarStock, descontarStockDirecto } from "./inventario";
 
 interface Logger {
   info: (obj: object, msg: string) => void;
@@ -69,11 +69,15 @@ export async function emitirComprobante(
     // per cobro across every paid path (manual, abono, webhook, workflow).
     void crearYEnviarEncuesta(cobro.id, log);
 
-    // Decrement stock for every producto item in this cobro. Fire-and-forget;
-    // uses GREATEST(..., 0) so stock never goes negative.
-    void descontarStockPorItems(
-      (cobro.itemsInventario as { productoId: number; cantidad: number; tipo?: string }[] | null) ?? [],
-    );
+    // Stock management: if the cobro requires a despacho (physical delivery), only
+    // *reserve* the stock — the actual decrement happens when the guía is delivered.
+    // Otherwise decrement immediately (services, in-person delivery, digital products).
+    const stockItems = (cobro.itemsInventario as { productoId: number; cantidad: number; tipo?: string }[] | null) ?? [];
+    if (cobro.requiereDespacho) {
+      void reservarStock(stockItems);
+    } else {
+      void descontarStockDirecto(stockItems);
+    }
 
     const montoDescuento = Number(cobro.montoDescuento ?? 0);
     const montoTotal = Number(cobro.monto) - montoDescuento;

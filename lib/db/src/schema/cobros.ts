@@ -99,6 +99,10 @@ export const cobrosTable = pgTable("cobros", {
   // The generation date is separate from the due date: a recurring charge is
   // generated on the previous due date and itself falls due next period.
   recurrenteFechaCiclo: date("recurrente_fecha_ciclo", { mode: "string" }),
+  // When true, paying this cobro only *reserves* stock (stockReservado +=) instead
+  // of immediately decrementing stockActual. The actual decrement happens when the
+  // associated guía de despacho is marked as "entregada".
+  requiereDespacho: boolean("requiere_despacho").notNull().default(false),
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   actualizadoEn: timestamp("actualizado_en").notNull().defaultNow(),
 }, (table) => [
