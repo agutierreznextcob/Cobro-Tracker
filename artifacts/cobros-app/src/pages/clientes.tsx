@@ -197,11 +197,10 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
                       variant="outline"
                       size="sm"
                       className="shrink-0 gap-1.5 px-3"
-                      onClick={buscarEnSii}
-                      disabled={buscandoRut}
-                      title="Buscar razón social y giro en el SII"
+                      disabled={true}
+                      title="Búsqueda por RUT disponible próximamente (requiere certificación DTE)"
                     >
-                      {buscandoRut ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCheck className="h-4 w-4" />}
+                      <SearchCheck className="h-4 w-4" />
                       <span className="hidden sm:inline">SII</span>
                     </Button>
                   </div>
