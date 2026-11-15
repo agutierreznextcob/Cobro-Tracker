@@ -140,20 +140,22 @@ function ImportarProductosButton({ onImported }: { onImported: () => void }) {
           e.target.value = "";
         }}
       />
-      <Button variant="outline" size="sm" className="gap-1.5" onClick={descargarPlantillaProductos}>
-        <Download className="h-4 w-4" />
-        Descargar plantilla Excel
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5"
-        disabled={importando}
-        onClick={() => inputRef.current?.click()}
-      >
-        {importando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-        Importar productos
-      </Button>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={descargarPlantillaProductos}>
+          <Download className="h-4 w-4" />
+          Descargar plantilla Excel
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          disabled={importando}
+          onClick={() => inputRef.current?.click()}
+        >
+          {importando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          Importar productos
+        </Button>
+      </div>
 
       <Dialog open={resultado != null} onOpenChange={(o) => !o && setResultado(null)}>
         <DialogContent className="sm:max-w-md">
