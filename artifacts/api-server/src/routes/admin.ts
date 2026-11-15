@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, cobrosTable, organizacionesTable, cobrosEliminadosTable, pagosSuscripcionTable, trialExtensionesTable } from "@workspace/db";
+import { db, usersTable, cobrosTable, organizacionesTable, cobrosEliminadosTable, pagosSuscripcionTable, trialExtensionesTable, invitacionesTable } from "@workspace/db";
 import { leerUltimaEjecucionSweep } from "../lib/salud-cartera";
 import type { CobroEliminado } from "@workspace/db";
 import { eq, sql, isNull, desc, or, ilike } from "drizzle-orm";
@@ -790,6 +790,48 @@ adminRouter.get("/admin/cobros-eliminados", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error listing deleted cobros");
     res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Anonymise / GDPR-delete a user account: wipes PII and frees the email.
+// Does NOT delete cobros or business data — only personal identifiers.
+// Cannot be used on the superadmin account itself.
+adminRouter.delete("/admin/usuarios/:id", async (req, res) => {
+  const { id } = req.params;
+  const adminId = req.user!.id;
+  if (id === adminId) {
+    res.status(400).json({ ok: false, mensaje: "No puedes eliminar tu propia cuenta de administrador." });
+    return;
+  }
+  try {
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!u) {
+      res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" });
+      return;
+    }
+    if (u.role === "admin") {
+      res.status(400).json({ ok: false, mensaje: "No se puede eliminar una cuenta de administrador de plataforma." });
+      return;
+    }
+    // Cancel any pending invitations for this org
+    if (u.organizationId) {
+      await db.delete(invitacionesTable).where(eq(invitacionesTable.organizationId, u.organizationId));
+    }
+    // Anonymise the user: wipe PII, free the email, deactivate
+    const anonEmail = `deleted_${id}@deleted.nextcob.com`;
+    await db.update(usersTable).set({
+      email: anonEmail,
+      firstName: "Cuenta",
+      lastName: "Eliminada",
+      rut: null,
+      phone: null,
+      activo: false,
+      updatedAt: new Date(),
+    }).where(eq(usersTable.id, id));
+    res.json({ ok: true, mensaje: "Cuenta anonimizada correctamente. El email ha sido liberado." });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting user account");
+    res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
   }
 });
 

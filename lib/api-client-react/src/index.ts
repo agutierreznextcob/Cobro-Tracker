@@ -78,6 +78,16 @@ export function useActualizarPacksUsuarios() {
   });
 }
 
+export function useEliminarCuentaAdmin() {
+  return useMutation({
+    mutationFn: (userId: string) =>
+      customFetch<{ ok: boolean; mensaje: string }>(
+        `/api/admin/usuarios/${userId}`,
+        { method: "DELETE", responseType: "json" },
+      ),
+  });
+}
+
 export function useActualizarOrgRole() {
   return useMutation({
     mutationFn: ({ userId, orgRole }: { userId: string; orgRole: "admin_org" | "supervisor" | "ejecutivo" }) =>

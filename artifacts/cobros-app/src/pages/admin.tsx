@@ -12,6 +12,7 @@ import {
   useReclamarCobrosHuerfanos,
   useActualizarPacksUsuarios,
   useActualizarOrgRole,
+  useEliminarCuentaAdmin,
   useListAdminTrialExtensiones,
   getListAdminTrialExtensionesQueryKey,
   getListAdminUsuariosQueryKey,
@@ -51,6 +52,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
   Shield,
   Mail,
   MessageCircle,
@@ -68,6 +76,10 @@ import {
   Headset,
   Copy,
   Webhook,
+  UserX,
+  KeyRound,
+  RefreshCw,
+  ChevronRight,
 } from "lucide-react";
 
 function formatFecha(iso: string | null): string {
@@ -186,7 +198,101 @@ function MetricCard({
   );
 }
 
-function CuentaActions({ u }: { u: AdminUsuario }) {
+function CuentaDetalleSheet({ u, open, onClose }: { u: AdminUsuario | null; open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const eliminarCuenta = useEliminarCuentaAdmin();
+  const [confirmEliminar, setConfirmEliminar] = useState(false);
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: getListAdminUsuariosQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetAdminMetricasQueryKey() });
+  };
+
+  const handleEliminar = () => {
+    if (!u) return;
+    eliminarCuenta.mutate(u.id, {
+      onSuccess: (res) => {
+        toast({ title: res.ok ? "Cuenta eliminada" : "Error", description: res.mensaje, variant: res.ok ? "default" : "destructive" });
+        if (res.ok) { setConfirmEliminar(false); onClose(); refresh(); }
+      },
+      onError: () => toast({ title: "Error", description: "No se pudo eliminar la cuenta.", variant: "destructive" }),
+    });
+  };
+
+  if (!u) return null;
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) { setConfirmEliminar(false); onClose(); } }}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader className="mb-4">
+          <SheetTitle className="flex items-center gap-2">
+            <EstadoBadge u={u} />
+            <span>{u.nombre || "Sin nombre"}</span>
+          </SheetTitle>
+          <SheetDescription asChild>
+            <div className="text-sm text-muted-foreground space-y-0.5">
+              <p>{u.email || "Sin email"}</p>
+              <p className="font-mono text-xs">{u.accountId || "—"}</p>
+            </div>
+          </SheetDescription>
+        </SheetHeader>
+
+        {/* Info grid */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          {[
+            { label: "RUT", value: u.rut || "—" },
+            { label: "Plan", value: u.planNombre ?? "NextCob" },
+            { label: "Vencimiento", value: u.vencimiento ? formatFecha(u.vencimiento) : "Sin vencimiento" },
+            { label: "Usuarios", value: u.isAdmin ? "—" : `${1 + u.usuariosExtra}${u.usuariosExtra > 0 ? ` (+${u.usuariosExtra})` : ""}` },
+            { label: "Plan mensual", value: u.isAdmin || u.esDemo ? "—" : formatCLP(u.montoMensual) },
+            { label: "Total recaudado", value: u.isAdmin ? "—" : formatCLP(u.totalRecaudado) },
+            { label: "Último pago", value: u.ultimoPagoEn ? `${formatFecha(u.ultimoPagoEn)}${u.ultimoPagoMonto != null ? ` · ${formatCLP(u.ultimoPagoMonto)}` : ""}` : "—" },
+            { label: "Próximo cobro", value: u.proximoCobroEn ? formatFecha(u.proximoCobroEn) : "—" },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-muted/40 rounded-lg p-3">
+              <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+              <p className="text-sm font-medium">{value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Acciones */}
+        {!u.isAdmin && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Acciones</p>
+            <CuentaActions u={u} onDone={onClose} />
+
+            {/* Eliminar cuenta — GDPR */}
+            <div className="border-t pt-4 mt-4">
+              <p className="text-xs text-muted-foreground mb-2">Zona de peligro — Ley 19.628 / GDPR</p>
+              {!confirmEliminar ? (
+                <Button variant="destructive" size="sm" className="w-full" onClick={() => setConfirmEliminar(true)}>
+                  <UserX className="h-4 w-4 mr-1.5" />
+                  Eliminar cuenta y liberar email
+                </Button>
+              ) : (
+                <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                  <p className="text-sm font-medium text-destructive">¿Confirmar eliminación?</p>
+                  <p className="text-xs text-muted-foreground">Se anonimizarán los datos personales (nombre, email, RUT, teléfono) y se desactivará la cuenta. Los cobros e historial se conservan para efectos contables. Esta acción no se puede deshacer.</p>
+                  <div className="flex gap-2 mt-2">
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => setConfirmEliminar(false)}>Cancelar</Button>
+                    <Button variant="destructive" size="sm" className="flex-1" onClick={handleEliminar} disabled={eliminarCuenta.isPending}>
+                      {eliminarCuenta.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                      Sí, eliminar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function CuentaActions({ u, onDone }: { u: AdminUsuario; onDone?: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const sendEmail = useSendAdminRecordatorioEmail();
@@ -424,86 +530,48 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
   }
 
   return (
-    <div className="flex items-center justify-end gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        className="gap-1.5"
-        onClick={handleEmail}
-        disabled={sendingEmail}
-      >
-        {sendingEmail ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Mail className="h-3.5 w-3.5" />
-        )}
-        Email
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        className="gap-1.5"
-        onClick={() =>
-          window.open(
-            buildWhatsappRenovacionUrl(u),
-            "_blank",
-            "noopener,noreferrer",
-          )
-        }
-      >
-        <MessageCircle className="h-3.5 w-3.5" />
-        WhatsApp
-      </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="outline" disabled={busy}>
-            {busy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <MoreHorizontal className="h-3.5 w-3.5" />
-            )}
+    <div className="space-y-1.5">
+      <div className="grid grid-cols-2 gap-1.5">
+        <Button size="sm" variant="outline" className="gap-1.5 w-full" onClick={handleEmail} disabled={sendingEmail}>
+          {sendingEmail ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+          Email
+        </Button>
+        <Button size="sm" variant="outline" className="gap-1.5 w-full" onClick={() => window.open(buildWhatsappRenovacionUrl(u), "_blank", "noopener,noreferrer")}>
+          <MessageCircle className="h-3.5 w-3.5" />
+          WhatsApp
+        </Button>
+        <Button size="sm" variant="outline" className="gap-1.5 w-full" onClick={abrirExtender} disabled={busy}>
+          <CalendarPlus className="h-3.5 w-3.5" />
+          Extender trial
+        </Button>
+        <Button size="sm" variant="outline" className="gap-1.5 w-full" onClick={() => handleDemo(!u.esDemo)} disabled={busy}>
+          <Star className="h-3.5 w-3.5" />
+          {u.esDemo ? "Quitar demo" : "Marcar demo"}
+        </Button>
+        <Button size="sm" variant="outline" className="gap-1.5 w-full" onClick={() => { setOrgRoleInput((u as any).orgRole ?? "admin_org"); setOrgRoleOpen(true); }} disabled={busy}>
+          <KeyRound className="h-3.5 w-3.5" />
+          Rol en org
+        </Button>
+        <Button size="sm" variant="outline" className="gap-1.5 w-full" onClick={() => { setPacksInput(String(u.usuariosExtra ?? 0)); setPacksOpen(true); }} disabled={busy}>
+          <Users className="h-3.5 w-3.5" />
+          Usuarios extra ({u.usuariosExtra ?? 0})
+        </Button>
+        <Button size="sm" variant="outline" className="gap-1.5 w-full col-span-2" onClick={handleReclamarCobros} disabled={busy}>
+          <RefreshCw className="h-3.5 w-3.5" />
+          Reasignar cobros sin dueño
+        </Button>
+        {u.activo ? (
+          <Button size="sm" variant="outline" className="gap-1.5 w-full col-span-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDesactivar} disabled={busy}>
+            <Ban className="h-3.5 w-3.5" />
+            Desactivar cuenta
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={abrirExtender}>
-            <CalendarPlus className="h-4 w-4 mr-2" />
-            Extender trial
-          </DropdownMenuItem>
-          {u.esDemo ? (
-            <DropdownMenuItem onClick={() => handleDemo(false)}>
-              <Star className="h-4 w-4 mr-2" />
-              Quitar cuenta demo
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={() => handleDemo(true)}>
-              <Star className="h-4 w-4 mr-2" />
-              Marcar como demo
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onClick={() => { setOrgRoleInput((u as any).orgRole ?? "admin_org"); setOrgRoleOpen(true); }}>
-            Rol en org
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => { setPacksInput(String(u.usuariosExtra ?? 0)); setPacksOpen(true); }}>
-            <Users className="h-4 w-4 mr-2" />
-            Usuarios extra ({u.usuariosExtra ?? 0})
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleReclamarCobros}>
-            <Users className="h-4 w-4 mr-2" />
-            Reasignar cobros sin dueño
-          </DropdownMenuItem>
-          {u.activo ? (
-            <DropdownMenuItem onClick={handleDesactivar} className="text-destructive">
-              <Ban className="h-4 w-4 mr-2" />
-              Desactivar cuenta
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={handleActivar}>
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Activar cuenta
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        ) : (
+          <Button size="sm" variant="outline" className="gap-1.5 w-full col-span-2" onClick={handleActivar} disabled={busy}>
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Activar cuenta
+          </Button>
+        )}
+      </div>
 
       <Dialog open={extenderOpen} onOpenChange={setExtenderOpen}>
         <DialogContent className="sm:max-w-md">
@@ -651,6 +719,7 @@ function CuentaActions({ u }: { u: AdminUsuario }) {
 
 export default function AdminPage() {
   const [busqueda, setBusqueda] = useState("");
+  const [selectedCuenta, setSelectedCuenta] = useState<AdminUsuario | null>(null);
   // Debounce so we don't hit the server on every keystroke; the search itself
   // runs server-side (accountId/email/RUT/nombre) so the panel stays fast with
   // many accounts.
@@ -788,19 +857,21 @@ export default function AdminPage() {
                     <TableHead className="text-right">Usuarios</TableHead>
                     <TableHead className="text-right">Plan mensual</TableHead>
                     <TableHead className="text-right">Recaudado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead className="w-8"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {usuariosFiltrados.map((u) => (
                     <TableRow
                       key={u.id}
+                      onClick={() => setSelectedCuenta(u)}
                       className={
-                        !u.activo
+                        "cursor-pointer " +
+                        (!u.activo
                           ? "opacity-60"
                           : u.requiereRecordatorio
                             ? "bg-amber-500/5"
-                            : undefined
+                            : "")
                       }
                     >
                       <TableCell className="font-mono text-xs whitespace-nowrap font-semibold text-primary">
@@ -874,7 +945,7 @@ export default function AdminPage() {
                         {u.isAdmin ? "—" : formatCLP(u.totalRecaudado)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <CuentaActions u={u} />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -888,6 +959,12 @@ export default function AdminPage() {
       <TrialExtensionesSection />
 
       <ConsultoresSection />
+
+      <CuentaDetalleSheet
+        u={selectedCuenta}
+        open={!!selectedCuenta}
+        onClose={() => setSelectedCuenta(null)}
+      />
     </div>
   );
 }
