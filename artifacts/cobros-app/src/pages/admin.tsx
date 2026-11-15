@@ -13,6 +13,7 @@ import {
   useActualizarPacksUsuarios,
   useActualizarOrgRole,
   useEliminarCuentaAdmin,
+  useCrearOrgAdmin,
   useListAdminTrialExtensiones,
   getListAdminTrialExtensionesQueryKey,
   getListAdminUsuariosQueryKey,
@@ -202,6 +203,7 @@ function CuentaDetalleSheet({ u, open, onClose }: { u: AdminUsuario | null; open
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const eliminarCuenta = useEliminarCuentaAdmin();
+  const crearOrg = useCrearOrgAdmin();
   const [confirmEliminar, setConfirmEliminar] = useState(false);
 
   const refresh = () => {
@@ -256,6 +258,35 @@ function CuentaDetalleSheet({ u, open, onClose }: { u: AdminUsuario | null; open
             </div>
           ))}
         </div>
+
+        {/* Alerta: sin organización */}
+        {!u.isAdmin && !u.organizationId && (
+          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Sin organización</p>
+            <p className="text-xs text-muted-foreground">Esta cuenta no tiene organización creada. No puede invitar usuarios hasta que se cree una.</p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              disabled={crearOrg.isPending}
+              onClick={() => {
+                crearOrg.mutate(u.id, {
+                  onSuccess: (res) => {
+                    toast({ title: res.ok ? "Organización creada" : "Error", description: res.mensaje, variant: res.ok ? "default" : "destructive" });
+                    if (res.ok) {
+                      queryClient.invalidateQueries({ queryKey: getListAdminUsuariosQueryKey() });
+                      onClose();
+                    }
+                  },
+                  onError: () => toast({ title: "Error", description: "No se pudo crear la organización.", variant: "destructive" }),
+                });
+              }}
+            >
+              {crearOrg.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Crear organización
+            </Button>
+          </div>
+        )}
 
         {/* Acciones */}
         {!u.isAdmin && (

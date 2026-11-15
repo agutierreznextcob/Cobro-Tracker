@@ -5,7 +5,7 @@ import type { CobroEliminado } from "@workspace/db";
 import { eq, sql, isNull, desc, or, ilike } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { computeSubscriptionState } from "../lib/subscription";
-import { computePricing } from "../lib/org";
+import { computePricing, createSoloOrganization, backfillUserOrgRecords } from "../lib/org";
 import { normalizarPacks } from "../lib/plans";
 import { sendRenovacionEmail, sendTrialExtendidoEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
@@ -106,6 +106,7 @@ interface EnrichedUsuario {
   ultimoPagoEn: string | null;
   ultimoPagoMonto: number | null;
   proximoCobroEn: string | null;
+  organizationId: number | null;
 }
 
 // Optional server-side search: case-insensitive substring match over account ID
@@ -202,6 +203,7 @@ async function buildUsuarios(q?: string): Promise<EnrichedUsuario[]> {
         ultimoPagoMonto: ultimoPago.get(u.id)?.montoTotal ?? null,
         proximoCobroEn:
           (state.status === "activa" && state.tieneSuscripcion) ? state.periodEnd : null,
+        organizationId: u.organizationId ?? null,
       };
     })
     .sort((a, b) => {
@@ -638,6 +640,26 @@ adminRouter.post("/admin/usuarios/:id/org-role", async (req, res) => {
     res.json({ ok: true, mensaje: `Rol actualizado a ${orgRole}.`, orgRole });
   } catch (err) {
     req.log.error({ err }, "Error updating orgRole");
+    res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+});
+
+// Creates a solo organization for a user that has none (fixes accounts that
+// missed auto-provisioning on first login). Idempotent: no-op if already has org.
+adminRouter.post("/admin/usuarios/:id/crear-org", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!u) { res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" }); return; }
+    if (u.organizationId != null) {
+      res.json({ ok: true, mensaje: `La cuenta ya tiene organización (id: ${u.organizationId}). No se hizo nada.`, organizationId: u.organizationId });
+      return;
+    }
+    const organizationId = await createSoloOrganization(u);
+    await backfillUserOrgRecords(id, organizationId);
+    res.json({ ok: true, mensaje: "Organización creada correctamente. El usuario ahora puede invitar personas.", organizationId });
+  } catch (err) {
+    req.log.error({ err }, "Error creating org for user");
     res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
   }
 });

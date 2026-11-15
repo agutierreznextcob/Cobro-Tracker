@@ -1106,6 +1106,8 @@ export interface AdminUsuario {
      * @nullable
      */
   proximoCobroEn: string | null;
+  /** @nullable */
+  organizationId: number | null;
 }
 
 export interface AdminMetricas {

@@ -88,6 +88,16 @@ export function useEliminarCuentaAdmin() {
   });
 }
 
+export function useCrearOrgAdmin() {
+  return useMutation({
+    mutationFn: (userId: string) =>
+      customFetch<{ ok: boolean; mensaje: string; organizationId?: number }>(
+        `/api/admin/usuarios/${userId}/crear-org`,
+        { method: "POST", responseType: "json" },
+      ),
+  });
+}
+
 export function useActualizarOrgRole() {
   return useMutation({
     mutationFn: ({ userId, orgRole }: { userId: string; orgRole: "admin_org" | "supervisor" | "ejecutivo" }) =>
