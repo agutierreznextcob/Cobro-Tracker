@@ -1,5 +1,5 @@
 import { db, productosTable, type Producto, type ItemInventarioSnapshot } from "@workspace/db";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getOrgContext } from "./org";
 import { roundMoney } from "./preferencias";
@@ -142,6 +142,31 @@ export function serializeProducto(p: Producto) {
     estadoStock: stock == null ? "no_aplica" : stock <= 0 ? "agotado" : stock <= Number(p.stockCritico) ? "critico" : "normal",
     creadoEn: p.creadoEn.toISOString(), actualizadoEn: p.actualizadoEn.toISOString(),
   };
+}
+
+// Descuenta stock de los productos de tipo "producto" al concretar una venta
+// (cobro pagado o guía de despacho entregada). Solo afecta productos que tienen
+// stockActual configurado (no null) — servicios se ignoran. Idempotente dentro
+// de una transacción: si el stock ya llegó a 0, se detiene en 0 (nunca negativo).
+export async function descontarStockPorItems(
+  items: { productoId: number; cantidad: number; tipo?: string }[],
+): Promise<void> {
+  const productosItems = items.filter(i => i.tipo !== "servicio" && i.cantidad > 0);
+  if (!productosItems.length) return;
+  for (const item of productosItems) {
+    await db
+      .update(productosTable)
+      .set({
+        stockActual: sql`GREATEST(COALESCE(${productosTable.stockActual}, 0) - ${String(item.cantidad)}, 0)`,
+        actualizadoEn: new Date(),
+      })
+      .where(
+        and(
+          eq(productosTable.id, item.productoId),
+          eq(productosTable.tipo, "producto"),
+        ),
+      );
+  }
 }
 
 export async function resolveItemsInventario(userId: string, input: unknown, monto: unknown, moneda = "CLP", decimales = 0): Promise<ItemInventarioSnapshot[]> {

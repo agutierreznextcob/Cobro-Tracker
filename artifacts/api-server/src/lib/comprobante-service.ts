@@ -11,6 +11,7 @@ import { sendComprobanteEmail } from "./email";
 import { getRemitenteContacto } from "./org";
 import { crearYEnviarEncuesta } from "./encuestas-service";
 import { crearNotificacion } from "./notificaciones-service";
+import { descontarStockPorItems } from "./inventario";
 
 interface Logger {
   info: (obj: object, msg: string) => void;
@@ -67,6 +68,12 @@ export async function emitirComprobante(
     // forget and idempotent (unique on encuestas.cobroId), so it runs at most once
     // per cobro across every paid path (manual, abono, webhook, workflow).
     void crearYEnviarEncuesta(cobro.id, log);
+
+    // Decrement stock for every producto item in this cobro. Fire-and-forget;
+    // uses GREATEST(..., 0) so stock never goes negative.
+    void descontarStockPorItems(
+      (cobro.itemsInventario as { productoId: number; cantidad: number; tipo?: string }[] | null) ?? [],
+    );
 
     const montoDescuento = Number(cobro.montoDescuento ?? 0);
     const montoTotal = Number(cobro.monto) - montoDescuento;

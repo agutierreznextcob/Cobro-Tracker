@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { db, guiasDespachoTable, guiaDespachoItemsTable, pedidosTable, pedidoItemsTable } from "@workspace/db";
 import { and, eq, desc } from "drizzle-orm";
 import { getOrgContext } from "../lib/org";
+import { descontarStockPorItems } from "../lib/inventario";
 import { getPreferenciasNegocio } from "../lib/preferencias";
 import { getEmpresaForScope, getEmpresaLogoBytes, documentScope } from "../lib/empresa";
 import PDFDocument from "pdfkit";
@@ -212,6 +213,20 @@ router.patch("/guias-despacho/:id/estado", action(async (req, res) => {
 
     return updated;
   });
+
+  // Descontar stock al entregar la guía. Fire-and-forget, fuera de la tx
+  // para no bloquearla. Usa GREATEST(..., 0) → nunca stock negativo.
+  if (estado === "entregada") {
+    const items = await db
+      .select({ productoId: guiaDespachoItemsTable.productoId, cantidad: guiaDespachoItemsTable.cantidad })
+      .from(guiaDespachoItemsTable)
+      .where(eq(guiaDespachoItemsTable.guiaId, guia.id));
+    void descontarStockPorItems(
+      items
+        .filter(i => i.productoId != null)
+        .map(i => ({ productoId: i.productoId!, cantidad: Number(i.cantidad) })),
+    );
+  }
 
   res.json(await serializeGuia(guia));
 }));
