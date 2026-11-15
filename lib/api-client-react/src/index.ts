@@ -57,3 +57,13 @@ export function useDeleteBodega() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: getListBodegasQueryKey() }); qc.invalidateQueries({ queryKey: getListLocalesQueryKey() }); },
   });
 }
+
+export function useResetMemberPassword() {
+  return useMutation({
+    mutationFn: (userId: string) =>
+      customFetch<{ ok: boolean; mensaje: string }>(`/api/organization/usuarios/${userId}/reset-password`, {
+        method: "POST",
+        responseType: "json",
+      }),
+  });
+}

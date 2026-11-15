@@ -15,9 +15,10 @@ import { requireOrgAdmin } from "../middlewares/requireOrgAdmin";
 import { requirePlanFeature, orgPuedeActivarMiembroTx } from "../middlewares/requirePlanFeature";
 import { getOrgContext, computePricing } from "../lib/org";
 import { normalizarPacks } from "../lib/plans";
-import { sendInvitacionEmail } from "../lib/email";
+import { sendInvitacionEmail, sendProvisionaryPasswordEmail } from "../lib/email";
 import { getPublicBaseUrl } from "../lib/flow-api";
 import { notificarInvitacionAceptada } from "../lib/notificaciones-service";
+import { hashPassword } from "../lib/password";
 
 const organizationRouter = Router();
 
@@ -1048,6 +1049,62 @@ organizationRouter.post("/invitaciones/:token/aceptar", async (req, res) => {
     res.json({ ok: true, mensaje: "Te uniste a la organización." });
   } catch (err) {
     req.log.error({ err }, "Error accepting invitacion");
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// --- Admin: reset password for a member (generates provisional password) ---
+organizationRouter.post("/organization/usuarios/:id/reset-password", requireOrgAdmin, async (req, res) => {
+  const targetId = req.params.id;
+  const adminId = req.user!.id;
+  try {
+    const ctx = await getOrgContext(adminId);
+    if (ctx.organizationId == null) {
+      res.status(404).json({ error: "Organización no encontrada" });
+      return;
+    }
+
+    const [target] = await db
+      .select({ id: usersTable.id, email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName, organizationId: usersTable.organizationId })
+      .from(usersTable)
+      .where(eq(usersTable.id, targetId));
+
+    if (!target || target.organizationId !== ctx.organizationId) {
+      res.status(404).json({ error: "Usuario no encontrado en tu organización" });
+      return;
+    }
+    if (target.id === adminId) {
+      res.status(400).json({ error: "Usa tu propio perfil para cambiar tu contraseña" });
+      return;
+    }
+
+    // Generate a provisional password: 3 words + 4 digits
+    const words = ["Colina", "Palma", "Nexo", "Cobro", "Torre", "Lima", "Mango", "Luna"];
+    const word = words[Math.floor(Math.random() * words.length)];
+    const digits = String(Math.floor(1000 + Math.random() * 9000));
+    const provisionalPassword = `${word}${digits}`;
+
+    const passwordHash = await hashPassword(provisionalPassword);
+    await db.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, targetId));
+
+    const [org] = await db.select({ nombre: organizacionesTable.nombre }).from(organizacionesTable).where(eq(organizacionesTable.id, ctx.organizationId));
+    const adminNombre = [req.user!.firstName, req.user!.lastName].filter(Boolean).join(" ") || req.user!.email || "El administrador";
+
+    if (target.email) {
+      sendProvisionaryPasswordEmail({
+        email: target.email,
+        nombre: [target.firstName, target.lastName].filter(Boolean).join(" ") || null,
+        provisionalPassword,
+        organizacionNombre: org?.nombre ?? "tu organización",
+        adminNombre,
+        loginUrl: `${getPublicBaseUrl()}/login`,
+      }, req.log).catch((err) => req.log.warn({ err }, "Error sending provisional password email"));
+    }
+
+    req.log.info({ targetId, adminId }, "Admin reset password for member");
+    res.json({ ok: true, mensaje: "Contraseña provisoria generada y enviada al usuario por correo." });
+  } catch (err) {
+    req.log.error({ err }, "Error resetting member password");
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

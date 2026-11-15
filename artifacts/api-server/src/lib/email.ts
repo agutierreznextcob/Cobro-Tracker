@@ -1166,3 +1166,55 @@ export async function sendEncuestaEmail(
   }
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// Email de contraseña provisoria (admin reseteó la contraseña de un miembro)
+// ---------------------------------------------------------------------------
+export interface ProvisionaryPasswordEmailData {
+  email: string;
+  nombre: string | null;
+  provisionalPassword: string;
+  organizacionNombre: string;
+  adminNombre: string;
+  loginUrl: string;
+}
+
+export async function sendProvisionaryPasswordEmail(
+  data: ProvisionaryPasswordEmailData,
+  log?: { warn: (obj: object, msg: string) => void },
+): Promise<EmailResult> {
+  const client = getResend();
+  if (!client) {
+    log?.warn({}, "RESEND_API_KEY not set — skipping provisional password email");
+    return { ok: false, error: "RESEND_API_KEY no está configurado." };
+  }
+
+  const saludo = data.nombre ? `Hola ${data.nombre}` : "Hola";
+
+  const { error } = await client.emails.send({
+    ...buildRemitente(),
+    to: [data.email],
+    subject: `Tu contraseña provisoria — ${data.organizacionNombre} en NextCob`,
+    html: buildEmailHtml({
+      title: "Contraseña provisoria",
+      previewText: `${data.adminNombre} generó una nueva contraseña provisoria para tu cuenta en NextCob.`,
+      heading: `${saludo}, aquí está tu contraseña provisoria 🔑`,
+      bodyLines: [
+        `<strong>${escapeHtml(data.adminNombre)}</strong> ha generado una nueva contraseña provisoria para tu cuenta en <strong>${escapeHtml(data.organizacionNombre)}</strong>.`,
+        `Tu contraseña provisoria es:`,
+        `<div style="background:#f4f4f5;border:1px solid #e4e4e7;border-radius:8px;padding:14px 20px;font-family:monospace;font-size:20px;font-weight:700;letter-spacing:2px;text-align:center;color:#09090b;">${escapeHtml(data.provisionalPassword)}</div>`,
+        `Inicia sesión con esta contraseña y te recomendamos cambiarla desde tu perfil por una que solo tú conozcas.`,
+      ],
+      ctaText: "Iniciar sesión",
+      ctaUrl: data.loginUrl,
+      footerNote: "Si no esperabas este mensaje, comunícate con el administrador de tu organización.",
+    }),
+  });
+
+  if (error) {
+    const msg = `Resend error: ${error.name} — ${error.message}`;
+    log?.warn({ resendError: error }, "Error sending provisional password email via Resend");
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
