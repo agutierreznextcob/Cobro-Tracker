@@ -348,7 +348,7 @@ export default function NewCobro() {
                                 field.onChange(undefined);
                               }
                             }}
-                            onFocus={() => setClienteDropdownOpen(true)}
+                            onFocus={() => { if (busquedaCliente.trim()) setClienteDropdownOpen(true); }}
                             onBlur={() => setTimeout(() => setClienteDropdownOpen(false), 150)}
                             autoComplete="off"
                           />
