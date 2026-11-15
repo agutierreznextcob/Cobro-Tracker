@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatMoney } from "@/lib/format";
 
 // --- Tipos ---
-export type EstadoPedido = "pendiente" | "aprobado" | "despachado" | "cancelado";
+export type EstadoPedido = "pendiente" | "aprobado" | "despachado" | "entregado" | "cancelado";
 
 export interface PedidoItem {
   id: number;
@@ -130,8 +130,9 @@ export function useConvertirCotizacionAPedido() {
 export const ESTADO_PEDIDO: Record<EstadoPedido, { label: string; className: string; dot: string }> = {
   pendiente: { label: "Pendiente", className: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900", dot: "bg-amber-500" },
   aprobado: { label: "Aprobado", className: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-900", dot: "bg-sky-500" },
-  despachado: { label: "Despachado", className: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900", dot: "bg-emerald-500" },
-  cancelado: { label: "Cancelado", className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900", dot: "bg-red-500" },
+  despachado: { label: "Despachado", className: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-900", dot: "bg-sky-500" },
+  entregado:  { label: "Entregado",  className: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900", dot: "bg-emerald-500" },
+  cancelado:  { label: "Cancelado",  className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900", dot: "bg-red-500" },
 };
 
 export function estadoBadgePedido(estado: EstadoPedido) {

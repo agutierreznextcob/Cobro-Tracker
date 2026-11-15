@@ -10,7 +10,7 @@ import { useListPedidos, ESTADO_PEDIDO, type EstadoPedido } from "@/lib/pedidos"
 import { Package, Search, RotateCw, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const FILTROS: Array<EstadoPedido | "todos"> = ["todos", "pendiente", "aprobado", "despachado", "cancelado"];
+const FILTROS: Array<EstadoPedido | "todos"> = ["todos", "pendiente", "aprobado", "despachado", "entregado", "cancelado"];
 
 export default function PedidosPage() {
   const { prefs } = usePreferencias();

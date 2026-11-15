@@ -198,6 +198,18 @@ router.patch("/guias-despacho/:id/estado", action(async (req, res) => {
       .set({ estado: estado as "emitida" | "en_despacho" | "entregada" | "anulada", actualizadoEn: new Date() })
       .where(condition)
       .returning();
+
+    // Cuando la guía se entrega, marcar el pedido origen como entregado
+    if (estado === "entregada" && updated.pedidoId) {
+      await tx.update(pedidosTable)
+        .set({
+          estado: "entregado" as "pendiente" | "aprobado" | "despachado" | "entregado" | "cancelado",
+          entregadoEn: new Date(),
+          actualizadoEn: new Date(),
+        })
+        .where(and(eq(pedidosTable.id, updated.pedidoId), eq(pedidosTable.estado, "despachado")));
+    }
+
     return updated;
   });
 

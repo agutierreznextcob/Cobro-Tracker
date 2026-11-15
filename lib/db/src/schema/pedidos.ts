@@ -15,7 +15,7 @@ export const pedidosTable = pgTable("pedidos", {
   clienteDireccion: text("cliente_direccion"),
   cotizacionId: integer("cotizacion_id").references(() => cotizacionesTable.id, { onDelete: "set null" }),
   estado: text("estado")
-    .$type<"pendiente" | "aprobado" | "despachado" | "cancelado">()
+    .$type<"pendiente" | "aprobado" | "despachado" | "entregado" | "cancelado">()
     .notNull()
     .default("pendiente"),
   moneda: text("moneda").notNull().default("CLP"),
@@ -30,6 +30,7 @@ export const pedidosTable = pgTable("pedidos", {
   aprobadoEn: timestamp("aprobado_en", { withTimezone: true }),
   despachadorId: text("despachador_id"),
   despachadoEn: timestamp("despachado_en", { withTimezone: true }),
+  entregadoEn: timestamp("entregado_en", { withTimezone: true }),
   guiaDespachoId: integer("guia_despacho_id"),
   creadoEn: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   actualizadoEn: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

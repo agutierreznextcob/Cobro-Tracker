@@ -202,7 +202,7 @@ router.patch("/pedidos/:id/estado", action(async (req, res) => {
     if (notasLogistica !== undefined) extra.notasLogistica = notasLogistica;
 
     const [updated] = await tx.update(pedidosTable)
-      .set({ estado: estado as "pendiente" | "aprobado" | "despachado" | "cancelado", ...extra })
+      .set({ estado: estado as "pendiente" | "aprobado" | "despachado" | "entregado" | "cancelado", ...extra })
       .where(condition)
       .returning();
     return updated;
