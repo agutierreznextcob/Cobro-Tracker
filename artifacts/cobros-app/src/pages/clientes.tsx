@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight, Shield, Download, Upload, Building2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Users, Search, Plus, Phone, Mail, ChevronRight, Loader2, ArrowUpRight, Shield, Download, Upload, Building2, CheckCircle2, AlertTriangle, SearchCheck } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { ScoreBadge } from "@/components/score-badge";
 import { formatCurrency } from "@/lib/format";
@@ -71,10 +71,46 @@ const clienteSchema = z.object({
 });
 type ClienteForm = z.infer<typeof clienteSchema>;
 
+// Autoformato RUT chileno mientras se escribe
+function formatRutInput(value: string): string {
+  const cleaned = value.replace(/[^0-9kK]/g, "").toUpperCase();
+  if (cleaned.length < 2) return cleaned;
+  const body = cleaned.slice(0, -1);
+  const dv = cleaned.slice(-1);
+  const bodyFormatted = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${bodyFormatted}-${dv}`;
+}
+
 function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
+  const [buscandoRut, setBuscandoRut] = useState(false);
   const { toast } = useToast();
   const createCliente = useCreateCliente();
+
+  const buscarEnSii = async () => {
+    const rut = form.getValues("rut");
+    if (!rut || !validarRut(rut)) {
+      toast({ title: "RUT inválido", description: "Ingresa un RUT válido antes de buscar.", variant: "destructive" });
+      return;
+    }
+    setBuscandoRut(true);
+    try {
+      const res = await fetch(`/api/clientes/buscar-rut/${encodeURIComponent(rut)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "No encontrado", description: data.error ?? "No se encontró información en el SII.", variant: "destructive" });
+        return;
+      }
+      // Autocomplete campos
+      if (data.nombre) form.setValue("nombre", data.nombre, { shouldValidate: true });
+      if (data.giro) form.setValue("giro", data.giro, { shouldValidate: true });
+      toast({ title: "Datos obtenidos del SII", description: `${data.nombre}${data.giro ? ` · ${data.giro}` : ""}` });
+    } catch {
+      toast({ title: "Error", description: "No se pudo consultar el SII.", variant: "destructive" });
+    } finally {
+      setBuscandoRut(false);
+    }
+  };
 
   const form = useForm<ClienteForm>({
     resolver: zodResolver(clienteSchema),
@@ -144,9 +180,31 @@ function NuevoClienteDialog({ onCreated }: { onCreated: () => void }) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>RUT *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="12.345.678-9" className="font-mono" {...field} />
-                  </FormControl>
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <Input
+                        placeholder="12.345.678-9"
+                        className="font-mono"
+                        {...field}
+                        onChange={(e) => {
+                          const formatted = formatRutInput(e.target.value);
+                          field.onChange(formatted);
+                        }}
+                      />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 gap-1.5 px-3"
+                      onClick={buscarEnSii}
+                      disabled={buscandoRut}
+                      title="Buscar razón social y giro en el SII"
+                    >
+                      {buscandoRut ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCheck className="h-4 w-4" />}
+                      <span className="hidden sm:inline">SII</span>
+                    </Button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

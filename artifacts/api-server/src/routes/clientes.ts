@@ -90,6 +90,67 @@ clientesRouter.get("/clientes", async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /clientes/buscar-rut/:rut — consulta datos del contribuyente en el SII
+// Devuelve razón social y giro si el RUT existe y tiene inicio de actividades.
+// ---------------------------------------------------------------------------
+clientesRouter.get("/clientes/buscar-rut/:rut", async (req, res) => {
+  const { normalizeRut } = await import("../lib/rut");
+  const rawRut = req.params.rut;
+  const normalized = normalizeRut(rawRut);
+  if (!normalized) {
+    res.status(400).json({ error: "RUT inválido" });
+    return;
+  }
+
+  // Separar cuerpo y dígito verificador
+  const [body, dv] = normalized.split("-");
+
+  try {
+    // El SII expone un endpoint XML que no requiere captcha para esta consulta
+    const url = `https://zeus.sii.cl/cvc_cgi/stc/getstc?RUT=${body}&DV=${dv.toUpperCase()}`;
+    const response = await fetch(url, {
+      headers: {
+        "Referer": "https://zeus.sii.cl/cvc/stc/stc.html",
+        "User-Agent": "Mozilla/5.0",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) {
+      res.status(502).json({ error: "El SII no respondió. Ingresa los datos manualmente." });
+      return;
+    }
+
+    const xml = await response.text();
+
+    // Extraer campos del XML de respuesta del SII
+    const razonSocial = xml.match(/<RAZON_SOCIAL>([\s\S]*?)<\/RAZON_SOCIAL>/)?.[1]?.trim() ?? null;
+    const giroRaw = xml.match(/<GIRO_DESCRIPCION>([\s\S]*?)<\/GIRO_DESCRIPCION>/)?.[1]?.trim() ?? null;
+    // Algunos formatos alternativos del SII
+    const razonAlt = xml.match(/<nombre>([\s\S]*?)<\/nombre>/i)?.[1]?.trim() ?? null;
+    const giroAlt = xml.match(/<giro>([\s\S]*?)<\/giro>/i)?.[1]?.trim() ?? null;
+
+    const nombre = razonSocial ?? razonAlt;
+    const giro = giroRaw ?? giroAlt;
+
+    if (!nombre) {
+      // RUT no encontrado o sin actividades en el SII
+      res.status(404).json({ error: "RUT no encontrado en el SII. Verifica el número o ingresa los datos manualmente." });
+      return;
+    }
+
+    res.json({ rut: normalized, nombre, giro: giro ?? null });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      res.status(504).json({ error: "El SII tardó demasiado. Ingresa los datos manualmente." });
+      return;
+    }
+    req.log.warn({ err }, "Error consultando SII");
+    res.status(502).json({ error: "No se pudo consultar el SII. Ingresa los datos manualmente." });
+  }
+});
+
 clientesRouter.post("/clientes", async (req, res) => {
   const userId = req.user!.id;
   const parsed = ClienteInputSchema.safeParse(req.body);
