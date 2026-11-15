@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   useCreateCobro, useCreateCobroRecurrente, useCreateCobrosMasivos,
-  useListClientes, useListMiembros, useGetDatosBancarios,
+  useListClientes, useListMiembros, useGetDatosBancarios, useGetCotizacion,
   getListMiembrosQueryKey, getListCobrosQueryKey,
   getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey,
   getGetDatosBancariosQueryKey,
@@ -13,7 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -46,6 +46,8 @@ function hoy() {
 
 export default function NewCobro() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  const fromCotizacionId = new URLSearchParams(search).get("fromCotizacion");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createCobro = useCreateCobro();
@@ -58,6 +60,10 @@ export default function NewCobro() {
   const isOrgAdmin = user?.orgRole === "admin_org";
   const isSupervisor = user?.orgRole === "supervisor";
   const puedeAsignar = isOrgAdmin || isSupervisor;
+
+  const { data: cotizacionOrigen } = useGetCotizacion(Number(fromCotizacionId), {
+    query: { enabled: !!fromCotizacionId && !isNaN(Number(fromCotizacionId)) },
+  });
 
   const { data: clientes } = useListClientes();
   const { data: miembros } = useListMiembros({
@@ -126,6 +132,39 @@ export default function NewCobro() {
     },
   });
 
+  // Pre-fill from cotización when fromCotizacion param is present
+  const cotizacionAplicada = useRef(false);
+  useEffect(() => {
+    if (!cotizacionOrigen || cotizacionAplicada.current) return;
+    cotizacionAplicada.current = true;
+    if (cotizacionOrigen.clienteId) {
+      form.setValue("clienteId", cotizacionOrigen.clienteId, { shouldValidate: true });
+    }
+    if (cotizacionOrigen.clienteEmail) {
+      form.setValue("emailPagador", cotizacionOrigen.clienteEmail, { shouldValidate: true });
+    }
+    if (cotizacionOrigen.fechaVencimiento) {
+      form.setValue("fechaVencimiento", cotizacionOrigen.fechaVencimiento.slice(0, 10));
+    }
+    // Set moneda and IVA from cotización
+    if (cotizacionOrigen.moneda) setMonedaDoc(cotizacionOrigen.moneda as Moneda);
+    if (cotizacionOrigen.porcentajeIva != null) setIvaDoc(String(cotizacionOrigen.porcentajeIva));
+    if (Number(cotizacionOrigen.porcentajeIva) > 0) form.setValue("incluyeIva", true);
+    // Pre-fill items from cotización items
+    const cotItems = (cotizacionOrigen as unknown as { items?: Array<{ productoId?: number | null; descripcion: string; cantidad: number | string; precioUnitario: number | string }> }).items;
+    if (cotItems && cotItems.length > 0) {
+      const lineasFromCot: LineaCatalogo[] = cotItems.map((l) => ({
+        productoId: l.productoId ?? 0,
+        nombre: l.descripcion,
+        cantidad: String(l.cantidad),
+        precioUnitario: String(l.precioUnitario),
+        tipo: "servicio" as const,
+        stockActual: null,
+      }));
+      setLineas(lineasFromCot);
+    }
+  }, [cotizacionOrigen]);
+
   const selectedClienteId = form.watch("clienteId");
   const selectedCliente = clientes?.find((c) => c.id === selectedClienteId);
   const tipoDocumentoWatch = form.watch("tipoDocumento");
@@ -173,6 +212,7 @@ export default function NewCobro() {
       clienteId: values.clienteId || undefined,
       fechaVencimiento: values.fechaVencimiento || undefined,
       responsableId: puedeAsignar ? values.responsableId || undefined : undefined,
+      ...(fromCotizacionId ? { cotizacionId: Number(fromCotizacionId) } : {}),
     };
 
     if (modoAvanzado !== "individual") {
@@ -247,7 +287,7 @@ export default function NewCobro() {
     <div className="max-w-5xl mx-auto space-y-0 animate-in fade-in duration-300">
       {/* Encabezado de página */}
       <div className="flex items-center gap-3 mb-5">
-        <Link href="/cobros" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <Link href={fromCotizacionId ? `/cotizaciones/${fromCotizacionId}` : "/cobros"} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           Volver
         </Link>
@@ -257,6 +297,20 @@ export default function NewCobro() {
           <h1 className="text-lg font-semibold">Nuevo documento de venta</h1>
         </div>
       </div>
+
+      {cotizacionOrigen && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-4 py-3 flex items-center gap-3">
+          <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+          <p className="text-sm text-blue-800 dark:text-blue-300">
+            Creando cobro desde cotización{" "}
+            <span className="font-semibold">{cotizacionOrigen.numeroCotizacion}</span>
+            {cotizacionOrigen.clienteNombre && (
+              <> · {cotizacionOrigen.clienteNombre}</>
+            )}
+            . Revisa el tipo de documento tributario antes de crear.
+          </p>
+        </div>
+      )}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-0">

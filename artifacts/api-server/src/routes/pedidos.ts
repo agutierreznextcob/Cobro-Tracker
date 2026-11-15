@@ -18,8 +18,10 @@ const action = (fn: (req: Request, res: Response) => Promise<void>) =>
   (req: Request, res: Response, _next: NextFunction) => {
     void fn(req, res).catch(err => {
       req.log?.error({ err }, "Operación de pedido fallida");
+      const isDev = process.env.NODE_ENV !== "production";
       res.status(err instanceof PedidoError ? err.status : 500).json({
         error: err instanceof PedidoError ? err.message : "No se pudo completar la operación. Intenta nuevamente.",
+        ...(isDev && !(err instanceof PedidoError) ? { detail: String(err?.message ?? err) } : {}),
       });
     });
   };

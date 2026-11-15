@@ -7,7 +7,6 @@ import {
   getGetCotizacionQueryKey,
   useSendCotizacion,
   useSetCotizacionEstado,
-  useConvertirCotizacion,
   type Cotizacion,
   type CotizacionItem,
 } from "@workspace/api-client-react";
@@ -28,13 +27,13 @@ import {
 import { EstadoCotizacionBadge } from "@/components/estado-cotizacion-badge";
 import { formatMoney, formatFechaPref, formatDate } from "@/lib/format";
 import { apiErrorMessage } from "@/lib/inventario";
-import { descargarPdfCotizacion, invalidateCobrosTrasConversion, invalidateCotizaciones } from "@/lib/cotizaciones";
+import { descargarPdfCotizacion, invalidateCotizaciones } from "@/lib/cotizaciones";
 import { ArrowLeft, ArrowRightLeft, Check, Download, ExternalLink, Eye, Loader2, Mail, Package, Pencil, RotateCw, X } from "lucide-react";
 import { downloadCotizacionPdf } from "@workspace/api-client-react";
 import { PdfPreviewDialog } from "@/components/pdf-preview-dialog";
 import { useConvertirCotizacionAPedido, PEDIDOS_KEY } from "@/lib/pedidos";
 
-type Confirm = null | "enviar" | "aceptada" | "rechazada" | "convertir" | "convertir-pedido";
+type Confirm = null | "enviar" | "aceptada" | "rechazada" | "convertir-pedido";
 
 export default function CotizacionDetailPage() {
   const params = useParams<{ id: string }>();
@@ -49,7 +48,6 @@ export default function CotizacionDetailPage() {
   });
   const enviar = useSendCotizacion();
   const setEstado = useSetCotizacionEstado();
-  const convertir = useConvertirCotizacion();
   const convertirPedido = useConvertirCotizacionAPedido();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [descargando, setDescargando] = useState(false);
@@ -72,16 +70,6 @@ export default function CotizacionDetailPage() {
       enviar.mutate({ id: c.id }, {
         onSuccess: (r) => { aplicar(r); toast({ title: "Cotización enviada", description: `Enviada a ${r.clienteEmail ?? "el cliente"}.` }); },
         onError: onErr("No se pudo enviar"),
-      });
-    } else if (which === "convertir") {
-      convertir.mutate({ id: c.id }, {
-        onSuccess: (r) => {
-          aplicar(r);
-          invalidateCobrosTrasConversion(qc);
-          toast({ title: "Cobro creado", description: "La cotización se convirtió en cobro." });
-          if (r.cobroId) navigate(`/cobros/${r.cobroId}`);
-        },
-        onError: onErr("No se pudo convertir"),
       });
     } else if (which === "convertir-pedido") {
       convertirPedido.mutate(c.id, {
@@ -137,14 +125,13 @@ export default function CotizacionDetailPage() {
 
   const fmt = (n: number) => formatMoney(n, c.moneda, c.decimales);
   const fecha = (s: string) => formatFechaPref(s, prefs.formatoFecha);
-  const pending = enviar.isPending || setEstado.isPending || convertir.isPending || convertirPedido.isPending;
+  const pending = enviar.isPending || setEstado.isPending || convertirPedido.isPending;
   const items = (c.items ?? []) as CotizacionItem[];
 
   const confirmCopy: Record<Exclude<Confirm, null>, { title: string; desc: string; cta: string }> = {
     enviar: { title: "Enviar cotización", desc: `Se enviará ${c.numeroCotizacion} con su PDF a ${c.clienteEmail ?? "el cliente"}. Quedará como enviada solo si el envío es exitoso.`, cta: "Enviar" },
     aceptada: { title: "Registrar aceptación", desc: "Marca esta cotización como aceptada por el cliente. Luego podrás convertirla en cobro.", cta: "Marcar aceptada" },
     rechazada: { title: "Registrar rechazo", desc: "Marca esta cotización como rechazada por el cliente. Esta acción cierra la cotización.", cta: "Marcar rechazada" },
-    convertir: { title: "Convertir en cobro", desc: `Se creará un cobro en ${c.moneda} por ${fmt(c.total)} con los mismos ítems y cliente, vinculado a esta cotización.`, cta: "Crear cobro" },
     "convertir-pedido": { title: "Convertir en pedido", desc: `Se creará un pedido de logística en ${c.moneda} por ${fmt(c.total)} con los mismos ítems y cliente, para que logística confirme disponibilidad.`, cta: "Crear pedido" },
   };
 
@@ -272,8 +259,8 @@ export default function CotizacionDetailPage() {
                   <Link href={`/cobros/${c.cobroId}`}><ExternalLink className="h-4 w-4 mr-2" />Ver cobro generado</Link>
                 </Button>
               ) : (
-                <Button className="w-full" onClick={() => setConfirm("convertir")} disabled={pending} data-testid="button-convertir">
-                  {convertir.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRightLeft className="h-4 w-4 mr-2" />}Convertir a cobro
+                <Button asChild className="w-full" data-testid="button-convertir">
+                  <Link href={`/cobros/nuevo?fromCotizacion=${c.id}`}><ArrowRightLeft className="h-4 w-4 mr-2" />Convertir a cobro</Link>
                 </Button>
               )
             )}

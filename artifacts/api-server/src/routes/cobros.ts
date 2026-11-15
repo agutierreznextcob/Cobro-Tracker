@@ -18,6 +18,7 @@ import {
   saludCarteraSnapshotsTable,
   cobrosRecurrentesTable,
   cobroEntregasInicialesTable,
+  cotizacionesTable,
 } from "@workspace/db";
 import type { Cobro, CobroDescuento, CobroAjuste } from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
@@ -297,6 +298,7 @@ cobrosRouter.post("/cobros", async (req, res) => {
   const clienteId = (parsed.data as Record<string, unknown>).clienteId as number | undefined;
   const fechaVencimiento = (parsed.data as Record<string, unknown>).fechaVencimiento as string | undefined;
   const responsableIdInput = (parsed.data as Record<string, unknown>).responsableId as string | undefined;
+  const cotizacionId = (req.body as Record<string, unknown>).cotizacionId as number | undefined;
   const user = req.isAuthenticated() ? req.user : null;
 
   try {
@@ -388,10 +390,18 @@ cobrosRouter.post("/cobros", async (req, res) => {
         clienteNombre,
         emailPagador: emailPagador ?? null,
         fechaVencimiento: fechaVencimiento ?? null,
+        cotizacionId: cotizacionId ?? null,
       })
       .returning();
     cobro.numeroDocumento = `${prefs.prefijoCobro}${String(cobro.id).padStart(4, "0")}`;
     await db.update(cobrosTable).set({ numeroDocumento: cobro.numeroDocumento }).where(eq(cobrosTable.id, cobro.id));
+
+    // Link cobro back to cotización if provided
+    if (cotizacionId) {
+      await db.update(cotizacionesTable)
+        .set({ cobroId: cobro.id, updatedAt: new Date() })
+        .where(eq(cotizacionesTable.id, cotizacionId));
+    }
 
     // Seed the user's default reminder sequence onto cobros that have a due date.
     if (cobro.fechaVencimiento && user?.id) {
