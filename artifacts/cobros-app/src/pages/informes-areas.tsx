@@ -194,7 +194,7 @@ export default function InformesAreasPage() {
               {area.responsableId && (
                 <div className="pt-2 border-t">
                   <p className="text-xs text-muted-foreground">
-                    Responsable: <span className="text-foreground font-medium">{area.responsableNombre ?? area.responsableId}</span>
+                    Responsable: <span className="text-foreground font-medium">{area.responsableId}</span>
                   </p>
                 </div>
               )}
