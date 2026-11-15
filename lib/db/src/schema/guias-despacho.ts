@@ -14,7 +14,7 @@ export const guiasDespachoTable = pgTable("guias_despacho", {
   clienteDireccion: text("cliente_direccion"),
   pedidoId: integer("pedido_id").references(() => pedidosTable.id, { onDelete: "set null" }),
   estado: text("estado")
-    .$type<"emitida" | "entregada" | "anulada">()
+    .$type<"emitida" | "en_despacho" | "entregada" | "anulada">()
     .notNull()
     .default("emitida"),
   fechaEmision: date("fecha_emision").notNull(),

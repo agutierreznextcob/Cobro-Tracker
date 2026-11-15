@@ -11,10 +11,10 @@ import { formatMoney, formatFechaPref } from "@/lib/format";
 import { usePreferencias } from "@/hooks/use-preferencias";
 import { useToast } from "@/hooks/use-toast";
 import { useGetGuia, useCambiarEstadoGuia, ESTADO_GUIA, type EstadoGuia } from "@/lib/guias-despacho";
-import { ArrowLeft, Check, Loader2, RotateCw, X } from "lucide-react";
+import { ArrowLeft, Check, Download, Loader2, RotateCw, Truck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type ConfirmAccion = null | "entregar" | "anular";
+type ConfirmAccion = null | "despachar" | "entregar" | "anular";
 
 export default function GuiaDetailPage() {
   const params = useParams<{ id: string }>();
@@ -37,9 +37,14 @@ export default function GuiaDetailPage() {
     const which = confirm;
     setConfirm(null);
 
-    if (which === "entregar") {
+    if (which === "despachar") {
+      cambiarEstado.mutate("en_despacho", {
+        onSuccess: () => toast({ title: "Guía en despacho", description: "La guía está en camino al destinatario." }),
+        onError: onErr("No se pudo actualizar"),
+      });
+    } else if (which === "entregar") {
       cambiarEstado.mutate("entregada", {
-        onSuccess: () => toast({ title: "Guía marcada como entregada" }),
+        onSuccess: () => toast({ title: "Guía entregada", description: "Se registró la entrega al destinatario." }),
         onError: onErr("No se pudo actualizar"),
       });
     } else if (which === "anular") {
@@ -48,6 +53,10 @@ export default function GuiaDetailPage() {
         onError: onErr("No se pudo anular"),
       });
     }
+  };
+
+  const descargarPDF = () => {
+    window.open(`/api/guias-despacho/${id}/pdf`, "_blank");
   };
 
   if (isLoading) return <div className="max-w-6xl mx-auto py-12 text-center text-muted-foreground">Cargando guía…</div>;
@@ -85,20 +94,30 @@ export default function GuiaDetailPage() {
             <RotateCw className={cn("h-3.5 w-3.5 mr-1.5", isFetching && "animate-spin")} />
             Actualizar
           </Button>
+          {/* Botón de descarga PDF — siempre visible */}
+          <Button variant="outline" size="sm" onClick={descargarPDF} className="gap-1.5">
+            <Download className="h-3.5 w-3.5" />Descargar PDF
+          </Button>
+          {/* Acciones según estado */}
           {g.estado === "emitida" && (
             <>
-              <Button size="sm" onClick={() => setConfirm("entregar")} disabled={cambiarEstado.isPending} className="gap-1.5">
-                <Check className="h-3.5 w-3.5" />Marcar entregada
+              <Button size="sm" onClick={() => setConfirm("despachar")} disabled={cambiarEstado.isPending} className="gap-1.5">
+                <Truck className="h-3.5 w-3.5" />Marcar en despacho
               </Button>
               <Button variant="outline" size="sm" onClick={() => setConfirm("anular")} disabled={cambiarEstado.isPending} className="gap-1.5 text-destructive hover:text-destructive">
                 <X className="h-3.5 w-3.5" />Anular
               </Button>
             </>
           )}
-          {g.estado === "entregada" && (
-            <Button variant="outline" size="sm" onClick={() => setConfirm("anular")} disabled={cambiarEstado.isPending} className="gap-1.5 text-destructive hover:text-destructive">
-              <X className="h-3.5 w-3.5" />Anular
-            </Button>
+          {g.estado === "en_despacho" && (
+            <>
+              <Button size="sm" onClick={() => setConfirm("entregar")} disabled={cambiarEstado.isPending} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700">
+                <Check className="h-3.5 w-3.5" />Marcar entregada
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirm("anular")} disabled={cambiarEstado.isPending} className="gap-1.5 text-destructive hover:text-destructive">
+                <X className="h-3.5 w-3.5" />Anular
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -233,11 +252,15 @@ export default function GuiaDetailPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm === "entregar" ? "Marcar guía como entregada" : "Anular guía"}
+              {confirm === "despachar" ? "Marcar guía en despacho"
+                : confirm === "entregar" ? "Marcar guía como entregada"
+                : "Anular guía"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm === "entregar"
-                ? "Se registrará que la guía fue entregada al destinatario."
+              {confirm === "despachar"
+                ? "Se registrará que la guía salió a despacho. Luego podrás marcarla como entregada."
+                : confirm === "entregar"
+                ? "Se registrará que la guía fue entregada al destinatario. Esta acción no se puede deshacer."
                 : "Esta acción no se puede deshacer. La guía quedará anulada."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -248,7 +271,9 @@ export default function GuiaDetailPage() {
               className={confirm === "anular" ? "bg-destructive hover:bg-destructive/90" : ""}
             >
               {cambiarEstado.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> :
-                confirm === "entregar" ? "Marcar entregada" : "Anular guía"}
+                confirm === "despachar" ? "Confirmar despacho"
+                : confirm === "entregar" ? "Confirmar entrega"
+                : "Anular guía"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

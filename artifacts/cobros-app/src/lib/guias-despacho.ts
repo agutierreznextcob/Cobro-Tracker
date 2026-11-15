@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatMoney } from "@/lib/format";
 
 // --- Tipos ---
-export type EstadoGuia = "emitida" | "entregada" | "anulada";
+export type EstadoGuia = "emitida" | "en_despacho" | "entregada" | "anulada";
 
 export interface GuiaItem {
   id: number;
@@ -111,9 +111,10 @@ export function useCambiarEstadoGuia(id: number) {
 
 // --- Estado helpers ---
 export const ESTADO_GUIA: Record<EstadoGuia, { label: string; className: string; dot: string }> = {
-  emitida: { label: "Emitida", className: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-900", dot: "bg-sky-500" },
-  entregada: { label: "Entregada", className: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900", dot: "bg-emerald-500" },
-  anulada: { label: "Anulada", className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900", dot: "bg-red-500" },
+  emitida:     { label: "Emitida",      className: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-900",         dot: "bg-sky-500" },
+  en_despacho: { label: "En despacho",  className: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900", dot: "bg-amber-500" },
+  entregada:   { label: "Entregada",    className: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900", dot: "bg-emerald-500" },
+  anulada:     { label: "Anulada",      className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",           dot: "bg-red-500" },
 };
 
 export function formatTotalGuia(guia: GuiaDespacho) {
