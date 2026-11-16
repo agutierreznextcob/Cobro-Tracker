@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, Lightbulb } from "lucide-react";
+import { ProductosMasVendidos, MenorMovimiento } from "@/components/informes/ventas-productos";
 import { useGetInformeArea, getGetInformeAreaQueryKey, useListBodegas, useListLocales, type GetInformeAreaParams } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -209,10 +210,14 @@ export default function InformesInventario() {
           <TabsTrigger value="vendidos" data-testid="tab-inv-vendidos">Productos más vendidos</TabsTrigger>
           <TabsTrigger value="valorizado" data-testid="tab-inv-valorizado">Stock actual valorizado</TabsTrigger>
           <TabsTrigger value="quiebres" data-testid="tab-inv-quiebres">Quiebres de stock</TabsTrigger>
+          <TabsTrigger value="mas-vendidos" data-testid="tab-inv-mas-vendidos">Productos y servicios más vendidos</TabsTrigger>
+          <TabsTrigger value="menor-movimiento" data-testid="tab-inv-menor-movimiento">Menor movimiento</TabsTrigger>
         </TabsList>
         <TabsContent value="vendidos" className="mt-0"><MasVendidosInventario /></TabsContent>
         <TabsContent value="valorizado" className="mt-0"><StockValorizado /></TabsContent>
         <TabsContent value="quiebres" className="mt-0"><Quiebres /></TabsContent>
+        <TabsContent value="mas-vendidos" className="mt-0"><ProductosMasVendidos /></TabsContent>
+        <TabsContent value="menor-movimiento" className="mt-0"><MenorMovimiento /></TabsContent>
       </Tabs>
     </div>
   );

@@ -25,6 +25,8 @@ import Informes from "@/pages/informes";
 import InformesCompras from "@/pages/informes-compras";
 import InformesInventario from "@/pages/informes-inventario";
 import InformesAreas from "@/pages/informes-areas";
+import InformesClientes from "@/pages/informes-clientes";
+import InformesGestion from "@/pages/informes-gestion";
 import ProfilePage from "@/pages/profile";
 import ClientesPage from "@/pages/clientes";
 import ClienteDetailPage from "@/pages/cliente-detail";
@@ -245,6 +247,20 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <InformesAreas />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/informes/clientes">
+        <AuthGate>
+          <Layout>
+            <InformesClientes />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/informes/gestion">
+        <AuthGate>
+          <Layout>
+            <InformesGestion />
           </Layout>
         </AuthGate>
       </Route>

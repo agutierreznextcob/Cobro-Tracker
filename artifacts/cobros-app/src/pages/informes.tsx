@@ -528,12 +528,7 @@ export default function Informes() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="cuentas">Cuentas por Cobrar</TabsTrigger>
-          <TabsTrigger value="ranking">Ranking de clientes</TabsTrigger>
-          <TabsTrigger value="gestiones">Gestiones</TabsTrigger>
-          <TabsTrigger value="satisfaccion">Satisfacción</TabsTrigger>
           <TabsTrigger value="recurrentes">Recurrentes</TabsTrigger>
-          <TabsTrigger value="mas-vendidos" data-testid="tab-mas-vendidos">Productos y servicios más vendidos</TabsTrigger>
-          <TabsTrigger value="menor-movimiento" data-testid="tab-menor-movimiento">Menor movimiento</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-6 mt-0">
@@ -980,17 +975,6 @@ export default function Informes() {
           <AgingReport moneda={monedaInforme} cobros={(cobros ?? []).filter((c) => monedaDe(c.moneda) === monedaInforme)} isOrgAdmin={isOrgAdmin} loading={isLoading} />
         </TabsContent>
 
-        <TabsContent value="ranking" className="space-y-6 mt-0">
-          <RankingClientes />
-        </TabsContent>
-
-        <TabsContent value="gestiones" className="space-y-6 mt-0">
-          <GestionesEjecutivos />
-        </TabsContent>
-
-        <TabsContent value="satisfaccion" className="space-y-6 mt-0">
-          <SatisfaccionReport />
-        </TabsContent>
         <TabsContent value="recurrentes" className="space-y-4 mt-0">
           {!nextCob ? (
             <Card className="p-8 text-center">
@@ -1017,12 +1001,7 @@ export default function Informes() {
             </>
           )}
         </TabsContent>
-        <TabsContent value="mas-vendidos" className="mt-0">
-          <ProductosMasVendidos />
-        </TabsContent>
-        <TabsContent value="menor-movimiento" className="mt-0">
-          <MenorMovimiento />
-        </TabsContent>
+
       </Tabs>
     </div>
   );

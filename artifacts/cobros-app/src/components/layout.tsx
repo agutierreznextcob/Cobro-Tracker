@@ -411,6 +411,8 @@ const INFORMES_ITEMS = [
   { href: "/informes/compras", label: "Compras", icon: ShoppingCart },
   { href: "/informes/inventario", label: "Inventario", icon: Boxes },
   { href: "/informes/areas", label: "Por Área", icon: FolderKanban },
+  { href: "/informes/clientes", label: "Clientes", icon: Users },
+  { href: "/informes/gestion", label: "Gestión", icon: CheckSquare },
 ];
 
 function InformesNavGroup({ closeMobile }: { closeMobile: () => void }) {
