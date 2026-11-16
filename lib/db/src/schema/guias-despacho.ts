@@ -31,6 +31,7 @@ export const guiasDespachoTable = pgTable("guias_despacho", {
   montoIva: numeric("monto_iva", { precision: 12, scale: 2 }).notNull(),
   total: numeric("total", { precision: 12, scale: 2 }).notNull(),
   observaciones: text("observaciones").notNull().default(""),
+  areaId: integer("area_id"),
   creadoEn: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   actualizadoEn: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

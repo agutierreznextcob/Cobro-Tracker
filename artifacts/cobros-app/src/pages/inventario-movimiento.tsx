@@ -11,6 +11,7 @@ import {
   getListInventarioQueryKey,
   useListBodegas,
   getListBodegasQueryKey,
+  useListAreas,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,8 @@ export default function InventarioMovimientoPage() {
   const [motivo, setMotivo] = useState("");
   const [origenId, setOrigenId] = useState("");
   const [destinoId, setDestinoId] = useState("");
+  const [areaId, setAreaId] = useState<number | undefined>(undefined);
+  const { data: areas } = useListAreas();
   const [, setLocation] = useLocation();
   const inventario = useListInventario({ query: { queryKey: getListInventarioQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
   const bodegasQ = useListBodegas({ query: { queryKey: getListBodegasQueryKey(), staleTime: 0, refetchOnMount: "always", refetchInterval: 30000 } });
@@ -81,6 +84,7 @@ export default function InventarioMovimientoPage() {
       tipo, cantidad: cant, motivo,
       bodegaOrigenId: usaOrigen ? Number(origenId) : null,
       bodegaDestinoId: usaDestino ? Number(destinoId) : null,
+      areaId: areaId ?? null,
     } }, {
       onSuccess: (p) => {
         qc.setQueryData(getGetProductoQueryKey(id), p);
@@ -192,6 +196,23 @@ export default function InventarioMovimientoPage() {
                 <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex justify-between font-mono">
                   <span className="text-muted-foreground font-sans">{hayBodegas ? (entreBodegas ? "Origen quedará en" : "Bodega quedará en") : "Quedará en"}</span>
                   <span className={resultante < 0 ? "text-red-600 font-bold" : "font-bold"}>{formatQty(resultante)} {unidad}</span>
+                </div>
+              )}
+              {(areas ?? []).length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Área / Departamento / Centro de costo</Label>
+                  <Select
+                    value={areaId != null ? String(areaId) : "ninguna"}
+                    onValueChange={(v) => setAreaId(v === "ninguna" ? undefined : Number(v))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Sin área asignada" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ninguna">Sin área asignada</SelectItem>
+                      {(areas ?? []).map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
               <Button type="submit" className="w-full" disabled={invalido || crear.isPending}>

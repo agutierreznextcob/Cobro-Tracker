@@ -58,6 +58,7 @@ export const movimientoBody = z.object({
   motivo: z.string().trim().min(1).max(1000),
   bodegaOrigenId: z.number().int().positive().nullable().optional(),
   bodegaDestinoId: z.number().int().positive().nullable().optional(),
+  areaId: z.number().int().positive().nullable().optional(),
 }).refine(d => d.tipo === "ajuste" || d.cantidad > 0, "La cantidad debe ser mayor a cero.")
   .superRefine((d, ctx) => {
     const motivos = d.tipo === "entrada"

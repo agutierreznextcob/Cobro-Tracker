@@ -18,6 +18,7 @@ export const movimientosStockTable = pgTable("movimientos_stock", {
   referenciaCobroId: integer("referencia_cobro_id"),
   bodegaOrigenId: integer("bodega_origen_id").references(() => bodegasTable.id, { onDelete: "restrict" }),
   bodegaDestinoId: integer("bodega_destino_id").references(() => bodegasTable.id, { onDelete: "restrict" }),
+  areaId: integer("area_id"),
   usuarioId: text("usuario_id").notNull(),
   creadoEn: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

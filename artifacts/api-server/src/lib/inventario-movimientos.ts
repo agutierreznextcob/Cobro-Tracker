@@ -56,6 +56,7 @@ export async function registrarMovimiento(userId: string, id: number, d: z.infer
     await tx.insert(movimientosStockTable).values({
       productoId: id, tipo: transfer ? "salida" : d.tipo, cantidad: String(quantity), motivo: d.motivo,
       usuarioId: userId, bodegaOrigenId: origin, bodegaDestinoId: destination,
+      areaId: d.areaId ?? null,
     });
     const [updated] = await tx.select().from(productosTable).where(eq(productosTable.id, id));
     return updated;

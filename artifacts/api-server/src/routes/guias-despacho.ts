@@ -125,6 +125,7 @@ router.post("/guias-despacho/from-pedido/:pedidoId", action(async (req, res) => 
       montoIva: pedido.montoIva,
       total: pedido.total,
       observaciones: pedido.notas ?? "",
+      areaId: pedido.areaId ?? null,
       // Datos de transporte opcionales desde el body
       transportista: req.body.transportista ?? "",
       patenteVehiculo: req.body.patenteVehiculo ?? "",
