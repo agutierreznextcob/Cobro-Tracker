@@ -1,4 +1,5 @@
 import { EquivalenciaCLP } from "@/components/equivalencia-clp";
+import { ClienteRapidoDialog } from "@/components/cliente-rapido-dialog";
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -342,6 +343,12 @@ export default function NewCobro() {
                       <FormLabel className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         <Users className="h-3.5 w-3.5" />
                         {modoAvanzado === "recurrente" ? "Cliente *" : "Cliente"}
+                        <ClienteRapidoDialog
+                          onCreated={(c) => {
+                            field.onChange(c.id);
+                            setBusquedaCliente(c.nombre);
+                          }}
+                        />
                       </FormLabel>
                       <FormControl>
                         <div className="relative">

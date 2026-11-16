@@ -1,4 +1,5 @@
 import { EquivalenciaCLP } from "@/components/equivalencia-clp";
+import { ClienteRapidoDialog } from "@/components/cliente-rapido-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -341,7 +342,15 @@ export default function CotizacionFormPage() {
             <CardHeader className="pb-3"><CardTitle className="text-base">Cliente y fechas</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Cliente</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label>Cliente</Label>
+                  <ClienteRapidoDialog
+                    onCreated={(c) => {
+                      setClienteId(String(c.id));
+                      setClienteGiro("");
+                    }}
+                  />
+                </div>
                 <Select value={clienteId} onValueChange={(v) => {
                   setClienteId(v);
                   const sel = clientes.find((c) => String(c.id) === v) as { giro?: string | null } | undefined;
@@ -357,7 +366,7 @@ export default function CotizacionFormPage() {
                   </SelectContent>
                 </Select>
                 {clientesQ.isError && <p className="text-xs text-red-600">No se pudieron cargar los clientes. <button type="button" className="underline" onClick={() => clientesQ.refetch()}>Reintentar</button></p>}
-                {!clientesQ.isLoading && clientes.length === 0 && <p className="text-xs text-muted-foreground">No tienes clientes. <Link href="/clientes" className="text-primary underline">Crear cliente</Link></p>}
+                {!clientesQ.isLoading && clientes.length === 0 && <p className="text-xs text-muted-foreground">No tienes clientes aún — usa el <span className="font-medium">+</span> para crear el primero.</p>}
               </div>
               {cliente && (
                 <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 grid gap-1.5 sm:grid-cols-2 text-sm" data-testid="card-cliente-datos">
