@@ -2,11 +2,8 @@ import { useState, useMemo, useRef } from "react";
 import { useListCobros, useListCotizaciones, useListClientes, useListProveedores, useListInventario } from "@workspace/api-client-react";
 import { useListPedidos } from "@/lib/pedidos";
 import { useListGuias } from "@/lib/guias-despacho";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { StatusBadge } from "@/components/status-badge";
-import { formatShortDate, formatMoney } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import { Link } from "wouter";
 import {
   Search, X,
