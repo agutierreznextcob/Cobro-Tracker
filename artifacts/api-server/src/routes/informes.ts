@@ -2,6 +2,7 @@ import { Router } from "express";
 import { GetInformeAreaQueryParams, GetInformeAreaResponse } from "@workspace/api-zod";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { informeArea } from "../lib/informes";
+import { kpiPorArea } from "../lib/informes-por-area";
 
 const router = Router();
 router.use("/informes", (req, res, next) => {
@@ -20,4 +21,20 @@ router.get("/informes", async (req, res) => {
     res.status(500).json({ error: "No se pudo generar el informe. Intenta nuevamente." });
   }
 });
+
+/** GET /informes/area/:areaId?moneda=CLP — KPIs para un área/dpto/centro de costo específico */
+router.get("/informes/area/:areaId", async (req, res) => {
+  const areaId = parseInt(req.params.areaId, 10);
+  if (!Number.isFinite(areaId) || areaId <= 0) {
+    res.status(400).json({ error: "ID de área inválido." }); return;
+  }
+  const moneda = typeof req.query.moneda === "string" ? req.query.moneda : "CLP";
+  try {
+    res.json(await kpiPorArea(req.user!.id, areaId, moneda));
+  } catch (err) {
+    req.log.error({ err }, "No se pudo generar el informe de área");
+    res.status(500).json({ error: "No se pudo generar el informe. Intenta nuevamente." });
+  }
+});
+
 export default router;
