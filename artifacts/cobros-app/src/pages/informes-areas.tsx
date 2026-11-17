@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useListAreas } from "@workspace/api-client-react";
 import { FiltroBArra, useFiltroBarra } from "@/components/informes/filtro-barra";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +19,9 @@ import {
   Clock,
   Percent,
   Package,
+  Download,
 } from "lucide-react";
+import { format } from "date-fns";
 import { Link } from "wouter";
 
 type AreaTipo = "area" | "departamento" | "centro_costo";
@@ -156,21 +159,52 @@ function AreaKpis({ areaId, moneda }: { areaId: number; moneda: string }) {
 
   const hasData = data.totalCobros > 0 || data.totalCotizaciones > 0 || data.totalPedidos > 0;
 
+  const exportarExcel = async () => {
+    const XLSX = await import("xlsx");
+    const fmt = (n: number) => n;
+    const rows = [
+      ["Indicador", "Valor", "Moneda"],
+      ["Total cobrado", fmt(data.totalCobrado), data.moneda],
+      ["Cobros pagados", data.cobrosPageados, ""],
+      ["Cobros pendientes", data.cobrosPendientes, ""],
+      ["Total cobros", data.totalCobros, ""],
+      ["Ticket promedio cobros", fmt(data.ticketPromedioCobros), data.moneda],
+      ["Total cotizaciones", data.totalCotizaciones, ""],
+      ["Monto cotizaciones", fmt(data.montoCotizaciones), data.moneda],
+      ["Tasa conversión cotizaciones", data.tasaConversionCotizaciones != null ? `${data.tasaConversionCotizaciones.toFixed(1)}%` : "Sin datos", ""],
+      ["Total pedidos", data.totalPedidos, ""],
+      ["Monto pedidos", fmt(data.montoPedidos), data.moneda],
+      ["Período desde", data.desde, ""],
+      ["Período hasta", data.hasta, ""],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 32 }, { wch: 20 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "KPIs por área");
+    XLSX.writeFile(wb, `informe-area-${format(new Date(), "yyyyMMdd")}.xlsx`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Período */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-muted-foreground">
           Desde {data.desde} hasta {data.hasta}
         </p>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3 w-3 ${isFetching ? "animate-spin" : ""}`} />
-          Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3 w-3 ${isFetching ? "animate-spin" : ""}`} />
+            Actualizar
+          </button>
+          <Button size="sm" className="gap-1.5" onClick={exportarExcel} disabled={!hasData}>
+            <Download className="h-4 w-4" />
+            Descargar Excel
+          </Button>
+        </div>
       </div>
 
       {!hasData && (

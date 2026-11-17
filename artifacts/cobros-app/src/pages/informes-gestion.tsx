@@ -50,7 +50,6 @@ function GestionesEjecutivos() {
         </p>
         <Button
           size="sm"
-          variant="outline"
           className="gap-1.5"
           onClick={exportar}
           disabled={rows.length === 0}

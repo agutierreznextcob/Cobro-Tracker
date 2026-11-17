@@ -64,7 +64,6 @@ function RankingClientes() {
         </p>
         <Button
           size="sm"
-          variant="outline"
           className="gap-1.5"
           onClick={exportar}
           disabled={ranking.length === 0}
@@ -179,7 +178,7 @@ function SatisfaccionReport() {
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
-        <Button size="sm" variant="outline" className="gap-1.5" onClick={exportarSatisfaccion} disabled={data.total === 0} data-testid="button-excel-satisfaccion">
+        <Button size="sm" className="gap-1.5" onClick={exportarSatisfaccion} disabled={data.total === 0} data-testid="button-excel-satisfaccion">
           <Download className="h-4 w-4" />
           Exportar Excel
         </Button>

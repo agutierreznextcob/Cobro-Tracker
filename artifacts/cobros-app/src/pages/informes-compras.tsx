@@ -104,7 +104,7 @@ export default function InformesCompras() {
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-5 mt-0">
-          <div className="flex flex-wrap items-start justify-between gap-3"><BotonExcel onExport={exportResumen} disabled={!ok} testId="button-excel-compras-resumen" /></div>
+          <div className="flex flex-wrap items-start justify-end gap-3"><BotonExcel onExport={exportResumen} disabled={!ok} testId="button-excel-compras-resumen" /></div>
           {body(() => data && (
             <>
               <NotaInforme desde={data.desde} hasta={data.hasta} moneda={data.moneda} notas={data.notas} />
@@ -144,7 +144,7 @@ export default function InformesCompras() {
         </TabsContent>
 
         <TabsContent value="proveedor" className="space-y-5 mt-0">
-          <div className="flex flex-wrap items-start justify-between gap-3"><BotonExcel onExport={exportProv} disabled={!ok || !data?.proveedores.length} testId="button-excel-compras-proveedor" /></div>
+          <div className="flex flex-wrap items-start justify-end gap-3"><BotonExcel onExport={exportProv} disabled={!ok || !data?.proveedores.length} testId="button-excel-compras-proveedor" /></div>
           {body(() => data && (
             <>
               <NotaInforme desde={data.desde} hasta={data.hasta} moneda={data.moneda} notas={data.notas} />
@@ -171,7 +171,7 @@ export default function InformesCompras() {
         </TabsContent>
 
         <TabsContent value="pagar" className="space-y-5 mt-0">
-          <div className="flex flex-wrap items-start justify-between gap-3"><BotonExcel onExport={exportPend} disabled={!ok || !data?.pendientes.length} testId="button-excel-compras-pagar" /></div>
+          <div className="flex flex-wrap items-start justify-end gap-3"><BotonExcel onExport={exportPend} disabled={!ok || !data?.pendientes.length} testId="button-excel-compras-pagar" /></div>
           <p className="text-xs text-muted-foreground">Facturas en estado <strong>borrador</strong> o <strong>recibida</strong> (no contabilizadas). El estado contable no confirma un pago real al proveedor.</p>
           {body(() => data && (
             <>
