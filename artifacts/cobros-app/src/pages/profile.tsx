@@ -35,7 +35,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { isValidRut, formatRut } from "@/lib/rut";
-import { TeamSection } from "@/components/team-section";
 import { DatosBancariosSection } from "@/components/datos-bancarios-section";
 import { OrgRoleBadge } from "@/components/org-role-badge";
 import { PlanSelector } from "@/components/plan-selector";
@@ -919,10 +918,11 @@ function ProfileSettings() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6 animate-in fade-in duration-300">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Mi perfil</h1>
-        <p className="text-muted-foreground mt-1">Gestiona tu cuenta y conexiones</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Mi cuenta</p>
+        <h1 className="text-2xl font-bold tracking-tight">Mi perfil</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Gestiona tu cuenta y conexiones</p>
       </div>
 
       <Accordion type="single" collapsible defaultValue="info" className="space-y-3">
@@ -1115,12 +1115,6 @@ function ProfileSettings() {
             })()}
         </div>
       </PerfilSeccion>
-
-      {user?.orgRole === "admin_org" && (
-        <PerfilSeccion value="equipo" icon={User} title="Mi Equipo">
-          <TeamSection embedded />
-        </PerfilSeccion>
-      )}
 
       <PerfilSeccion value="flow" oculta={!!user?.esConsultor} icon={KeyRound} title="Conectar Flow" description="Ingresa tus credenciales de Flow para generar links de pago reales. Se guardan encriptadas con AES-256.">
         <div className="space-y-4">
