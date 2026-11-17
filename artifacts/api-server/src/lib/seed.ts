@@ -4,6 +4,7 @@ import {
   cobrosTable,
   trialRutsTable,
   clientesTable,
+  empresasTable,
 } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { hashPassword } from "./password";
@@ -275,6 +276,39 @@ async function ensureAccountSeqFloor(): Promise<void> {
   `);
 }
 
+// Siembra el perfil de empresa de NextCob para la cuenta demo.
+// Idempotente: sólo inserta cuando el scope no existe todavía.
+async function ensureDemoEmpresa(demoUserId: string): Promise<void> {
+  const scope = `user:${demoUserId}`;
+  const [existing] = await db
+    .select({ scope: empresasTable.scope })
+    .from(empresasTable)
+    .where(eq(empresasTable.scope, scope));
+  if (existing) return; // ya existe, no tocar
+
+  await db.insert(empresasTable).values({
+    scope,
+    perfil: {
+      razonSocial: "NextCob",
+      rut: "77.123.456-9",
+      giro: "Servicios de tecnología y software",
+      direccion: "Av. Providencia 1234, Of. 5",
+      ciudad: "Santiago",
+      telefono: "+56 9 5738 0827",
+      email: "contacto@nextcob.com",
+      sitioWeb: "https://nextcob.com",
+      piePagina: "Gracias por confiar en NextCob. Transferencia a Banco Estado cuenta corriente 123456789.",
+      condicionesPago: "Pago al contado. Transferencia bancaria.",
+      validezDias: 30,
+      colorPrimario: "#2563EB",
+      plantilla: "moderna",
+      logoPath: null,
+    },
+  }).onConflictDoNothing();
+
+  logger.info({ scope }, "Seed: perfil de empresa NextCob creado para cuenta demo");
+}
+
 // Idempotently ensure the demo + superadmin accounts exist, plus a few sample
 // cobros for the demo when it has none. Safe to run on every startup.
 export async function seedEssentialAccounts(): Promise<void> {
@@ -282,6 +316,7 @@ export async function seedEssentialAccounts(): Promise<void> {
   const superadminUserId = await ensureSuperadmin();
   if (demoUserId) {
     await ensureDemoCobros(demoUserId);
+    await ensureDemoEmpresa(demoUserId);
   }
   if (superadminUserId) {
     await cleanupSuperadminSampleData(superadminUserId);
