@@ -8,14 +8,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Moneda } from "@/lib/format";
 import {
-  BotonExcel, CHART_COLOR, ErrorReporte, FiltroMoneda, FiltroPeriodo, KpiCard, NotaInforme, SkeletonReporte, VacioReporte,
+  BotonExcel, CHART_COLOR, ErrorReporte, FiltroMoneda, KpiCard, NotaInforme, SkeletonReporte, VacioReporte,
   compactMoney, descargarXlsx, fechaCorta, money, type Periodo,
 } from "@/components/informes/shared";
+import { FiltroBArra, useFiltroBarra } from "@/components/informes/filtro-barra";
 
 const ESTADO_LABEL: Record<string, string> = { borrador: "Borrador", recibida: "Recibida", contabilizada: "Contabilizada" };
 
+/** Mapea el preset de FiltroBarra al tipo Periodo que espera el backend */
+function presetToPeriodo(preset: string): Periodo {
+  switch (preset) {
+    case "7d": return "7dias";
+    case "3m": return "trimestre";
+    case "1y": return "año";
+    case "all": return "todo";
+    case "1m":
+    default: return "mes";
+  }
+}
+
 export default function InformesCompras() {
-  const [periodo, setPeriodo] = useState<Periodo>("mes");
+  const filtro = useFiltroBarra("1m");
+  const periodo: Periodo = filtro.preset === "custom" ? "mes" : presetToPeriodo(filtro.preset);
   const [moneda, setMoneda] = useState<Moneda>("CLP");
   const [proveedor, setProveedor] = useState("todos");
   const { data: proveedores } = useListProveedores();
@@ -50,21 +64,27 @@ export default function InformesCompras() {
     { name: "Notas", rows: [{ ...meta, "Total pendiente": totalPend, Aclaración: "Estado contable (no contabilizada); no constituye prueba de pago." }] },
   ]);
 
-  const filtros = (
-    <div className="flex flex-wrap gap-2">
-      <FiltroPeriodo value={periodo} onChange={setPeriodo} />
-      <FiltroMoneda value={moneda} onChange={setMoneda} />
-      <Select value={proveedor} onValueChange={setProveedor}>
-        <SelectTrigger className="w-[220px] h-9" data-testid="select-proveedor"><SelectValue placeholder="Proveedor" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="todos">Todos los proveedores</SelectItem>
-          {(proveedores ?? []).map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.razonSocial}</SelectItem>)}
-        </SelectContent>
-      </Select>
-    </div>
-  );
   const body = (render: () => React.ReactNode) => isLoading ? <SkeletonReporte /> : isError || !data ? <ErrorReporte onRetry={() => refetch()} /> : render();
   const v = data?.variacion;
+
+  const barraExtras = (
+    <>
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium text-muted-foreground">Moneda</label>
+        <FiltroMoneda value={moneda} onChange={setMoneda} />
+      </div>
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium text-muted-foreground">Proveedor</label>
+        <Select value={proveedor} onValueChange={setProveedor}>
+          <SelectTrigger className="w-[220px] h-8 text-xs" data-testid="select-proveedor"><SelectValue placeholder="Proveedor" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos los proveedores</SelectItem>
+            {(proveedores ?? []).map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.razonSocial}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    </>
+  );
 
   return (
     <div className="space-y-6">
@@ -73,6 +93,9 @@ export default function InformesCompras() {
         <h1 className="text-2xl font-bold tracking-tight">Compras</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Cuánto le compras a quién, y qué facturas siguen sin contabilizar.</p>
       </div>
+
+      <FiltroBArra {...filtro} extras={barraExtras} />
+
       <Tabs defaultValue="resumen" className="space-y-5">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="resumen" data-testid="tab-compras-resumen">Resumen de compras</TabsTrigger>
@@ -81,7 +104,7 @@ export default function InformesCompras() {
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-5 mt-0">
-          <div className="flex flex-wrap items-start justify-between gap-3">{filtros}<BotonExcel onExport={exportResumen} disabled={!ok} testId="button-excel-compras-resumen" /></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><BotonExcel onExport={exportResumen} disabled={!ok} testId="button-excel-compras-resumen" /></div>
           {body(() => data && (
             <>
               <NotaInforme desde={data.desde} hasta={data.hasta} moneda={data.moneda} notas={data.notas} />
@@ -121,7 +144,7 @@ export default function InformesCompras() {
         </TabsContent>
 
         <TabsContent value="proveedor" className="space-y-5 mt-0">
-          <div className="flex flex-wrap items-start justify-between gap-3">{filtros}<BotonExcel onExport={exportProv} disabled={!ok || !data?.proveedores.length} testId="button-excel-compras-proveedor" /></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><BotonExcel onExport={exportProv} disabled={!ok || !data?.proveedores.length} testId="button-excel-compras-proveedor" /></div>
           {body(() => data && (
             <>
               <NotaInforme desde={data.desde} hasta={data.hasta} moneda={data.moneda} notas={data.notas} />
@@ -148,7 +171,7 @@ export default function InformesCompras() {
         </TabsContent>
 
         <TabsContent value="pagar" className="space-y-5 mt-0">
-          <div className="flex flex-wrap items-start justify-between gap-3">{filtros}<BotonExcel onExport={exportPend} disabled={!ok || !data?.pendientes.length} testId="button-excel-compras-pagar" /></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><BotonExcel onExport={exportPend} disabled={!ok || !data?.pendientes.length} testId="button-excel-compras-pagar" /></div>
           <p className="text-xs text-muted-foreground">Facturas en estado <strong>borrador</strong> o <strong>recibida</strong> (no contabilizadas). El estado contable no confirma un pago real al proveedor.</p>
           {body(() => data && (
             <>

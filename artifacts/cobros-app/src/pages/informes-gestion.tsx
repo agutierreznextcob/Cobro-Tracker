@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download } from "lucide-react";
 import { format } from "date-fns";
+import { FiltroBArra, useFiltroBarra } from "@/components/informes/filtro-barra";
 
 function GestionesEjecutivos() {
   const { data: metricas, isLoading } = useGetGestionesMetricas();
@@ -115,6 +116,8 @@ function GestionesEjecutivos() {
 }
 
 export default function InformesGestion() {
+  const filtro = useFiltroBarra("1m");
+
   return (
     <div className="space-y-6">
       <div>
@@ -122,6 +125,9 @@ export default function InformesGestion() {
         <h1 className="text-2xl font-bold tracking-tight">Gestión</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Rendimiento del equipo de cobranza por ejecutivo.</p>
       </div>
+
+      <FiltroBArra {...filtro} />
+
       <Tabs defaultValue="gestiones" className="space-y-5">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="gestiones">Gestiones</TabsTrigger>

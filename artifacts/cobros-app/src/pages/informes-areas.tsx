@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useListAreas } from "@workspace/api-client-react";
+import { FiltroBArra, useFiltroBarra } from "@/components/informes/filtro-barra";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -326,6 +327,23 @@ function AreaKpis({ areaId, moneda }: { areaId: number; moneda: string }) {
 export default function InformesAreasPage() {
   const { data: areas, isLoading } = useListAreas();
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
+  const [moneda, setMoneda] = useState("CLP");
+  const filtro = useFiltroBarra("1m");
+
+  const barraExtras = (
+    <div className="space-y-1">
+      <label className="text-[11px] font-medium text-muted-foreground">Moneda</label>
+      <Select value={moneda} onValueChange={setMoneda}>
+        <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="CLP">CLP</SelectItem>
+          <SelectItem value="USD">USD</SelectItem>
+          <SelectItem value="EUR">EUR</SelectItem>
+          <SelectItem value="UF">UF</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -389,6 +407,8 @@ export default function InformesAreasPage() {
           </span>
         </Link>
       </div>
+
+      <FiltroBArra {...filtro} extras={barraExtras} />
 
       {/* Selector */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -469,7 +489,7 @@ export default function InformesAreasPage() {
           </div>
         </div>
       ) : (
-        <AreaKpis areaId={selectedAreaId} moneda="CLP" />
+        <AreaKpis areaId={selectedAreaId} moneda={moneda} />
       )}
     </div>
   );

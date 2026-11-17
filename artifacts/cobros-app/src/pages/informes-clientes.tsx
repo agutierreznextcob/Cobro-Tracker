@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Star, Loader2, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { FiltroBArra, useFiltroBarra } from "@/components/informes/filtro-barra";
 
 const CATEGORIA_LABEL: Record<string, string> = {
   excelente: "Excelente",
@@ -279,6 +280,8 @@ function SatisfaccionReport() {
 }
 
 export default function InformesClientes() {
+  const filtro = useFiltroBarra("1m");
+
   return (
     <div className="space-y-6">
       <div>
@@ -286,6 +289,9 @@ export default function InformesClientes() {
         <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Comportamiento de pago, ranking y satisfacción de tus clientes.</p>
       </div>
+
+      <FiltroBArra {...filtro} />
+
       <Tabs defaultValue="ranking" className="space-y-5">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="ranking">Ranking de clientes</TabsTrigger>

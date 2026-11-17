@@ -9,9 +9,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Moneda } from "@/lib/format";
 import {
-  BotonExcel, CHART_COLOR, ErrorReporte, FiltroMoneda, FiltroPeriodo, KpiCard, NotaInforme, SkeletonReporte, VacioReporte,
+  BotonExcel, CHART_COLOR, ErrorReporte, FiltroMoneda, KpiCard, NotaInforme, SkeletonReporte, VacioReporte,
   descargarXlsx, fechaCorta, fmtNum, money, type Periodo,
 } from "@/components/informes/shared";
+import { FiltroBArra, useFiltroBarra, type FiltroBarra } from "@/components/informes/filtro-barra";
+
+/** Mapea preset a Periodo del backend */
+function presetToPeriodo(preset: string): Periodo {
+  switch (preset) {
+    case "7d": return "7dias";
+    case "3m": return "trimestre";
+    case "1y": return "año";
+    case "all": return "todo";
+    default: return "mes";
+  }
+}
 
 function useInforme(params: GetInformeAreaParams) {
   return useGetInformeArea(params, { query: { queryKey: getGetInformeAreaQueryKey(params) } });
@@ -21,9 +33,8 @@ function Header({ children, excel }: { children: React.ReactNode; excel: React.R
   return <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex flex-wrap gap-2">{children}</div>{excel}</div>;
 }
 
-function MasVendidosInventario() {
-  const [periodo, setPeriodo] = useState<Periodo>("mes");
-  const [moneda, setMoneda] = useState<Moneda>("CLP");
+function MasVendidosInventario({ filtro, moneda }: { filtro: FiltroBarra; moneda: Moneda }) {
+  const periodo: Periodo = filtro.preset === "custom" ? "mes" : presetToPeriodo(filtro.preset);
   const params: GetInformeAreaParams = { area: "inventario", periodo, moneda };
   const { data, isLoading, isError, refetch } = useInforme(params);
   const rows = data?.ventas ?? [];
@@ -34,9 +45,7 @@ function MasVendidosInventario() {
   ]);
   return (
     <div className="space-y-5">
-      <Header excel={<BotonExcel onExport={exportar} disabled={isLoading || isError || !rows.length} testId="button-excel-inv-vendidos" />}>
-        <FiltroPeriodo value={periodo} onChange={setPeriodo} /><FiltroMoneda value={moneda} onChange={setMoneda} />
-      </Header>
+      <Header excel={<BotonExcel onExport={exportar} disabled={isLoading || isError || !rows.length} testId="button-excel-inv-vendidos" />}>{null}</Header>
       {isLoading ? <SkeletonReporte /> : isError || !data ? <ErrorReporte onRetry={() => refetch()} /> : (
         <>
           <NotaInforme desde={data.desde} hasta={data.hasta} moneda={data.moneda} notas={data.notas} />
@@ -143,8 +152,8 @@ function StockValorizado() {
   );
 }
 
-function Quiebres() {
-  const [periodo, setPeriodo] = useState<Periodo>("trimestre");
+function Quiebres({ filtro }: { filtro: FiltroBarra }) {
+  const periodo: Periodo = filtro.preset === "custom" ? "trimestre" : presetToPeriodo(filtro.preset);
   const params: GetInformeAreaParams = { area: "inventario", periodo };
   const { data, isLoading, isError, refetch } = useInforme(params);
   const rows = useMemo(() => [...(data?.quiebres ?? [])].sort((a, b) => b.frecuencia - a.frecuencia), [data]);
@@ -155,9 +164,7 @@ function Quiebres() {
   ]);
   return (
     <div className="space-y-5">
-      <Header excel={<BotonExcel onExport={exportar} disabled={isLoading || isError || !rows.length} testId="button-excel-quiebres" />}>
-        <FiltroPeriodo value={periodo} onChange={setPeriodo} />
-      </Header>
+      <Header excel={<BotonExcel onExport={exportar} disabled={isLoading || isError || !rows.length} testId="button-excel-quiebres" />}>{null}</Header>
       {isLoading ? <SkeletonReporte /> : isError || !data ? <ErrorReporte onRetry={() => refetch()} /> : (
         <>
           <NotaInforme desde={data.desde} hasta={data.hasta} notas={data.notas} />
@@ -198,6 +205,16 @@ function Quiebres() {
 }
 
 export default function InformesInventario() {
+  const filtro = useFiltroBarra("1m");
+  const [moneda, setMoneda] = useState<Moneda>("CLP");
+
+  const barraExtras = (
+    <div className="space-y-1">
+      <label className="text-[11px] font-medium text-muted-foreground">Moneda</label>
+      <FiltroMoneda value={moneda} onChange={setMoneda} />
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -205,6 +222,9 @@ export default function InformesInventario() {
         <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Qué rota, cuánto vale tu bodega y dónde te quedas sin stock.</p>
       </div>
+
+      <FiltroBArra {...filtro} extras={barraExtras} />
+
       <Tabs defaultValue="vendidos" className="space-y-5">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="vendidos" data-testid="tab-inv-vendidos">Productos más vendidos</TabsTrigger>
@@ -213,9 +233,9 @@ export default function InformesInventario() {
           <TabsTrigger value="mas-vendidos" data-testid="tab-inv-mas-vendidos">Productos y servicios más vendidos</TabsTrigger>
           <TabsTrigger value="menor-movimiento" data-testid="tab-inv-menor-movimiento">Menor movimiento</TabsTrigger>
         </TabsList>
-        <TabsContent value="vendidos" className="mt-0"><MasVendidosInventario /></TabsContent>
+        <TabsContent value="vendidos" className="mt-0"><MasVendidosInventario filtro={filtro} moneda={moneda} /></TabsContent>
         <TabsContent value="valorizado" className="mt-0"><StockValorizado /></TabsContent>
-        <TabsContent value="quiebres" className="mt-0"><Quiebres /></TabsContent>
+        <TabsContent value="quiebres" className="mt-0"><Quiebres filtro={filtro} /></TabsContent>
         <TabsContent value="mas-vendidos" className="mt-0"><ProductosMasVendidos /></TabsContent>
         <TabsContent value="menor-movimiento" className="mt-0"><MenorMovimiento /></TabsContent>
       </Tabs>
