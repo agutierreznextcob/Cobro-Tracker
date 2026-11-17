@@ -36,6 +36,7 @@ import PortalPage from "@/pages/portal";
 import Notificaciones from "@/pages/notificaciones";
 import RecordatoriosConfig from "@/pages/recordatorios-config";
 import WorkflowsPage from "@/pages/workflows";
+import ConfiguracionCobranza from "@/pages/configuracion-cobranza";
 import WorkflowDetail from "@/pages/workflow-detail";
 import TareasPage from "@/pages/tareas";
 import GestionHoyPage from "@/pages/gestion-hoy";
@@ -492,17 +493,24 @@ function AppRouter() {
           </Layout>
         </AuthGate>
       </Route>
+      <Route path="/configuracion/cobranza">
+        <AuthGate>
+          <Layout>
+            <ConfiguracionCobranza />
+          </Layout>
+        </AuthGate>
+      </Route>
       <Route path="/recordatorios/config">
         <AuthGate>
           <Layout>
-            <RecordatoriosConfig />
+            <ConfiguracionCobranza />
           </Layout>
         </AuthGate>
       </Route>
       <Route path="/workflows" nest={false}>
         <AuthGate>
           <Layout>
-            <WorkflowsPage />
+            <ConfiguracionCobranza />
           </Layout>
         </AuthGate>
       </Route>

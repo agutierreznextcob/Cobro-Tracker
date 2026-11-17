@@ -81,7 +81,7 @@ function estadoIcon(estado: string) {
   return <Clock className="h-4 w-4 text-amber-500" />;
 }
 
-export default function WorkflowsPage() {
+export default function WorkflowsPage({ hideHeader }: { hideHeader?: boolean } = {}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -140,7 +140,7 @@ export default function WorkflowsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        {!hideHeader && <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
             <WorkflowIcon className="h-6 w-6 text-primary" />
             Automatización de cobranza
@@ -148,7 +148,7 @@ export default function WorkflowsPage() {
           <p className="text-sm text-muted-foreground">
             Secuencias inteligentes que gestionan tus cobros automáticamente.
           </p>
-        </div>
+        </div>}
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setPlantillaOpen(true)}>
             <Zap className="mr-2 h-4 w-4" />

@@ -303,8 +303,7 @@ const LOGISTICA_ITEMS: NavLeaf[] = [
 ];
 
 const CONFIG_ITEMS: NavLeaf[] = [
-  { href: "/recordatorios/config", label: "Recordatorios", icon: CalendarClock, feature: "Recordatorios automáticos" },
-  { href: "/workflows", label: "Automatización", icon: Workflow, feature: "Workflows inteligentes", match: (l) => l === "/workflows" || l.startsWith("/workflows/") },
+  { href: "/configuracion/cobranza", label: "Cobranza", icon: Workflow, feature: "Workflows inteligentes", match: (l) => l === "/configuracion/cobranza" || l === "/recordatorios/config" || l === "/workflows" || l.startsWith("/workflows/") },
   { href: "/configuracion/empresa", label: "Perfil de empresa", icon: Building2 },
   { href: "/configuracion/preferencias", label: "Preferencias", icon: SlidersHorizontal },
   { href: "/configuracion/usuarios", label: "Usuarios y permisos", icon: Users, match: (l) => l === "/configuracion/usuarios" },
