@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal, ShoppingCart, Truck, Building2, Package, FileText, FolderKanban } from "lucide-react";
+import { Home, Plus, Search, Users, UserCircle, LogOut, List, Shield, BarChart3, Bell, CalendarClock, Inbox, Menu, X, Workflow, CheckSquare, MessageSquare, Lock, Clock, ChevronDown, Calendar, Star, ListTodo, Boxes, Warehouse, ShoppingBag, FileSignature, Settings, SlidersHorizontal, ShoppingCart, Truck, Building2, Package, FileText, FolderKanban, BookOpen } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useListNotificaciones, getListNotificacionesQueryKey, useGetSubscriptionStatus, useGetGestionResumen, getGetGestionResumenQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -302,6 +302,10 @@ const LOGISTICA_ITEMS: NavLeaf[] = [
   { href: "/guias-despacho", label: "Guías de despacho", icon: FileText, match: (l) => l === "/guias-despacho" || l.startsWith("/guias-despacho/") },
 ];
 
+const CONTABILIDAD_ITEMS: NavLeaf[] = [
+  { href: "/contabilidad", label: "Contabilidad", icon: BookOpen, match: (l) => l.startsWith("/contabilidad") },
+];
+
 const CONFIG_ITEMS: NavLeaf[] = [
   { href: "/configuracion/cobranza", label: "Cobranza", icon: Workflow, feature: "Workflows inteligentes", match: (l) => l === "/configuracion/cobranza" || l === "/recordatorios/config" || l === "/workflows" || l.startsWith("/workflows/") },
   { href: "/configuracion/empresa", label: "Perfil de empresa", icon: Building2 },
@@ -492,11 +496,12 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/locales", label: "Locales y bodegas", icon: Warehouse },
     { id: "gestion_group" },
     { id: "informes_group" },
+    { id: "contabilidad_group" },
     { href: "/encuestas", label: "Satisfacción", icon: MessageSquare, feature: "Encuestas de satisfacción" },
     { id: "config_group" },
   ] as Array<
     | { href: string; label: string; icon: typeof Home; feature?: string }
-    | { id: "gestion_group" | "notificaciones" | "ventas_group" | "logistica_group" | "config_group" | "informes_group" }
+    | { id: "gestion_group" | "notificaciones" | "ventas_group" | "logistica_group" | "config_group" | "informes_group" | "contabilidad_group" }
   >;
 
   const displayName = user
@@ -580,6 +585,9 @@ export function Layout({ children }: { children: ReactNode }) {
             }
             if ("id" in item && item.id === "informes_group") {
               return <InformesNavGroup key="informes_group" closeMobile={closeMobile} />;
+            }
+            if ("id" in item && item.id === "contabilidad_group") {
+              return <NavGroup key="contabilidad_group" id="contabilidad" label="Contabilidad" icon={BookOpen} items={CONTABILIDAD_ITEMS} closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;
             }
             if ("id" in item && item.id === "config_group") {
               return <NavGroup key="config_group" id="configuracion" label="Configuración" icon={Settings} items={CONFIG_ITEMS} closeMobile={closeMobile} esStarter={esStarter} setUpgradeFeature={setUpgradeFeature} />;

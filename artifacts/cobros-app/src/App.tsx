@@ -70,6 +70,7 @@ import PreferenciasPage from "@/pages/preferencias";
 import EmpresaPage from "@/pages/empresa";
 import ConfiguracionUsuariosPage from "@/pages/configuracion-usuarios";
 import ConfiguracionAreasPage from "@/pages/configuracion-areas";
+import ContabilidadPage from "@/pages/contabilidad/index";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -555,6 +556,13 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <TareasPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/contabilidad">
+        <AuthGate>
+          <Layout>
+            <ContabilidadPage />
           </Layout>
         </AuthGate>
       </Route>
