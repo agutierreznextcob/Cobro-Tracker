@@ -48,8 +48,8 @@ import {
 import { es } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FiltroBArra, useFiltroBarra } from "@/components/informes/filtro-barra";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 import { formatCurrency, formatMoney, monedaDe, MONEDAS, type Moneda } from "@/lib/format";
@@ -109,16 +109,6 @@ const METODO_COLOR = {
   Manual: "#f59e0b",
 } as const;
 
-type PresetKey = "7d" | "1m" | "3m" | "1y" | "all" | "custom";
-
-const PRESETS: { key: PresetKey; label: string }[] = [
-  { key: "7d", label: "Últimos 7 días" },
-  { key: "1m", label: "Último mes" },
-  { key: "3m", label: "Último trimestre" },
-  { key: "1y", label: "Último año" },
-  { key: "all", label: "Todo el tiempo" },
-];
-
 function bucketStart(d: Date, g: Gran): Date {
   if (g === "dia") return startOfDay(d);
   if (g === "semana") return startOfWeek(d, { weekStartsOn: 1 });
@@ -142,9 +132,7 @@ const compactCLP = (v: number) =>
 
 export default function Informes() {
   const { prefs: prefsInformes } = usePreferencias();
-  const [preset, setPreset] = useState<PresetKey>("1m");
-  const [customDesde, setCustomDesde] = useState("");
-  const [customHasta, setCustomHasta] = useState("");
+  const filtro = useFiltroBarra("1m");
   const [granSel, setGranSel] = useState<Gran | "auto">("auto");
   const [filterTipoDoc, setFilterTipoDoc] = useState<TipoDocumento | "todos">("todos");
 
@@ -214,34 +202,13 @@ export default function Informes() {
     }, null);
   }, [cobros]);
 
+  // For "todo el tiempo" use the actual first cobro date if available
   const range = useMemo(() => {
-    const now = new Date();
-    const hasta =
-      preset === "custom" && customHasta ? endOfDay(parseISO(customHasta)) : endOfDay(now);
-    let desde: Date;
-    switch (preset) {
-      case "7d":
-        desde = startOfDay(subDays(now, 6));
-        break;
-      case "3m":
-        desde = startOfDay(subMonths(now, 3));
-        break;
-      case "1y":
-        desde = startOfDay(subYears(now, 1));
-        break;
-      case "all":
-        desde = startOfDay(minDate ?? subYears(now, 1));
-        break;
-      case "custom":
-        desde = customDesde ? startOfDay(parseISO(customDesde)) : startOfDay(subMonths(now, 1));
-        break;
-      case "1m":
-      default:
-        desde = startOfDay(subMonths(now, 1));
-        break;
+    if (filtro.preset === "all" && minDate) {
+      return { desde: startOfDay(minDate), hasta: filtro.range.hasta };
     }
-    return { desde, hasta };
-  }, [preset, customDesde, customHasta, minDate]);
+    return filtro.range;
+  }, [filtro.preset, filtro.range, minDate]);
 
   const filtered = useMemo(() => {
     if (!cobros) return [] as Cobro[];
@@ -524,6 +491,58 @@ export default function Informes() {
         </p>
       </div>
 
+      <FiltroBArra
+        {...filtro}
+        extras={
+          <>
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-muted-foreground">Agrupar por</label>
+              <Select value={granSel} onValueChange={(v) => setGranSel(v as Gran | "auto")}>
+                <SelectTrigger className="h-8 w-[130px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto" className="text-xs">Automático</SelectItem>
+                  <SelectItem value="dia" className="text-xs">Día</SelectItem>
+                  <SelectItem value="semana" className="text-xs">Semana</SelectItem>
+                  <SelectItem value="mes" className="text-xs">Mes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-muted-foreground">Tipo de documento</label>
+              <Select value={filterTipoDoc} onValueChange={(v) => setFilterTipoDoc(v as TipoDocumento | "todos")}>
+                <SelectTrigger className="h-8 w-[220px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos" className="text-xs">Todos</SelectItem>
+                  {TIPO_DOCUMENTO_VALUES.map((t) => (
+                    <SelectItem key={t} value={t} className="text-xs">{TIPO_DOCUMENTO_LABELS[t]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-muted-foreground">Moneda</label>
+              <Select value={monedaInforme} onValueChange={(v) => setMonedaInforme(v as Moneda)}>
+                <SelectTrigger className="h-8 w-[110px] text-xs" data-testid="select-moneda-informe">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monedasPresentes.map((m) => (
+                    <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <span className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-foreground self-center" data-testid="label-moneda-informe">
+              Importes en {monedaInforme}
+            </span>
+          </>
+        }
+      />
+
       <Tabs defaultValue="resumen" className="space-y-6">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
@@ -544,103 +563,6 @@ export default function Informes() {
               Descargar Excel
             </Button>
           </div>
-
-      {/* Period selector */}
-      <Card className="p-4 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          {PRESETS.map((p) => (
-            <Button
-              key={p.key}
-              size="sm"
-              variant={preset === p.key ? "default" : "outline"}
-              className="h-8 text-xs"
-              onClick={() => setPreset(p.key)}
-            >
-              {p.label}
-            </Button>
-          ))}
-        </div>
-
-        <div className="flex items-end gap-3 flex-wrap">
-          <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Desde</label>
-            <Input
-              type="date"
-              value={customDesde}
-              max={customHasta || undefined}
-              onChange={(e) => {
-                setCustomDesde(e.target.value);
-                setPreset("custom");
-              }}
-              className="h-8 w-[150px] text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Hasta</label>
-            <Input
-              type="date"
-              value={customHasta}
-              min={customDesde || undefined}
-              onChange={(e) => {
-                setCustomHasta(e.target.value);
-                setPreset("custom");
-              }}
-              className="h-8 w-[150px] text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Agrupar por</label>
-            <Select value={granSel} onValueChange={(v) => setGranSel(v as Gran | "auto")}>
-              <SelectTrigger className="h-8 w-[130px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto" className="text-xs">Automático</SelectItem>
-                <SelectItem value="dia" className="text-xs">Día</SelectItem>
-                <SelectItem value="semana" className="text-xs">Semana</SelectItem>
-                <SelectItem value="mes" className="text-xs">Mes</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Tipo de documento</label>
-            <Select
-              value={filterTipoDoc}
-              onValueChange={(v) => setFilterTipoDoc(v as TipoDocumento | "todos")}
-            >
-              <SelectTrigger className="h-8 w-[220px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos" className="text-xs">Todos</SelectItem>
-                {TIPO_DOCUMENTO_VALUES.map((t) => (
-                  <SelectItem key={t} value={t} className="text-xs">
-                    {TIPO_DOCUMENTO_LABELS[t]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Moneda</label>
-            <Select value={monedaInforme} onValueChange={(v) => setMonedaInforme(v as Moneda)}>
-              <SelectTrigger className="h-8 w-[110px] text-xs" data-testid="select-moneda-informe">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {monedasPresentes.map((m) => (
-                  <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <p className="text-xs text-muted-foreground ml-auto self-center">
-            <span className="mr-2 rounded bg-secondary px-1.5 py-0.5 font-medium text-foreground" data-testid="label-moneda-informe">Importes en {monedaInforme}</span>
-            {format(range.desde, "d MMM yyyy", { locale: es })} —{" "}
-            {format(range.hasta, "d MMM yyyy", { locale: es })}
-          </p>
-        </div>
-      </Card>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

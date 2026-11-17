@@ -96,8 +96,7 @@ function MasVendidosInventario({ filtro, moneda }: { filtro: FiltroBarra; moneda
   );
 }
 
-function StockValorizado() {
-  const [moneda, setMoneda] = useState<Moneda>("CLP");
+function StockValorizado({ moneda }: { moneda: Moneda }) {
   const [bodega, setBodega] = useState("todas");
   const [local, setLocal] = useState("todos");
   const { data: bodegas } = useListBodegas();
@@ -113,7 +112,6 @@ function StockValorizado() {
   return (
     <div className="space-y-5">
       <Header excel={<BotonExcel onExport={exportar} disabled={isLoading || isError || !rows.length} testId="button-excel-valorizado" />}>
-        <FiltroMoneda value={moneda} onChange={setMoneda} />
         <Select value={local} onValueChange={(v) => { setLocal(v); setBodega("todas"); }}>
           <SelectTrigger className="w-[190px] h-9" data-testid="select-local"><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="todos">Todos los locales</SelectItem>{(locales ?? []).map((l) => <SelectItem key={l.id} value={String(l.id)}>{l.nombre}</SelectItem>)}</SelectContent>
@@ -234,7 +232,7 @@ export default function InformesInventario() {
           <TabsTrigger value="menor-movimiento" data-testid="tab-inv-menor-movimiento">Menor movimiento</TabsTrigger>
         </TabsList>
         <TabsContent value="vendidos" className="mt-0"><MasVendidosInventario filtro={filtro} moneda={moneda} /></TabsContent>
-        <TabsContent value="valorizado" className="mt-0"><StockValorizado /></TabsContent>
+        <TabsContent value="valorizado" className="mt-0"><StockValorizado moneda={moneda} /></TabsContent>
         <TabsContent value="quiebres" className="mt-0"><Quiebres filtro={filtro} /></TabsContent>
         <TabsContent value="mas-vendidos" className="mt-0"><ProductosMasVendidos /></TabsContent>
         <TabsContent value="menor-movimiento" className="mt-0"><MenorMovimiento /></TabsContent>
