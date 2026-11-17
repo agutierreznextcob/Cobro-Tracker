@@ -55,3 +55,8 @@ export * from "./guias-despacho";
 export * from "./guia-despacho-items";
 export * from "./permisos-usuario";
 export * from "./areas-org";
+// Contabilidad
+export * from "./plan-cuentas";
+export * from "./asientos-contables";
+export * from "./presupuesto";
+export * from "./libro-sii";
