@@ -70,6 +70,8 @@ import PreferenciasPage from "@/pages/preferencias";
 import EmpresaPage from "@/pages/empresa";
 import ConfiguracionUsuariosPage from "@/pages/configuracion-usuarios";
 import ConfiguracionAreasPage from "@/pages/configuracion-areas";
+import ConfiguracionVentasPage from "@/pages/configuracion-ventas";
+import ConfiguracionVentasDocumentosPage from "@/pages/configuracion-ventas-documentos";
 import ContabilidadPage from "@/pages/contabilidad/index";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
@@ -484,6 +486,20 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <ConfiguracionAreasPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/configuracion/ventas/documentos">
+        <AuthGate>
+          <Layout>
+            <ConfiguracionVentasDocumentosPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/configuracion/ventas">
+        <AuthGate>
+          <Layout>
+            <ConfiguracionVentasPage />
           </Layout>
         </AuthGate>
       </Route>

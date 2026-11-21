@@ -38,7 +38,7 @@ import { getFlowCredentials, getMpCredentials } from "./profile";
 import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
 import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
-import { itemsInventarioBody, resolveItemsInventario } from "../lib/inventario";
+import { itemsInventarioBody, resolveItemsInventario, descontarStockDirecto } from "../lib/inventario";
 import { getPreferenciasNegocio, roundMoney, formatDocumentMoney } from "../lib/preferencias";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro, fechaHoySantiago, ensureUserDefaults } from "../lib/recordatorios";
@@ -1853,6 +1853,18 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
         await aplicarDefaultsACobro(cobro.id, cobro.responsableId);
       } catch (err) {
         req.log.warn({ err, cobroId: cobro.id }, "No se pudo aplicar la secuencia de recordatorios por defecto");
+      }
+    }
+
+    // Descontar stock al pagar (si el cobro tiene itemsInventario de tipo producto)
+    if (bodyParsed.data.estado === "pagado" && current.estado !== "pagado") {
+      const rawItems = cobro.itemsInventario;
+      if (Array.isArray(rawItems) && rawItems.length > 0) {
+        try {
+          await descontarStockDirecto(rawItems as Array<{ productoId: number; cantidad: number; tipo?: string }>);
+        } catch (err) {
+          req.log.warn({ err, cobroId: cobro.id }, "No se pudo descontar stock al pagar cobro");
+        }
       }
     }
 

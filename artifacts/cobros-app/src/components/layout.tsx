@@ -312,6 +312,7 @@ const CONFIG_ITEMS: NavLeaf[] = [
   { href: "/configuracion/preferencias", label: "Preferencias", icon: SlidersHorizontal },
   { href: "/configuracion/usuarios", label: "Usuarios y permisos", icon: Users, match: (l) => l === "/configuracion/usuarios" },
   { href: "/configuracion/areas", label: "Áreas y centros de costo", icon: FolderKanban, match: (l) => l === "/configuracion/areas" },
+  { href: "/configuracion/ventas", label: "Ventas", icon: ShoppingBag, match: (l) => l.startsWith("/configuracion/ventas") },
 ];
 
 function MobileBell() {

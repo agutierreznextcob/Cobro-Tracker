@@ -55,6 +55,8 @@ export * from "./guias-despacho";
 export * from "./guia-despacho-items";
 export * from "./permisos-usuario";
 export * from "./areas-org";
+// Configuración de ventas
+export * from "./documentos-venta";
 // Contabilidad
 export * from "./plan-cuentas";
 export * from "./asientos-contables";

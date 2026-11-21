@@ -35,6 +35,7 @@ import guiasDespachoRouter from "./guias-despacho";
 import permisosRouter from "./permisos";
 import { areasRouter } from "./areas";
 import { contabilidadRouter } from "./contabilidad";
+import configuracionVentasRouter from "./configuracion-ventas";
 
 // ORDEN DE MONTAJE: los routers con rutas públicas (portal, leads, chat,
 // webhooks, encuestas) deben ir ANTES de cualquier router con auth "en blanco"
@@ -105,5 +106,6 @@ router.use(guiasDespachoRouter);
 router.use("/permisos", permisosRouter);
 router.use(areasRouter);
 router.use(contabilidadRouter);
+router.use(configuracionVentasRouter);
 
 export default router;
