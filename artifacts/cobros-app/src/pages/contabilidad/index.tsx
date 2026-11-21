@@ -1,57 +1,112 @@
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, FileText, TrendingUp, Calculator, FileSpreadsheet, BarChart3 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  BookOpen,
+  FileText,
+  TrendingUp,
+  FileSpreadsheet,
+  BarChart3,
+  ChevronRight,
+} from "lucide-react";
 import PlanCuentasPage from "./plan-cuentas";
 import AsientosPage from "./asientos";
 import InformesPage from "./informes";
 import PresupuestoPage from "./presupuesto";
 import LibroSiiPage from "./libro-sii";
 
-const TABS = [
-  { value: "asientos", label: "Asientos", icon: FileText },
-  { value: "informes", label: "Informes", icon: BarChart3 },
-  { value: "plan-cuentas", label: "Plan de cuentas", icon: BookOpen },
-  { value: "presupuesto", label: "Presupuesto", icon: TrendingUp },
-  { value: "libro-sii", label: "Libro SII", icon: FileSpreadsheet },
+const SUBMODULOS = [
+  {
+    id: "asientos",
+    label: "Asientos contables",
+    icon: FileText,
+    desc: "Registros de doble entrada",
+    component: AsientosPage,
+  },
+  {
+    id: "informes",
+    label: "Informes",
+    icon: BarChart3,
+    desc: "Balances, estado de resultado, libros",
+    component: InformesPage,
+  },
+  {
+    id: "plan-cuentas",
+    label: "Plan de cuentas",
+    icon: BookOpen,
+    desc: "PCGCh / IFRS Chile",
+    component: PlanCuentasPage,
+  },
+  {
+    id: "presupuesto",
+    label: "Presupuesto",
+    icon: TrendingUp,
+    desc: "Proyección basada en datos reales",
+    component: PresupuestoPage,
+  },
+  {
+    id: "libro-sii",
+    label: "Libro SII",
+    icon: FileSpreadsheet,
+    desc: "Importar compras y ventas",
+    component: LibroSiiPage,
+  },
 ];
 
 export default function ContabilidadPage() {
-  const [tab, setTab] = useState("asientos");
+  const [activo, setActivo] = useState("asientos");
+
+  const submodulo = SUBMODULOS.find((s) => s.id === activo)!;
+  const PageComponent = submodulo.component;
 
   return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Módulo</p>
-        <h1 className="text-2xl font-bold tracking-tight">Contabilidad</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Asientos, informes, plan de cuentas, presupuesto e importación SII</p>
-      </div>
+    <div className="flex gap-0 min-h-[calc(100vh-8rem)]">
+      {/* Sidebar izquierdo */}
+      <aside className="w-56 shrink-0 border-r bg-muted/30 flex flex-col">
+        <div className="px-4 py-4 border-b">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Módulo</p>
+          <h1 className="text-base font-bold tracking-tight mt-0.5">Contabilidad</h1>
+        </div>
+        <nav className="flex-1 py-2">
+          {SUBMODULOS.map((s) => {
+            const Icon = s.icon;
+            const isActive = activo === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setActivo(s.id)}
+                className={cn(
+                  "w-full flex items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60",
+                  isActive && "bg-background border-r-2 border-primary shadow-sm"
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "h-4 w-4 mt-0.5 shrink-0",
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  )}
+                />
+                <div className="min-w-0">
+                  <p
+                    className={cn(
+                      "text-sm font-medium leading-tight",
+                      isActive ? "text-primary" : "text-foreground"
+                    )}
+                  >
+                    {s.label}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{s.desc}</p>
+                </div>
+                {isActive && <ChevronRight className="h-3 w-3 ml-auto mt-1 shrink-0 text-primary" />}
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
 
-      <Tabs value={tab} onValueChange={setTab} className="space-y-5">
-        <TabsList className="flex-wrap h-auto">
-          {TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value} className="gap-1.5">
-              <t.icon className="h-4 w-4" />
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContent value="asientos" className="mt-0">
-          <AsientosPage hideHeader />
-        </TabsContent>
-        <TabsContent value="informes" className="mt-0">
-          <InformesPage hideHeader />
-        </TabsContent>
-        <TabsContent value="plan-cuentas" className="mt-0">
-          <PlanCuentasPage hideHeader />
-        </TabsContent>
-        <TabsContent value="presupuesto" className="mt-0">
-          <PresupuestoPage hideHeader />
-        </TabsContent>
-        <TabsContent value="libro-sii" className="mt-0">
-          <LibroSiiPage hideHeader />
-        </TabsContent>
-      </Tabs>
+      {/* Contenido principal */}
+      <main className="flex-1 min-w-0 overflow-auto">
+        <PageComponent hideHeader />
+      </main>
     </div>
   );
 }

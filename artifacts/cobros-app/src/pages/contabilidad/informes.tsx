@@ -1,559 +1,524 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, FileText, TrendingUp, BookOpen, Layers, BarChart3, Calculator } from "lucide-react";
-import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TrendingUp, TrendingDown, Minus, BarChart3, BookOpen, FileText, Calculator, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const currentYear = new Date().getFullYear();
-const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0");
-const defaultPeriodo = `${currentYear}${currentMonth}`;
-const defaultPeriodoDesde = `${currentYear}01`;
+// ─── utilidades ─────────────────────────────────────────────────────────────
 
-function fmt(n: number | null | undefined) {
-  if (n == null) return "0";
-  return Math.abs(n).toLocaleString("es-CL", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
+const CLP = (n: number) =>
+  new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(n);
 
-function fmtSigned(n: number) {
-  if (n > 0) return `$ ${fmt(n)}`;
-  if (n < 0) return `($ ${fmt(n)})`;
-  return "$ 0";
-}
+const anioActual = new Date().getFullYear();
+const ANIOS = Array.from({ length: 5 }, (_, i) => anioActual - i);
+const MESES = [
+  { v: "", l: "Todo el año" },
+  { v: "1", l: "Enero" }, { v: "2", l: "Febrero" }, { v: "3", l: "Marzo" },
+  { v: "4", l: "Abril" }, { v: "5", l: "Mayo" }, { v: "6", l: "Junio" },
+  { v: "7", l: "Julio" }, { v: "8", l: "Agosto" }, { v: "9", l: "Septiembre" },
+  { v: "10", l: "Octubre" }, { v: "11", l: "Noviembre" }, { v: "12", l: "Diciembre" },
+];
 
-// ═══ BALANCE 8 COLUMNAS ═══
-function Balance8ColTab() {
-  const [desde, setDesde] = useState(defaultPeriodoDesde);
-  const [hasta, setHasta] = useState(defaultPeriodo);
-  const [ejecutar, setEjecutar] = useState(false);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["balance-8col", desde, hasta],
-    queryFn: async () => {
-      const res = await fetch(`/api/contabilidad/informes/balance-8col?periodoDesde=${desde}&periodoHasta=${hasta}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Error");
-      return res.json() as Promise<any[]>;
-    },
-    enabled: ejecutar,
-  });
-
-  const TIPO_COLORS: Record<string, string> = {
-    activo: "text-blue-600", pasivo: "text-red-600", patrimonio: "text-purple-600",
-    ingreso: "text-green-600", egreso: "text-orange-600", orden: "text-gray-500",
-  };
-
+function StatCard({ label, value, sub, trend }: { label: string; value: string; sub?: string; trend?: "up" | "down" | "neutral" }) {
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="space-y-1">
-          <Label className="text-xs">Período desde (AAAAMM)</Label>
-          <Input className="w-32" value={desde} onChange={(e) => setDesde(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Período hasta (AAAAMM)</Label>
-          <Input className="w-32" value={hasta} onChange={(e) => setHasta(e.target.value)} />
-        </div>
-        <Button size="sm" onClick={() => setEjecutar(true)}>Generar balance</Button>
-      </div>
-
-      {isLoading && <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
-
-      {data && data.length > 0 && (
-        <div className="border rounded-lg overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
-            <thead className="bg-muted/40 border-b">
-              <tr>
-                <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-28">Código</th>
-                <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cuenta</th>
-                <th className="text-right py-2.5 px-2 text-xs font-semibold text-muted-foreground">SA Debe</th>
-                <th className="text-right py-2.5 px-2 text-xs font-semibold text-muted-foreground">SA Haber</th>
-                <th className="text-right py-2.5 px-2 text-xs font-semibold text-muted-foreground">Mov Debe</th>
-                <th className="text-right py-2.5 px-2 text-xs font-semibold text-muted-foreground">Mov Haber</th>
-                <th className="text-right py-2.5 px-2 text-xs font-semibold text-muted-foreground">SF Debe</th>
-                <th className="text-right py-2.5 px-2 text-xs font-semibold text-muted-foreground">SF Haber</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.filter((r) => r.saldoFinalDebe !== 0 || r.saldoFinalHaber !== 0 || r.movDebe !== 0 || r.movHaber !== 0).map((r) => (
-                <tr key={r.cuentaId} className="border-b hover:bg-muted/20">
-                  <td className="py-2 px-3 font-mono text-xs">{r.codigo}</td>
-                  <td className={`py-2 px-3 text-sm ${TIPO_COLORS[r.tipo] ?? ""}`}>{r.nombre}</td>
-                  <td className="py-2 px-2 text-right font-mono text-xs">{r.saldoAntDebe ? fmt(r.saldoAntDebe) : "—"}</td>
-                  <td className="py-2 px-2 text-right font-mono text-xs">{r.saldoAntHaber ? fmt(r.saldoAntHaber) : "—"}</td>
-                  <td className="py-2 px-2 text-right font-mono text-xs">{r.movDebe ? fmt(r.movDebe) : "—"}</td>
-                  <td className="py-2 px-2 text-right font-mono text-xs">{r.movHaber ? fmt(r.movHaber) : "—"}</td>
-                  <td className="py-2 px-2 text-right font-mono text-xs font-medium">{r.saldoFinalDebe ? fmt(r.saldoFinalDebe) : "—"}</td>
-                  <td className="py-2 px-2 text-right font-mono text-xs font-medium">{r.saldoFinalHaber ? fmt(r.saldoFinalHaber) : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {data && data.length === 0 && (
-        <div className="text-center py-16 text-muted-foreground">
-          <FileText className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p>Sin movimientos en el período seleccionado</p>
-        </div>
-      )}
-    </div>
+    <Card>
+      <CardContent className="pt-5 pb-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className={cn(
+          "text-2xl font-bold mt-1",
+          trend === "up" && "text-emerald-600 dark:text-emerald-400",
+          trend === "down" && "text-red-600 dark:text-red-400",
+        )}>{value}</p>
+        {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+      </CardContent>
+    </Card>
   );
 }
 
-// ═══ BALANCE COMPARATIVO ═══
-function BalanceComparativoTab() {
-  const [periodos, setPeriodos] = useState(`${currentYear}01,${currentYear}02,${currentYear}03`);
-  const [ejecutar, setEjecutar] = useState(false);
+// ─── Tab 1: Resumen financiero ───────────────────────────────────────────────
+
+function ResumenTab() {
+  const [anio, setAnio] = useState(String(anioActual));
+  const [mes, setMes] = useState("");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["balance-comparativo", periodos],
-    queryFn: async () => {
-      const res = await fetch(`/api/contabilidad/informes/balance-comparativo?periodos=${encodeURIComponent(periodos)}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Error");
-      return res.json() as Promise<{ periodos: string[]; movimientos: any[] }>;
-    },
-    enabled: ejecutar,
-  });
-
-  // Agrupar por cuenta
-  const cuentas: Record<string, { codigo: string; nombre: string; datos: Record<string, number> }> = {};
-  data?.movimientos.forEach((r) => {
-    if (!cuentas[r.cuentaCodigo]) {
-      cuentas[r.cuentaCodigo] = { codigo: r.cuentaCodigo, nombre: r.cuentaNombre, datos: {} };
-    }
-    const neto = r.sumaDebe - r.sumaHaber;
-    cuentas[r.cuentaCodigo].datos[r.periodo] = (cuentas[r.cuentaCodigo].datos[r.periodo] ?? 0) + neto;
-  });
-
-  const periodosArr = data?.periodos ?? [];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="space-y-1 flex-1 max-w-sm">
-          <Label className="text-xs">Períodos a comparar (AAAAMM separados por coma)</Label>
-          <Input value={periodos} onChange={(e) => setPeriodos(e.target.value)} placeholder="202401,202402,202403" />
-        </div>
-        <Button size="sm" onClick={() => setEjecutar(true)}>Comparar</Button>
-      </div>
-
-      {isLoading && <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
-
-      {data && Object.keys(cuentas).length > 0 && (
-        <div className="border rounded-lg overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 border-b">
-              <tr>
-                <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cuenta</th>
-                {periodosArr.map((p) => (
-                  <th key={p} className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {`${p.substring(4, 6)}/${p.substring(0, 4)}`}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Object.values(cuentas).sort((a, b) => a.codigo.localeCompare(b.codigo)).map((c) => (
-                <tr key={c.codigo} className="border-b hover:bg-muted/20">
-                  <td className="py-2 px-3">
-                    <span className="font-mono text-xs text-muted-foreground mr-2">{c.codigo}</span>
-                    {c.nombre}
-                  </td>
-                  {periodosArr.map((p) => (
-                    <td key={p} className={`py-2 px-3 text-right font-mono text-xs ${(c.datos[p] ?? 0) < 0 ? "text-red-600" : ""}`}>
-                      {c.datos[p] ? fmtSigned(c.datos[p]) : "—"}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══ ESTADO DE RESULTADO ═══
-function EstadoResultadoTab() {
-  const [desde, setDesde] = useState(defaultPeriodoDesde);
-  const [hasta, setHasta] = useState(defaultPeriodo);
-  const [ejecutar, setEjecutar] = useState(false);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["estado-resultado", desde, hasta],
-    queryFn: async () => {
-      const res = await fetch(`/api/contabilidad/informes/estado-resultado?periodoDesde=${desde}&periodoHasta=${hasta}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Error");
-      return res.json() as Promise<{ lineas: any[]; totalIngresos: number; totalEgresos: number; utilidadNeta: number }>;
-    },
-    enabled: ejecutar,
+    queryKey: ["contabilidad-resumen", anio, mes],
+    queryFn: () =>
+      apiRequest<any>(`/api/contabilidad/informes/resumen-financiero?anio=${anio}${mes ? `&mes=${mes}` : ""}`),
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="space-y-1">
-          <Label className="text-xs">Período desde (AAAAMM)</Label>
-          <Input className="w-32" value={desde} onChange={(e) => setDesde(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Período hasta (AAAAMM)</Label>
-          <Input className="w-32" value={hasta} onChange={(e) => setHasta(e.target.value)} />
-        </div>
-        <Button size="sm" onClick={() => setEjecutar(true)}>Generar informe</Button>
+    <div className="space-y-5">
+      {/* Filtros */}
+      <div className="flex gap-3 flex-wrap">
+        <Select value={anio} onValueChange={setAnio}>
+          <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {ANIOS.map((a) => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={mes} onValueChange={setMes}>
+          <SelectTrigger className="w-40"><SelectValue placeholder="Todo el año" /></SelectTrigger>
+          <SelectContent>
+            {MESES.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
-      {isLoading && <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
+      {isLoading && <div className="grid grid-cols-3 gap-4">{[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}</div>}
 
       {data && (
-        <div className="space-y-4">
-          {/* Resumen */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="border rounded-lg p-4 text-center">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Ingresos</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">$ {fmt(data.totalIngresos)}</p>
-            </div>
-            <div className="border rounded-lg p-4 text-center">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Egresos</p>
-              <p className="text-2xl font-bold text-red-600 mt-1">$ {fmt(data.totalEgresos)}</p>
-            </div>
-            <div className={`border rounded-lg p-4 text-center ${data.utilidadNeta >= 0 ? "bg-green-50 dark:bg-green-900/10 border-green-200" : "bg-red-50 dark:bg-red-900/10 border-red-200"}`}>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Utilidad Neta</p>
-              <p className={`text-2xl font-bold mt-1 ${data.utilidadNeta >= 0 ? "text-green-700" : "text-red-700"}`}>
-                {fmtSigned(data.utilidadNeta)}
-              </p>
-            </div>
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard
+              label="Ingresos cobrados"
+              value={CLP(data.totales.ingresos)}
+              sub={`${data.serie.reduce((s: number, m: any) => s + m.cantidadCobros, 0)} cobros pagados`}
+              trend="up"
+            />
+            <StatCard
+              label="Gastos (compras)"
+              value={CLP(data.totales.gastos)}
+              sub={`${data.serie.reduce((s: number, m: any) => s + m.cantidadCompras, 0)} facturas registradas`}
+              trend="down"
+            />
+            <StatCard
+              label="Resultado"
+              value={CLP(data.totales.resultado)}
+              sub={data.totales.resultado >= 0 ? "Superávit" : "Déficit"}
+              trend={data.totales.resultado >= 0 ? "up" : "down"}
+            />
           </div>
 
-          {/* Tabla detalle */}
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 border-b">
-                <tr>
-                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cuenta</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-24">Tipo</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-32">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="bg-green-50/50 dark:bg-green-900/5 border-b">
-                  <td colSpan={3} className="py-2 px-3 text-xs font-semibold text-green-700 uppercase tracking-wider">INGRESOS</td>
-                </tr>
-                {data.lineas.filter((l) => l.tipo === "ingreso").map((l) => (
-                  <tr key={l.cuentaId} className="border-b hover:bg-muted/20">
-                    <td className="py-2 px-3"><span className="font-mono text-xs text-muted-foreground mr-2">{l.codigo}</span>{l.nombre}</td>
-                    <td className="py-2 px-3 text-xs text-green-600">Ingreso</td>
-                    <td className="py-2 px-3 text-right font-mono font-medium text-green-700">$ {fmt(l.neto)}</td>
-                  </tr>
-                ))}
-                <tr className="bg-red-50/50 dark:bg-red-900/5 border-b border-t-2">
-                  <td colSpan={3} className="py-2 px-3 text-xs font-semibold text-red-700 uppercase tracking-wider">EGRESOS</td>
-                </tr>
-                {data.lineas.filter((l) => l.tipo === "egreso").map((l) => (
-                  <tr key={l.cuentaId} className="border-b hover:bg-muted/20">
-                    <td className="py-2 px-3"><span className="font-mono text-xs text-muted-foreground mr-2">{l.codigo}</span>{l.nombre}</td>
-                    <td className="py-2 px-3 text-xs text-red-600">Egreso</td>
-                    <td className="py-2 px-3 text-right font-mono font-medium text-red-700">$ {fmt(l.neto)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══ LIBRO DIARIO ═══
-function LibroDiarioTab() {
-  const [desde, setDesde] = useState(defaultPeriodo);
-  const [hasta, setHasta] = useState(defaultPeriodo);
-  const [ejecutar, setEjecutar] = useState(false);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["libro-diario", desde, hasta],
-    queryFn: async () => {
-      const res = await fetch(`/api/contabilidad/informes/libro-diario?periodoDesde=${desde}&periodoHasta=${hasta}&limit=200`, { credentials: "include" });
-      if (!res.ok) throw new Error("Error");
-      return res.json() as Promise<any[]>;
-    },
-    enabled: ejecutar,
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="space-y-1">
-          <Label className="text-xs">Período desde (AAAAMM)</Label>
-          <Input className="w-32" value={desde} onChange={(e) => setDesde(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Período hasta (AAAAMM)</Label>
-          <Input className="w-32" value={hasta} onChange={(e) => setHasta(e.target.value)} />
-        </div>
-        <Button size="sm" onClick={() => setEjecutar(true)}>Generar libro</Button>
-      </div>
-
-      {isLoading && <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
-
-      {data && data.length > 0 && (
-        <div className="space-y-4">
-          {data.map((a) => (
-            <div key={a.id} className="border rounded-lg overflow-hidden">
-              <div className="bg-muted/40 px-3 py-2 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-sm font-semibold">{a.numero}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {format(new Date(a.fecha + "T12:00:00"), "dd/MM/yyyy")}
-                  </span>
-                  <span className="text-sm">{a.descripcion}</span>
+          {/* Tabla mensual */}
+          {data.serie.length > 1 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Detalle por mes</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/40">
+                        <th className="text-left px-4 py-2.5 font-medium">Mes</th>
+                        <th className="text-right px-4 py-2.5 font-medium text-emerald-700 dark:text-emerald-400">Ingresos</th>
+                        <th className="text-right px-4 py-2.5 font-medium text-red-700 dark:text-red-400">Gastos</th>
+                        <th className="text-right px-4 py-2.5 font-medium">Resultado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.serie.map((s: any) => (
+                        <tr key={s.mes} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="px-4 py-2.5 font-medium">{s.label}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+                            {s.ingresos > 0 ? CLP(s.ingresos) : <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-red-700 dark:text-red-400">
+                            {s.gastos > 0 ? CLP(s.gastos) : <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className={cn(
+                            "px-4 py-2.5 text-right tabular-nums font-medium",
+                            s.resultado > 0 ? "text-emerald-700 dark:text-emerald-400" : s.resultado < 0 ? "text-red-700 dark:text-red-400" : "text-muted-foreground",
+                          )}>
+                            {s.ingresos === 0 && s.gastos === 0 ? "—" : CLP(s.resultado)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-muted/50 font-semibold">
+                        <td className="px-4 py-2.5">Total</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{CLP(data.totales.ingresos)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-red-700 dark:text-red-400">{CLP(data.totales.gastos)}</td>
+                        <td className={cn(
+                          "px-4 py-2.5 text-right tabular-nums",
+                          data.totales.resultado >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400",
+                        )}>
+                          {CLP(data.totales.resultado)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
-              </div>
-              <table className="w-full text-sm">
-                <tbody>
-                  {a.lineas.map((l: any, i: number) => (
-                    <tr key={i} className="border-t">
-                      <td className="py-2 px-3 font-mono text-xs text-muted-foreground w-24">{l.cuentaCodigo}</td>
-                      <td className="py-2 px-3">{l.cuentaNombre}</td>
-                      <td className="py-2 px-3 text-right font-mono text-xs w-28">
-                        {parseFloat(l.debe) > 0 ? `$ ${fmt(parseFloat(l.debe))}` : ""}
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono text-xs w-28">
-                        {parseFloat(l.haber) > 0 ? `$ ${fmt(parseFloat(l.haber))}` : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {data.serie.length === 0 && (
+            <Card className="border-dashed">
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                No hay cobros pagados ni compras registradas para este período.
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-// ═══ LIBRO MAYOR ═══
-function LibroMayorTab() {
-  const [cuentaId, setCuentaId] = useState("");
-  const [desde, setDesde] = useState(defaultPeriodo);
-  const [hasta, setHasta] = useState(defaultPeriodo);
-  const [ejecutar, setEjecutar] = useState(false);
+// ─── Tab 2: Presupuesto proyectado ──────────────────────────────────────────
 
-  const { data: cuentas = [] } = useQuery({
-    queryKey: ["cuentas-hojas"],
-    queryFn: async () => {
-      const res = await fetch("/api/contabilidad/plan-cuentas/hojas", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json() as Promise<any[]>;
-    },
-  });
+function PresupuestoTab() {
+  const [mesesHistorico, setMesesHistorico] = useState("6");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["libro-mayor", cuentaId, desde, hasta],
-    queryFn: async () => {
-      const res = await fetch(`/api/contabilidad/informes/libro-mayor?cuentaId=${cuentaId}&periodoDesde=${desde}&periodoHasta=${hasta}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Error");
-      return res.json() as Promise<{ cuenta: any; saldoAnterior: number; movimientos: any[] }>;
-    },
-    enabled: ejecutar && !!cuentaId,
+    queryKey: ["contabilidad-presupuesto-real", mesesHistorico],
+    queryFn: () =>
+      apiRequest<any>(`/api/contabilidad/informes/presupuesto-real?meses=${mesesHistorico}`),
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="space-y-1 flex-1 max-w-xs">
-          <Label className="text-xs">Cuenta</Label>
-          <Select value={cuentaId} onValueChange={setCuentaId}>
-            <SelectTrigger><SelectValue placeholder="Selecciona cuenta..." /></SelectTrigger>
+    <div className="space-y-5">
+      <div className="flex gap-3 items-center flex-wrap">
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Base histórica</p>
+          <Select value={mesesHistorico} onValueChange={setMesesHistorico}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {cuentas.map((c: any) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.codigo} — {c.nombre}</SelectItem>
-              ))}
+              <SelectItem value="3">Últimos 3 meses</SelectItem>
+              <SelectItem value="6">Últimos 6 meses</SelectItem>
+              <SelectItem value="12">Último año</SelectItem>
+              <SelectItem value="24">Últimos 2 años</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Desde (AAAAMM)</Label>
-          <Input className="w-32" value={desde} onChange={(e) => setDesde(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Hasta (AAAAMM)</Label>
-          <Input className="w-32" value={hasta} onChange={(e) => setHasta(e.target.value)} />
-        </div>
-        <Button size="sm" onClick={() => setEjecutar(true)} disabled={!cuentaId}>Ver mayor</Button>
+        {data && (
+          <div className="text-xs text-muted-foreground mt-4">
+            Basado en datos del {data.fechaDesde} al {data.fechaHasta}
+          </div>
+        )}
       </div>
 
-      {isLoading && <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
+      {isLoading && <Skeleton className="h-64" />}
 
       {data && (
-        <div className="space-y-3">
-          <div className="bg-muted/40 rounded-lg px-4 py-2 flex gap-6 text-sm">
-            <span><strong>{data.cuenta.codigo}</strong> — {data.cuenta.nombre}</span>
-            <span className="text-muted-foreground">Saldo anterior: <strong>$ {fmt(data.saldoAnterior)}</strong></span>
+        <>
+          {/* Resumen histórico */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard
+              label="Promedio ingresos/mes"
+              value={CLP(data.historico.promedioIngresos)}
+              sub={`sobre ${data.mesesHistorico} meses`}
+              trend="up"
+            />
+            <StatCard
+              label="Promedio gastos/mes"
+              value={CLP(data.historico.promedioGastos)}
+              sub={`sobre ${data.mesesHistorico} meses`}
+              trend="down"
+            />
+            <StatCard
+              label="Resultado promedio/mes"
+              value={CLP(data.historico.promedioIngresos - data.historico.promedioGastos)}
+              sub="proyectado mensual"
+              trend={(data.historico.promedioIngresos - data.historico.promedioGastos) >= 0 ? "up" : "down"}
+            />
           </div>
-          <div className="border rounded-lg overflow-hidden">
+
+          {/* Proyección 12 meses */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Proyección próximos 12 meses</CardTitle>
+              <CardDescription className="text-xs">
+                Calculado en base al promedio histórico de los últimos {data.mesesHistorico} meses
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/40">
+                      <th className="text-left px-4 py-2.5 font-medium">Período</th>
+                      <th className="text-right px-4 py-2.5 font-medium text-emerald-700 dark:text-emerald-400">Ingresos proy.</th>
+                      <th className="text-right px-4 py-2.5 font-medium text-red-700 dark:text-red-400">Gastos proy.</th>
+                      <th className="text-right px-4 py-2.5 font-medium">Resultado proy.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.proyeccion.map((p: any) => (
+                      <tr key={`${p.anio}-${p.mes}`} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="px-4 py-2.5 font-medium">{p.label}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{CLP(p.ingresosProyectados)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-red-700 dark:text-red-400">{CLP(p.gastosProyectados)}</td>
+                        <td className={cn(
+                          "px-4 py-2.5 text-right tabular-nums font-medium",
+                          p.resultadoProyectado >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400",
+                        )}>
+                          {CLP(p.resultadoProyectado)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-muted/50 font-semibold">
+                      <td className="px-4 py-2.5">Total anual proyectado</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+                        {CLP(data.proyeccion.reduce((s: number, p: any) => s + p.ingresosProyectados, 0))}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-red-700 dark:text-red-400">
+                        {CLP(data.proyeccion.reduce((s: number, p: any) => s + p.gastosProyectados, 0))}
+                      </td>
+                      <td className={cn(
+                        "px-4 py-2.5 text-right tabular-nums",
+                        data.historico.promedioIngresos >= data.historico.promedioGastos
+                          ? "text-emerald-700 dark:text-emerald-400"
+                          : "text-red-700 dark:text-red-400",
+                      )}>
+                        {CLP(data.proyeccion.reduce((s: number, p: any) => s + p.resultadoProyectado, 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {data.historico.mesesConIngresos === 0 && data.historico.mesesConGastos === 0 && (
+            <Card className="border-dashed">
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                No hay datos históricos suficientes para calcular una proyección. Registra cobros y compras para ver el presupuesto.
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Tab 3: Libro diario (desde asientos) ───────────────────────────────────
+
+function LibroDiarioTab() {
+  const [periodoDesde, setPeriodoDesde] = useState(() => {
+    const h = new Date();
+    return `${h.getFullYear()}${String(h.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [periodoHasta, setPeriodoHasta] = useState(periodoDesde);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["libro-diario", periodoDesde, periodoHasta],
+    queryFn: () =>
+      apiRequest<any[]>(`/api/contabilidad/informes/libro-diario?periodoDesde=${periodoDesde}&periodoHasta=${periodoHasta}`),
+  });
+
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-3 flex-wrap">
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Período desde (AAAAMM)</p>
+          <input
+            className="border rounded px-3 py-1.5 text-sm w-32 bg-background"
+            value={periodoDesde}
+            onChange={(e) => setPeriodoDesde(e.target.value)}
+            maxLength={6}
+          />
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Período hasta (AAAAMM)</p>
+          <input
+            className="border rounded px-3 py-1.5 text-sm w-32 bg-background"
+            value={periodoHasta}
+            onChange={(e) => setPeriodoHasta(e.target.value)}
+            maxLength={6}
+          />
+        </div>
+      </div>
+
+      {isLoading && <Skeleton className="h-48" />}
+
+      {data && data.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            No hay asientos contabilizados en este período.
+          </CardContent>
+        </Card>
+      )}
+
+      {data && data.map((asiento: any) => (
+        <Card key={asiento.id} className="overflow-hidden">
+          <CardHeader className="py-3 px-4 bg-muted/30 border-b">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-semibold text-muted-foreground">{asiento.numero}</span>
+                <span className="font-medium text-sm">{asiento.descripcion}</span>
+              </div>
+              <span className="text-xs text-muted-foreground">{asiento.fecha}</span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
             <table className="w-full text-sm">
-              <thead className="bg-muted/40 border-b">
-                <tr>
-                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Fecha</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">N° Asiento</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground">Descripción</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground">Debe</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground">Haber</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground">Saldo</th>
+              <thead>
+                <tr className="border-b text-xs text-muted-foreground">
+                  <th className="text-left px-4 py-2">Cuenta</th>
+                  <th className="text-right px-4 py-2">Debe</th>
+                  <th className="text-right px-4 py-2">Haber</th>
                 </tr>
               </thead>
               <tbody>
-                {data.movimientos.map((m: any, i: number) => (
-                  <tr key={i} className="border-b hover:bg-muted/20">
-                    <td className="py-2 px-3 text-xs">{format(new Date(m.fecha + "T12:00:00"), "dd/MM/yyyy")}</td>
-                    <td className="py-2 px-3 font-mono text-xs">{m.numero}</td>
-                    <td className="py-2 px-3 text-xs text-muted-foreground">{m.descripcionAsiento}</td>
-                    <td className="py-2 px-3 text-right font-mono text-xs">{parseFloat(m.debe) > 0 ? `$ ${fmt(parseFloat(m.debe))}` : "—"}</td>
-                    <td className="py-2 px-3 text-right font-mono text-xs">{parseFloat(m.haber) > 0 ? `$ ${fmt(parseFloat(m.haber))}` : "—"}</td>
-                    <td className={`py-2 px-3 text-right font-mono text-xs font-medium ${m.saldo < 0 ? "text-red-600" : ""}`}>$ {fmt(m.saldo)}</td>
+                {asiento.lineas?.map((l: any) => (
+                  <tr key={l.id} className="border-b last:border-0">
+                    <td className="px-4 py-2">
+                      <span className="font-mono text-xs text-muted-foreground mr-2">{l.cuentaCodigo}</span>
+                      {l.cuentaNombre}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {parseFloat(l.debe) > 0 ? CLP(parseFloat(l.debe)) : ""}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {parseFloat(l.haber) > 0 ? CLP(parseFloat(l.haber)) : ""}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
 
-// ═══ CÁLCULO IVA ═══
+// ─── Tab 4: Cálculo IVA F29 ─────────────────────────────────────────────────
+
 function CalculoIvaTab() {
-  const [periodo, setPeriodo] = useState(defaultPeriodo);
-  const [ejecutar, setEjecutar] = useState(false);
+  const [periodo, setPeriodo] = useState(() => {
+    const h = new Date();
+    return `${h.getFullYear()}${String(h.getMonth() + 1).padStart(2, "0")}`;
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["calculo-iva", periodo],
-    queryFn: async () => {
-      const res = await fetch(`/api/contabilidad/informes/calculo-iva?periodo=${periodo}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Error");
-      return res.json() as Promise<any>;
-    },
-    enabled: ejecutar,
+    queryFn: () => apiRequest<any>(`/api/contabilidad/informes/calculo-iva?periodo=${periodo}`),
+    enabled: /^\d{6}$/.test(periodo),
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="space-y-1">
-          <Label className="text-xs">Período (AAAAMM)</Label>
-          <Input className="w-32" value={periodo} onChange={(e) => setPeriodo(e.target.value)} />
-        </div>
-        <Button size="sm" onClick={() => setEjecutar(true)}>Calcular IVA</Button>
+    <div className="space-y-5">
+      <div>
+        <p className="text-xs text-muted-foreground mb-1">Período (AAAAMM)</p>
+        <input
+          className="border rounded px-3 py-1.5 text-sm w-32 bg-background"
+          value={periodo}
+          onChange={(e) => setPeriodo(e.target.value)}
+          maxLength={6}
+        />
       </div>
 
-      {isLoading && <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
+      {isLoading && <Skeleton className="h-64" />}
 
-      {data && (
-        <div className="space-y-6">
-          {/* F29 */}
-          <div className="border rounded-lg overflow-hidden">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border-b px-4 py-2.5">
-              <h3 className="font-semibold text-blue-800 dark:text-blue-300">Formulario 29 — IVA Mensual</h3>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Período {data.periodo.substring(4, 6)}/{data.periodo.substring(0, 4)}</p>
-            </div>
-            <div className="p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ventas</h4>
-                  <div className="flex justify-between text-sm py-1 border-b"><span>Ventas netas afectas</span><span className="font-mono font-medium">$ {fmt(data.f29.ventasNetas)}</span></div>
-                  <div className="flex justify-between text-sm py-1 border-b"><span>Ventas exentas / no afectas</span><span className="font-mono">$ {fmt(data.f29.ventasExentas)}</span></div>
-                  <div className="flex justify-between text-sm py-1 bg-muted/30 px-2 rounded font-semibold">
-                    <span>IVA Débito Fiscal (19%)</span>
-                    <span className="font-mono text-primary">$ {fmt(data.f29.ivaDebito)}</span>
-                  </div>
+      {data?.f29 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Ventas */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Ventas del período</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Neto</span><span className="tabular-nums font-medium">{CLP(data.f29.ventasNetas)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Exento</span><span className="tabular-nums">{CLP(data.f29.ventasExentas)}</span></div>
+              <div className="flex justify-between border-t pt-2"><span className="font-semibold">IVA débito (19%)</span><span className="tabular-nums font-bold">{CLP(data.f29.ivaDebito)}</span></div>
+            </CardContent>
+          </Card>
+
+          {/* Compras */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-red-700 dark:text-red-400">Compras del período</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Neto</span><span className="tabular-nums font-medium">{CLP(data.f29.comprasNetas)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">IVA no recuperable</span><span className="tabular-nums">{CLP(data.f29.ivaNoRecuperable)}</span></div>
+              <div className="flex justify-between border-t pt-2"><span className="font-semibold">IVA crédito</span><span className="tabular-nums font-bold">{CLP(data.f29.ivaCredito)}</span></div>
+            </CardContent>
+          </Card>
+
+          {/* Determinación */}
+          <Card className={cn(
+            "md:col-span-2 border-2",
+            data.f29.situacion === "pago" && "border-red-500",
+            data.f29.situacion === "remanente" && "border-emerald-500",
+            data.f29.situacion === "cero" && "border-muted",
+          )}>
+            <CardContent className="pt-5">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Determinación IVA — Formulario 29</p>
+                  <p className={cn(
+                    "text-3xl font-bold mt-1",
+                    data.f29.situacion === "pago" ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400",
+                  )}>
+                    {CLP(Math.abs(data.f29.ivaDeterminar))}
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Compras</h4>
-                  <div className="flex justify-between text-sm py-1 border-b"><span>Compras netas afectas</span><span className="font-mono font-medium">$ {fmt(data.f29.comprasNetas)}</span></div>
-                  <div className="flex justify-between text-sm py-1 border-b"><span>IVA no recuperable</span><span className="font-mono text-muted-foreground">$ {fmt(data.f29.ivaNoRecuperable)}</span></div>
-                  <div className="flex justify-between text-sm py-1 bg-muted/30 px-2 rounded font-semibold">
-                    <span>IVA Crédito Fiscal</span>
-                    <span className="font-mono text-green-600">$ {fmt(data.f29.ivaCredito)}</span>
-                  </div>
-                </div>
+                <Badge
+                  className={cn(
+                    "text-sm px-4 py-1.5 uppercase font-semibold",
+                    data.f29.situacion === "pago" && "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+                    data.f29.situacion === "remanente" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+                  )}
+                >
+                  {data.f29.situacion === "pago" ? "🔴 A pagar al SII" : data.f29.situacion === "remanente" ? "🟢 Remanente crédito" : "Sin movimiento"}
+                </Badge>
               </div>
-
-              <div className={`mt-4 p-4 rounded-lg border-2 text-center ${data.f29.situacion === "pago" ? "border-red-200 bg-red-50 dark:bg-red-900/10" : data.f29.situacion === "remanente" ? "border-green-200 bg-green-50 dark:bg-green-900/10" : "border-muted"}`}>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-                  {data.f29.situacion === "pago" ? "IVA A PAGAR" : data.f29.situacion === "remanente" ? "REMANENTE A FAVOR" : "SIN DIFERENCIA"}
-                </p>
-                <p className={`text-3xl font-bold font-mono ${data.f29.situacion === "pago" ? "text-red-700" : data.f29.situacion === "remanente" ? "text-green-700" : "text-muted-foreground"}`}>
-                  $ {fmt(Math.abs(data.f29.ivaDeterminar))}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-sm text-muted-foreground bg-muted/30 rounded p-3">
-            <strong>Formulario 22 (Renta anual)</strong> y <strong>Formulario 50 (Retenciones)</strong> requieren información adicional de remuneraciones y retenciones. Se generarán desde el módulo de RR.HH. una vez disponible.
-          </div>
+            </CardContent>
+          </Card>
         </div>
+      )}
+
+      {data && !data.f29.ventasNetas && !data.f29.comprasNetas && (
+        <Card className="border-dashed">
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            No hay documentos en el libro SII para este período. Importa el libro de compras y ventas primero.
+          </CardContent>
+        </Card>
       )}
     </div>
   );
 }
 
-// ═══ COMPONENTE PRINCIPAL ═══
+// ─── Componente principal ────────────────────────────────────────────────────
+
 interface Props { hideHeader?: boolean }
 
-export default function InformesContabilidadPage({ hideHeader }: Props) {
+export default function InformesPage({ hideHeader }: Props) {
+  const TABS = [
+    { value: "resumen", label: "Resumen financiero", icon: BarChart3 },
+    { value: "presupuesto", label: "Presupuesto", icon: TrendingUp },
+    { value: "libro-diario", label: "Libro diario", icon: BookOpen },
+    { value: "iva", label: "Cálculo IVA (F29)", icon: Calculator },
+  ];
+
   return (
-    <div className="space-y-5">
+    <div className="p-5 space-y-5">
       {!hideHeader && (
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contabilidad</p>
-          <h1 className="text-2xl font-bold tracking-tight">Informes Contables</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Informes</h1>
         </div>
       )}
 
-      <Tabs defaultValue="balance8" className="space-y-5">
+      <Tabs defaultValue="resumen" className="space-y-5">
         <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="balance8" className="gap-1.5">
-            <Layers className="h-4 w-4" />
-            Balance 8 columnas
-          </TabsTrigger>
-          <TabsTrigger value="comparativo" className="gap-1.5">
-            <BarChart3 className="h-4 w-4" />
-            Balance comparativo
-          </TabsTrigger>
-          <TabsTrigger value="resultado" className="gap-1.5">
-            <TrendingUp className="h-4 w-4" />
-            Estado de resultado
-          </TabsTrigger>
-          <TabsTrigger value="diario" className="gap-1.5">
-            <FileText className="h-4 w-4" />
-            Libro diario
-          </TabsTrigger>
-          <TabsTrigger value="mayor" className="gap-1.5">
-            <BookOpen className="h-4 w-4" />
-            Libro mayor
-          </TabsTrigger>
-          <TabsTrigger value="iva" className="gap-1.5">
-            <Calculator className="h-4 w-4" />
-            Cálculo IVA
-          </TabsTrigger>
+          {TABS.map((t) => (
+            <TabsTrigger key={t.value} value={t.value} className="gap-1.5">
+              <t.icon className="h-4 w-4" />
+              {t.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="balance8" className="mt-0"><Balance8ColTab /></TabsContent>
-        <TabsContent value="comparativo" className="mt-0"><BalanceComparativoTab /></TabsContent>
-        <TabsContent value="resultado" className="mt-0"><EstadoResultadoTab /></TabsContent>
-        <TabsContent value="diario" className="mt-0"><LibroDiarioTab /></TabsContent>
-        <TabsContent value="mayor" className="mt-0"><LibroMayorTab /></TabsContent>
-        <TabsContent value="iva" className="mt-0"><CalculoIvaTab /></TabsContent>
+        <TabsContent value="resumen"><ResumenTab /></TabsContent>
+        <TabsContent value="presupuesto"><PresupuestoTab /></TabsContent>
+        <TabsContent value="libro-diario"><LibroDiarioTab /></TabsContent>
+        <TabsContent value="iva"><CalculoIvaTab /></TabsContent>
       </Tabs>
     </div>
   );

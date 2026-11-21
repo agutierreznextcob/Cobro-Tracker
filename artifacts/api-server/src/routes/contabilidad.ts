@@ -12,6 +12,8 @@ import {
   presupuestoItemsTable,
   libroSiiImportacionesTable,
   libroSiiDocumentosTable,
+  cobrosTable,
+  comprasTable,
   type InsertPlanCuenta,
   type InsertAsiento,
   type InsertAsientoLinea,
@@ -20,7 +22,7 @@ import {
   type InsertLibroSiiImportacion,
   type InsertLibroSiiDocumento,
 } from "@workspace/db";
-import { eq, and, asc, desc, sql, inArray, gte, lte, sum, like, isNull } from "drizzle-orm";
+import { eq, and, asc, desc, sql, inArray, gte, lte, sum, like, isNull, ne } from "drizzle-orm";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { z } from "zod/v4";
 import { getOrgContext } from "../lib/org";
@@ -1075,4 +1077,235 @@ contabilidadRouter.delete("/contabilidad/libro-sii/:id", requireSubscription, as
   await db.delete(libroSiiImportacionesTable).where(eq(libroSiiImportacionesTable.id, id));
 
   res.json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INFORMES DESDE DATOS REALES (cobros + compras de la plataforma)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/contabilidad/informes/resumen-financiero
+ * Resumen financiero: ingresos (cobros pagados) y gastos (compras) por período.
+ * Query params: anio (obligatorio), mes (opcional, 1-12 para filtrar un mes)
+ */
+contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubscription, async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+
+  const { anio, mes } = req.query as Record<string, string>;
+  if (!anio || isNaN(parseInt(anio))) {
+    return res.status(400).json({ error: "Se requiere el parámetro anio (ej: 2024)" });
+  }
+
+  const anioNum = parseInt(anio);
+  const mesNum = mes ? parseInt(mes) : null;
+
+  // Cobros pagados del año (ingresos). Filtramos por organizationId o usuarioId.
+  const orgCtx = await (async () => {
+    const { getOrgContext } = await import("../lib/org");
+    return getOrgContext(auth.userId);
+  })();
+
+  const orgId = orgCtx.organizationId ?? null;
+
+  // Construir filtros de fecha
+  const fechaDesde = mesNum
+    ? `${anioNum}-${String(mesNum).padStart(2, "0")}-01`
+    : `${anioNum}-01-01`;
+  const ultimoDia = mesNum
+    ? new Date(anioNum, mesNum, 0).getDate()
+    : 31;
+  const mesHasta = mesNum ?? 12;
+  const fechaHasta = `${anioNum}-${String(mesHasta).padStart(2, "0")}-${String(ultimoDia).padStart(2, "0")}`;
+
+  // ── Ingresos por mes (cobros con estado pagado/parcial) ──
+  const cobrosBase = db
+    .select({
+      mes: sql<string>`to_char(fecha_vencimiento::date, 'MM')`,
+      totalMonto: sum(cobrosTable.monto).mapWith(Number),
+      totalNeto: sum(cobrosTable.montoNeto).mapWith(Number),
+      totalIva: sum(cobrosTable.montoIva).mapWith(Number),
+      count: sql<number>`count(*)`.mapWith(Number),
+    })
+    .from(cobrosTable)
+    .where(
+      and(
+        orgId
+          ? eq(cobrosTable.organizationId, orgId)
+          : eq(cobrosTable.usuarioId, auth.userId),
+        inArray(cobrosTable.estado, ["pagado", "pagado_parcial"]),
+        gte(cobrosTable.fechaVencimiento, fechaDesde),
+        lte(cobrosTable.fechaVencimiento, fechaHasta),
+      ),
+    )
+    .groupBy(sql`to_char(fecha_vencimiento::date, 'MM')`)
+    .orderBy(sql`to_char(fecha_vencimiento::date, 'MM')`);
+
+  // ── Gastos por mes (compras recibidas/contabilizadas) ──
+  const comprasBase = db
+    .select({
+      mes: sql<string>`to_char(fecha_emision::date, 'MM')`,
+      totalSubtotal: sum(comprasTable.subtotal).mapWith(Number),
+      totalIva: sum(comprasTable.montoIva).mapWith(Number),
+      totalMonto: sum(comprasTable.total).mapWith(Number),
+      count: sql<number>`count(*)`.mapWith(Number),
+    })
+    .from(comprasTable)
+    .where(
+      and(
+        orgId
+          ? eq(comprasTable.organizationId, orgId)
+          : eq(comprasTable.usuarioId, auth.userId),
+        inArray(comprasTable.estado, ["recibida", "contabilizada"]),
+        gte(comprasTable.fechaEmision, fechaDesde),
+        lte(comprasTable.fechaEmision, fechaHasta),
+      ),
+    )
+    .groupBy(sql`to_char(fecha_emision::date, 'MM')`)
+    .orderBy(sql`to_char(fecha_emision::date, 'MM')`);
+
+  const [cobrosRows, comprasRows] = await Promise.all([cobrosBase, comprasBase]);
+
+  // Mapear por mes (1..12)
+  const mesesLabels = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const meses = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const ingresosPorMes: Record<number, { monto: number; neto: number; iva: number; count: number }> = {};
+  const gastosPorMes: Record<number, { subtotal: number; iva: number; total: number; count: number }> = {};
+
+  for (const r of cobrosRows) {
+    const m = parseInt(r.mes);
+    ingresosPorMes[m] = { monto: r.totalMonto ?? 0, neto: r.totalNeto ?? 0, iva: r.totalIva ?? 0, count: r.count ?? 0 };
+  }
+  for (const r of comprasRows) {
+    const m = parseInt(r.mes);
+    gastosPorMes[m] = { subtotal: r.totalSubtotal ?? 0, iva: r.totalIva ?? 0, total: r.totalMonto ?? 0, count: r.count ?? 0 };
+  }
+
+  const serie = (mesNum ? [mesNum] : meses).map((m) => {
+    const ing = ingresosPorMes[m] ?? { monto: 0, neto: 0, iva: 0, count: 0 };
+    const gas = gastosPorMes[m] ?? { subtotal: 0, iva: 0, total: 0, count: 0 };
+    return {
+      mes: m,
+      label: mesesLabels[m - 1],
+      ingresos: ing.monto,
+      ingresosNeto: ing.neto,
+      ingresosIva: ing.iva,
+      cantidadCobros: ing.count,
+      gastos: gas.total,
+      gastosNeto: gas.subtotal,
+      gastosIva: gas.iva,
+      cantidadCompras: gas.count,
+      resultado: ing.monto - gas.total,
+    };
+  });
+
+  const totales = serie.reduce(
+    (acc, s) => ({
+      ingresos: acc.ingresos + s.ingresos,
+      gastos: acc.gastos + s.gastos,
+      resultado: acc.resultado + s.resultado,
+    }),
+    { ingresos: 0, gastos: 0, resultado: 0 },
+  );
+
+  res.json({ anio: anioNum, mes: mesNum, serie, totales });
+});
+
+/**
+ * GET /api/contabilidad/informes/presupuesto-real
+ * Proyección automática de presupuesto: promedio mensual de los últimos N meses
+ * Query params: meses (default 6) — cuántos meses históricos usar para calcular.
+ */
+contabilidadRouter.get("/contabilidad/informes/presupuesto-real", requireSubscription, async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+
+  const { meses: mesesStr = "6" } = req.query as Record<string, string>;
+  const mesesHistorico = Math.min(Math.max(parseInt(mesesStr) || 6, 1), 24);
+
+  const orgCtx = await (async () => {
+    const { getOrgContext } = await import("../lib/org");
+    return getOrgContext(auth.userId);
+  })();
+
+  const orgId = orgCtx.organizationId ?? null;
+
+  // Rango: últimos N meses hasta hoy
+  const hoy = new Date();
+  const fechaHasta = hoy.toISOString().slice(0, 10);
+  const fechaDesde = new Date(hoy.getFullYear(), hoy.getMonth() - mesesHistorico, 1)
+    .toISOString()
+    .slice(0, 10);
+
+  // Cobros pagados agrupados por mes
+  const cobrosRows = await db
+    .select({
+      anio: sql<number>`extract(year from fecha_vencimiento::date)`.mapWith(Number),
+      mes: sql<number>`extract(month from fecha_vencimiento::date)`.mapWith(Number),
+      total: sum(cobrosTable.monto).mapWith(Number),
+    })
+    .from(cobrosTable)
+    .where(
+      and(
+        orgId ? eq(cobrosTable.organizationId, orgId) : eq(cobrosTable.usuarioId, auth.userId),
+        inArray(cobrosTable.estado, ["pagado", "pagado_parcial"]),
+        gte(cobrosTable.fechaVencimiento, fechaDesde),
+        lte(cobrosTable.fechaVencimiento, fechaHasta),
+      ),
+    )
+    .groupBy(sql`extract(year from fecha_vencimiento::date)`, sql`extract(month from fecha_vencimiento::date)`);
+
+  // Compras agrupadas por mes
+  const comprasRows = await db
+    .select({
+      anio: sql<number>`extract(year from fecha_emision::date)`.mapWith(Number),
+      mes: sql<number>`extract(month from fecha_emision::date)`.mapWith(Number),
+      total: sum(comprasTable.total).mapWith(Number),
+    })
+    .from(comprasTable)
+    .where(
+      and(
+        orgId ? eq(comprasTable.organizationId, orgId) : eq(comprasTable.usuarioId, auth.userId),
+        inArray(comprasTable.estado, ["recibida", "contabilizada"]),
+        gte(comprasTable.fechaEmision, fechaDesde),
+        lte(comprasTable.fechaEmision, fechaHasta),
+      ),
+    )
+    .groupBy(sql`extract(year from fecha_emision::date)`, sql`extract(month from fecha_emision::date)`);
+
+  const totalIngresos = cobrosRows.reduce((s, r) => s + (r.total ?? 0), 0);
+  const totalGastos = comprasRows.reduce((s, r) => s + (r.total ?? 0), 0);
+
+  const promedioIngresos = cobrosRows.length > 0 ? totalIngresos / mesesHistorico : 0;
+  const promedioGastos = comprasRows.length > 0 ? totalGastos / mesesHistorico : 0;
+
+  // Proyección para los próximos 12 meses
+  const proyeccion = Array.from({ length: 12 }, (_, i) => {
+    const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i + 1, 1);
+    const mesesLabels = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    return {
+      mes: fecha.getMonth() + 1,
+      anio: fecha.getFullYear(),
+      label: `${mesesLabels[fecha.getMonth()]} ${fecha.getFullYear()}`,
+      ingresosProyectados: Math.round(promedioIngresos),
+      gastosProyectados: Math.round(promedioGastos),
+      resultadoProyectado: Math.round(promedioIngresos - promedioGastos),
+    };
+  });
+
+  res.json({
+    mesesHistorico,
+    fechaDesde,
+    fechaHasta,
+    historico: {
+      totalIngresos,
+      totalGastos,
+      promedioIngresos: Math.round(promedioIngresos),
+      promedioGastos: Math.round(promedioGastos),
+      mesesConIngresos: cobrosRows.length,
+      mesesConGastos: comprasRows.length,
+    },
+    proyeccion,
+  });
 });
