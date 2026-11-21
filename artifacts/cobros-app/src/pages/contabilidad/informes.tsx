@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+async function apiFetch<T>(url: string): Promise<T> {
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  return res.json() as Promise<T>;
+}
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,7 +53,7 @@ function ResumenTab() {
   const { data, isLoading } = useQuery({
     queryKey: ["contabilidad-resumen", anio, mes],
     queryFn: () =>
-      apiRequest<any>(`/api/contabilidad/informes/resumen-financiero?anio=${anio}${mes ? `&mes=${mes}` : ""}`),
+      apiFetch<any>(`/api/contabilidad/informes/resumen-financiero?anio=${anio}${mes ? `&mes=${mes}` : ""}`),
   });
 
   return (
@@ -172,7 +176,7 @@ function PresupuestoTab() {
   const { data, isLoading } = useQuery({
     queryKey: ["contabilidad-presupuesto-real", mesesHistorico],
     queryFn: () =>
-      apiRequest<any>(`/api/contabilidad/informes/presupuesto-real?meses=${mesesHistorico}`),
+      apiFetch<any>(`/api/contabilidad/informes/presupuesto-real?meses=${mesesHistorico}`),
   });
 
   return (
@@ -306,7 +310,7 @@ function LibroDiarioTab() {
   const { data, isLoading } = useQuery({
     queryKey: ["libro-diario", periodoDesde, periodoHasta],
     queryFn: () =>
-      apiRequest<any[]>(`/api/contabilidad/informes/libro-diario?periodoDesde=${periodoDesde}&periodoHasta=${periodoHasta}`),
+      apiFetch<any[]>(`/api/contabilidad/informes/libro-diario?periodoDesde=${periodoDesde}&periodoHasta=${periodoHasta}`),
   });
 
   return (
@@ -396,7 +400,7 @@ function CalculoIvaTab() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["calculo-iva", periodo],
-    queryFn: () => apiRequest<any>(`/api/contabilidad/informes/calculo-iva?periodo=${periodo}`),
+    queryFn: () => apiFetch<any>(`/api/contabilidad/informes/calculo-iva?periodo=${periodo}`),
     enabled: /^\d{6}$/.test(periodo),
   });
 
