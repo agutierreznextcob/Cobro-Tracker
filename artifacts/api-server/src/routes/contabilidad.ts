@@ -126,6 +126,136 @@ contabilidadRouter.post("/contabilidad/plan-cuentas", requireSubscription, async
   res.status(201).json(cuenta);
 });
 
+/** POST /api/contabilidad/plan-cuentas/seed-estandar — carga plan de cuentas chileno estándar si está vacío */
+contabilidadRouter.post("/contabilidad/plan-cuentas/seed-estandar", requireSubscription, async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+
+  // Solo seed si no hay cuentas
+  const existing = await db
+    .select({ id: planCuentasTable.id })
+    .from(planCuentasTable)
+    .where(eq(planCuentasTable.scope, auth.scope))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return res.json({ seeded: false, message: "El plan de cuentas ya tiene datos" });
+  }
+
+  // Plan de cuentas estándar chileno (PCGCh simplificado)
+  const PLAN_ESTANDAR = [
+    // ── ACTIVOS ──
+    { codigo: "1", nombre: "ACTIVOS", tipo: "activo", naturaleza: "deudora", nivel: 1, esHoja: false, codigoSii: null },
+    { codigo: "1.1", nombre: "Activos Corrientes", tipo: "activo", naturaleza: "deudora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "1.1.01", nombre: "Efectivo y Equivalentes", tipo: "activo", naturaleza: "deudora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "1.1.01.001", nombre: "Caja", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.1.01.002", nombre: "Banco cuenta corriente", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.1.02", nombre: "Cuentas por Cobrar", tipo: "activo", naturaleza: "deudora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "1.1.02.001", nombre: "Clientes nacionales", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.1.02.002", nombre: "Documentos por cobrar", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.1.03", nombre: "IVA", tipo: "activo", naturaleza: "deudora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "1.1.03.001", nombre: "IVA Crédito Fiscal", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.1.03.002", nombre: "Remanente IVA CF", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.1.04", nombre: "Existencias / Inventario", tipo: "activo", naturaleza: "deudora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "1.1.04.001", nombre: "Mercaderías", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.1.05", nombre: "Impuestos por Recuperar", tipo: "activo", naturaleza: "deudora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "1.1.05.001", nombre: "PPM por recuperar", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.2", nombre: "Activos No Corrientes", tipo: "activo", naturaleza: "deudora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "1.2.01", nombre: "Propiedad, Planta y Equipo", tipo: "activo", naturaleza: "deudora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "1.2.01.001", nombre: "Maquinaria y equipos", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.2.01.002", nombre: "Muebles y útiles", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.2.01.003", nombre: "Equipos computacionales", tipo: "activo", naturaleza: "deudora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "1.2.01.090", nombre: "Depreciación acumulada", tipo: "activo", naturaleza: "acreedora", nivel: 4, esHoja: true, codigoSii: null },
+    // ── PASIVOS ──
+    { codigo: "2", nombre: "PASIVOS", tipo: "pasivo", naturaleza: "acreedora", nivel: 1, esHoja: false, codigoSii: null },
+    { codigo: "2.1", nombre: "Pasivos Corrientes", tipo: "pasivo", naturaleza: "acreedora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "2.1.01", nombre: "Cuentas por Pagar", tipo: "pasivo", naturaleza: "acreedora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "2.1.01.001", nombre: "Proveedores nacionales", tipo: "pasivo", naturaleza: "acreedora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "2.1.01.002", nombre: "Documentos por pagar", tipo: "pasivo", naturaleza: "acreedora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "2.1.02", nombre: "IVA Débito Fiscal", tipo: "pasivo", naturaleza: "acreedora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "2.1.02.001", nombre: "IVA Débito Fiscal", tipo: "pasivo", naturaleza: "acreedora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "2.1.03", nombre: "Retenciones y Sueldos", tipo: "pasivo", naturaleza: "acreedora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "2.1.03.001", nombre: "Sueldos por pagar", tipo: "pasivo", naturaleza: "acreedora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "2.1.03.002", nombre: "AFP por pagar", tipo: "pasivo", naturaleza: "acreedora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "2.1.03.003", nombre: "Isapre/Fonasa por pagar", tipo: "pasivo", naturaleza: "acreedora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "2.1.04", nombre: "Obligaciones Financieras CP", tipo: "pasivo", naturaleza: "acreedora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "2.1.04.001", nombre: "Préstamos bancarios CP", tipo: "pasivo", naturaleza: "acreedora", nivel: 4, esHoja: true, codigoSii: null },
+    { codigo: "2.2", nombre: "Pasivos No Corrientes", tipo: "pasivo", naturaleza: "acreedora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "2.2.01", nombre: "Obligaciones Financieras LP", tipo: "pasivo", naturaleza: "acreedora", nivel: 3, esHoja: false, codigoSii: null },
+    { codigo: "2.2.01.001", nombre: "Préstamos bancarios LP", tipo: "pasivo", naturaleza: "acreedora", nivel: 4, esHoja: true, codigoSii: null },
+    // ── PATRIMONIO ──
+    { codigo: "3", nombre: "PATRIMONIO", tipo: "patrimonio", naturaleza: "acreedora", nivel: 1, esHoja: false, codigoSii: null },
+    { codigo: "3.1", nombre: "Capital", tipo: "patrimonio", naturaleza: "acreedora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "3.1.01", nombre: "Capital aportado", tipo: "patrimonio", naturaleza: "acreedora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "3.2", nombre: "Resultados", tipo: "patrimonio", naturaleza: "acreedora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "3.2.01", nombre: "Utilidades acumuladas", tipo: "patrimonio", naturaleza: "acreedora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "3.2.02", nombre: "Resultado del ejercicio", tipo: "patrimonio", naturaleza: "acreedora", nivel: 3, esHoja: true, codigoSii: null },
+    // ── INGRESOS ──
+    { codigo: "4", nombre: "INGRESOS", tipo: "ingreso", naturaleza: "acreedora", nivel: 1, esHoja: false, codigoSii: null },
+    { codigo: "4.1", nombre: "Ingresos de Explotación", tipo: "ingreso", naturaleza: "acreedora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "4.1.01", nombre: "Ventas de productos", tipo: "ingreso", naturaleza: "acreedora", nivel: 3, esHoja: true, codigoSii: "91" },
+    { codigo: "4.1.02", nombre: "Prestación de servicios", tipo: "ingreso", naturaleza: "acreedora", nivel: 3, esHoja: true, codigoSii: "91" },
+    { codigo: "4.2", nombre: "Otros Ingresos", tipo: "ingreso", naturaleza: "acreedora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "4.2.01", nombre: "Ingresos financieros", tipo: "ingreso", naturaleza: "acreedora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "4.2.02", nombre: "Otros ingresos fuera de explotación", tipo: "ingreso", naturaleza: "acreedora", nivel: 3, esHoja: true, codigoSii: null },
+    // ── EGRESOS ──
+    { codigo: "5", nombre: "EGRESOS", tipo: "egreso", naturaleza: "deudora", nivel: 1, esHoja: false, codigoSii: null },
+    { codigo: "5.1", nombre: "Costo de Ventas", tipo: "egreso", naturaleza: "deudora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "5.1.01", nombre: "Costo de ventas de mercaderías", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.1.02", nombre: "Costo de servicios prestados", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.2", nombre: "Gastos de Administración y Ventas", tipo: "egreso", naturaleza: "deudora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "5.2.01", nombre: "Remuneraciones y honorarios", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.2.02", nombre: "Arriendos", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.2.03", nombre: "Servicios básicos", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.2.04", nombre: "Materiales y suministros", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.2.05", nombre: "Gastos de representación", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.2.06", nombre: "Publicidad y marketing", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.2.07", nombre: "Depreciación del ejercicio", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.2.08", nombre: "Seguros", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.2.09", nombre: "Mantención y reparaciones", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.3", nombre: "Gastos Financieros", tipo: "egreso", naturaleza: "deudora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "5.3.01", nombre: "Intereses bancarios", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.3.02", nombre: "Comisiones bancarias", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.4", nombre: "Gastos Tributarios", tipo: "egreso", naturaleza: "deudora", nivel: 2, esHoja: false, codigoSii: null },
+    { codigo: "5.4.01", nombre: "Impuesto de primera categoría", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.4.02", nombre: "PPM mensual", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+    { codigo: "5.4.03", nombre: "Otros impuestos", tipo: "egreso", naturaleza: "deudora", nivel: 3, esHoja: true, codigoSii: null },
+  ] as const;
+
+  // Insertar en bloque
+  const toInsert = PLAN_ESTANDAR.map((c) => ({
+    scope: auth.scope,
+    codigo: c.codigo,
+    nombre: c.nombre,
+    tipo: c.tipo as InsertPlanCuenta["tipo"],
+    naturaleza: c.naturaleza as InsertPlanCuenta["naturaleza"],
+    nivel: c.nivel,
+    padreId: null as number | null,
+    esHoja: c.esHoja,
+    activa: true,
+    esEstandar: true,
+    codigoSii: c.codigoSii,
+  }));
+
+  // Insertar todas las cuentas primero sin padre
+  const inserted = await db.insert(planCuentasTable).values(toInsert).returning();
+
+  // Ahora actualizar padreId en base a código padre
+  const codeToId = Object.fromEntries(inserted.map((c) => [c.codigo, c.id]));
+  for (const c of inserted) {
+    const parts = c.codigo.split(".");
+    if (parts.length > 1) {
+      const parentCode = parts.slice(0, -1).join(".");
+      const parentId = codeToId[parentCode];
+      if (parentId) {
+        await db.update(planCuentasTable).set({ padreId: parentId }).where(eq(planCuentasTable.id, c.id));
+      }
+    }
+  }
+
+  res.json({ seeded: true, count: inserted.length });
+});
+
 /** PUT /api/contabilidad/plan-cuentas/:id — actualizar cuenta */
 contabilidadRouter.put("/contabilidad/plan-cuentas/:id", requireSubscription, async (req, res) => {
   const auth = await requireAuth(req, res);

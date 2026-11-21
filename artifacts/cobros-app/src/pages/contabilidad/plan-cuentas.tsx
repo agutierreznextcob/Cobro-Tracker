@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,6 +145,36 @@ export default function PlanCuentasPage({ hideHeader }: Props) {
 
   const { data: cuentas = [], isLoading } = useQuery({ queryKey: ["plan-cuentas"], queryFn: fetchCuentas });
 
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/contabilidad/plan-cuentas/seed-estandar", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Error al cargar plan estándar");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["plan-cuentas"] });
+      if (data.seeded) {
+        toast({ title: `Plan de cuentas cargado (${data.count} cuentas)` });
+      }
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  // Auto-seed cuando no hay cuentas y ya terminó de cargar
+  const hasAutoSeeded = useRef(false);
+  useEffect(() => {
+    if (!isLoading && cuentas.length === 0 && !hasAutoSeeded.current) {
+      hasAutoSeeded.current = true;
+      seedMutation.mutate();
+    }
+  }, [isLoading, cuentas.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const mutation = useMutation({
     mutationFn: createCuenta,
     onSuccess: () => {
@@ -223,9 +253,19 @@ export default function PlanCuentasPage({ hideHeader }: Props) {
         )}
         {!isLoading && cuentas.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
-            <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No hay cuentas cargadas</p>
-            <p className="text-sm mt-1">El plan de cuentas estándar se carga automáticamente.</p>
+            {seedMutation.isPending ? (
+              <>
+                <Loader2 className="h-10 w-10 mx-auto mb-3 animate-spin opacity-50" />
+                <p className="font-medium">Cargando plan de cuentas estándar...</p>
+                <p className="text-sm mt-1">Esto puede tomar unos segundos.</p>
+              </>
+            ) : (
+              <>
+                <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                <p className="font-medium">No hay cuentas cargadas</p>
+                <p className="text-sm mt-1">El plan de cuentas estándar se carga automáticamente.</p>
+              </>
+            )}
           </div>
         )}
       </div>
