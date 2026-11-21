@@ -29,6 +29,56 @@ import { getOrgContext } from "../lib/org";
 
 export const contabilidadRouter = Router();
 
+// ─── Migration endpoint (temporary) ─────────────────────────────────────────
+// Creates plan_cuentas table if it doesn't exist in production
+contabilidadRouter.post("/run-migration-plan-cuentas", async (req, res) => {
+  try {
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_cuenta') THEN
+          CREATE TYPE tipo_cuenta AS ENUM ('activo', 'pasivo', 'patrimonio', 'ingreso', 'egreso', 'orden');
+        END IF;
+      END $$;
+    `);
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'naturaleza_cuenta') THEN
+          CREATE TYPE naturaleza_cuenta AS ENUM ('deudora', 'acreedora');
+        END IF;
+      END $$;
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS plan_cuentas (
+        id SERIAL PRIMARY KEY,
+        scope VARCHAR(64) NOT NULL,
+        codigo VARCHAR(20) NOT NULL,
+        nombre TEXT NOT NULL,
+        descripcion TEXT,
+        tipo tipo_cuenta NOT NULL,
+        naturaleza naturaleza_cuenta NOT NULL,
+        nivel INTEGER NOT NULL DEFAULT 1,
+        padre_id INTEGER,
+        es_hoja BOOLEAN NOT NULL DEFAULT TRUE,
+        activa BOOLEAN NOT NULL DEFAULT TRUE,
+        es_estandar BOOLEAN NOT NULL DEFAULT FALSE,
+        codigo_sii VARCHAR(10),
+        creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        actualizado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS plan_cuentas_scope_idx ON plan_cuentas(scope);
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS plan_cuentas_codigo_scope_idx ON plan_cuentas(scope, codigo);
+    `);
+    res.json({ ok: true, message: "Migration completed successfully" });
+  } catch (err: any) {
+    console.error("Migration error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getScope(userId: string, orgId: string | null) {
