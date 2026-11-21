@@ -7,7 +7,7 @@ import { z } from "zod";
 import {
   useCreateCobro, useCreateCobroRecurrente, useCreateCobrosMasivos,
   useListClientes, useListMiembros, useGetDatosBancarios, useGetCotizacion,
-  useListAreas,
+  useListAreas, useListCotizaciones, useSetCotizacionEstado,
   getListMiembrosQueryKey, getListCobrosQueryKey,
   getGetCobrosSummaryQueryKey, getGetDashboardMetricsQueryKey,
   getGetDatosBancariosQueryKey,
@@ -25,7 +25,11 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { formatMoney, roundTo, MONEDAS, MONEDA_INFO, type Moneda } from "@/lib/format";
 import { usePreferencias, decimalesPref } from "@/hooks/use-preferencias";
 import { TIPO_DOCUMENTO_GRUPOS, TIPO_DOCUMENTO_LABELS, TIPO_DOCUMENTO_VALUES, tipoDocumentoPermiteIva } from "@/lib/tipo-documento";
-import { Loader2, ArrowLeft, Users, Lock, ChevronDown, ChevronUp, Calendar, FileText } from "lucide-react";
+import { Loader2, ArrowLeft, Users, Lock, ChevronDown, ChevronUp, Calendar, FileText, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Link } from "wouter";
 import { CatalogoLineas, lineasPayload, lineasValidas, totalLineas, type LineaCatalogo } from "@/components/catalogo-lineas";
 
@@ -56,6 +60,9 @@ export default function NewCobro() {
   const createCobro = useCreateCobro();
   const createCobroRecurrente = useCreateCobroRecurrente();
   const createCobrosMasivos = useCreateCobrosMasivos();
+  const setCotizacionEstado = useSetCotizacionEstado();
+  // Alerta de cotización pendiente
+  const [alertaCotizacion, setAlertaCotizacion] = useState<{ cotizacionId: number; numeroCotizacion: string; payload: CobroInput } | null>(null);
   const { data: datosBancarios } = useGetDatosBancarios({
     query: { queryKey: getGetDatosBancariosQueryKey() },
   });
@@ -175,6 +182,13 @@ export default function NewCobro() {
 
   const selectedClienteId = form.watch("clienteId");
   const selectedCliente = clientes?.find((c) => c.id === selectedClienteId);
+  // Cargar cotizaciones para detectar si hay pendientes del cliente
+  const { data: todasCotizaciones } = useListCotizaciones({
+    query: { enabled: !!selectedClienteId && !fromCotizacionId },
+  });
+  const cotizacionesPendientesCliente = (todasCotizaciones ?? []).filter(
+    (c) => c.clienteId === selectedClienteId && c.estado === "enviada",
+  );
   const tipoDocumentoWatch = form.watch("tipoDocumento");
   const permiteIva = tipoDocumentoPermiteIva(tipoDocumentoWatch);
   const incluyeIvaWatch = form.watch("incluyeIva");
@@ -281,6 +295,17 @@ export default function NewCobro() {
       return;
     }
 
+    // Si hay cotizaciones pendientes del cliente, mostrar alerta primero
+    if (!fromCotizacionId && cotizacionesPendientesCliente.length > 0) {
+      const primera = cotizacionesPendientesCliente[0];
+      setAlertaCotizacion({ cotizacionId: primera.id, numeroCotizacion: primera.numeroCotizacion ?? String(primera.id), payload });
+      return;
+    }
+
+    submitCobro(payload);
+  };
+
+  const submitCobro = (payload: CobroInput) => {
     createCobro.mutate({ data: payload }, {
       onSuccess: (data) => {
         queryClient.invalidateQueries({ queryKey: getListCobrosQueryKey() });
@@ -311,6 +336,50 @@ export default function NewCobro() {
           <h1 className="text-lg font-semibold">Nuevo documento de venta</h1>
         </div>
       </div>
+
+      {/* Diálogo: cotización pendiente para este cliente */}
+      <AlertDialog open={!!alertaCotizacion} onOpenChange={(open) => { if (!open) setAlertaCotizacion(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Cotización pendiente
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Hay una cotización <strong>{alertaCotizacion?.numeroCotizacion}</strong> a nombre de este cliente en espera de aprobación.
+              ¿Quieres revisar el documento antes de generar la venta?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setAlertaCotizacion(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              onClick={() => {
+                if (alertaCotizacion) setLocation(`/cotizaciones/${alertaCotizacion.cotizacionId}`);
+                setAlertaCotizacion(null);
+              }}
+            >
+              Revisar cotización
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!alertaCotizacion) return;
+                // Anular la cotización (libera el stock reservado)
+                try {
+                  await setCotizacionEstado.mutateAsync({ id: alertaCotizacion.cotizacionId, data: { estado: "rechazada" } });
+                } catch {
+                  // continuar aunque falle
+                }
+                const payload = alertaCotizacion.payload;
+                setAlertaCotizacion(null);
+                submitCobro(payload);
+              }}
+            >
+              No, generar documento de venta
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {cotizacionOrigen && (
         <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-4 py-3 flex items-center gap-3">

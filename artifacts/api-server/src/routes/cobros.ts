@@ -19,6 +19,7 @@ import {
   cobrosRecurrentesTable,
   cobroEntregasInicialesTable,
   cotizacionesTable,
+  documentosVentaTable,
 } from "@workspace/db";
 import type { Cobro, CobroDescuento, CobroAjuste } from "@workspace/db";
 import { eq, desc, sql, and, gte, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
@@ -38,7 +39,7 @@ import { getFlowCredentials, getMpCredentials } from "./profile";
 import { crearOrdenFlow, getPublicBaseUrl } from "../lib/flow-api";
 import { crearPreferenciaMp } from "../lib/mp-api";
 import { sendPaymentLinkEmail, sendRecordatorioEmail, sendAvisoManualEmail } from "../lib/email";
-import { itemsInventarioBody, resolveItemsInventario, descontarStockDirecto } from "../lib/inventario";
+import { itemsInventarioBody, resolveItemsInventario, descontarStockDirecto, confirmarStock, liberarStockReservado, aumentarStock } from "../lib/inventario";
 import { getPreferenciasNegocio, roundMoney, formatDocumentMoney } from "../lib/preferencias";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { aplicarDefaultsACobro, fechaHoySantiago, ensureUserDefaults } from "../lib/recordatorios";
@@ -405,6 +406,45 @@ cobrosRouter.post("/cobros", async (req, res) => {
       await db.update(cotizacionesTable)
         .set({ cobroId: cobro.id, updatedAt: new Date() })
         .where(eq(cotizacionesTable.id, cotizacionId));
+    }
+
+    // Descontar/confirmar stock al emitir el documento de venta
+    // Solo si el tipo de documento tiene afectaStock=true en la configuración
+    if (user?.id && req.body.itemsInventario?.length > 0) {
+      try {
+        const ctx = await getOrgContext(user.id);
+        const [docConfig] = await db.select()
+          .from(documentosVentaTable)
+          .where(
+            and(
+              eq(documentosVentaTable.tipoDocumento, tipoDocumento),
+              ctx.organizationId
+                ? eq(documentosVentaTable.organizationId, ctx.organizationId)
+                : eq(documentosVentaTable.usuarioId, user.id),
+            )
+          );
+        // Defaults: boletas y facturas afectan stock, notas de débito no
+        const afectaStockDefault = ["boleta_manual","boleta_electronica","boleta_electronica_stock","factura_electronica","factura_electronica_stock","nota_credito","nota_credito_stock"].includes(tipoDocumento);
+        const afectaStock = docConfig?.afectaStock ?? afectaStockDefault;
+        const tipoMovimiento = docConfig?.tipoMovimientoStock ?? "rebaja";
+
+        if (afectaStock) {
+          const items = (req.body.itemsInventario as Array<{ productoId: number; cantidad: number; tipo?: string }>)
+            .filter(i => i.productoId);
+          if (tipoMovimiento === "aumenta") {
+            // Nota de crédito / devolución → aumenta stock (liberar reserva no aplica)
+            await aumentarStock(items);
+          } else if (cotizacionId) {
+            // Venía de cotización → confirmarStock (baja stockActual Y libera stockReservado)
+            await confirmarStock(items);
+          } else {
+            // Venta directa → descontarStockDirecto
+            await descontarStockDirecto(items);
+          }
+        }
+      } catch (err) {
+        req.log?.warn({ err, cobroId: cobro.id }, "No se pudo actualizar stock al emitir documento de venta");
+      }
     }
 
     // Seed the user's default reminder sequence onto cobros that have a due date.
@@ -1853,18 +1893,6 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
         await aplicarDefaultsACobro(cobro.id, cobro.responsableId);
       } catch (err) {
         req.log.warn({ err, cobroId: cobro.id }, "No se pudo aplicar la secuencia de recordatorios por defecto");
-      }
-    }
-
-    // Descontar stock al pagar (si el cobro tiene itemsInventario de tipo producto)
-    if (bodyParsed.data.estado === "pagado" && current.estado !== "pagado") {
-      const rawItems = cobro.itemsInventario;
-      if (Array.isArray(rawItems) && rawItems.length > 0) {
-        try {
-          await descontarStockDirecto(rawItems as Array<{ productoId: number; cantidad: number; tipo?: string }>);
-        } catch (err) {
-          req.log.warn({ err, cobroId: cobro.id }, "No se pudo descontar stock al pagar cobro");
-        }
       }
     }
 

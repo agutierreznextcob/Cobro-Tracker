@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { db, pedidosTable, pedidoItemsTable, cotizacionesTable, cotizacionItemsTable, clientesTable, documentosVentaTable, productosTable, movimientosStockTable, stockPorBodegaTable } from "@workspace/db";
+import { db, pedidosTable, pedidoItemsTable, cotizacionesTable, cotizacionItemsTable, clientesTable } from "@workspace/db";
 import { and, eq, desc } from "drizzle-orm";
 import { getOrgContext } from "../lib/org";
 import { getPreferenciasNegocio } from "../lib/preferencias";
@@ -175,67 +175,6 @@ router.patch("/pedidos/:id", action(async (req, res) => {
   res.json(await serializePedido(pedido));
 }));
 
-// ─── Helper: bajar stock al despachar un pedido ──────────────────────────────
-async function descontarStockPedido(pedidoId: number, userId: string, ctx: Awaited<ReturnType<typeof getOrgContext>>) {
-  const items = await db.select().from(pedidoItemsTable).where(eq(pedidoItemsTable.pedidoId, pedidoId));
-
-  for (const item of items) {
-    if (!item.productoId) continue;
-    const cantidad = Number(item.cantidad);
-    if (cantidad <= 0) continue;
-
-    // Verificar que el producto existe y es de tipo producto (no servicio)
-    const [producto] = await db.select().from(productosTable).where(eq(productosTable.id, item.productoId));
-    if (!producto || producto.tipo !== "producto") continue;
-
-    // ¿Tiene bodegas?
-    const stockRows = await db.select().from(stockPorBodegaTable).where(eq(stockPorBodegaTable.productoId, item.productoId));
-
-    if (stockRows.length > 0) {
-      // Rebajar del primer stock disponible (bodega con stock)
-      const bodegaConStock = stockRows.find(s => Number(s.stockActual) >= cantidad) ?? stockRows[0];
-      const nuevoStock = Math.max(0, Math.round((Number(bodegaConStock.stockActual) - cantidad) * 1000) / 1000);
-      await db.update(stockPorBodegaTable)
-        .set({ stockActual: String(nuevoStock), actualizadoEn: new Date() })
-        .where(eq(stockPorBodegaTable.id, bodegaConStock.id));
-
-      // Recalcular total
-      const updatedRows = await db.select().from(stockPorBodegaTable).where(eq(stockPorBodegaTable.productoId, item.productoId));
-      const total = updatedRows.reduce((n, s) => n + Number(s.stockActual), 0);
-      await db.update(productosTable)
-        .set({ stockActual: String(Math.round(total * 1000) / 1000), actualizadoEn: new Date() })
-        .where(eq(productosTable.id, item.productoId));
-
-      await db.insert(movimientosStockTable).values({
-        productoId: item.productoId,
-        tipo: "salida",
-        cantidad: String(cantidad),
-        motivo: `Venta / Pedido #${pedidoId}`,
-        usuarioId: userId,
-        bodegaOrigenId: bodegaConStock.bodegaId,
-        areaId: null,
-      });
-    } else {
-      // Sin bodegas: rebajar del stock global
-      const stockActual = Number(producto.stockActual ?? 0);
-      const nuevoStock = Math.max(0, Math.round((stockActual - cantidad) * 1000) / 1000);
-      await db.update(productosTable)
-        .set({ stockActual: String(nuevoStock), actualizadoEn: new Date() })
-        .where(eq(productosTable.id, item.productoId));
-
-      await db.insert(movimientosStockTable).values({
-        productoId: item.productoId,
-        tipo: "salida",
-        cantidad: String(cantidad),
-        motivo: `Venta / Pedido #${pedidoId}`,
-        usuarioId: userId,
-        bodegaOrigenId: null,
-        areaId: null,
-      });
-    }
-  }
-}
-
 // PATCH /pedidos/:id/estado — cambio de estado
 router.patch("/pedidos/:id/estado", action(async (req, res) => {
   const { condition } = await getScopedPedido(req.user!.id, Number(req.params.id));
@@ -270,16 +209,8 @@ router.patch("/pedidos/:id/estado", action(async (req, res) => {
     return updated;
   });
 
-  // Descontar stock al despachar (fuera de la transacción principal para no bloquearla)
-  if (estado === "despachado") {
-    const ctx = await getOrgContext(req.user!.id);
-    try {
-      await descontarStockPedido(pedido.id, req.user!.id, ctx);
-    } catch (err) {
-      // No fallar la operación por error de stock — solo registrar
-      req.log?.warn({ err, pedidoId: pedido.id }, "No se pudo descontar stock al despachar pedido");
-    }
-  }
+  // Stock is managed at document emission time (cobro creation), not at despacho.
+  // Pedidos are logistics documents only and do not move stock.
 
   res.json(await serializePedido(pedido));
 }));

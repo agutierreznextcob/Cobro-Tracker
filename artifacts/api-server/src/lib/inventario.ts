@@ -168,7 +168,22 @@ function filterProductos(items: StockItem[]) {
   return items.filter(i => i.tipo !== "servicio" && i.cantidad > 0);
 }
 
-/** Cobro pagado + requiereDespacho=true → incrementa stockReservado */
+/** Libera stock reservado (cotización rechazada/anulada) → decrementa stockReservado */
+export async function liberarStockReservado(items: StockItem[]): Promise<void> {
+  const rows = filterProductos(items);
+  if (!rows.length) return;
+  for (const item of rows) {
+    await db
+      .update(productosTable)
+      .set({
+        stockReservado: sql`GREATEST(COALESCE(${productosTable.stockReservado}, 0) - ${String(item.cantidad)}, 0)`,
+        actualizadoEn: new Date(),
+      })
+      .where(and(eq(productosTable.id, item.productoId), eq(productosTable.tipo, "producto")));
+  }
+}
+
+/** Cotización creada/enviada → incrementa stockReservado */
 export async function reservarStock(items: StockItem[]): Promise<void> {
   const rows = filterProductos(items);
   if (!rows.length) return;
@@ -193,6 +208,21 @@ export async function confirmarStock(items: StockItem[]): Promise<void> {
       .set({
         stockActual: sql`GREATEST(COALESCE(${productosTable.stockActual}, 0) - ${String(item.cantidad)}, 0)`,
         stockReservado: sql`GREATEST(COALESCE(${productosTable.stockReservado}, 0) - ${String(item.cantidad)}, 0)`,
+        actualizadoEn: new Date(),
+      })
+      .where(and(eq(productosTable.id, item.productoId), eq(productosTable.tipo, "producto")));
+  }
+}
+
+/** Nota de crédito / devolución → incrementa stockActual */
+export async function aumentarStock(items: StockItem[]): Promise<void> {
+  const rows = filterProductos(items);
+  if (!rows.length) return;
+  for (const item of rows) {
+    await db
+      .update(productosTable)
+      .set({
+        stockActual: sql`COALESCE(${productosTable.stockActual}, 0) + ${String(item.cantidad)}`,
         actualizadoEn: new Date(),
       })
       .where(and(eq(productosTable.id, item.productoId), eq(productosTable.tipo, "producto")));

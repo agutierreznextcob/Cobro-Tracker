@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { db, guiasDespachoTable, guiaDespachoItemsTable, pedidosTable, pedidoItemsTable } from "@workspace/db";
 import { and, eq, desc } from "drizzle-orm";
 import { getOrgContext } from "../lib/org";
-import { confirmarStock, descontarStockDirecto } from "../lib/inventario";
+// Stock functions removed: guías never move stock (handled at cobro creation)
 import { getPreferenciasNegocio } from "../lib/preferencias";
 import { getEmpresaForScope, getEmpresaLogoBytes, documentScope } from "../lib/empresa";
 import PDFDocument from "pdfkit";
@@ -215,24 +215,8 @@ router.patch("/guias-despacho/:id/estado", action(async (req, res) => {
     return updated;
   });
 
-  // Stock management on entrega. Fire-and-forget, outside the tx.
-  // - cobroId set → cobro already reserved stock; confirmarStock decrements
-  //   stockActual AND releases the reservation (stockReservado -=).
-  // - no cobroId   → guía without prior cobro; direct decrement only.
-  if (estado === "entregada") {
-    const items = await db
-      .select({ productoId: guiaDespachoItemsTable.productoId, cantidad: guiaDespachoItemsTable.cantidad })
-      .from(guiaDespachoItemsTable)
-      .where(eq(guiaDespachoItemsTable.guiaId, guia.id));
-    const stockItems = items
-      .filter(i => i.productoId != null)
-      .map(i => ({ productoId: i.productoId!, cantidad: Number(i.cantidad) }));
-    if (guia.cobroId != null) {
-      void confirmarStock(stockItems);
-    } else {
-      void descontarStockDirecto(stockItems);
-    }
-  }
+  // Stock is managed at document emission time (cobro creation), not here.
+  // The guía de despacho never moves stock; it is a logistics document only.
 
   res.json(await serializeGuia(guia));
 }));

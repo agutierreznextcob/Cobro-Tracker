@@ -4,6 +4,7 @@ import { and, eq, desc, inArray } from "drizzle-orm";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { cotizacionScope, cotizacionValues, getScopedCotizacion, serializeCotizacion, estadoCotizacion, CotizacionError } from "../lib/cotizaciones";
 import { getOrgContext, getRemitenteContacto } from "../lib/org";
+import { reservarStock, liberarStockReservado } from "../lib/inventario";
 import { getPreferenciasNegocio, hoySantiago } from "../lib/preferencias";
 import { cotizacionPdf } from "../lib/cotizacion-pdf";
 import { sendCotizacionEmail } from "../lib/email";
@@ -124,6 +125,16 @@ router.post("/cotizaciones/:id/enviar", action(async (req, res) => {
         .where(condition).returning();
       return saved;
     });
+    // Reservar stock al enviar la cotización
+    try {
+      const items = await db.select().from(cotizacionItemsTable).where(eq(cotizacionItemsTable.cotizacionId, updated.id));
+      const ids = items.flatMap(i => i.productoId != null ? [i.productoId] : []);
+      const products = ids.length ? await db.select({ id: productosTable.id, tipo: productosTable.tipo }).from(productosTable).where(inArray(productosTable.id, ids)) : [];
+      const stockItems = items
+        .filter(i => i.productoId != null && products.find(p => p.id === i.productoId)?.tipo === "producto")
+        .map(i => ({ productoId: i.productoId!, cantidad: Number(i.cantidad) }));
+      if (stockItems.length > 0) await reservarStock(stockItems);
+    } catch (_) { /* best-effort: no falla el envío por error de stock */ }
     res.json(await serializeCotizacion(updated));
   } catch (err) {
     await db.update(cotizacionesTable).set({ envioEnCurso: null }).where(and(condition, eq(cotizacionesTable.envioEnCurso, claim)));
@@ -134,14 +145,25 @@ router.patch("/cotizaciones/:id/estado", action(async (req, res) => {
   const { condition } = await getScopedCotizacion(req.user!.id, Number(req.params.id));
   const estado = req.body.estado;
   if (estado !== "aceptada" && estado !== "rechazada") throw new CotizacionError("Estado inválido.");
-  const updated = await db.transaction(async tx => {
+  const { updated, stockItems } = await db.transaction(async tx => {
     const [q] = await tx.select().from(cotizacionesTable).where(condition).for("update");
     if (!q) throw new CotizacionError("Cotización no encontrada.", 404);
     assertNotSending(q);
     if (estadoCotizacion(q) !== "enviada") throw new CotizacionError("Solo puedes registrar la decisión de una cotización enviada y vigente.", 409);
     const [row] = await tx.update(cotizacionesTable).set({ estado, updatedAt: new Date() }).where(condition).returning();
-    return row;
+    // Cargar items para liberar reserva si se rechaza
+    const items = await tx.select().from(cotizacionItemsTable).where(eq(cotizacionItemsTable.cotizacionId, q.id));
+    const ids = items.flatMap(i => i.productoId != null ? [i.productoId] : []);
+    const products = ids.length ? await tx.select({ id: productosTable.id, tipo: productosTable.tipo }).from(productosTable).where(inArray(productosTable.id, ids)) : [];
+    const stockItems = items
+      .filter(i => i.productoId != null && products.find(p => p.id === i.productoId)?.tipo === "producto")
+      .map(i => ({ productoId: i.productoId!, cantidad: Number(i.cantidad) }));
+    return { updated: row, stockItems };
   });
+  // Liberar reserva si se rechaza (el stock ya no está comprometido)
+  if (estado === "rechazada" && stockItems.length > 0) {
+    try { await liberarStockReservado(stockItems); } catch (_) { /* best-effort */ }
+  }
   res.json(await serializeCotizacion(updated));
 }));
 router.post("/cotizaciones/:id/convertir", action(async (req, res) => {
