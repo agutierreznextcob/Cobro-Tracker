@@ -303,7 +303,12 @@ const LOGISTICA_ITEMS: NavLeaf[] = [
 ];
 
 const CONTABILIDAD_ITEMS: NavLeaf[] = [
-  { href: "/contabilidad", label: "Contabilidad", icon: BookOpen, match: (l) => l.startsWith("/contabilidad") },
+  { href: "/contabilidad", label: "Resumen", icon: BookOpen, match: (l) => l === "/contabilidad" },
+  { href: "/contabilidad/asientos", label: "Asientos contables", icon: FileText, match: (l) => l.startsWith("/contabilidad/asientos") },
+  { href: "/contabilidad/plan-cuentas", label: "Plan de cuentas", icon: List, match: (l) => l.startsWith("/contabilidad/plan-cuentas") },
+  { href: "/contabilidad/informes", label: "Informes", icon: BarChart3, match: (l) => l.startsWith("/contabilidad/informes") },
+  { href: "/contabilidad/libro-sii", label: "Libro SII", icon: FileSignature, match: (l) => l.startsWith("/contabilidad/libro-sii") },
+  { href: "/contabilidad/presupuesto", label: "Presupuesto", icon: ListTodo, match: (l) => l.startsWith("/contabilidad/presupuesto") },
 ];
 
 const CONFIG_ITEMS: NavLeaf[] = [

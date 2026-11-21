@@ -1,7 +1,28 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db, documentosVentaTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getOrgContext } from "../lib/org";
+
+// Asegurar que la tabla exista (puede no estar migrada en instancias legacy)
+async function ensureDocumentosVentaTable() {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS documentos_venta (
+        id SERIAL PRIMARY KEY,
+        organization_id INTEGER,
+        usuario_id TEXT NOT NULL,
+        tipo_documento TEXT NOT NULL,
+        nombre_personalizado TEXT,
+        activo BOOLEAN NOT NULL DEFAULT TRUE,
+        afecta_stock BOOLEAN NOT NULL DEFAULT FALSE,
+        tipo_movimiento_stock TEXT DEFAULT 'rebaja',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+  } catch (_e) { /* ignorar si ya existe */ }
+}
+void ensureDocumentosVentaTable();
 
 const router = Router();
 
@@ -49,8 +70,14 @@ async function getScope(userId: string) {
 
 // GET /configuracion/ventas/documentos — lista todos con defaults si no existen
 router.get("/configuracion/ventas/documentos", action(async (req, res) => {
-  const scope = await getScope(req.user!.id);
-  const rows = await db.select().from(documentosVentaTable).where(scope);
+  let rows: (typeof documentosVentaTable.$inferSelect)[] = [];
+  try {
+    const scope = await getScope(req.user!.id);
+    rows = await db.select().from(documentosVentaTable).where(scope);
+  } catch (_err) {
+    // La tabla puede no existir aún en esta instancia — devolver defaults
+    rows = [];
+  }
 
   // Merge con defaults
   const result = DOCUMENTOS_DEFAULT.map(def => {

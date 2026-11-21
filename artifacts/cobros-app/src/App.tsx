@@ -73,6 +73,11 @@ import ConfiguracionAreasPage from "@/pages/configuracion-areas";
 import ConfiguracionVentasPage from "@/pages/configuracion-ventas";
 import ConfiguracionVentasDocumentosPage from "@/pages/configuracion-ventas-documentos";
 import ContabilidadPage from "@/pages/contabilidad/index";
+import AsientosPage from "@/pages/contabilidad/asientos";
+import PlanCuentasPage from "@/pages/contabilidad/plan-cuentas";
+import ContabilidadInformesPage from "@/pages/contabilidad/informes";
+import LibroSiiPage from "@/pages/contabilidad/libro-sii";
+import PresupuestoPage from "@/pages/contabilidad/presupuesto";
 import { Layout } from "@/components/layout";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useGetSubscriptionStatus } from "@workspace/api-client-react";
@@ -579,6 +584,41 @@ function AppRouter() {
         <AuthGate>
           <Layout>
             <ContabilidadPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/contabilidad/asientos">
+        <AuthGate>
+          <Layout>
+            <AsientosPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/contabilidad/plan-cuentas">
+        <AuthGate>
+          <Layout>
+            <PlanCuentasPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/contabilidad/informes">
+        <AuthGate>
+          <Layout>
+            <ContabilidadInformesPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/contabilidad/libro-sii">
+        <AuthGate>
+          <Layout>
+            <LibroSiiPage />
+          </Layout>
+        </AuthGate>
+      </Route>
+      <Route path="/contabilidad/presupuesto">
+        <AuthGate>
+          <Layout>
+            <PresupuestoPage />
           </Layout>
         </AuthGate>
       </Route>
