@@ -1254,7 +1254,7 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
   // ── Ingresos por mes (cobros con estado pagado/parcial) ──
   const cobrosBase = db
     .select({
-      mes: sql<string>`to_char(fecha_vencimiento::date, 'MM')`,
+      mes: sql<string>`to_char(${cobrosTable.fechaVencimiento}::date, 'MM')`,
       totalMonto: sum(cobrosTable.monto).mapWith(Number),
       totalNeto: sum(cobrosTable.montoNeto).mapWith(Number),
       totalIva: sum(cobrosTable.montoIva).mapWith(Number),
@@ -1269,13 +1269,13 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
         lte(cobrosTable.fechaVencimiento, fechaHasta),
       ),
     )
-    .groupBy(sql`to_char(fecha_vencimiento::date, 'MM')`)
-    .orderBy(sql`to_char(fecha_vencimiento::date, 'MM')`);
+    .groupBy(sql`to_char(${cobrosTable.fechaVencimiento}::date, 'MM')`)
+    .orderBy(sql`to_char(${cobrosTable.fechaVencimiento}::date, 'MM')`);
 
   // ── Gastos por mes (compras recibidas/contabilizadas) ──
   const comprasBase = db
     .select({
-      mes: sql<string>`to_char(fecha_emision::date, 'MM')`,
+      mes: sql<string>`to_char(${comprasTable.fechaEmision}::date, 'MM')`,
       totalSubtotal: sum(comprasTable.subtotal).mapWith(Number),
       totalIva: sum(comprasTable.montoIva).mapWith(Number),
       totalMonto: sum(comprasTable.total).mapWith(Number),
@@ -1292,8 +1292,8 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
         lte(comprasTable.fechaEmision, fechaHasta),
       ),
     )
-    .groupBy(sql`to_char(fecha_emision::date, 'MM')`)
-    .orderBy(sql`to_char(fecha_emision::date, 'MM')`);
+    .groupBy(sql`to_char(${comprasTable.fechaEmision}::date, 'MM')`)
+    .orderBy(sql`to_char(${comprasTable.fechaEmision}::date, 'MM')`);
 
   const [cobrosRows, comprasRows] = await Promise.all([cobrosBase, comprasBase]);
 
