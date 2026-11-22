@@ -1231,11 +1231,7 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
   const mesNum = mes ? parseInt(mes) : null;
 
   // Cobros pagados del año (ingresos). Filtramos por organizationId o usuarioId.
-  const orgCtx = await (async () => {
-    const { getOrgContext } = await import("../lib/org");
-    return getOrgContext(auth.userId);
-  })();
-
+  const orgCtx = await getOrgContext(auth.userId);
   const orgId = orgCtx.organizationId ?? null;
 
   // Construir filtros de fecha
@@ -1354,10 +1350,7 @@ contabilidadRouter.get("/contabilidad/informes/presupuesto-real", requireSubscri
   const { meses: mesesStr = "6" } = req.query as Record<string, string>;
   const mesesHistorico = Math.min(Math.max(parseInt(mesesStr) || 6, 1), 24);
 
-  const orgCtx = await (async () => {
-    const { getOrgContext } = await import("../lib/org");
-    return getOrgContext(auth.userId);
-  })();
+  const orgCtx = await getOrgContext(auth.userId);
 
   const orgId = orgCtx.organizationId ?? null;
 
