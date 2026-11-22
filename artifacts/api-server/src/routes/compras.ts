@@ -9,6 +9,7 @@ import { hoySantiago } from "../lib/preferencias";
 import { lockInventoryScope } from "../lib/inventario-bodegas";
 import { CompraError, compraPorId, compraScope, exigirRecepcion, guardarCompra, proveedorInput, proveedorPorId, proveedorScope, purchaseDate, serializeCompras, serializeProveedor } from "../lib/compras";
 import { previewRecepcion, recibirCompra } from "../lib/compras-recepcion";
+import { generarAsientoCompra } from "../lib/contabilidad-auto";
 import { devolverCompra, listDevoluciones } from "../lib/compras-devoluciones";
 
 const router = Router();
@@ -94,15 +95,34 @@ router.delete("/compras/:id", route(async (req, res) => {
 router.get("/compras/:id/recepcion", route(async (req, res) => { res.json(await previewRecepcion(req.user!.id, idOf(req))); }));
 router.get("/compras/:id/devoluciones", route(async (req, res) => { res.json(await listDevoluciones(req.user!.id, idOf(req))); }));
 router.post("/compras/:id/devoluciones", route(async (req, res) => { res.json(await devolverCompra(req.user!.id, idOf(req), req.body)); }));
-router.post("/compras/:id/recepcion", route(async (req, res) => { res.json(await recibirCompra(req.user!.id, idOf(req), RecibirCompraBody.parse(req.body))); }));
+router.post("/compras/:id/recepcion", route(async (req, res) => {
+  const compraId = idOf(req);
+  const userId = req.user!.id;
+  const result = await recibirCompra(userId, compraId, RecibirCompraBody.parse(req.body));
+  // Generar asiento contable automáticamente al recibir la compra
+  const orgCtx = await getOrgContext(userId);
+  const scope = orgCtx.organizationId ? `org:${orgCtx.organizationId}` : `user:${userId}`;
+  void generarAsientoCompra(scope, userId, compraId).catch((err) =>
+    req.log.warn({ err, compraId }, "No se pudo generar asiento contable para compra recibida"),
+  );
+  res.json(result);
+}));
 router.post("/compras/:id/contabilizar", route(async (req, res) => {
+  const compraId = idOf(req);
+  const userId = req.user!.id;
   const result = await db.transaction(async tx => {
-    const { c, ctx } = await compraPorId(req.user!.id, idOf(req), tx, true);
+    const { c, ctx } = await compraPorId(userId, compraId, tx, true);
     exigirRecepcion(ctx);
     if (c.estado === "borrador") throw new CompraError("Confirma primero la recepción.", 409);
     const [saved] = c.estado === "contabilizada" ? [c] : await tx.update(comprasTable).set({ estado: "contabilizada", updatedAt: new Date() }).where(eq(comprasTable.id, c.id)).returning();
     return (await serializeCompras([saved], ctx, tx))[0];
   });
+  // Generar asiento contable automáticamente al contabilizar
+  const orgCtx = await getOrgContext(userId);
+  const scope = orgCtx.organizationId ? `org:${orgCtx.organizationId}` : `user:${userId}`;
+  void generarAsientoCompra(scope, userId, compraId).catch((err) =>
+    req.log.warn({ err, compraId }, "No se pudo generar asiento contable para compra contabilizada"),
+  );
   res.json(result);
 }));
 export default router;

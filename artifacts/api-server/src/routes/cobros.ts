@@ -57,6 +57,7 @@ import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "../lib
 import { fechaCicloAnclada } from "../lib/cobros-recurrentes";
 import { asegurarLinkPagoCobro, portalUrlExistenteParaCobro } from "../lib/cobro-payment-link";
 import { createHash } from "crypto";
+import { generarAsientoCobro } from "../lib/contabilidad-auto";
 
 const cobrosRouter = Router();
 
@@ -1904,6 +1905,12 @@ cobrosRouter.patch("/cobros/:id", async (req, res) => {
         tipo: "pago",
         titulo: `${cobro.clienteNombre || "Cliente"} pagó ${formatDocumentMoney(montoACobrar(cobro), cobro.moneda, cobro.decimales)}`,
       });
+      // Generar asiento contable automáticamente
+      const orgCtx = await getOrgContext(userId);
+      const scope = orgCtx.organizationId ? `org:${orgCtx.organizationId}` : `user:${userId}`;
+      void generarAsientoCobro(scope, userId, cobro.id).catch((err) =>
+        req.log.warn({ err, cobroId: cobro.id }, "No se pudo generar asiento contable para cobro pagado"),
+      );
     } else if (bodyParsed.data.estado === "fallido" && cobro.responsableId) {
       await crearNotificacion({
         eventKey: `cobro:${cobro.id}:fallido`,
@@ -2516,6 +2523,14 @@ cobrosRouter.post("/cobros/:id/abonos", async (req, res) => {
       if (estadoTrasAbono === "pagado") {
         void emitirComprobante(cobro.id, { metodo: "manual" }, req.log);
       }
+      // Generar asiento contable para el cobro (pagado o parcial)
+      if (estadoTrasAbono === "pagado" || estadoTrasAbono === "parcial") {
+        const orgCtxAbono = await getOrgContext(userId);
+        const scopeAbono = orgCtxAbono.organizationId ? `org:${orgCtxAbono.organizationId}` : `user:${userId}`;
+        void generarAsientoCobro(scopeAbono, userId, cobro.id).catch((err) =>
+          req.log.warn({ err, cobroId: cobro.id }, "No se pudo generar asiento contable para abono"),
+        );
+      }
       req.log.info({ cobroId: cobro.id, abonoId: abono.id, monto }, "Manual abono confirmed");
       res.status(201).json({ ...abonoConfirmado, monto: Number(abonoConfirmado.monto), creadoEn: abonoConfirmado.creadoEn.toISOString(), confirmadoEn: abonoConfirmado.confirmadoEn?.toISOString() ?? null });
       return;
@@ -2637,6 +2652,14 @@ cobrosRouter.post("/cobros/:id/abonos/:abonoId/confirmar", async (req, res) => {
     }
     if (estadoTrasConfirmar === "pagado") {
       void emitirComprobante(paramsParsed.data.id, { metodo: "manual" }, req.log);
+    }
+    // Generar asiento contable automáticamente
+    if (estadoTrasConfirmar === "pagado" || estadoTrasConfirmar === "parcial") {
+      const orgCtxConfirmar = await getOrgContext(userId);
+      const scopeConfirmar = orgCtxConfirmar.organizationId ? `org:${orgCtxConfirmar.organizationId}` : `user:${userId}`;
+      void generarAsientoCobro(scopeConfirmar, userId, paramsParsed.data.id).catch((err) =>
+        req.log.warn({ err, cobroId: paramsParsed.data.id }, "No se pudo generar asiento contable al confirmar abono"),
+      );
     }
     req.log.info({ abonoId, cobroId: paramsParsed.data.id }, "Abono confirmed manually");
     res.json({ ...updated, monto: Number(updated.monto), creadoEn: updated.creadoEn.toISOString(), confirmadoEn: updated.confirmadoEn?.toISOString() ?? null });

@@ -26,6 +26,7 @@ import { eq, and, asc, desc, sql, inArray, gte, lte, sum, like, isNull, ne } fro
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { z } from "zod/v4";
 import { getOrgContext, cobroScopeCondition } from "../lib/org";
+import { generarAsientoCobro, generarAsientoCompra, backfillAsientosHistoricos } from "../lib/contabilidad-auto";
 
 export const contabilidadRouter = Router();
 
@@ -1440,4 +1441,62 @@ contabilidadRouter.get("/contabilidad/informes/presupuesto-real", requireSubscri
     },
     proyeccion,
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SINCRONIZACIÓN AUTOMÁTICA DE ASIENTOS HISTÓRICOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/contabilidad/sincronizar-historico
+ * Genera asientos contables para todos los cobros pagados/parciales y compras
+ * recibidas que aún no tienen asiento. Idempotente — se puede ejecutar varias
+ * veces sin duplicar asientos.
+ */
+contabilidadRouter.post("/contabilidad/sincronizar-historico", requireSubscription, async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const result = await backfillAsientosHistoricos(auth.scope, auth.userId);
+    res.json({
+      ok: true,
+      cobros: result.cobros,
+      compras: result.compras,
+      resumen: `Cobros: ${result.cobros.generados} generados, ${result.cobros.saltados} ya tenían asiento, ${result.cobros.errores.length} errores. ` +
+               `Compras: ${result.compras.generados} generados, ${result.compras.saltados} ya tenían asiento, ${result.compras.errores.length} errores.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
+/**
+ * POST /api/contabilidad/asientos/desde-cobro/:cobroId
+ * Genera (o recupera) el asiento contable de un cobro específico.
+ */
+contabilidadRouter.post("/contabilidad/asientos/desde-cobro/:cobroId", requireSubscription, async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  const cobroId = parseInt(req.params.cobroId);
+  if (isNaN(cobroId)) return res.status(400).json({ error: "ID inválido" });
+
+  const result = await generarAsientoCobro(auth.scope, auth.userId, cobroId);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json(result);
+});
+
+/**
+ * POST /api/contabilidad/asientos/desde-compra/:compraId
+ * Genera (o recupera) el asiento contable de una compra específica.
+ */
+contabilidadRouter.post("/contabilidad/asientos/desde-compra/:compraId", requireSubscription, async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  const compraId = parseInt(req.params.compraId);
+  if (isNaN(compraId)) return res.status(400).json({ error: "ID inválido" });
+
+  const result = await generarAsientoCompra(auth.scope, auth.userId, compraId);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json(result);
 });
