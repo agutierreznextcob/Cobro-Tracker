@@ -25,7 +25,8 @@ import {
 import { eq, and, asc, desc, sql, inArray, gte, lte, sum, like, isNull, ne } from "drizzle-orm";
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { z } from "zod/v4";
-import { getOrgContext } from "../lib/org";
+import { getOrgContext, cobroScopeCondition } from "../lib/org";
+import { compraScope } from "../lib/compras";
 
 export const contabilidadRouter = Router();
 
@@ -1231,9 +1232,8 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
   const anioNum = parseInt(anio);
   const mesNum = mes ? parseInt(mes) : null;
 
-  // Cobros pagados del año (ingresos). Filtramos por organizationId o usuarioId.
+  // Cobros pagados del año (ingresos). Filtramos con las funciones de scope correctas.
   const orgCtx = await getOrgContext(auth.userId);
-  const orgId = orgCtx.organizationId ?? null;
 
   // Construir filtros de fecha
   const fechaDesde = mesNum
@@ -1257,9 +1257,7 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
     .from(cobrosTable)
     .where(
       and(
-        orgId
-          ? eq(cobrosTable.organizationId, orgId)
-          : eq(cobrosTable.usuarioId, auth.userId),
+        cobroScopeCondition(orgCtx, auth.userId),
         inArray(cobrosTable.estado, ["pagado", "pagado_parcial"]),
         gte(cobrosTable.fechaVencimiento, fechaDesde),
         lte(cobrosTable.fechaVencimiento, fechaHasta),
@@ -1280,9 +1278,7 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
     .from(comprasTable)
     .where(
       and(
-        orgId
-          ? eq(comprasTable.organizationId, orgId)
-          : eq(comprasTable.usuarioId, auth.userId),
+        compraScope(orgCtx, auth.userId),
         inArray(comprasTable.estado, ["recibida", "contabilizada"]),
         gte(comprasTable.fechaEmision, fechaDesde),
         lte(comprasTable.fechaEmision, fechaHasta),
@@ -1357,8 +1353,6 @@ contabilidadRouter.get("/contabilidad/informes/presupuesto-real", requireSubscri
 
   const orgCtx = await getOrgContext(auth.userId);
 
-  const orgId = orgCtx.organizationId ?? null;
-
   // Rango: últimos N meses hasta hoy
   const hoy = new Date();
   const fechaHasta = hoy.toISOString().slice(0, 10);
@@ -1376,7 +1370,7 @@ contabilidadRouter.get("/contabilidad/informes/presupuesto-real", requireSubscri
     .from(cobrosTable)
     .where(
       and(
-        orgId ? eq(cobrosTable.organizationId, orgId) : eq(cobrosTable.usuarioId, auth.userId),
+        cobroScopeCondition(orgCtx, auth.userId),
         inArray(cobrosTable.estado, ["pagado", "pagado_parcial"]),
         gte(cobrosTable.fechaVencimiento, fechaDesde),
         lte(cobrosTable.fechaVencimiento, fechaHasta),
@@ -1394,7 +1388,7 @@ contabilidadRouter.get("/contabilidad/informes/presupuesto-real", requireSubscri
     .from(comprasTable)
     .where(
       and(
-        orgId ? eq(comprasTable.organizationId, orgId) : eq(comprasTable.usuarioId, auth.userId),
+        compraScope(orgCtx, auth.userId),
         inArray(comprasTable.estado, ["recibida", "contabilizada"]),
         gte(comprasTable.fechaEmision, fechaDesde),
         lte(comprasTable.fechaEmision, fechaHasta),
