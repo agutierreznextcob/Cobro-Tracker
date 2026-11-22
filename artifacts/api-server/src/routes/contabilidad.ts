@@ -26,7 +26,6 @@ import { eq, and, asc, desc, sql, inArray, gte, lte, sum, like, isNull, ne } fro
 import { requireSubscription } from "../middlewares/requireSubscription";
 import { z } from "zod/v4";
 import { getOrgContext, cobroScopeCondition } from "../lib/org";
-import { compraScope } from "../lib/compras";
 
 export const contabilidadRouter = Router();
 
@@ -1278,7 +1277,9 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
     .from(comprasTable)
     .where(
       and(
-        compraScope(orgCtx, auth.userId),
+        orgCtx.organizationId != null
+          ? eq(comprasTable.organizationId, orgCtx.organizationId)
+          : and(isNull(comprasTable.organizationId), eq(comprasTable.usuarioId, auth.userId)),
         inArray(comprasTable.estado, ["recibida", "contabilizada"]),
         gte(comprasTable.fechaEmision, fechaDesde),
         lte(comprasTable.fechaEmision, fechaHasta),
@@ -1388,7 +1389,9 @@ contabilidadRouter.get("/contabilidad/informes/presupuesto-real", requireSubscri
     .from(comprasTable)
     .where(
       and(
-        compraScope(orgCtx, auth.userId),
+        orgCtx.organizationId != null
+          ? eq(comprasTable.organizationId, orgCtx.organizationId)
+          : and(isNull(comprasTable.organizationId), eq(comprasTable.usuarioId, auth.userId)),
         inArray(comprasTable.estado, ["recibida", "contabilizada"]),
         gte(comprasTable.fechaEmision, fechaDesde),
         lte(comprasTable.fechaEmision, fechaHasta),
