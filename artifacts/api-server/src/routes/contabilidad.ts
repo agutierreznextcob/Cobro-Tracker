@@ -1254,7 +1254,7 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
   // ── Ingresos por mes (cobros con estado pagado/parcial) ──
   const cobrosBase = db
     .select({
-      mes: sql<string>`lpad(extract(month from ${cobrosTable.fechaVencimiento}::date)::text, 2, '0')`,
+      mes: sql<string>`lpad(extract(month from cobros.fecha_vencimiento::date)::text, 2, '0')`,
       totalMonto: sum(cobrosTable.monto).mapWith(Number),
       totalNeto: sum(cobrosTable.montoNeto).mapWith(Number),
       totalIva: sum(cobrosTable.montoIva).mapWith(Number),
@@ -1275,7 +1275,7 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
   // ── Gastos por mes (compras recibidas/contabilizadas) ──
   const comprasBase = db
     .select({
-      mes: sql<string>`lpad(extract(month from ${comprasTable.fechaEmision}::date)::text, 2, '0')`,
+      mes: sql<string>`lpad(extract(month from compras.fecha_emision::date)::text, 2, '0')`,
       totalSubtotal: sum(comprasTable.subtotal).mapWith(Number),
       totalIva: sum(comprasTable.montoIva).mapWith(Number),
       totalMonto: sum(comprasTable.total).mapWith(Number),
