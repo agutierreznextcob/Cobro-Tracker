@@ -1448,6 +1448,76 @@ contabilidadRouter.get("/contabilidad/informes/presupuesto-real", requireSubscri
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
+ * GET /api/contabilidad/sincronizar-historico/preview
+ * Muestra cuántos cobros y compras procesaría el backfill sin ejecutar nada.
+ */
+contabilidadRouter.get("/contabilidad/sincronizar-historico/preview", requireSubscription, async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const { scope } = auth;
+
+    // Cobros pagados/parciales sin asiento
+    const cobrosConAsiento = await db
+      .select({ origenId: asientosContablesTable.origenId })
+      .from(asientosContablesTable)
+      .where(and(
+        eq(asientosContablesTable.scope, scope),
+        inArray(asientosContablesTable.origen, ["cobro", "pago_parcial"]),
+      ));
+    const cobrosConAsientoIds = new Set(cobrosConAsiento.map(r => r.origenId).filter((id): id is number => id != null));
+
+    let cobrosCond;
+    if (scope.startsWith("org:")) {
+      const orgId = parseInt(scope.replace("org:", ""));
+      cobrosCond = and(eq(cobrosTable.organizationId, orgId), inArray(cobrosTable.estado, ["pagado", "parcial"]));
+    } else {
+      const uid = scope.replace("user:", "");
+      cobrosCond = and(eq(cobrosTable.responsableId, uid), inArray(cobrosTable.estado, ["pagado", "parcial"]));
+    }
+    const cobros = await db.select({ id: cobrosTable.id }).from(cobrosTable).where(cobrosCond);
+    const cobrosSinAsiento = cobros.filter(c => !cobrosConAsientoIds.has(c.id));
+
+    // Compras recibidas/contabilizadas sin asiento
+    const comprasConAsiento = await db
+      .select({ origenId: asientosContablesTable.origenId })
+      .from(asientosContablesTable)
+      .where(and(eq(asientosContablesTable.scope, scope), eq(asientosContablesTable.origen, "compra")));
+    const comprasConAsientoIds = new Set(comprasConAsiento.map(r => r.origenId).filter((id): id is number => id != null));
+
+    let comprasCond;
+    if (scope.startsWith("org:")) {
+      const orgId = parseInt(scope.replace("org:", ""));
+      comprasCond = and(eq(comprasTable.organizationId, orgId), inArray(comprasTable.estado, ["recibida", "contabilizada"]));
+    } else {
+      const uid = scope.replace("user:", "");
+      comprasCond = and(eq(comprasTable.usuarioId, uid), inArray(comprasTable.estado, ["recibida", "contabilizada"]));
+    }
+    const compras = await db.select({ id: comprasTable.id }).from(comprasTable).where(comprasCond);
+    const comprasSinAsiento = compras.filter(c => !comprasConAsientoIds.has(c.id));
+
+    res.json({
+      ok: true,
+      preview: true,
+      cobros: {
+        total: cobros.length,
+        conAsiento: cobrosConAsientoIds.size,
+        sinAsiento: cobrosSinAsiento.length,
+      },
+      compras: {
+        total: compras.length,
+        conAsiento: comprasConAsientoIds.size,
+        sinAsiento: comprasSinAsiento.length,
+      },
+      resumen: `Se generarían ${cobrosSinAsiento.length} asiento(s) de cobros y ${comprasSinAsiento.length} asiento(s) de compras.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
+/**
  * POST /api/contabilidad/sincronizar-historico
  * Genera asientos contables para todos los cobros pagados/parciales y compras
  * recibidas que aún no tienen asiento. Idempotente — se puede ejecutar varias
@@ -1465,6 +1535,74 @@ contabilidadRouter.post("/contabilidad/sincronizar-historico", requireSubscripti
       compras: result.compras,
       resumen: `Cobros: ${result.cobros.generados} generados, ${result.cobros.saltados} ya tenían asiento, ${result.cobros.errores.length} errores. ` +
                `Compras: ${result.compras.generados} generados, ${result.compras.saltados} ya tenían asiento, ${result.compras.errores.length} errores.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
+/**
+ * GET /api/contabilidad/asientos/pendientes
+ * Lista cobros pagados/parciales y compras recibidas que NO tienen asiento contable.
+ * Útil para detectar pagos que quedaron sin contabilizar por algún error.
+ */
+contabilidadRouter.get("/contabilidad/asientos/pendientes", requireSubscription, async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const { scope } = auth;
+
+    // Cobros con asiento (cobro o pago_parcial)
+    const cobrosConAsiento = await db
+      .select({ origenId: asientosContablesTable.origenId })
+      .from(asientosContablesTable)
+      .where(and(
+        eq(asientosContablesTable.scope, scope),
+        inArray(asientosContablesTable.origen, ["cobro", "pago_parcial"]),
+      ));
+    const cobrosConAsientoIds = new Set(cobrosConAsiento.map(r => r.origenId).filter((id): id is number => id != null));
+
+    let cobrosCond;
+    if (scope.startsWith("org:")) {
+      const orgId = parseInt(scope.replace("org:", ""));
+      cobrosCond = and(eq(cobrosTable.organizationId, orgId), inArray(cobrosTable.estado, ["pagado", "parcial"]));
+    } else {
+      const uid = scope.replace("user:", "");
+      cobrosCond = and(eq(cobrosTable.responsableId, uid), inArray(cobrosTable.estado, ["pagado", "parcial"]));
+    }
+    const cobros = await db
+      .select({ id: cobrosTable.id, clienteNombre: cobrosTable.clienteNombre, monto: cobrosTable.monto, estado: cobrosTable.estado, pagadoEn: cobrosTable.pagadoEn })
+      .from(cobrosTable)
+      .where(cobrosCond);
+    const cobrosSinAsiento = cobros.filter(c => !cobrosConAsientoIds.has(c.id));
+
+    // Compras sin asiento
+    const comprasConAsiento = await db
+      .select({ origenId: asientosContablesTable.origenId })
+      .from(asientosContablesTable)
+      .where(and(eq(asientosContablesTable.scope, scope), eq(asientosContablesTable.origen, "compra")));
+    const comprasConAsientoIds = new Set(comprasConAsiento.map(r => r.origenId).filter((id): id is number => id != null));
+
+    let comprasCond;
+    if (scope.startsWith("org:")) {
+      const orgId = parseInt(scope.replace("org:", ""));
+      comprasCond = and(eq(comprasTable.organizationId, orgId), inArray(comprasTable.estado, ["recibida", "contabilizada"]));
+    } else {
+      const uid = scope.replace("user:", "");
+      comprasCond = and(eq(comprasTable.usuarioId, uid), inArray(comprasTable.estado, ["recibida", "contabilizada"]));
+    }
+    const compras = await db
+      .select({ id: comprasTable.id, proveedorNombre: comprasTable.proveedorNombre, total: comprasTable.total, estado: comprasTable.estado, numeroFactura: comprasTable.numeroFactura })
+      .from(comprasTable)
+      .where(comprasCond);
+    const comprasSinAsiento = compras.filter(c => !comprasConAsientoIds.has(c.id));
+
+    res.json({
+      ok: true,
+      cobros: cobrosSinAsiento.map(c => ({ id: c.id, clienteNombre: c.clienteNombre, monto: Number(c.monto), estado: c.estado, pagadoEn: c.pagadoEn })),
+      compras: comprasSinAsiento.map(c => ({ id: c.id, proveedorNombre: c.proveedorNombre, total: Number(c.total), estado: c.estado, numeroFactura: c.numeroFactura })),
+      total: cobrosSinAsiento.length + comprasSinAsiento.length,
     });
   } catch (err: any) {
     res.status(500).json({ error: err?.message ?? "Error interno" });
