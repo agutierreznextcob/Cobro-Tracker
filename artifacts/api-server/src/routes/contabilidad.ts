@@ -1269,8 +1269,8 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
         lte(cobrosTable.fechaVencimiento, fechaHasta),
       ),
     )
-    .groupBy(sql`extract(month from ${cobrosTable.fechaVencimiento}::date)`)
-    .orderBy(sql`extract(month from ${cobrosTable.fechaVencimiento}::date)`);
+    .groupBy(sql`extract(month from cobros.fecha_vencimiento::date)`)
+    .orderBy(sql`extract(month from cobros.fecha_vencimiento::date)`);
 
   // ── Gastos por mes (compras recibidas/contabilizadas) ──
   const comprasBase = db
@@ -1292,8 +1292,8 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
         lte(comprasTable.fechaEmision, fechaHasta),
       ),
     )
-    .groupBy(sql`extract(month from ${comprasTable.fechaEmision}::date)`)
-    .orderBy(sql`extract(month from ${comprasTable.fechaEmision}::date)`);
+    .groupBy(sql`extract(month from compras.fecha_emision::date)`)
+    .orderBy(sql`extract(month from compras.fecha_emision::date)`);
 
   const [cobrosRows, comprasRows] = await Promise.all([cobrosBase, comprasBase]);
 
