@@ -1264,7 +1264,7 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
     .where(
       and(
         cobroScopeCondition(orgCtx, auth.userId),
-        inArray(cobrosTable.estado, ["pagado", "pagado_parcial"]),
+        inArray(cobrosTable.estado, ["pagado", "parcial"]),
         gte(cobrosTable.fechaVencimiento, fechaDesde),
         lte(cobrosTable.fechaVencimiento, fechaHasta),
       ),
@@ -1379,7 +1379,7 @@ contabilidadRouter.get("/contabilidad/informes/presupuesto-real", requireSubscri
     .where(
       and(
         cobroScopeCondition(orgCtx, auth.userId),
-        inArray(cobrosTable.estado, ["pagado", "pagado_parcial"]),
+        inArray(cobrosTable.estado, ["pagado", "parcial"]),
         gte(cobrosTable.fechaVencimiento, fechaDesde),
         lte(cobrosTable.fechaVencimiento, fechaHasta),
       ),
