@@ -3,24 +3,23 @@
  *
  * Lógica de partida doble:
  *
- * COBRO PAGADO (venta):
- *   DEBE  1.1.03 Deudores comerciales / Clientes (o 1.1.01 Caja si pago inmediato)
- *   DEBE  2.1.01 IVA Débito Fiscal  (si incluye IVA)
- *   HABER 4.1.01 Ventas de productos  -OR-  4.1.02 Prestación de servicios
- *   HABER 2.1.01 IVA Débito Fiscal    (si incluye IVA, como cuenta de pasivo)
+ * ABONO / PAGO PARCIAL (cada abono genera su propio asiento):
+ *   DEBE  1.1.01 Caja / Banco (monto del abono)
+ *   HABER 4.1.02 Prestación de servicios (monto neto del abono)
+ *   HABER 2.1.01 IVA Débito Fiscal (IVA proporcional del abono, si aplica)
  *
- * Simplificado (práctico para pymes):
- *   DEBE  1.1.01 Caja / Banco (monto total recibido)
+ * COBRO PAGADO COMPLETO (si no tiene abonos previos, genera asiento único):
+ *   DEBE  1.1.01 Caja / Banco (monto total)
  *   HABER 4.1.02 Prestación de servicios (monto neto)
- *   HABER 2.1.01 IVA Débito Fiscal (monto IVA)
+ *   HABER 2.1.01 IVA Débito Fiscal (monto IVA, si aplica)
  *
- * COMPRA RECIBIDA (gasto/costo):
- *   DEBE  5.2.xx Cuenta de gasto  (monto neto)
+ * COMPRA RECIBIDA:
+ *   DEBE  5.2.04 Materiales / costo (monto neto)
  *   DEBE  2.1.02 IVA Crédito Fiscal (monto IVA)
  *   HABER 2.1.03 Proveedores / Cuentas por pagar (total)
  */
-import { db, cobrosTable, comprasTable, compraItemsTable, planCuentasTable, asientosContablesTable, asientoLineasTable } from "@workspace/db";
-import { eq, and, inArray, like, isNull, sql, asc } from "drizzle-orm";
+import { db, cobrosTable, comprasTable, pagosParciales, planCuentasTable, asientosContablesTable, asientoLineasTable } from "@workspace/db";
+import { eq, and, inArray, like, sql } from "drizzle-orm";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +65,10 @@ async function nextNumero(scope: string, anio: string): Promise<string> {
   return `${anio}-${String(nextNum).padStart(4, "0")}`;
 }
 
-/** Inserta asiento + lineas y lo deja en estado "contabilizado" directamente */
+/**
+ * Inserta asiento + líneas en una sola transacción atómica.
+ * Deja el asiento en estado "contabilizado" directamente.
+ */
 async function insertarAsientoContabilizado(input: AsientoInput): Promise<GenerarResult> {
   const { scope, userId, fecha, periodo, descripcion, origen, origenId, moneda, lineas } = input;
 
@@ -77,31 +79,41 @@ async function insertarAsientoContabilizado(input: AsientoInput): Promise<Genera
   }
 
   const anio = periodo.substring(0, 4);
-  const numero = await nextNumero(scope, anio);
 
-  const [asiento] = await db.insert(asientosContablesTable).values({
-    scope, numero, fecha, periodo, descripcion,
-    estado: "contabilizado",
-    origen,
-    origenId,
-    moneda,
-    usuarioId: userId,
-  }).returning();
+  // Transacción atómica: número correlativo + cabecera + líneas juntos
+  return await db.transaction(async (tx) => {
+    // Calcular el próximo número dentro de la transacción para evitar race conditions
+    const [row] = await tx
+      .select({ cnt: sql<number>`count(*)` })
+      .from(asientosContablesTable)
+      .where(and(eq(asientosContablesTable.scope, scope), like(asientosContablesTable.numero, `${anio}-%`)));
+    const nextNum = ((row?.cnt ?? 0) as number) + 1;
+    const numero = `${anio}-${String(nextNum).padStart(4, "0")}`;
 
-  await db.insert(asientoLineasTable).values(
-    lineas.map((l, i) => ({
-      asientoId: asiento.id,
-      cuentaId: l.cuentaId,
-      cuentaCodigo: l.cuentaCodigo,
-      cuentaNombre: l.cuentaNombre,
-      debe: String(l.debe.toFixed(2)),
-      haber: String(l.haber.toFixed(2)),
-      descripcion: l.descripcion,
-      orden: l.orden ?? i,
-    }))
-  );
+    const [asiento] = await tx.insert(asientosContablesTable).values({
+      scope, numero, fecha, periodo, descripcion,
+      estado: "contabilizado",
+      origen,
+      origenId,
+      moneda,
+      usuarioId: userId,
+    }).returning();
 
-  return { ok: true, asientoId: asiento.id, numero };
+    await tx.insert(asientoLineasTable).values(
+      lineas.map((l, i) => ({
+        asientoId: asiento.id,
+        cuentaId: l.cuentaId,
+        cuentaCodigo: l.cuentaCodigo,
+        cuentaNombre: l.cuentaNombre,
+        debe: String(l.debe.toFixed(2)),
+        haber: String(l.haber.toFixed(2)),
+        descripcion: l.descripcion,
+        orden: l.orden ?? i,
+      }))
+    );
+
+    return { ok: true, asientoId: asiento.id, numero };
+  });
 }
 
 // ─── Mapa de cuentas por código ───────────────────────────────────────────────
@@ -114,23 +126,113 @@ async function getCuentasPorCodigo(scope: string, codigos: string[]): Promise<Ma
   return new Map(rows.map(r => [r.codigo, r]));
 }
 
-// ─── Generador para un cobro ──────────────────────────────────────────────────
+// ─── Generador para un abono individual ──────────────────────────────────────
 
 /**
- * Genera el asiento contable para un cobro pagado o parcial.
- * Si ya existe un asiento con origen="cobro" y origenId=cobro.id, lo salta.
+ * Genera el asiento contable para un abono (pago parcial) específico.
+ * Cada abono genera su propio asiento de tipo "pago_parcial" con origenId=abono.id.
+ * Si ya existe asiento para ese abono, lo salta (idempotente).
  *
  * Partida:
- *   DEBE  1.1.01 Caja y banco (monto total pagado hasta ahora)
- *   HABER 4.1.02 Prestación de servicios (monto neto)
- *   HABER 2.1.01 IVA Débito Fiscal (monto IVA, si aplica)
+ *   DEBE  1.1.01 Caja/Banco (monto del abono)
+ *   HABER 4.1.02 Ventas/Servicios (monto neto proporcional)
+ *   HABER 2.1.01 IVA Débito Fiscal (IVA proporcional, si aplica)
+ */
+export async function generarAsientoAbono(
+  scope: string,
+  userId: string,
+  abonoId: number,
+): Promise<GenerarResult> {
+  // Verificar si ya tiene asiento este abono específico
+  const [existente] = await db.select({ id: asientosContablesTable.id })
+    .from(asientosContablesTable)
+    .where(and(
+      eq(asientosContablesTable.scope, scope),
+      eq(asientosContablesTable.origen, "pago_parcial"),
+      eq(asientosContablesTable.origenId, abonoId),
+    ));
+  if (existente) return { ok: true, skipped: true, asientoId: existente.id };
+
+  // Cargar abono y su cobro asociado
+  const [abono] = await db.select().from(pagosParciales).where(eq(pagosParciales.id, abonoId));
+  if (!abono) return { ok: false, error: `Abono ${abonoId} no encontrado` };
+  if (abono.estado !== "confirmado") {
+    return { ok: false, error: `Abono ${abonoId} no está confirmado (estado: ${abono.estado})` };
+  }
+
+  const [cobro] = await db.select().from(cobrosTable).where(eq(cobrosTable.id, abono.cobroId));
+  if (!cobro) return { ok: false, error: `Cobro ${abono.cobroId} no encontrado para el abono ${abonoId}` };
+
+  const montoAbono = Number(abono.monto);
+  if (montoAbono <= 0) return { ok: false, error: `Abono ${abonoId} tiene monto inválido: ${montoAbono}` };
+
+  // Calcular IVA proporcional al monto del abono
+  const incluyeIva = cobro.incluyeIva;
+  let montoNeto = montoAbono;
+  let montoIva = 0;
+
+  if (incluyeIva && cobro.montoNeto && cobro.monto && Number(cobro.monto) > 0) {
+    // Proporción IVA del cobro original aplicada al abono
+    const tasaIva = Number(cobro.montoIva ?? 0) / Number(cobro.monto);
+    montoIva = Math.round(montoAbono * tasaIva);
+    montoNeto = montoAbono - montoIva;
+  }
+
+  // Usar confirmadoEn como fecha contable del abono
+  const fecha = abono.confirmadoEn
+    ? abono.confirmadoEn.toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const periodo = fecha.replace(/-/g, "").slice(0, 6);
+
+  const descripcion = `Abono ${cobro.clienteNombre ?? "cliente"} - ${cobro.descripcion?.slice(0, 50) ?? `Cobro #${cobro.id}`}`;
+
+  const codigosNecesarios = ["1.1.01", "4.1.02", "2.1.01"];
+  const cuentas = await getCuentasPorCodigo(scope, codigosNecesarios);
+
+  const cCaja = cuentas.get("1.1.01");
+  const cVentas = cuentas.get("4.1.02");
+  const cIva = cuentas.get("2.1.01");
+
+  if (!cCaja || !cVentas) {
+    return { ok: false, error: `Faltan cuentas: ${!cCaja ? "1.1.01 (Caja)" : ""} ${!cVentas ? "4.1.02 (Ventas)" : ""}`.trim() };
+  }
+
+  const lineas: LineaInput[] = [];
+  lineas.push({ cuentaId: cCaja.id, cuentaCodigo: cCaja.codigo, cuentaNombre: cCaja.nombre, debe: montoAbono, haber: 0, orden: 0 });
+
+  if (incluyeIva && montoIva > 0 && cIva) {
+    lineas.push({ cuentaId: cVentas.id, cuentaCodigo: cVentas.codigo, cuentaNombre: cVentas.nombre, debe: 0, haber: montoNeto, orden: 1 });
+    lineas.push({ cuentaId: cIva.id, cuentaCodigo: cIva.codigo, cuentaNombre: cIva.nombre, debe: 0, haber: montoIva, orden: 2 });
+  } else {
+    lineas.push({ cuentaId: cVentas.id, cuentaCodigo: cVentas.codigo, cuentaNombre: cVentas.nombre, debe: 0, haber: montoAbono, orden: 1 });
+  }
+
+  return insertarAsientoContabilizado({
+    scope, userId, fecha, periodo, descripcion,
+    origen: "pago_parcial",
+    origenId: abonoId,
+    moneda: cobro.moneda ?? "CLP",
+    lineas,
+  });
+}
+
+// ─── Generador para un cobro completo ────────────────────────────────────────
+
+/**
+ * Genera el asiento contable para un cobro pagado en su totalidad.
+ *
+ * IMPORTANTE: Si el cobro tiene abonos registrados, NO genera asiento nuevo —
+ * cada abono ya tiene su propio asiento de tipo "pago_parcial".
+ * Solo genera un asiento de tipo "cobro" si NO hay abonos (pago directo total).
+ *
+ * Idempotente: si ya existe asiento con origen="cobro" y origenId=cobro.id, lo salta.
  */
 export async function generarAsientoCobro(
   scope: string,
   userId: string,
   cobroId: number,
 ): Promise<GenerarResult> {
-  // Verificar si ya tiene asiento
+  // Verificar si ya tiene asiento de tipo "cobro"
   const [existente] = await db.select({ id: asientosContablesTable.id })
     .from(asientosContablesTable)
     .where(and(
@@ -147,22 +249,34 @@ export async function generarAsientoCobro(
     return { ok: false, error: `Cobro ${cobroId} no está pagado (estado: ${cobro.estado})` };
   }
 
+  // Si tiene abonos confirmados, NO generar asiento único — cada abono tiene el suyo
+  const abonos = await db.select({ id: pagosParciales.id })
+    .from(pagosParciales)
+    .where(and(eq(pagosParciales.cobroId, cobroId), eq(pagosParciales.estado, "confirmado")));
+
+  if (abonos.length > 0) {
+    // Generar asientos para cada abono que no lo tenga
+    let generados = 0;
+    for (const { id } of abonos) {
+      const r = await generarAsientoAbono(scope, userId, id);
+      if (r.ok && !r.skipped) generados++;
+    }
+    return { ok: true, skipped: generados === 0, numero: `${generados} abonos procesados` };
+  }
+
+  // Sin abonos: pago directo total → generar asiento único de tipo "cobro"
   const fecha = cobro.pagadoEn
     ? cobro.pagadoEn.toISOString().slice(0, 10)
     : (cobro.fechaVencimiento ?? new Date().toISOString().slice(0, 10));
-  const periodo = fecha.replace(/-/g, "").slice(0, 6); // AAAAMM
+  const periodo = fecha.replace(/-/g, "").slice(0, 6);
 
-  // Montos
   const montoTotal = Number(cobro.monto);
   const incluyeIva = cobro.incluyeIva;
   const montoNeto = incluyeIva && cobro.montoNeto ? Number(cobro.montoNeto) : montoTotal;
   const montoIva = incluyeIva && cobro.montoIva ? Number(cobro.montoIva) : 0;
 
-  // Para cobros parciales: usar monto total (lo que se debe, luego se ajusta)
-  // La partida representa la venta reconocida
   const descripcion = `Venta ${cobro.clienteNombre ?? "cliente"} - ${cobro.descripcion?.slice(0, 60) ?? `Cobro #${cobro.id}`}`;
 
-  // Obtener cuentas del plan
   const codigosNecesarios = ["1.1.01", "4.1.02", "2.1.01"];
   const cuentas = await getCuentasPorCodigo(scope, codigosNecesarios);
 
@@ -171,27 +285,22 @@ export async function generarAsientoCobro(
   const cIva = cuentas.get("2.1.01");
 
   if (!cCaja || !cVentas) {
-    return { ok: false, error: `Faltan cuentas en el plan de cuentas: ${!cCaja ? "1.1.01 (Caja)" : ""} ${!cVentas ? "4.1.02 (Ventas)" : ""}`.trim() };
+    return { ok: false, error: `Faltan cuentas: ${!cCaja ? "1.1.01 (Caja)" : ""} ${!cVentas ? "4.1.02 (Ventas)" : ""}`.trim() };
   }
 
   const lineas: LineaInput[] = [];
-
-  // DEBE: Caja/Banco por el total
   lineas.push({ cuentaId: cCaja.id, cuentaCodigo: cCaja.codigo, cuentaNombre: cCaja.nombre, debe: montoTotal, haber: 0, orden: 0 });
 
   if (incluyeIva && montoIva > 0 && cIva) {
-    // HABER: Ventas (neto)
     lineas.push({ cuentaId: cVentas.id, cuentaCodigo: cVentas.codigo, cuentaNombre: cVentas.nombre, debe: 0, haber: montoNeto, orden: 1 });
-    // HABER: IVA Débito Fiscal
     lineas.push({ cuentaId: cIva.id, cuentaCodigo: cIva.codigo, cuentaNombre: cIva.nombre, debe: 0, haber: montoIva, orden: 2 });
   } else {
-    // HABER: Ventas (monto total)
     lineas.push({ cuentaId: cVentas.id, cuentaCodigo: cVentas.codigo, cuentaNombre: cVentas.nombre, debe: 0, haber: montoTotal, orden: 1 });
   }
 
   return insertarAsientoContabilizado({
     scope, userId, fecha, periodo, descripcion,
-    origen: cobro.estado === "parcial" ? "pago_parcial" : "cobro",
+    origen: "cobro",
     origenId: cobro.id,
     moneda: cobro.moneda ?? "CLP",
     lineas,
@@ -248,21 +357,16 @@ export async function generarAsientoCompra(
   const cProveedores = cuentas.get("2.1.03");
 
   if (!cGasto || !cProveedores) {
-    return { ok: false, error: `Faltan cuentas en el plan de cuentas: ${!cGasto ? "5.2.04 (Materiales)" : ""} ${!cProveedores ? "2.1.03 (Proveedores)" : ""}`.trim() };
+    return { ok: false, error: `Faltan cuentas: ${!cGasto ? "5.2.04 (Materiales)" : ""} ${!cProveedores ? "2.1.03 (Proveedores)" : ""}`.trim() };
   }
 
   const lineas: LineaInput[] = [];
-
-  // DEBE: Gasto/Costo (subtotal neto)
   lineas.push({ cuentaId: cGasto.id, cuentaCodigo: cGasto.codigo, cuentaNombre: cGasto.nombre, debe: subtotal, haber: 0, orden: 0 });
 
-  // DEBE: IVA Crédito Fiscal (si existe y si hay cuenta)
   if (montoIva > 0 && cIvaCredito) {
     lineas.push({ cuentaId: cIvaCredito.id, cuentaCodigo: cIvaCredito.codigo, cuentaNombre: cIvaCredito.nombre, debe: montoIva, haber: 0, orden: 1 });
-    // HABER: Proveedores (total con IVA)
     lineas.push({ cuentaId: cProveedores.id, cuentaCodigo: cProveedores.codigo, cuentaNombre: cProveedores.nombre, debe: 0, haber: total, orden: 2 });
   } else {
-    // HABER: Proveedores (total sin IVA)
     lineas.push({ cuentaId: cProveedores.id, cuentaCodigo: cProveedores.codigo, cuentaNombre: cProveedores.nombre, debe: 0, haber: subtotal, orden: 1 });
   }
 
@@ -285,80 +389,50 @@ export interface BackfillResult {
 /**
  * Genera asientos para todos los cobros pagados/parciales y compras recibidas
  * que aún no tienen asiento contable, dentro del scope dado.
+ * Idempotente: no duplica si ya existen asientos.
  */
 export async function backfillAsientosHistoricos(
   scope: string,
   userId: string,
 ): Promise<BackfillResult> {
-  // ── Cobros pagados/parciales sin asiento ─────────────────────────────────
-  // IDs de cobros que ya tienen asiento
-  const cobrosConAsiento = await db.select({ origenId: asientosContablesTable.origenId })
-    .from(asientosContablesTable)
-    .where(and(
-      eq(asientosContablesTable.scope, scope),
-      inArray(asientosContablesTable.origen, ["cobro", "pago_parcial"]),
-    ));
-  const cobrosConAsientoIds = new Set(cobrosConAsiento.map(r => r.origenId).filter((id): id is number => id != null));
-
-  // Cobros pagados/parciales según scope
-  // Para scope org:X → organizationId; para user:X → responsableId
+  // ── Cobros pagados/parciales ──────────────────────────────────────────────
   let cobrosCond;
   if (scope.startsWith("org:")) {
     const orgId = parseInt(scope.replace("org:", ""));
-    cobrosCond = and(
-      eq(cobrosTable.organizationId, orgId),
-      inArray(cobrosTable.estado, ["pagado", "parcial"]),
-    );
+    cobrosCond = and(eq(cobrosTable.organizationId, orgId), inArray(cobrosTable.estado, ["pagado", "parcial"]));
   } else {
     const uid = scope.replace("user:", "");
-    cobrosCond = and(
-      eq(cobrosTable.responsableId, uid),
-      inArray(cobrosTable.estado, ["pagado", "parcial"]),
-    );
+    cobrosCond = and(eq(cobrosTable.responsableId, uid), inArray(cobrosTable.estado, ["pagado", "parcial"]));
   }
 
   const cobros = await db.select({ id: cobrosTable.id }).from(cobrosTable).where(cobrosCond);
-  const cobrosSinAsiento = cobros.filter(c => !cobrosConAsientoIds.has(c.id));
+  const cobrosResult = { total: cobros.length, generados: 0, saltados: 0, errores: [] as { id: number; error: string }[] };
 
-  const cobrosResult = { total: cobros.length, generados: 0, saltados: cobrosConAsientoIds.size, errores: [] as { id: number; error: string }[] };
-
-  for (const { id } of cobrosSinAsiento) {
+  for (const { id } of cobros) {
     const r = await generarAsientoCobro(scope, userId, id);
     if (r.skipped) { cobrosResult.saltados++; continue; }
-    if (r.ok) cobrosResult.generados++;
-    else cobrosResult.errores.push({ id, error: r.error ?? "error desconocido" });
+    if (r.ok) {
+      // puede haber generado N asientos de abonos; contamos como 1 cobro procesado
+      cobrosResult.generados++;
+    } else {
+      cobrosResult.errores.push({ id, error: r.error ?? "error desconocido" });
+    }
   }
 
-  // ── Compras recibidas/contabilizadas sin asiento ──────────────────────────
-  const comprasConAsiento = await db.select({ origenId: asientosContablesTable.origenId })
-    .from(asientosContablesTable)
-    .where(and(
-      eq(asientosContablesTable.scope, scope),
-      eq(asientosContablesTable.origen, "compra"),
-    ));
-  const comprasConAsientoIds = new Set(comprasConAsiento.map(r => r.origenId).filter((id): id is number => id != null));
-
+  // ── Compras recibidas/contabilizadas ─────────────────────────────────────
   let comprasCond;
   if (scope.startsWith("org:")) {
     const orgId = parseInt(scope.replace("org:", ""));
-    comprasCond = and(
-      eq(comprasTable.organizationId, orgId),
-      inArray(comprasTable.estado, ["recibida", "contabilizada"]),
-    );
+    comprasCond = and(eq(comprasTable.organizationId, orgId), inArray(comprasTable.estado, ["recibida", "contabilizada"]));
   } else {
     const uid = scope.replace("user:", "");
-    comprasCond = and(
-      eq(comprasTable.usuarioId, uid),
-      inArray(comprasTable.estado, ["recibida", "contabilizada"]),
-    );
+    comprasCond = and(eq(comprasTable.usuarioId, uid), inArray(comprasTable.estado, ["recibida", "contabilizada"]));
   }
 
   const compras = await db.select({ id: comprasTable.id }).from(comprasTable).where(comprasCond);
-  const comprasSinAsiento = compras.filter(c => !comprasConAsientoIds.has(c.id));
+  const comprasResult = { total: compras.length, generados: 0, saltados: 0, errores: [] as { id: number; error: string }[] };
 
-  const comprasResult = { total: compras.length, generados: 0, saltados: comprasConAsientoIds.size, errores: [] as { id: number; error: string }[] };
-
-  for (const { id } of comprasSinAsiento) {
+  for (const { id } of compras) {
     const r = await generarAsientoCompra(scope, userId, id);
     if (r.skipped) { comprasResult.saltados++; continue; }
     if (r.ok) comprasResult.generados++;

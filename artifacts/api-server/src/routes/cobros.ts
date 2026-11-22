@@ -57,7 +57,7 @@ import { isWhatsAppConfigured, sanitizePhone, sendWhatsAppMensaje } from "../lib
 import { fechaCicloAnclada } from "../lib/cobros-recurrentes";
 import { asegurarLinkPagoCobro, portalUrlExistenteParaCobro } from "../lib/cobro-payment-link";
 import { createHash } from "crypto";
-import { generarAsientoCobro } from "../lib/contabilidad-auto";
+import { generarAsientoCobro, generarAsientoAbono } from "../lib/contabilidad-auto";
 
 const cobrosRouter = Router();
 
@@ -2523,12 +2523,12 @@ cobrosRouter.post("/cobros/:id/abonos", async (req, res) => {
       if (estadoTrasAbono === "pagado") {
         void emitirComprobante(cobro.id, { metodo: "manual" }, req.log);
       }
-      // Generar asiento contable para el cobro (pagado o parcial)
+      // Generar asiento contable por el abono confirmado (cada abono tiene su propio asiento)
       if (estadoTrasAbono === "pagado" || estadoTrasAbono === "parcial") {
         const orgCtxAbono = await getOrgContext(userId);
         const scopeAbono = orgCtxAbono.organizationId ? `org:${orgCtxAbono.organizationId}` : `user:${userId}`;
-        void generarAsientoCobro(scopeAbono, userId, cobro.id).catch((err) =>
-          req.log.warn({ err, cobroId: cobro.id }, "No se pudo generar asiento contable para abono"),
+        void generarAsientoAbono(scopeAbono, userId, abono.id).catch((err) =>
+          req.log.warn({ err, cobroId: cobro.id, abonoId: abono.id }, "No se pudo generar asiento contable para abono"),
         );
       }
       req.log.info({ cobroId: cobro.id, abonoId: abono.id, monto }, "Manual abono confirmed");
@@ -2653,12 +2653,12 @@ cobrosRouter.post("/cobros/:id/abonos/:abonoId/confirmar", async (req, res) => {
     if (estadoTrasConfirmar === "pagado") {
       void emitirComprobante(paramsParsed.data.id, { metodo: "manual" }, req.log);
     }
-    // Generar asiento contable automáticamente
+    // Generar asiento contable por el abono confirmado (cada abono tiene su propio asiento)
     if (estadoTrasConfirmar === "pagado" || estadoTrasConfirmar === "parcial") {
       const orgCtxConfirmar = await getOrgContext(userId);
       const scopeConfirmar = orgCtxConfirmar.organizationId ? `org:${orgCtxConfirmar.organizationId}` : `user:${userId}`;
-      void generarAsientoCobro(scopeConfirmar, userId, paramsParsed.data.id).catch((err) =>
-        req.log.warn({ err, cobroId: paramsParsed.data.id }, "No se pudo generar asiento contable al confirmar abono"),
+      void generarAsientoAbono(scopeConfirmar, userId, abonoId).catch((err) =>
+        req.log.warn({ err, cobroId: paramsParsed.data.id, abonoId }, "No se pudo generar asiento contable al confirmar abono"),
       );
     }
     req.log.info({ abonoId, cobroId: paramsParsed.data.id }, "Abono confirmed manually");
