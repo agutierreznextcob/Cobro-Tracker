@@ -1219,6 +1219,7 @@ contabilidadRouter.delete("/contabilidad/libro-sii/:id", requireSubscription, as
  * Query params: anio (obligatorio), mes (opcional, 1-12 para filtrar un mes)
  */
 contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubscription, async (req, res) => {
+  try {
   const auth = await requireAuth(req, res);
   if (!auth) return;
 
@@ -1336,6 +1337,10 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
   );
 
   res.json({ anio: anioNum, mes: mesNum, serie, totales });
+  } catch (err: any) {
+    console.error("[resumen-financiero] Error:", err?.message, err?.stack);
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
 });
 
 /**
