@@ -1254,7 +1254,7 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
   // ── Ingresos por mes (cobros con estado pagado/parcial) ──
   const cobrosBase = db
     .select({
-      mes: sql<string>`to_char(${cobrosTable.fechaVencimiento}::date, 'MM')`,
+      mes: sql<string>`lpad(extract(month from ${cobrosTable.fechaVencimiento}::date)::text, 2, '0')`,
       totalMonto: sum(cobrosTable.monto).mapWith(Number),
       totalNeto: sum(cobrosTable.montoNeto).mapWith(Number),
       totalIva: sum(cobrosTable.montoIva).mapWith(Number),
@@ -1269,13 +1269,13 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
         lte(cobrosTable.fechaVencimiento, fechaHasta),
       ),
     )
-    .groupBy(sql`to_char(${cobrosTable.fechaVencimiento}::date, 'MM')`)
-    .orderBy(sql`to_char(${cobrosTable.fechaVencimiento}::date, 'MM')`);
+    .groupBy(sql`extract(month from ${cobrosTable.fechaVencimiento}::date)`)
+    .orderBy(sql`extract(month from ${cobrosTable.fechaVencimiento}::date)`);
 
   // ── Gastos por mes (compras recibidas/contabilizadas) ──
   const comprasBase = db
     .select({
-      mes: sql<string>`to_char(${comprasTable.fechaEmision}::date, 'MM')`,
+      mes: sql<string>`lpad(extract(month from ${comprasTable.fechaEmision}::date)::text, 2, '0')`,
       totalSubtotal: sum(comprasTable.subtotal).mapWith(Number),
       totalIva: sum(comprasTable.montoIva).mapWith(Number),
       totalMonto: sum(comprasTable.total).mapWith(Number),
@@ -1292,8 +1292,8 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
         lte(comprasTable.fechaEmision, fechaHasta),
       ),
     )
-    .groupBy(sql`to_char(${comprasTable.fechaEmision}::date, 'MM')`)
-    .orderBy(sql`to_char(${comprasTable.fechaEmision}::date, 'MM')`);
+    .groupBy(sql`extract(month from ${comprasTable.fechaEmision}::date)`)
+    .orderBy(sql`extract(month from ${comprasTable.fechaEmision}::date)`);
 
   const [cobrosRows, comprasRows] = await Promise.all([cobrosBase, comprasBase]);
 
