@@ -29,6 +29,11 @@ import { getOrgContext, cobroScopeCondition } from "../lib/org";
 
 export const contabilidadRouter = Router();
 
+// DIAGNÓSTICO TEMPORAL - eliminar después
+contabilidadRouter.get("/contabilidad/informes/diag", async (req, res) => {
+  res.json({ ok: true, user: (req.user as any)?.id ?? null, ts: Date.now() });
+});
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getScope(userId: string, orgId: string | null) {
@@ -1222,6 +1227,8 @@ contabilidadRouter.get("/contabilidad/informes/resumen-financiero", requireSubsc
   try {
   const auth = await requireAuth(req, res);
   if (!auth) return;
+  // DIAG: early ping
+  console.log("[resumen-financiero] handler reached, user:", auth.userId);
 
   const { anio, mes } = req.query as Record<string, string>;
   if (!anio || isNaN(parseInt(anio))) {
