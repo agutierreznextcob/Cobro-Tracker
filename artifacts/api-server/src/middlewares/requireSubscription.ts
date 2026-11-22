@@ -26,7 +26,7 @@ export async function requireSubscription(
     }
     next();
   } catch (err) {
-    req.log.error({ err }, "Error checking subscription access");
+    console.error("[requireSubscription] Error checking subscription access:", err);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 }
