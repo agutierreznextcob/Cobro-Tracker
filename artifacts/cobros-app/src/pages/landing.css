@@ -10,16 +10,19 @@
   --popover-foreground: 0 0% 4%;
   --primary: 180 79% 24.12%;
   --primary-foreground: 0 0% 100%;
-  --ring: 21 80% 54%;
-  --border: 30 10% 88%;
-  --muted: 36 30% 97%;
+  --ring: 180 79% 24.12%;
+  --border: 180 15% 88%;
+  --muted: 180 10% 97%;
   --muted-foreground: 0 0% 32%;
   --nc-ink: #0A0A0A;
-  --nc-orange: #E86B2A;
   --nc-cyan: #0D6E6E;
+  --nc-cyan-light: #12908F;
+  --nc-cyan-pale: #EBF5F5;
+  --nc-cyan-ultra: #F0F9F9;
+  --nc-orange: #E86B2A;
   --nc-gold: #F4A800;
-  --nc-paper: #FBFAF7;
-  --nc-line: #E4E1DA;
+  --nc-paper: #F7FAFA;
+  --nc-line: #D1E8E8;
   background: #FFFFFF;
   color: var(--nc-ink);
   font-family: 'Instrument Sans', system-ui, sans-serif;
@@ -35,11 +38,11 @@
 
 .nc-dialog {
   border: 1px solid #0A0A0A;
-  box-shadow: 8px 8px 0 0 #E86B2A;
+  box-shadow: 8px 8px 0 0 var(--nc-cyan);
   font-family: 'Instrument Sans', system-ui, sans-serif;
 }
-.nc-dialog button[type="submit"] { background: #E86B2A; color: #0A0A0A; }
-.nc-dialog button[type="submit"]:hover { background: #F47B3B; }
+.nc-dialog button[type="submit"] { background: var(--nc-cyan); color: #FFFFFF; }
+.nc-dialog button[type="submit"]:hover { background: var(--nc-cyan-light); }
 
 .nextcob-landing .nc-display {
   font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif;
@@ -61,29 +64,30 @@
 .nextcob-landing .nc-paper { background: var(--nc-paper); }
 .nextcob-landing .nc-rule { border-color: var(--nc-line); }
 
-/* Buttons */
+/* ─── Buttons ─────────────────────────────────────────────── */
 .nextcob-landing .landing-cta {
-  background-color: var(--nc-orange);
-  color: var(--nc-ink);
-  border: 1px solid var(--nc-ink);
+  background-color: var(--nc-cyan);
+  color: #FFFFFF;
+  border: 1px solid var(--nc-cyan);
   transition: background-color .15s ease, transform .15s ease;
 }
-.nextcob-landing .landing-cta:hover { background-color: #F47B3B; }
+.nextcob-landing .landing-cta:hover { background-color: var(--nc-cyan-light); border-color: var(--nc-cyan-light); }
 .nextcob-landing .landing-cta:active { transform: translateY(1px); }
+
 .nextcob-landing .landing-secondary {
   border: 1px solid var(--nc-cyan);
   color: var(--nc-cyan);
-  background: #FFFFFF;
+  background: transparent;
   transition: background-color .15s ease, color .15s ease;
 }
 .nextcob-landing .landing-secondary:hover { background-color: var(--nc-cyan); color: #FFFFFF; }
 
 .nextcob-landing :focus-visible {
-  outline: 2px solid var(--nc-orange);
+  outline: 2px solid var(--nc-cyan);
   outline-offset: 2px;
 }
 
-/* Nav links */
+/* ─── Nav links ───────────────────────────────────────────── */
 .nextcob-landing .nc-navlink {
   position: relative;
   padding: 0.5rem 0;
@@ -97,20 +101,110 @@
   position: absolute;
   left: 0; right: 0; bottom: -1.15rem;
   height: 3px;
-  background: var(--nc-orange);
+  background: var(--nc-cyan);
 }
 
-/* Cards that link out */
+/* ─── Cards / tiles ───────────────────────────────────────── */
 .nextcob-landing .nc-tile {
-  transition: background-color .15s ease, border-color .15s ease;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
-.nextcob-landing .nc-tile:hover { background-color: #FFF4EC; border-color: var(--nc-orange); }
-.nextcob-landing .nc-tile:hover .nc-arrow { color: var(--nc-orange); transform: translateX(3px); }
+.nextcob-landing .nc-tile:hover {
+  background-color: var(--nc-cyan-ultra);
+  border-color: var(--nc-cyan);
+}
+.nextcob-landing .nc-tile:hover .nc-arrow { color: var(--nc-cyan); transform: translateX(3px); }
 .nextcob-landing .nc-arrow { transition: transform .15s ease, color .15s ease; }
 
-/* One-time load-in, no loops */
+/* ─── Animations ──────────────────────────────────────────── */
 @keyframes ncRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .nextcob-landing .nc-rise { animation: ncRise .6s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 0ms); }
+
+@keyframes ncFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+.nextcob-landing .nc-float { animation: ncFloat 4s ease-in-out infinite; }
+.nextcob-landing .nc-float-slow { animation: ncFloat 6s ease-in-out infinite; animation-delay: 1s; }
+
+@keyframes ncPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.nextcob-landing .nc-pulse { animation: ncPulse 2s ease-in-out infinite; }
+
+@keyframes ncSlideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: none; }
+}
+.nextcob-landing .nc-slide-in { animation: ncSlideIn .5s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 0ms); }
+
+@keyframes ncCountUp {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+.nextcob-landing .nc-count { animation: ncCountUp .7s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 0ms); }
+
 @media (prefers-reduced-motion: reduce) {
-  .nextcob-landing .nc-rise { animation: none; }
+  .nextcob-landing .nc-rise,
+  .nextcob-landing .nc-float,
+  .nextcob-landing .nc-float-slow,
+  .nextcob-landing .nc-pulse,
+  .nextcob-landing .nc-slide-in,
+  .nextcob-landing .nc-count { animation: none; }
+}
+
+/* ─── Hero gradient ───────────────────────────────────────── */
+.nc-hero-bg {
+  background: linear-gradient(135deg, #FFFFFF 0%, #F0F9F9 50%, #E8F5F5 100%);
+  position: relative;
+  overflow: hidden;
+}
+.nc-hero-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 60% at 80% 50%, rgba(13,110,110,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ─── Mock UI card ────────────────────────────────────────── */
+.nc-mockup {
+  background: #FFFFFF;
+  border: 1px solid var(--nc-line);
+  box-shadow: 0 20px 60px rgba(13,110,110,0.12), 0 4px 16px rgba(13,110,110,0.06);
+}
+.nc-mockup-bar {
+  background: var(--nc-cyan);
+  height: 3px;
+}
+
+/* ─── Feature cards ───────────────────────────────────────── */
+.nc-feat-card {
+  border: 1px solid var(--nc-line);
+  background: #FFFFFF;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.nc-feat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(13,110,110,0.10);
+}
+
+/* ─── Stats band ──────────────────────────────────────────── */
+.nc-stats-band {
+  background: var(--nc-cyan);
+  color: #FFFFFF;
+}
+
+/* ─── Module list ─────────────────────────────────────────── */
+.nc-module-row {
+  transition: background-color .12s ease;
+}
+.nc-module-row:hover { background-color: var(--nc-cyan-ultra); }
+
+/* ─── Gradient text ───────────────────────────────────────── */
+.nc-gradient-text {
+  background: linear-gradient(135deg, var(--nc-cyan) 0%, #12B0AE 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
